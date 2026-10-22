@@ -18,6 +18,7 @@ import com.intellij.ui.table.TableView;
 import com.intellij.util.ui.ColumnInfo;
 import com.intellij.util.ui.ListTableModel;
 import com.intellij.util.ui.components.BorderLayoutPanel;
+import com.redhat.devtools.lsp4ij.dap.DAPBundle;
 import com.redhat.devtools.lsp4ij.dap.settings.UserDefinedDebugAdapterServerSettings;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import org.eclipse.lsp4j.debug.ExceptionBreakpointsFilter;
@@ -32,7 +33,7 @@ import java.util.stream.Collectors;
 
 /**
  * "Exception Breakpoints" panel which shows the DAP exceptions breakpoints filter in a table
- * which can be enabled/disabled with checkbox.
+ * which can be enabled/disabled with checkbox, and given a condition when the filter supports one.
  */
 public class DAPExceptionBreakpointsPanel extends BorderLayoutPanel implements Disposable {
 
@@ -40,6 +41,7 @@ public class DAPExceptionBreakpointsPanel extends BorderLayoutPanel implements D
 
     static final EnabledColumnInfo ENABLED_COLUMN = new EnabledColumnInfo();
     static final NameColumnInfo NAME_COLUMN = new NameColumnInfo();
+    private static final int CONDITION_COLUMN_INDEX = 2;
 
     private final @NotNull DAPBreakpointHandlerBase<?> breakpointHandler;
     private final @NotNull ListTableModel<ExceptionBreakpointsFilter> myModel;
@@ -49,7 +51,7 @@ public class DAPExceptionBreakpointsPanel extends BorderLayoutPanel implements D
         this.breakpointHandler = breakpointHandler;
 
         // Create Table view
-        this.myModel = new ListTableModel<>(new ColumnInfo[]{ENABLED_COLUMN, NAME_COLUMN});
+        this.myModel = new ListTableModel<>(new ColumnInfo[]{ENABLED_COLUMN, NAME_COLUMN, new ConditionColumnInfo()});
         this.myModel.setSortable(true);
         this.myTable = new TableView<>(this.myModel);
         this.addToCenter(ScrollPaneFactory.createScrollPane(this.myTable));
@@ -63,8 +65,8 @@ public class DAPExceptionBreakpointsPanel extends BorderLayoutPanel implements D
             refreshModel(filtersSettings);
         }
         myModel.addTableModelListener(e -> {
-            if (e.getColumn() == 0) {
-                // An "exception breakpoint filter" item has been selected/unselected
+            if (e.getColumn() == 0 || e.getColumn() == CONDITION_COLUMN_INDEX) {
+                // An "exception breakpoint filter" item has been selected/unselected, or its condition changed
                 breakpointHandler.sendExceptionBreakpointFilters();
             }
         });
@@ -122,6 +124,73 @@ public class DAPExceptionBreakpointsPanel extends BorderLayoutPanel implements D
                 }
             };
         }
+    }
+
+    private class ConditionColumnInfo extends ColumnInfo<ExceptionBreakpointsFilter, String> {
+
+        ConditionColumnInfo() {
+            super(DAPBundle.message("dap.panels.exception.breakpoints.condition"));
+        }
+
+        public @Nullable String valueOf(ExceptionBreakpointsFilter filter) {
+            String condition = getCondition(filter.getFilter());
+            return condition != null ? condition : "";
+        }
+
+        public boolean isCellEditable(ExceptionBreakpointsFilter filter) {
+            return supportsCondition(filter);
+        }
+
+        public void setValue(ExceptionBreakpointsFilter filter, String condition) {
+            setCondition(filter.getFilter(), condition);
+        }
+
+        public @Nullable TableCellRenderer getRenderer(ExceptionBreakpointsFilter filter) {
+            return new ColoredTableCellRenderer() {
+                protected void customizeCellRenderer(@NotNull JTable table, @Nullable Object value, boolean selected, boolean hasFocus, int row, int column) {
+                    if (value instanceof String condition && !condition.isEmpty()) {
+                        this.append(condition);
+                    } else if (supportsCondition(filter) && StringUtils.isNotBlank(filter.getConditionDescription())) {
+                        // What the condition means for this filter, until one is given
+                        this.append(filter.getConditionDescription(), SimpleTextAttributes.GRAYED_ATTRIBUTES);
+                    }
+                }
+            };
+        }
+    }
+
+    /**
+     * Returns the condition of the given exception breakpoint filter, and null if it has none.
+     *
+     * @param filterId the exception breakpoint filter id.
+     * @return the condition of the given exception breakpoint filter, and null if it has none.
+     */
+    public @Nullable String getCondition(@Nullable String filterId) {
+        var conditions = getFilterSettings().getExceptionBreakpointsFilterConditions();
+        return filterId != null && conditions != null ? conditions.get(filterId) : null;
+    }
+
+    /**
+     * Sets the condition of the given exception breakpoint filter, which the DAP server uses when the filter
+     * supports conditions. An empty condition removes it.
+     *
+     * @param filterId  the exception breakpoint filter id.
+     * @param condition the condition, or null to remove it.
+     */
+    public void setCondition(@NotNull String filterId, @Nullable String condition) {
+        var settings = getFilterSettings();
+        var conditions = settings.getExceptionBreakpointsFilterConditions() != null ?
+                new TreeMap<>(settings.getExceptionBreakpointsFilterConditions()) : new TreeMap<String, String>();
+        if (StringUtils.isBlank(condition)) {
+            conditions.remove(filterId);
+        } else {
+            conditions.put(filterId, condition.trim());
+        }
+        settings.setExceptionBreakpointsFilterConditions(conditions);
+    }
+
+    private static boolean supportsCondition(@NotNull ExceptionBreakpointsFilter filter) {
+        return Boolean.TRUE.equals(filter.getSupportsCondition());
     }
 
     /**

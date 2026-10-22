@@ -29,7 +29,10 @@ import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.Collections;
+import java.util.IdentityHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
 /**
@@ -49,6 +52,7 @@ public abstract class BreakpointHandlerBase<B extends XBreakpoint<?>> extends XB
     protected final @NotNull Project project;
     protected final List<IDebugProtocolServer> debugProtocolServers = ContainerUtil.createConcurrentList();
     protected final List<B> breakpoints = ContainerUtil.createConcurrentList();
+    private final Map<IDebugProtocolServer, Capabilities> capabilities = Collections.synchronizedMap(new IdentityHashMap<>());
 
     public BreakpointHandlerBase(@NotNull Class<? extends XBreakpointType<B, ?>> breakpointTypeClass,
                                  @NotNull XDebugSession debugSession,
@@ -63,7 +67,19 @@ public abstract class BreakpointHandlerBase<B extends XBreakpoint<?>> extends XB
     public CompletableFuture<@Nullable Void> initialize(@NotNull IDebugProtocolServer debugProtocolServer,
                                                         @NotNull Capabilities capabilities) {
         this.debugProtocolServers.add(debugProtocolServer);
+        this.capabilities.put(debugProtocolServer, capabilities);
         return sendBreakpoints(debugProtocolServer, null);
+    }
+
+    /**
+     * Returns the capabilities of the given initialized DAP server, and empty capabilities otherwise.
+     *
+     * @param debugProtocolServer the DAP server.
+     * @return the capabilities of the given initialized DAP server, and empty capabilities otherwise.
+     */
+    protected @NotNull Capabilities getCapabilities(@NotNull IDebugProtocolServer debugProtocolServer) {
+        var serverCapabilities = capabilities.get(debugProtocolServer);
+        return serverCapabilities != null ? serverCapabilities : new Capabilities();
     }
 
     @Override
@@ -111,6 +127,7 @@ public abstract class BreakpointHandlerBase<B extends XBreakpoint<?>> extends XB
     @Override
     public void dispose() {
         debugProtocolServers.clear();
+        capabilities.clear();
     }
 
     protected CompletableFuture<@Nullable Void> sendBreakpoints(@Nullable IDebugProtocolServer debugProtocolServer,
