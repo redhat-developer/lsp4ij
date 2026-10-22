@@ -413,7 +413,13 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
                                             }
                                         }
                                     } else {
-                                        breakpointReached(session, server, breakpoint, context, stackFrame.getId(), threadId);
+                                        breakpointReached(session, server, breakpoint, context, stackFrame.getId(), threadId)
+                                                .exceptionally(error -> {
+                                                    // e.g. the program could not be resumed: say so instead of leaving it stopped silently
+                                                    Throwable cause = error instanceof CompletionException && error.getCause() != null ? error.getCause() : error;
+                                                    debugProcess.print("Cannot handle the breakpoint: " + cause.getMessage(), ConsoleViewContentType.ERROR_OUTPUT);
+                                                    return null;
+                                                });
                                     }
                                 }
                             });
