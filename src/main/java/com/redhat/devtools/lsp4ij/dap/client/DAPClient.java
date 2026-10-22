@@ -349,63 +349,78 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
     @Override
     public void stopped(StoppedEventArguments args) {
         var server = getDebugProtocolServer();
-        if (server == null) {
-            return;
-        }
         Integer threadId = args.getThreadId();
-        if (threadId == null) {
+        if (server == null || threadId == null) {
             return;
         }
-        getThreads(true)
-                .thenAcceptAsync(threads -> {
-                    var threadResult = Arrays.stream(threads)
-                            .filter(t -> threadId.equals(t.getId()))
-                            .findFirst();
-                    if (threadResult.isEmpty()) {
-                        // The Thread doesn't exist
-                        return;
-                    }
-                    var activeThread = threadResult.get();
-                    // get the stack trace
-                    StackTraceArguments stackTraceArgs = new StackTraceArguments();
-                    stackTraceArgs.setThreadId(args.getThreadId());
-                    server
-                            .stackTrace(stackTraceArgs)
-                            .thenAcceptAsync(stackTraceResponse -> {
-                                StackFrame[] stackFrames = stackTraceResponse.getStackFrames();
-                                if (stackFrames != null && stackFrames.length > 0) {
-                                    var stackFrame = stackFrames[0];
-                                    XBreakpoint<?> breakpoint = debugProcess.getBreakpointHandler().findBreakpoint(stackFrame);
-                                    XSuspendContext context = getSession().getSuspendContext();
-                                    if (context == null) {
-                                        context = new DAPSuspendContext(this);
-                                    }
-                                    // Create an execution stack per thread and
-                                    // initialize the stack with current DAP stack frames for the active thread
-                                    for(var thread : threads) {
-                                        ((DAPSuspendContext) context).addToExecutionStack(thread, thread.equals(activeThread) ? stackFrames : null);
-                                    }
-                                    XDebugSession session = getSession();
-                                    if (breakpoint == null) {
-                                        session.positionReached(context);
+        getThreads(true).thenAcceptAsync(threads -> {
+            var stoppedThread = Arrays.stream(threads)
+                    .filter(thread -> threadId.equals(thread.getId()))
+                    .findFirst();
+            // A thread which the debug adapter doesn't report doesn't suspend the session
+            stoppedThread.ifPresent(thread -> getStackFrames(server, threadId)
+                    .thenAcceptAsync(frames -> suspend(server, args, threads, thread, frames)));
+        });
+    }
 
-                                        if (StoppedEventArgumentsReason.EXCEPTION.equals(args.getReason())) {
-                                            // The stopped event comes from an Exception
-                                            // Show an error hint with the exception description in the proper line
-                                            showExceptionHint(getProject(), context, server, getCapabilities(), args, DAPClient::showErrorHint);
-                                        }
-                                    } else {
-                                        breakpointReached(session, server, breakpoint, context, stackFrame.getId(), threadId)
-                                                .exceptionally(error -> {
-                                                    // e.g. the program could not be resumed: say so instead of leaving it stopped silently
-                                                    Throwable cause = error instanceof CompletionException && error.getCause() != null ? error.getCause() : error;
-                                                    debugProcess.print("Cannot handle the breakpoint: " + cause.getMessage(), ConsoleViewContentType.ERROR_OUTPUT);
-                                                    return null;
-                                                });
-                                    }
-                                }
-                            });
-                });
+    /**
+     * Returns the stack frames of the given thread, innermost first, and none if the debug adapter returns none.
+     *
+     * @param server   the debug adapter.
+     * @param threadId the DAP thread.
+     * @return the stack frames of the given thread, innermost first.
+     */
+    private static CompletableFuture<StackFrame[]> getStackFrames(@NotNull IDebugProtocolServer server, int threadId) {
+        StackTraceArguments args = new StackTraceArguments();
+        args.setThreadId(threadId);
+        return server.stackTrace(args)
+                .thenApply(response -> response != null && response.getStackFrames() != null ? response.getStackFrames() : new StackFrame[0]);
+    }
+
+    /**
+     * Suspends the session where the given thread stopped. At a breakpoint, the session is told which one; elsewhere,
+     * the session is suspended at the top frame, and an exception which stopped the thread is shown there.
+     *
+     * @param server        the debug adapter.
+     * @param args          the stopped event.
+     * @param threads       the threads the debug adapter reports.
+     * @param stoppedThread the thread which stopped.
+     * @param frames        the stack frames of the stopped thread, innermost first.
+     */
+    private void suspend(@NotNull IDebugProtocolServer server,
+                         @NotNull StoppedEventArguments args,
+                         org.eclipse.lsp4j.debug.Thread[] threads,
+                         org.eclipse.lsp4j.debug.Thread stoppedThread,
+                         StackFrame[] frames) {
+        if (frames.length == 0) {
+            return;
+        }
+        StackFrame topFrame = frames[0];
+        DAPSuspendContext context = getSuspendContext(threads, stoppedThread, frames);
+        XBreakpoint<?> breakpoint = debugProcess.getBreakpointHandler().findBreakpoint(topFrame);
+        if (breakpoint != null) {
+            breakpointReached(getSession(), server, breakpoint, context, topFrame.getId(), stoppedThread.getId())
+                    .exceptionally(this::reportBreakpointFailure);
+            return;
+        }
+        getSession().positionReached(context);
+        if (StoppedEventArgumentsReason.EXCEPTION.equals(args.getReason())) {
+            showExceptionHint(getProject(), context, server, getCapabilities(), args, DAPClient::showErrorHint);
+        }
+    }
+
+    /**
+     * Returns the session's suspend context, or a new one if the session is not suspended, with an execution stack
+     * per thread: the stopped thread's has the frames it stopped in, and the others' are computed when shown.
+     */
+    private @NotNull DAPSuspendContext getSuspendContext(org.eclipse.lsp4j.debug.Thread[] threads,
+                                                        org.eclipse.lsp4j.debug.Thread stoppedThread,
+                                                        StackFrame[] frames) {
+        var context = getSession().getSuspendContext() instanceof DAPSuspendContext suspended ? suspended : new DAPSuspendContext(this);
+        for (var thread : threads) {
+            context.addToExecutionStack(thread, thread.equals(stoppedThread) ? frames : null);
+        }
+        return context;
     }
 
     /**
@@ -512,6 +527,16 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
         return hint.toString();
     }
 
+    private @Nullable Void reportBreakpointFailure(@NotNull Throwable error) {
+        // e.g. the program could not be resumed: say so instead of leaving it stopped silently
+        debugProcess.print("Cannot handle the breakpoint: " + getCause(error).getMessage(), ConsoleViewContentType.ERROR_OUTPUT);
+        return null;
+    }
+
+    private static @NotNull Throwable getCause(@NotNull Throwable error) {
+        return error instanceof CompletionException && error.getCause() != null ? error.getCause() : error;
+    }
+
     /**
      * Tells the session that the program stopped at the given breakpoint, with the value of the breakpoint's
      * "Evaluate and log" expression in the stopped frame, and resumes the program if the breakpoint doesn't suspend.
@@ -561,8 +586,7 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
         return server.evaluate(args)
                 .handle((response, error) -> {
                     if (error != null) {
-                        Throwable cause = error instanceof CompletionException && error.getCause() != null ? error.getCause() : error;
-                        return "Cannot evaluate '" + expression + "': " + cause.getMessage();
+                        return "Cannot evaluate '" + expression + "': " + getCause(error).getMessage();
                     }
                     return response != null ? response.getResult() : null;
                 });
