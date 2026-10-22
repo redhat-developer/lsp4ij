@@ -30,17 +30,36 @@ public class DAPExpressionCodeFragment extends PsiFileBase {
 
     private final @NotNull FileType fileType;
     private final @Nullable DAPDebugProcess debugProcess;
+    private final boolean physical;
 
     public DAPExpressionCodeFragment(@NotNull CharSequence text,
                                      @NotNull FileType fileType,
                                      @NotNull Language language,
                                      @Nullable DAPDebugProcess debugProcess,
                                      @NotNull Project project) {
+        this(text, fileType, language, debugProcess, project, false);
+    }
+
+    /**
+     * Creates an expression code fragment, physical when an editor shows it: IntelliJ then highlights and inspects
+     * it as a file, which it does only for a physical one.
+     *
+     * @param physical true if the fragment is physical, as IntelliJ asks for the document of an expression editor.
+     */
+    public DAPExpressionCodeFragment(@NotNull CharSequence text,
+                                     @NotNull FileType fileType,
+                                     @NotNull Language language,
+                                     @Nullable DAPDebugProcess debugProcess,
+                                     @NotNull Project project,
+                                     boolean physical) {
+        // As for IntelliJ's own code fragments, only a physical one sends PSI events
         super(new SingleRootFileViewProvider(PsiManager.getInstance(project),
-                new LightVirtualFile("DAPExpressionCodeFragment." + fileType.getDefaultExtension(), fileType, text)),
+                new LightVirtualFile("DAPExpressionCodeFragment." + fileType.getDefaultExtension(), fileType, text),
+                physical),
                 language);
         this.fileType = fileType;
         this.debugProcess = debugProcess;
+        this.physical = physical;
         ((SingleRootFileViewProvider) getViewProvider()).forceCachedPsi(this);
     }
 
@@ -52,7 +71,7 @@ public class DAPExpressionCodeFragment extends PsiFileBase {
 
     @Override
     public boolean isPhysical() {
-        return false;
+        return physical;
     }
 
     public @Nullable DAPStackFrame getCurrentDapStackFrame() {
