@@ -576,6 +576,42 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
         debugProtocolServer.stepIn(args);
     }
 
+    /**
+     * Pauses the debuggee. The 'pause' request pauses a thread, while IntelliJ pauses a whole debug session, in which
+     * no thread is selected while it runs: like VS Code when no thread is focused, this pauses the first thread the
+     * debug adapter reports. It does the same for each child session started with 'startDebugging', which may be the
+     * one that runs the program. The adapter's 'stopped' event then suspends the session.
+     *
+     * @return a future that completes once the 'pause' requests have been answered.
+     */
+    public CompletableFuture<Void> pause() {
+        var requests = new ArrayList<CompletableFuture<Void>>();
+        var server = debugProtocolServer;
+        if (server != null) {
+            requests.add(pauseFirstThread(server));
+        }
+        for (DAPClient child : List.copyOf(childrenClient)) {
+            requests.add(child.pause());
+        }
+        return CompletableFuture.allOf(requests.toArray(CompletableFuture[]::new));
+    }
+
+    /**
+     * Sends 'pause' for the first thread the debug adapter reports, if it reports any.
+     */
+    static CompletableFuture<Void> pauseFirstThread(@NotNull IDebugProtocolServer server) {
+        return server.threads()
+                .thenCompose(response -> {
+                    var threads = response != null ? response.getThreads() : null;
+                    if (threads == null || threads.length == 0) {
+                        return CompletableFuture.completedFuture(null);
+                    }
+                    PauseArguments args = new PauseArguments();
+                    args.setThreadId(threads[0].getId());
+                    return server.pause(args);
+                });
+    }
+
     public CompletableFuture<StepInTargetsResponse> stepInTargets(int frameId) {
         if (debugProtocolServer == null) {
             return CompletableFuture.completedFuture(null);
