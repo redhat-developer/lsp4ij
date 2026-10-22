@@ -15,6 +15,7 @@ import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.xdebugger.XDebugSession;
 import com.intellij.xdebugger.XExpression;
 import com.intellij.xdebugger.XSourcePosition;
+import com.intellij.xdebugger.breakpoints.SuspendPolicy;
 import com.intellij.xdebugger.breakpoints.XBreakpoint;
 import com.intellij.xdebugger.breakpoints.XBreakpointType;
 import com.redhat.devtools.lsp4ij.dap.descriptors.DebugAdapterDescriptor;
@@ -83,6 +84,7 @@ public abstract class DAPBreakpointHandlerBase<B extends XBreakpoint<?>> extends
 
     private static void addSourceBreakpoint(@NotNull XSourcePosition sourcePosition,
                                             @Nullable XExpression conditionExpression,
+                                            @Nullable String logMessage,
                                             @NotNull Map<Source, List<SourceBreakpoint>> targetBreakpoints) {
         Source source = toDAPSource(sourcePosition);
         int lineNumber = getLineNumber(sourcePosition);
@@ -92,9 +94,40 @@ public abstract class DAPBreakpointHandlerBase<B extends XBreakpoint<?>> extends
             // Breakpoint with condition
             sourceBreakpoint.setCondition(conditionExpression.getExpression());
         }
+        if (logMessage != null) {
+            // Logpoint: the debug adapter logs the message instead of stopping
+            sourceBreakpoint.setLogMessage(logMessage);
+        }
         List<SourceBreakpoint> sourceBreakpoints = targetBreakpoints
                 .computeIfAbsent(source, s -> new ArrayList<>());
         sourceBreakpoints.add(sourceBreakpoint);
+    }
+
+    /**
+     * Returns the DAP log message of a breakpoint which doesn't suspend, and null otherwise.
+     * <p>
+     * For such a breakpoint, IntelliJ logs "Breakpoint reached" and the value of the "Evaluate and log" expression.
+     * As a DAP logpoint, the debug adapter logs them without stopping, with the expression in braces to be
+     * interpolated. A debug adapter which doesn't support logpoints ignores the message and stops: the client then
+     * evaluates the expression, logs and resumes.
+     *
+     * @param breakpoint the IntelliJ breakpoint.
+     * @return the DAP log message of a breakpoint which doesn't suspend, and null otherwise.
+     */
+    static @Nullable String getLogMessage(@NotNull XBreakpoint<?> breakpoint) {
+        if (breakpoint.getSuspendPolicy() != SuspendPolicy.NONE) {
+            return null;
+        }
+        List<String> parts = new ArrayList<>();
+        XSourcePosition sourcePosition = breakpoint.getSourcePosition();
+        if (breakpoint.isLogMessage() && sourcePosition != null) {
+            parts.add("Breakpoint reached at " + sourcePosition.getFile().getName() + ":" + getLineNumber(sourcePosition));
+        }
+        XExpression logExpression = breakpoint.getLogExpressionObject();
+        if (logExpression != null && StringUtils.isNotBlank(logExpression.getExpression())) {
+            parts.add("{" + logExpression.getExpression() + "}");
+        }
+        return parts.isEmpty() ? null : String.join("\n", parts);
     }
 
     private static @NotNull Source toDAPSource(@NotNull XSourcePosition sourcePosition) {
@@ -116,13 +149,13 @@ public abstract class DAPBreakpointHandlerBase<B extends XBreakpoint<?>> extends
         for (B breakpoint : breakpoints) {
             var sourcePosition = breakpoint.getSourcePosition();
             if (sourcePosition != null) {
-                addSourceBreakpoint(sourcePosition, breakpoint.getConditionExpression(), targetBreakpoints);
+                addSourceBreakpoint(sourcePosition, breakpoint.getConditionExpression(), getLogMessage(breakpoint), targetBreakpoints);
             }
         }
 
         if (temporaryBreakpoint != null) {
             if (temporaryBreakpoint.add()) {
-                addSourceBreakpoint(temporaryBreakpoint.sourcePosition(), null, targetBreakpoints);
+                addSourceBreakpoint(temporaryBreakpoint.sourcePosition(), null, null, targetBreakpoints);
             } else {
                 // Removed IntelliJ breakpoint
                 // Create a Source with empty source breakpoints if it doesn't exist,
