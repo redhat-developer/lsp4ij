@@ -147,6 +147,13 @@ completion should be available in the expression editor by consuming the
 
 ![Completion](images/DAP_debugging_completion.png)
 
+## Hexadecimal values
+
+When the DAP server supports value formatting (`supportsValueFormattingOptions`), the context menu of the Variables and
+Watches views has `Show Values as Hexadecimal`, which asks the DAP server for numbers in hexadecimal
+([ValueFormat](https://microsoft.github.io/debug-adapter-protocol//specification.html#Types_ValueFormat)) in the
+variables, evaluations and set values of the debug session, and shows the values again.
+
 ## Set value
 
 If debug adapter [supports setting a variable to a value](https://microsoft.github.io/debug-adapter-protocol//specification.html#Types_Capabilities),
