@@ -57,6 +57,7 @@ import java.lang.Thread;
 import java.util.*;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -412,10 +413,66 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
                                             }
                                         }
                                     } else {
-                                        session.breakpointReached(breakpoint, null, context);
+                                        breakpointReached(session, server, breakpoint, context, stackFrame.getId(), threadId);
                                     }
                                 }
                             });
+                });
+    }
+
+    /**
+     * Tells the session that the program stopped at the given breakpoint, with the value of the breakpoint's
+     * "Evaluate and log" expression in the stopped frame, and resumes the program if the breakpoint doesn't suspend.
+     * <p>
+     * A breakpoint which doesn't suspend is sent as a logpoint, so a debug adapter which supports logpoints doesn't
+     * stop at it; one which doesn't support them stops, and is resumed here once IntelliJ has logged.
+     *
+     * @param session    the debug session.
+     * @param server     the debug adapter.
+     * @param breakpoint the IntelliJ breakpoint where the program stopped.
+     * @param context    the suspend context of the stop.
+     * @param frameId    the DAP frame where the program stopped.
+     * @param threadId   the DAP thread which stopped.
+     * @return the future, completed once the session is told and the program resumed if it must be.
+     */
+    static CompletableFuture<@Nullable Void> breakpointReached(@NotNull XDebugSession session,
+                                                               @NotNull IDebugProtocolServer server,
+                                                               @NotNull XBreakpoint<?> breakpoint,
+                                                               @NotNull XSuspendContext context,
+                                                               int frameId,
+                                                               int threadId) {
+        return evaluateLogExpression(server, breakpoint, frameId)
+                .thenCompose(logged -> {
+                    if (session.breakpointReached(breakpoint, logged, context)) {
+                        return CompletableFuture.completedFuture(null);
+                    }
+                    // The breakpoint doesn't suspend: resume the program
+                    ContinueArguments args = new ContinueArguments();
+                    args.setThreadId(threadId);
+                    return server.continue_(args).thenAccept(response -> {
+                    });
+                });
+    }
+
+    private static CompletableFuture<@Nullable String> evaluateLogExpression(@NotNull IDebugProtocolServer server,
+                                                                             @NotNull XBreakpoint<?> breakpoint,
+                                                                             int frameId) {
+        var logExpression = breakpoint.getLogExpressionObject();
+        if (logExpression == null || StringUtils.isBlank(logExpression.getExpression())) {
+            return CompletableFuture.completedFuture(null);
+        }
+        String expression = logExpression.getExpression();
+        EvaluateArguments args = new EvaluateArguments();
+        args.setExpression(expression);
+        args.setFrameId(frameId);
+        args.setContext(EvaluateArgumentsContext.WATCH);
+        return server.evaluate(args)
+                .handle((response, error) -> {
+                    if (error != null) {
+                        Throwable cause = error instanceof CompletionException && error.getCause() != null ? error.getCause() : error;
+                        return "Cannot evaluate '" + expression + "': " + cause.getMessage();
+                    }
+                    return response != null ? response.getResult() : null;
                 });
     }
 
