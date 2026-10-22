@@ -76,6 +76,8 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
     private static final Logger LOGGER = LoggerFactory.getLogger(DAPClient.class);
 
     public static final org.eclipse.lsp4j.debug.Thread[] EMPTY_THREADS = new org.eclipse.lsp4j.debug.Thread[0];
+
+    private static final int MAX_EXCEPTION_HINT_STACK_LINES = 10;
     /**
      * Any events we receive from the adapter that require further contact with the
      * adapter needs to be farmed off to another thread as the events arrive at the
@@ -401,18 +403,12 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
                                                     // has occurred before computing the error hint position.
                                                     // TODO: remove this timer by detecting that scroll editor is finished
                                                     // to display the error hint
-                                                    StringBuilder error = new StringBuilder("Exception has occurred: ");
-                                                    error.append(args.getText());
-                                                    if (StringUtils.isNotBlank(args.getDescription())) {
-                                                        error.append("\n");
-                                                        error.append(args.getDescription());
-                                                    }
-                                                    String errorMessage = error.toString();
-                                                    AppExecutorUtil.getAppScheduledExecutorService().schedule(() -> {
-                                                        ApplicationManager.getApplication().invokeLater(() -> {
-                                                            showErrorHint(editor, errorMessage, offset);
-                                                        });
-                                                    }, 1, TimeUnit.SECONDS);
+                                                    getExceptionHint(server, getCapabilities(), args)
+                                                            .thenAccept(errorMessage -> AppExecutorUtil.getAppScheduledExecutorService().schedule(() -> {
+                                                                ApplicationManager.getApplication().invokeLater(() -> {
+                                                                    showErrorHint(editor, errorMessage, offset);
+                                                                });
+                                                            }, 1, TimeUnit.SECONDS));
                                                 }
                                             }
                                         }
@@ -422,6 +418,59 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
                                 }
                             });
                 });
+    }
+
+    /**
+     * Returns the text of the error hint shown where the program stopped at an exception. When the debug adapter
+     * supports the 'exceptionInfo' request, the text has the exception's id, its description and the first lines
+     * of its stack trace; otherwise, or if the request fails, it has the stopped event's text and description.
+     *
+     * @param server       the debug adapter.
+     * @param capabilities the debug adapter capabilities.
+     * @param args         the stopped event, with the reason 'exception'.
+     * @return the text of the error hint.
+     */
+    static CompletableFuture<String> getExceptionHint(@NotNull IDebugProtocolServer server,
+                                                      @NotNull Capabilities capabilities,
+                                                      @NotNull StoppedEventArguments args) {
+        String stoppedHint = getExceptionHint(args.getText(), args.getDescription(), null);
+        if (!Boolean.TRUE.equals(capabilities.getSupportsExceptionInfoRequest()) || args.getThreadId() == null) {
+            return CompletableFuture.completedFuture(stoppedHint);
+        }
+        ExceptionInfoArguments exceptionInfoArgs = new ExceptionInfoArguments();
+        exceptionInfoArgs.setThreadId(args.getThreadId());
+        return server.exceptionInfo(exceptionInfoArgs)
+                .handle((info, error) -> {
+                    if (error != null || info == null) {
+                        return stoppedHint;
+                    }
+                    var details = info.getDetails();
+                    String exception = StringUtils.isNotBlank(info.getExceptionId()) || details == null ?
+                            info.getExceptionId() : details.getTypeName();
+                    return getExceptionHint(exception, info.getDescription(), details != null ? details.getStackTrace() : null);
+                });
+    }
+
+    private static String getExceptionHint(@Nullable String exception,
+                                            @Nullable String description,
+                                            @Nullable String stackTrace) {
+        StringBuilder hint = new StringBuilder("Exception has occurred: ");
+        hint.append(exception);
+        if (StringUtils.isNotBlank(description)) {
+            hint.append("\n");
+            hint.append(description);
+        }
+        if (StringUtils.isNotBlank(stackTrace)) {
+            // The hint shows where the exception comes from, not its whole stack
+            var lines = stackTrace.strip().lines().toList();
+            lines.stream()
+                    .limit(MAX_EXCEPTION_HINT_STACK_LINES)
+                    .forEach(line -> hint.append("\n").append(line));
+            if (lines.size() > MAX_EXCEPTION_HINT_STACK_LINES) {
+                hint.append("\n...");
+            }
+        }
+        return hint.toString();
     }
 
     static void showErrorHint(@NotNull Editor editor, @NotNull String text, int offset) {

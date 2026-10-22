@@ -38,7 +38,7 @@ Current state of [Requests](https://microsoft.github.io/debug-adapter-protocol//
 * ✅ [Disassemble](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_Disassemble) (see [user guide](./UserGuide.md#disassemble)).
 * ✅ [Disconnect](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_Disconnect).
 * ✅ [Evaluate](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_Evaluate) (see [user guide](./UserGuide.md#evaluate-expression)).
-* ❌ [ExceptionInfo](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_ExceptionInfo).
+* ✅ [ExceptionInfo](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_ExceptionInfo).
 * ❌ [Goto](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_Goto).
 * ❌ [GotoTargets](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_GotoTargets).
 * ✅ [Initialize](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_Initialize).
