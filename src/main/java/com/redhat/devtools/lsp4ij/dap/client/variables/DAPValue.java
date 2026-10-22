@@ -33,6 +33,8 @@ public class DAPValue extends XNamedValue {
     private final @Nullable Integer parentVariablesReference;
     @Nullable
     private final Icon icon;
+    // The variable with the value of a lazy variable, once the user asked for it
+    private volatile @Nullable Variable resolved;
 
     public DAPValue(@NotNull DAPStackFrame stackFrame,
                     @NotNull Variable variable,
@@ -46,9 +48,23 @@ public class DAPValue extends XNamedValue {
 
     @Override
     public void computePresentation(@NotNull XValueNode node, @NotNull XValuePlace place) {
-        XValuePresentation presentation = getPresentation();
-        boolean hasChildren = variable.getVariablesReference() > 0;
-        node.setPresentation(icon, presentation, hasChildren);
+        var server = getClient().getDebugProtocolServer();
+        if (resolved == null && server != null && DAPLazyValueEvaluator.isLazy(variable)) {
+            // Getting the value may run code: get it when the user asks for it
+            node.setPresentation(icon, getPresentation(variable), false);
+            node.setFullValueEvaluator(new DAPLazyValueEvaluator(server, variable.getVariablesReference(), value -> {
+                resolved = value;
+                node.setPresentation(icon, getPresentation(value), value.getVariablesReference() > 0);
+            }));
+            return;
+        }
+        Variable shown = getShownVariable();
+        node.setPresentation(icon, getPresentation(shown), shown.getVariablesReference() > 0);
+    }
+
+    private @NotNull Variable getShownVariable() {
+        Variable value = resolved;
+        return value != null ? value : variable;
     }
 
     @Override
@@ -58,9 +74,10 @@ public class DAPValue extends XNamedValue {
             return;
         }
 
-        int parentVariablesReference = variable.getVariablesReference();
+        Variable shown = getShownVariable();
+        int parentVariablesReference = shown.getVariablesReference();
         // a large variable, such as a large array, is read a page at a time
-        new DAPVariableChildren(server, variable, getClient().getValueFormat(),
+        new DAPVariableChildren(server, shown, getClient().getValueFormat(),
                 child -> new DAPValue(stackFrame, child, parentVariablesReference))
                 .load(node);
     }
@@ -76,8 +93,8 @@ public class DAPValue extends XNamedValue {
     }
 
     @NotNull
-    private XValuePresentation getPresentation() {
-        return getClient().getServerDescriptor().getVariableSupport().getValuePresentation(variable);
+    private XValuePresentation getPresentation(@NotNull Variable shown) {
+        return getClient().getServerDescriptor().getVariableSupport().getValuePresentation(shown);
     }
 
 

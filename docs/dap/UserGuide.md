@@ -172,6 +172,13 @@ DAP server for the next 100 ([`variables`](https://microsoft.github.io/debug-ada
 with `filter` `indexed`, `start` and `count`), so a large variable is read a page at a time. Its named children, when
 it says it has any (`namedVariables`), are asked for first.
 
+## Lazy variables
+
+A variable which the DAP server marks as lazy
+([presentationHint.lazy](https://microsoft.github.io/debug-adapter-protocol//specification.html#Types_VariablePresentationHint)),
+such as a property computed by a getter, is shown with a `Show value` link instead of its value, since getting the value
+may run code. Clicking the link asks the DAP server for the value, which then replaces the link and can be expanded.
+
 ## Set value
 
 If debug adapter [supports setting a variable to a value](https://microsoft.github.io/debug-adapter-protocol//specification.html#Types_Capabilities),
