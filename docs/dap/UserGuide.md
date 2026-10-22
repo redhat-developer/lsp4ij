@@ -76,6 +76,12 @@ are based on the default configuration provided by the DAP server.
 
 You can then select or deselect the exception breakpoints you want to use.
 
+An exception breakpoint which the DAP server allows to be conditional (`supportsCondition`) can be given a condition
+in the `Condition` column, such as the exception types to stop at; until then, the column shows what the DAP server
+says the condition means. The condition is sent with the
+[exception filter options](https://microsoft.github.io/debug-adapter-protocol//specification.html#Types_ExceptionFilterOptions)
+when the DAP server supports them (`supportsExceptionFilterOptions`), and kept with the selected exception breakpoints.
+
 Take a sample JavaScript file containing an error:
 
 ![DAP exception breakpoint / Syntax error](./images/DAP_exception_breakpoint_sample.png)
