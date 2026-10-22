@@ -17,6 +17,7 @@ import com.intellij.xdebugger.XExpression;
 import com.intellij.xdebugger.XSourcePosition;
 import com.intellij.xdebugger.breakpoints.XBreakpoint;
 import com.intellij.xdebugger.breakpoints.XBreakpointType;
+import com.intellij.xdebugger.breakpoints.XLineBreakpoint;
 import com.redhat.devtools.lsp4ij.dap.descriptors.DebugAdapterDescriptor;
 import org.eclipse.lsp4j.debug.*;
 import org.eclipse.lsp4j.debug.services.IDebugProtocolServer;
@@ -26,6 +27,7 @@ import org.jetbrains.annotations.Nullable;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 
 import static com.redhat.devtools.lsp4ij.dap.DAPIJUtils.*;
 
@@ -35,7 +37,11 @@ import static com.redhat.devtools.lsp4ij.dap.DAPIJUtils.*;
 public abstract class DAPBreakpointHandlerBase<B extends XBreakpoint<?>> extends BreakpointHandlerBase<B> {
 
     private static final SourceBreakpoint[] EMPTY_SOURCE_BREAKPOINTS = new SourceBreakpoint[0];
+
+    static final String SHADOWED_BREAKPOINT_MESSAGE = "Ignored in this DAP debug session: a DAP breakpoint on the same line takes precedence.";
+
     private final @NotNull DAPExceptionBreakpointsPanel exceptionBreakpointsPanel;
+    private final Set<B> shadowedBreakpoints = ConcurrentHashMap.newKeySet();
 
     public DAPBreakpointHandlerBase(@NotNull Class<? extends XBreakpointType<B, ?>> breakpointTypeClass,
                                     @NotNull XDebugSession debugSession,
@@ -113,7 +119,7 @@ public abstract class DAPBreakpointHandlerBase<B extends XBreakpoint<?>> extends
         Map<Source, List<SourceBreakpoint>> targetBreakpoints = new HashMap<>();
         for (B breakpoint : breakpoints) {
             var sourcePosition = breakpoint.getSourcePosition();
-            if (sourcePosition != null) {
+            if (sourcePosition != null && !isShadowed(breakpoint)) {
                 addSourceBreakpoint(sourcePosition, breakpoint.getConditionExpression(), targetBreakpoints);
             }
         }
@@ -194,6 +200,75 @@ public abstract class DAPBreakpointHandlerBase<B extends XBreakpoint<?>> extends
                 });
     }
 
+    /**
+     * A forwarded native line breakpoint and a DAP breakpoint can be on the same line. Only the DAP
+     * breakpoint is sent: two breakpoints at one location with different settings (condition, log,
+     * suspend policy) cannot be merged without silently dropping one of them, and the DAP protocol
+     * leaves it to each debug adapter how it handles duplicates. The native breakpoint is marked as
+     * invalid for this debug session only (its tooltip explains why); it stays enabled and keeps
+     * working with the language's own debugger.
+     */
+    @Override
+    protected void onBreakpointsChanged(@NotNull B breakpoint) {
+        // Check all breakpoints, not only the changed line: when a breakpoint moves to another line,
+        // IntelliJ unregisters it with its new position, so the old line is not known anymore.
+        for (B candidate : breakpoints) {
+            updateShadowedPresentation(candidate, isShadowed(candidate));
+        }
+        if (!breakpoints.contains(breakpoint)) {
+            updateShadowedPresentation(breakpoint, false);
+        }
+    }
+
+    private void updateShadowedPresentation(@NotNull B breakpoint, boolean shadowed) {
+        if (!(breakpoint instanceof XLineBreakpoint<?> lineBreakpoint)) {
+            return;
+        }
+        if (shadowed) {
+            if (shadowedBreakpoints.add(breakpoint)) {
+                // The breakpoint is not sent anymore: forget the DAP id it had before
+                breakpoint.putUserData(DAP_BREAKPOINT_ID, null);
+                debugSession.setBreakpointInvalid(lineBreakpoint, SHADOWED_BREAKPOINT_MESSAGE);
+            }
+        } else if (shadowedBreakpoints.remove(breakpoint)) {
+            // Reset the presentation; the response of the debug adapter updates it when the breakpoint is sent
+            debugSession.updateBreakpointPresentation(lineBreakpoint, null, null);
+        }
+    }
+
+    /**
+     * Returns true if the given breakpoint is a native line breakpoint with a DAP breakpoint on the same line.
+     *
+     * @param breakpoint the breakpoint.
+     * @return true if the given breakpoint is a native line breakpoint with a DAP breakpoint on the same line.
+     */
+    boolean isShadowed(@NotNull B breakpoint) {
+        if (breakpoint.getType() instanceof DAPBreakpointTypeBase<?>) {
+            return false;
+        }
+        XSourcePosition position = breakpoint.getSourcePosition();
+        if (position == null) {
+            return false;
+        }
+        for (B other : breakpoints) {
+            if (other.getType() instanceof DAPBreakpointTypeBase<?>) {
+                XSourcePosition otherPosition = other.getSourcePosition();
+                if (otherPosition != null
+                        && otherPosition.getLine() == position.getLine()
+                        && otherPosition.getFile().equals(position.getFile())) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    @Override
+    public void dispose() {
+        super.dispose();
+        shadowedBreakpoints.clear();
+    }
+
     private <B extends XBreakpoint<?>> boolean supportsBreakpointType(B breakpoint) {
         // A DAP breakpoint is always supported. A language's NATIVE line breakpoint is supported when
         // its file is mapped to this DAP server, so that while a DAP session runs it can be forwarded
@@ -234,7 +309,8 @@ public abstract class DAPBreakpointHandlerBase<B extends XBreakpoint<?>> extends
         }
         for (B breakpoint : breakpoints) {
             XSourcePosition breakpointPosition = breakpoint.getSourcePosition();
-            if (breakpointPosition == null) {
+            if (breakpointPosition == null || isShadowed(breakpoint)) {
+                // A shadowed breakpoint is not sent: the DAP breakpoint on the same line is the one reached
                 continue;
             }
             VirtualFile fileInBreakpoint = breakpointPosition.getFile();
