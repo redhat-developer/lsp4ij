@@ -47,7 +47,7 @@ Current state of [Requests](https://microsoft.github.io/debug-adapter-protocol//
 * ❌ [Locations](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_Locations).
 * ❌ [Modules](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_Modules).
 * ✅ [Next](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_Next).
-* ❌ [Pause](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_Pause).
+* ✅ [Pause](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_Pause).
 * ❌ [ReadMemory](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_ReadMemory).
 * ❌ [Restart](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_Restart).
 * ❌ [RestartFrame](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_RestartFrame).
