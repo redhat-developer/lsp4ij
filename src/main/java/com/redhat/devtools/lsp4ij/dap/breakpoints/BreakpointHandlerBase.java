@@ -91,6 +91,7 @@ public abstract class BreakpointHandlerBase<B extends XBreakpoint<?>> extends XB
         }
 
         breakpoints.add(breakpoint);
+        onBreakpointsChanged(breakpoint);
         sendBreakpoints(null, null);
     }
 
@@ -102,6 +103,7 @@ public abstract class BreakpointHandlerBase<B extends XBreakpoint<?>> extends XB
             return;
         }
         breakpoints.remove(breakpoint);
+        onBreakpointsChanged(breakpoint);
         // DAP replaces breakpoints per source, not per session. Include the removed
         // source even when other files still have breakpoints, so its last breakpoint
         // is cleared by an empty setBreakpoints request.
@@ -191,6 +193,15 @@ public abstract class BreakpointHandlerBase<B extends XBreakpoint<?>> extends XB
     }
 
     protected abstract boolean supportsBreakpoint(B breakpoint);
+
+    /**
+     * Called when the given breakpoint has been added to or removed from the registered breakpoints,
+     * before the breakpoints are sent to the debug adapter.
+     *
+     * @param breakpoint the added or removed breakpoint.
+     */
+    protected void onBreakpointsChanged(@NotNull B breakpoint) {
+    }
 
     protected abstract @NotNull CompletableFuture<@Nullable Void> doSendBreakpoints(@Nullable IDebugProtocolServer debugProtocolServer,
                                                                            @Nullable TemporaryBreakpoint temporaryBreakpoint);
