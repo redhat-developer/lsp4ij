@@ -28,9 +28,11 @@ import java.lang.reflect.Proxy;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -79,6 +81,18 @@ public class DAPClientBreakpointReachedTest {
     }
 
     @Test
+    void failsWhenTheProgramCannotBeResumed() {
+        var server = server(CompletableFuture.completedFuture(result("21")), CompletableFuture.failedFuture(new IllegalStateException("not stopped")));
+
+        var reached = DAPClient.breakpointReached(session(false), server, breakpoint("n"), new XSuspendContext() {
+        }, 3, 7);
+
+        // the caller reports the failure, rather than leaving the program stopped without a word
+        var error = assertThrows(CompletionException.class, reached::join);
+        assertEquals("not stopped", error.getCause().getMessage());
+    }
+
+    @Test
     void evaluatesNothingWithoutAnExpression() {
         var server = server(CompletableFuture.completedFuture(result("21")));
 
@@ -101,6 +115,10 @@ public class DAPClientBreakpointReachedTest {
     }
 
     private IDebugProtocolServer server(CompletableFuture<EvaluateResponse> evaluation) {
+        return server(evaluation, CompletableFuture.completedFuture(new ContinueResponse()));
+    }
+
+    private IDebugProtocolServer server(CompletableFuture<EvaluateResponse> evaluation, CompletableFuture<ContinueResponse> continuation) {
         return proxy(IDebugProtocolServer.class, (method, args) -> switch (method) {
             case "evaluate" -> {
                 var arguments = (EvaluateArguments) args[0];
@@ -109,7 +127,7 @@ public class DAPClientBreakpointReachedTest {
             }
             case "continue_" -> {
                 continued.add(((ContinueArguments) args[0]).getThreadId());
-                yield CompletableFuture.completedFuture(new ContinueResponse());
+                yield continuation;
             }
             default -> throw new AssertionError(method);
         });
