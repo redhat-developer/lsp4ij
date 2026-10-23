@@ -36,6 +36,8 @@ public class DAPExecutionStack extends XExecutionStack {
     private final @NotNull DAPSuspendContext suspendContext;
     private final int threadId;
     private @Nullable List<DAPStackFrame> stackFrames;
+    // How many times the debug adapter said the frames are out of date: frames asked for before are not kept
+    private int invalidations;
 
     public DAPExecutionStack(@NotNull DAPClient client,
                              @NotNull DAPSuspendContext suspendContext,
@@ -69,14 +71,16 @@ public class DAPExecutionStack extends XExecutionStack {
                 suspendContext.setActiveExecutionStack(this);
             } else {
                 // The DAP stack frames is not loaded, load it
+                int invalidations = getInvalidations();
                 StackTraceArguments stackTraceArgs = new StackTraceArguments();
                 stackTraceArgs.setThreadId(getThreadId());
                 client.getDebugProtocolServer()
                         .stackTrace(stackTraceArgs)
                         .thenAcceptAsync(stackTraceResponse -> {
                             StackFrame[] stackFrames = stackTraceResponse.getStackFrames();
-                            this.stackFrames = stackFrames != null ? toDAPStackFrames(stackFrames) : Collections.emptyList();
-                            container.addStackFrames(this.stackFrames, true);
+                            List<DAPStackFrame> frames = stackFrames != null ? toDAPStackFrames(stackFrames) : Collections.emptyList();
+                            keepStackFrames(frames, invalidations);
+                            container.addStackFrames(frames, true);
                         });
             }
         } else {
@@ -90,22 +94,39 @@ public class DAPExecutionStack extends XExecutionStack {
 
     /**
      * Loads this stack's frames again, as when the debug adapter says that they are out of date. Frames not loaded
-     * yet are loaded when they are shown.
+     * yet, or still loading, are loaded when they are shown.
      *
      * @return a future that completes once the frames are loaded
      */
     CompletableFuture<Void> reloadStackFrames() {
         var server = client.getDebugProtocolServer();
-        if (stackFrames == null || server == null) {
-            return CompletableFuture.completedFuture(null);
+        int invalidations;
+        synchronized (this) {
+            invalidations = ++this.invalidations;
+            if (stackFrames == null || server == null) {
+                return CompletableFuture.completedFuture(null);
+            }
         }
         StackTraceArguments stackTraceArgs = new StackTraceArguments();
         stackTraceArgs.setThreadId(getThreadId());
         return server.stackTrace(stackTraceArgs)
                 .thenAccept(stackTraceResponse -> {
                     StackFrame[] frames = stackTraceResponse.getStackFrames();
-                    this.stackFrames = frames != null ? toDAPStackFrames(frames) : Collections.emptyList();
+                    keepStackFrames(frames != null ? toDAPStackFrames(frames) : Collections.emptyList(), invalidations);
                 });
+    }
+
+    private synchronized int getInvalidations() {
+        return invalidations;
+    }
+
+    /**
+     * Keeps the given frames, unless the debug adapter said that the frames are out of date since they were asked for.
+     */
+    private synchronized void keepStackFrames(@NotNull List<DAPStackFrame> frames, int invalidations) {
+        if (this.invalidations == invalidations) {
+            this.stackFrames = frames;
+        }
     }
     
     private @NotNull List<DAPStackFrame> toDAPStackFrames(@NotNull StackFrame[] stackFrames) {
