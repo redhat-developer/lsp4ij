@@ -61,6 +61,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Function;
 import java.util.function.UnaryOperator;
 
 import static com.intellij.codeInsight.hint.HintManagerImpl.getHintPosition;
@@ -653,6 +654,59 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
             });
         }
         return result;
+    }
+
+    // Invalidated
+
+    @Override
+    public void invalidated(InvalidatedEventArguments args) {
+        invalidated(getSession(), args, () -> getThreads(true), this::reloadStackFrames);
+    }
+
+    /**
+     * Shows again what the debug adapter says is out of date, such as after an evaluation that changed the program
+     * while it is stopped: the threads, the stacks, the variables, or, when the event names no area, all of them.
+     * IntelliJ asks the debug adapter for variables each time its views show them, so rebuilding the views shows
+     * the new values; the stack frames are kept from the stop, so they are loaded again first.
+     *
+     * @param session        the debug session
+     * @param args           the invalidated event's arguments
+     * @param refreshThreads refreshes the threads panel
+     * @param reloadStacks   loads again the stack frames of the stopped thread with the given ID, or of every stopped
+     *                       thread for null
+     * @return a future that completes once the views are rebuilt, if they have to be
+     */
+    static CompletableFuture<Void> invalidated(@NotNull XDebugSession session,
+                                               @NotNull InvalidatedEventArguments args,
+                                               @NotNull Runnable refreshThreads,
+                                               @NotNull Function<Integer, CompletableFuture<Void>> reloadStacks) {
+        Set<String> areas = args.getAreas() != null ? Set.of(args.getAreas()) : Set.of();
+        boolean all = areas.isEmpty() || areas.contains(InvalidatedAreas.ALL);
+        if (all || areas.contains(InvalidatedAreas.THREADS)) {
+            refreshThreads.run();
+        }
+
+        boolean stacks = all || areas.contains(InvalidatedAreas.STACKS);
+        if (!session.isSuspended() || !stacks && !areas.contains(InvalidatedAreas.VARIABLES)) {
+            // a running program shows no stacks or variables
+            return CompletableFuture.completedFuture(null);
+        }
+        CompletableFuture<Void> reloaded = stacks ? reloadStacks.apply(args.getThreadId()) : CompletableFuture.completedFuture(null);
+        return reloaded.thenRun(session::rebuildViews);
+    }
+
+    /**
+     * Loads again the stack frames of the stopped thread with the given ID, or of every stopped thread for null.
+     */
+    private CompletableFuture<Void> reloadStackFrames(@Nullable Integer threadId) {
+        if (!(getSession().getSuspendContext() instanceof DAPSuspendContext context)) {
+            return CompletableFuture.completedFuture(null);
+        }
+        return CompletableFuture.allOf(Arrays.stream(context.getExecutionStacks())
+                .map(DAPExecutionStack.class::cast)
+                .filter(stack -> threadId == null || stack.getThreadId() == threadId)
+                .map(DAPExecutionStack::reloadStackFrames)
+                .toArray(CompletableFuture[]::new));
     }
 
     // Capabilities

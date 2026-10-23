@@ -25,6 +25,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 
 /**
  * Debug Adapter Protocol (DAP) execution stack.
@@ -85,6 +86,26 @@ public class DAPExecutionStack extends XExecutionStack {
 
     public int getThreadId() {
         return threadId;
+    }
+
+    /**
+     * Loads this stack's frames again, as when the debug adapter says that they are out of date. Frames not loaded
+     * yet are loaded when they are shown.
+     *
+     * @return a future that completes once the frames are loaded
+     */
+    CompletableFuture<Void> reloadStackFrames() {
+        var server = client.getDebugProtocolServer();
+        if (stackFrames == null || server == null) {
+            return CompletableFuture.completedFuture(null);
+        }
+        StackTraceArguments stackTraceArgs = new StackTraceArguments();
+        stackTraceArgs.setThreadId(getThreadId());
+        return server.stackTrace(stackTraceArgs)
+                .thenAccept(stackTraceResponse -> {
+                    StackFrame[] frames = stackTraceResponse.getStackFrames();
+                    this.stackFrames = frames != null ? toDAPStackFrames(frames) : Collections.emptyList();
+                });
     }
     
     private @NotNull List<DAPStackFrame> toDAPStackFrames(@NotNull StackFrame[] stackFrames) {
