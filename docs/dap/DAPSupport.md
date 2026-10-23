@@ -12,7 +12,7 @@ Current state of [Events](https://microsoft.github.io/debug-adapter-protocol//sp
 * ❌ [Continued](https://microsoft.github.io/debug-adapter-protocol//specification.html#Events_Continued).
 * ❌ [Exited](https://microsoft.github.io/debug-adapter-protocol//specification.html#Events_Exited).
 * ✅ [Initialized](https://microsoft.github.io/debug-adapter-protocol//specification.html#Events_Initialized).
-* ❌ [Invalidated](https://microsoft.github.io/debug-adapter-protocol//specification.html#Events_Invalidated).
+* ✅ [Invalidated](https://microsoft.github.io/debug-adapter-protocol//specification.html#Events_Invalidated).
 * ❌ [LoadedSource](https://microsoft.github.io/debug-adapter-protocol//specification.html#Events_LoadedSource).
 * ❌ [Memory](https://microsoft.github.io/debug-adapter-protocol//specification.html#Events_Memory).
 * ❌ [Module](https://microsoft.github.io/debug-adapter-protocol//specification.html#Events_Module).
