@@ -89,6 +89,19 @@ public class DAPClientExceptionHintTest {
         assertEquals("Exception has occurred: IllegalArgument: bad 5\nUncaught", hint);
     }
 
+    @Test
+    void showsTheStoppedEventWhenTheAdapterDoesNotAnswer() {
+        var hint = DAPClient.getExceptionHint(server(new CompletableFuture<>()), capabilities(true), stopped()).join();
+
+        assertEquals(List.of(7), asked);
+        assertEquals("Exception has occurred: IllegalArgument: bad 5\nUncaught", hint);
+    }
+
+    @Test
+    void showsEachLineOfTheHintAndItsTextAsWritten() {
+        assertEquals("Exception has occurred: Array&lt;Int&gt;<br>at f()", DAPClient.toHintHtml("Exception has occurred: Array<Int>\nat f()"));
+    }
+
     private static StoppedEventArguments stopped() {
         var args = new StoppedEventArguments();
         args.setReason("exception");

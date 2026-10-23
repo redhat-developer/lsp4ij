@@ -22,6 +22,7 @@ import com.intellij.openapi.progress.EmptyProgressIndicator;
 import com.intellij.util.concurrency.AppExecutorUtil;
 import com.intellij.openapi.progress.ProgressIndicator;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.ui.LightweightHint;
 import com.intellij.xdebugger.XDebugSession;
 import com.intellij.xdebugger.breakpoints.XBreakpoint;
@@ -78,6 +79,7 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
     public static final org.eclipse.lsp4j.debug.Thread[] EMPTY_THREADS = new org.eclipse.lsp4j.debug.Thread[0];
 
     private static final int MAX_EXCEPTION_HINT_STACK_LINES = 10;
+    private static final long EXCEPTION_INFO_TIMEOUT_SECONDS = 1;
     /**
      * Any events we receive from the adapter that require further contact with the
      * adapter needs to be farmed off to another thread as the events arrive at the
@@ -440,6 +442,8 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
         ExceptionInfoArguments exceptionInfoArgs = new ExceptionInfoArguments();
         exceptionInfoArgs.setThreadId(args.getThreadId());
         return server.exceptionInfo(exceptionInfoArgs)
+                // a debug adapter that doesn't answer must not keep the hint from being shown
+                .orTimeout(EXCEPTION_INFO_TIMEOUT_SECONDS, TimeUnit.SECONDS)
                 .handle((info, error) -> {
                     if (error != null || info == null) {
                         return stoppedHint;
@@ -477,12 +481,24 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
         if (ApplicationManager.getApplication().isUnitTestMode()) {
             return;
         }
+        String html = toHintHtml(text);
         if (ApplicationManager.getApplication().isDispatchThread()) {
-            doShowErrorHint(editor, text, offset);
+            doShowErrorHint(editor, html, offset);
         } else {
             ApplicationManager.getApplication()
-                    .invokeLater(() -> doShowErrorHint(editor, text, offset));
+                    .invokeLater(() -> doShowErrorHint(editor, html, offset));
         }
+    }
+
+    /**
+     * Returns the text of an error hint as the HTML the hint shows: its lines on lines of their own, and
+     * characters such as {@code <} as themselves.
+     *
+     * @param text the text of the error hint.
+     * @return the HTML of the error hint.
+     */
+    static @NotNull String toHintHtml(@NotNull String text) {
+        return StringUtil.escapeXmlEntities(text).replace("\n", "<br>");
     }
 
     private static void doShowErrorHint(@NotNull Editor editor, @NotNull String hintText, int offset) {
