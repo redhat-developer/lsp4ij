@@ -48,6 +48,8 @@ import org.eclipse.lsp4j.jsonrpc.messages.ResponseMessage;
 
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.swing.*;
 import java.awt.*;
@@ -70,6 +72,8 @@ import static com.intellij.codeInsight.hint.HintManagerImpl.getHintPosition;
  * Debug Protocol Adapter (DAP) client implementation.
  */
 public class DAPClient implements IDebugProtocolClient, Disposable {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(DAPClient.class);
 
     public static final org.eclipse.lsp4j.debug.Thread[] EMPTY_THREADS = new org.eclipse.lsp4j.debug.Thread[0];
     /**
@@ -680,7 +684,8 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
                                                @NotNull InvalidatedEventArguments args,
                                                @NotNull Runnable refreshThreads,
                                                @NotNull Function<Integer, CompletableFuture<Void>> reloadStacks) {
-        Set<String> areas = args.getAreas() != null ? Set.of(args.getAreas()) : Set.of();
+        // the event may name an area more than once
+        List<String> areas = args.getAreas() != null ? Arrays.asList(args.getAreas()) : List.of();
         boolean all = areas.isEmpty() || areas.contains(InvalidatedAreas.ALL);
         if (all || areas.contains(InvalidatedAreas.THREADS)) {
             refreshThreads.run();
@@ -692,7 +697,13 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
             return CompletableFuture.completedFuture(null);
         }
         CompletableFuture<Void> reloaded = stacks ? reloadStacks.apply(args.getThreadId()) : CompletableFuture.completedFuture(null);
-        return reloaded.thenRun(session::rebuildViews);
+        return reloaded
+                .exceptionally(error -> {
+                    // the other areas are shown again even so
+                    LOGGER.warn("Error while loading the stack frames again after a DAP invalidated event", error);
+                    return null;
+                })
+                .thenRun(session::rebuildViews);
     }
 
     /**

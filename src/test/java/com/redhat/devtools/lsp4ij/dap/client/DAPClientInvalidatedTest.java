@@ -33,7 +33,7 @@ public class DAPClientInvalidatedTest {
 
     @Test
     void refreshesEverythingWhenTheEventNamesNoArea() {
-        DAPClient.invalidated(session(true), event(null, null), this::refreshThreads, this::reloadStacks).join();
+        DAPClient.invalidated(session(true), event(null), this::refreshThreads, this::reloadStacks).join();
 
         assertEquals(List.of("threads", "stacks of every thread", "rebuild"), calls);
     }
@@ -69,6 +69,24 @@ public class DAPClientInvalidatedTest {
     }
 
     @Test
+    void reloadsTheStacksOnceForAnAreaNamedTwice() {
+        DAPClient.invalidated(session(true), event(null, InvalidatedAreas.STACKS, InvalidatedAreas.STACKS), this::refreshThreads, this::reloadStacks).join();
+
+        assertEquals(List.of("stacks of every thread", "rebuild"), calls);
+    }
+
+    @Test
+    void rebuildsTheViewsWhenTheStacksCannotBeLoaded() {
+        DAPClient.invalidated(session(true), event(null), this::refreshThreads, threadId -> {
+            calls.add("stacks of every thread");
+            return CompletableFuture.failedFuture(new IllegalStateException("no stack trace"));
+        }).join();
+
+        // the variables are out of date too, and don't need the stack frames to be loaded again
+        assertEquals(List.of("threads", "stacks of every thread", "rebuild"), calls);
+    }
+
+    @Test
     void refreshesTheThreadsAloneForThreads() {
         DAPClient.invalidated(session(true), event(null, InvalidatedAreas.THREADS), this::refreshThreads, this::reloadStacks).join();
 
@@ -77,7 +95,7 @@ public class DAPClientInvalidatedTest {
 
     @Test
     void refreshesOnlyTheThreadsOfARunningProgram() {
-        DAPClient.invalidated(session(false), event(null, null), this::refreshThreads, this::reloadStacks).join();
+        DAPClient.invalidated(session(false), event(null), this::refreshThreads, this::reloadStacks).join();
 
         assertEquals(List.of("threads"), calls);
         assertTrue(calls.stream().noneMatch("rebuild"::equals));
@@ -92,11 +110,11 @@ public class DAPClientInvalidatedTest {
         return CompletableFuture.completedFuture(null);
     }
 
-    private static InvalidatedEventArguments event(Integer threadId, String area) {
+    private static InvalidatedEventArguments event(Integer threadId, String... areas) {
         var args = new InvalidatedEventArguments();
         args.setThreadId(threadId);
-        if (area != null) {
-            args.setAreas(new String[]{area});
+        if (areas.length > 0) {
+            args.setAreas(areas);
         }
         return args;
     }
