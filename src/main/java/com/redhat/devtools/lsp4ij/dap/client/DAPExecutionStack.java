@@ -79,7 +79,7 @@ public class DAPExecutionStack extends XExecutionStack {
                         .thenAcceptAsync(stackTraceResponse -> {
                             StackFrame[] stackFrames = stackTraceResponse.getStackFrames();
                             List<DAPStackFrame> frames = stackFrames != null ? toDAPStackFrames(stackFrames) : Collections.emptyList();
-                            keepStackFrames(frames, invalidations);
+                            setStackFrames(frames, invalidations);
                             container.addStackFrames(frames, true);
                         });
             }
@@ -94,7 +94,7 @@ public class DAPExecutionStack extends XExecutionStack {
 
     /**
      * Loads this stack's frames again, as when the debug adapter says that they are out of date. Frames not loaded
-     * yet, or still loading, are loaded when they are shown.
+     * yet, still loading, or that fail to load again, are loaded when they are shown.
      *
      * @return a future that completes once the frames are loaded
      */
@@ -112,7 +112,13 @@ public class DAPExecutionStack extends XExecutionStack {
         return server.stackTrace(stackTraceArgs)
                 .thenAccept(stackTraceResponse -> {
                     StackFrame[] frames = stackTraceResponse.getStackFrames();
-                    keepStackFrames(frames != null ? toDAPStackFrames(frames) : Collections.emptyList(), invalidations);
+                    setStackFrames(frames != null ? toDAPStackFrames(frames) : Collections.emptyList(), invalidations);
+                })
+                .whenComplete((result, error) -> {
+                    if (error != null) {
+                        // the frames are out of date: drop them rather than show them again
+                        setStackFrames(null, invalidations);
+                    }
                 });
     }
 
@@ -121,9 +127,10 @@ public class DAPExecutionStack extends XExecutionStack {
     }
 
     /**
-     * Keeps the given frames, unless the debug adapter said that the frames are out of date since they were asked for.
+     * Sets the frames, or none for them to be loaded when they are shown, unless the debug adapter said that the frames
+     * are out of date since they were asked for.
      */
-    private synchronized void keepStackFrames(@NotNull List<DAPStackFrame> frames, int invalidations) {
+    private synchronized void setStackFrames(@Nullable List<DAPStackFrame> frames, int invalidations) {
         if (this.invalidations == invalidations) {
             this.stackFrames = frames;
         }
