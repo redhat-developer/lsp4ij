@@ -92,6 +92,73 @@ public class DAPShadowedBreakpointTest extends HeavyPlatformTestCase {
         }
     }
 
+    /**
+     * A disabled DAP breakpoint doesn't shadow the native breakpoint: the native breakpoint is sent, shown as
+     * invalid while the debug adapter reports it as pending, and as verified once the adapter verifies it.
+     */
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    public void testNativeBreakpointIsVerifiedWhenDAPBreakpointOnTheSameLineIsDisabled() throws Exception {
+        var nativeType = new NativeLineBreakpointType();
+        XBreakpointType.EXTENSION_POINT_NAME.getPoint().registerExtension(nativeType, getTestRootDisposable());
+
+        var presentations = new ArrayList<String>();
+        var session = (XDebugSession) Proxy.newProxyInstance(XDebugSession.class.getClassLoader(), new Class[]{XDebugSession.class}, (p, m, a) -> {
+            String target = a != null && a.length > 0 && a[0] instanceof XLineBreakpoint<?> b
+                    ? (b.getType() instanceof DAPBreakpointType ? "dap " : "native ") : "";
+            switch (m.getName()) {
+                case "setBreakpointInvalid" -> presentations.add(target + "invalid:" + a[1]);
+                case "setBreakpointVerified" -> presentations.add(target + "verified");
+                case "updateBreakpointPresentation" -> presentations.add(target + "reset:" + a[2]);
+                default -> {
+                }
+            }
+            return null;
+        });
+        var handler = (BreakpointHandlerBase) handler(session);
+        var requests = new ArrayList<SetBreakpointsArguments>();
+        // Like the Fule adapter: each request installs the breakpoints with a new id, pending until the script is loaded
+        var server = server(requests, "pending native script resolution");
+
+        var dir = Files.createTempDirectory("dap-breakpoints-");
+        var path = dir.resolve("a.lua");
+        try {
+            var file = file(path);
+            XLineBreakpoint<?> nativeBreakpoint = WriteAction.compute(() -> XDebuggerManager.getInstance(getProject()).getBreakpointManager()
+                    .addLineBreakpoint((XLineBreakpointType) nativeType, file.getUrl(), 0, null));
+            nativeBreakpoint.setCondition("a == 1");
+            XLineBreakpoint<?> dapBreakpoint = WriteAction.compute(() -> XDebuggerManager.getInstance(getProject()).getBreakpointManager()
+                    .addLineBreakpoint(new DAPBreakpointType(), file.getUrl(), 0, new DAPBreakpointProperties()));
+
+            handler.registerBreakpoint(nativeBreakpoint);
+            handler.registerBreakpoint(dapBreakpoint);
+            handler.initialize(server, new Capabilities()).join();
+            assertNull(single(requests).getCondition());
+            assertEquals(List.of("native invalid:" + DAPBreakpointHandlerBase.SHADOWED_BREAKPOINT_MESSAGE,
+                    "dap invalid:pending native script resolution"), presentations);
+            requests.clear();
+            presentations.clear();
+
+            // The DAP breakpoint is disabled in the IDE: IntelliJ unregisters it, then registers it again (ignored as disabled)
+            dapBreakpoint.setEnabled(false);
+            handler.unregisterBreakpoint(dapBreakpoint, false);
+            handler.registerBreakpoint(dapBreakpoint);
+            assertEquals("a == 1", single(requests).getCondition());
+            assertEquals(List.of("native reset:null", "native invalid:pending native script resolution"), presentations);
+            presentations.clear();
+
+            // The script is loaded: the debug adapter verifies the native breakpoint by its id (DAP 'breakpoint' event)
+            var changed = new Breakpoint();
+            changed.setId(2);
+            changed.setVerified(true);
+            changed.setLine(1);
+            handler.updateBreakpoint(changed, null);
+            assertEquals(List.of("native verified"), presentations);
+        } finally {
+            handler.dispose();
+            com.intellij.openapi.util.io.FileUtil.delete(dir.toFile());
+        }
+    }
+
     private static SourceBreakpoint single(List<SetBreakpointsArguments> requests) {
         assertEquals(1, requests.size());
         assertEquals(1, requests.get(0).getBreakpoints().length);
@@ -129,11 +196,33 @@ public class DAPShadowedBreakpointTest extends HeavyPlatformTestCase {
     }
 
     private static IDebugProtocolServer server(List<SetBreakpointsArguments> requests) {
+        return server(requests, null);
+    }
+
+    /**
+     * Returns a debug adapter which answers each 'setBreakpoints' request with unverified breakpoints (id = request
+     * number) and the given message, or with no breakpoints if the message is null.
+     */
+    private static IDebugProtocolServer server(List<SetBreakpointsArguments> requests, @Nullable String pendingMessage) {
+        var requestCount = new java.util.concurrent.atomic.AtomicInteger();
         return (IDebugProtocolServer) Proxy.newProxyInstance(IDebugProtocolServer.class.getClassLoader(), new Class[]{IDebugProtocolServer.class}, (p, m, a) -> {
             if (m.getName().equals("setBreakpoints")) {
-                requests.add((SetBreakpointsArguments) a[0]);
+                var arguments = (SetBreakpointsArguments) a[0];
+                requests.add(arguments);
+                int id = requestCount.incrementAndGet();
                 var response = new SetBreakpointsResponse();
-                response.setBreakpoints(new Breakpoint[0]);
+                if (pendingMessage == null) {
+                    response.setBreakpoints(new Breakpoint[0]);
+                } else {
+                    response.setBreakpoints(Arrays.stream(arguments.getBreakpoints()).map(sourceBreakpoint -> {
+                        var breakpoint = new Breakpoint();
+                        breakpoint.setId(id);
+                        breakpoint.setVerified(false);
+                        breakpoint.setMessage(pendingMessage);
+                        breakpoint.setLine(sourceBreakpoint.getLine());
+                        return breakpoint;
+                    }).toArray(Breakpoint[]::new));
+                }
                 return CompletableFuture.completedFuture(response);
             }
             if (m.getName().equals("equals")) return p == a[0];
