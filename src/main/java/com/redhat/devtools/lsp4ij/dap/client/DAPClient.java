@@ -386,28 +386,7 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
                                         if (StoppedEventArgumentsReason.EXCEPTION.equals(args.getReason())) {
                                             // The stopped event comes from an Exception
                                             // Show an error hint with the exception description in the proper line
-                                            var sourcePosition = context.getActiveExecutionStack() != null
-                                                    && context.getActiveExecutionStack().getTopFrame() != null ?
-                                                    context.getActiveExecutionStack().getTopFrame().getSourcePosition() : null;
-                                            if (sourcePosition != null) {
-                                                var file = sourcePosition.getFile();
-                                                Editor[] editors = LSPIJUtils.editorsForFile(file, getProject());
-                                                if (editors != null && editors.length > 0) {
-                                                    var editor = editors[0];
-                                                    int offset = sourcePosition.getOffset();
-
-                                                    // Wait briefly to be sure that scroll of the editor
-                                                    // has occurred before computing the error hint position.
-                                                    // TODO: remove this timer by detecting that scroll editor is finished
-                                                    // to display the error hint
-                                                    getExceptionHint(server, getCapabilities(), args)
-                                                            .thenAccept(errorMessage -> AppExecutorUtil.getAppScheduledExecutorService().schedule(() -> {
-                                                                ApplicationManager.getApplication().invokeLater(() -> {
-                                                                    showErrorHint(editor, errorMessage, offset);
-                                                                });
-                                                            }, 1, TimeUnit.SECONDS));
-                                                }
-                                            }
+                                            showExceptionHint(getProject(), context, server, getCapabilities(), args, DAPClient::showErrorHint);
                                         }
                                     } else {
                                         session.breakpointReached(breakpoint, null, context);
@@ -415,6 +394,55 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
                                 }
                             });
                 });
+    }
+
+    /**
+     * Shows the error hint of an exception stop where the program stopped, in an editor of the top frame's file,
+     * with the text of {@link #getExceptionHint(IDebugProtocolServer, Capabilities, StoppedEventArguments)}. When no
+     * editor shows the file, nothing is asked of the debug adapter.
+     *
+     * @param project      the project.
+     * @param context      the suspend context of the stop.
+     * @param server       the debug adapter.
+     * @param capabilities the debug adapter capabilities.
+     * @param args         the stopped event, with the reason 'exception'.
+     * @param display      shows the text of the hint in the editor, at the offset where the program stopped.
+     * @return the future, completed once the text of the hint is known and its display scheduled.
+     */
+    static CompletableFuture<@Nullable Void> showExceptionHint(@NotNull Project project,
+                                                               @NotNull XSuspendContext context,
+                                                               @NotNull IDebugProtocolServer server,
+                                                               @NotNull Capabilities capabilities,
+                                                               @NotNull StoppedEventArguments args,
+                                                               @NotNull ErrorHintDisplay display) {
+        var stack = context.getActiveExecutionStack();
+        var topFrame = stack != null ? stack.getTopFrame() : null;
+        var position = topFrame != null ? topFrame.getSourcePosition() : null;
+        if (position == null) {
+            return CompletableFuture.completedFuture(null);
+        }
+        Editor[] editors = LSPIJUtils.editorsForFile(position.getFile(), project);
+        if (editors == null || editors.length == 0) {
+            return CompletableFuture.completedFuture(null);
+        }
+        Editor editor = editors[0];
+        int offset = position.getOffset();
+        // Wait briefly to be sure that scroll of the editor
+        // has occurred before computing the error hint position.
+        // TODO: remove this timer by detecting that scroll editor is finished
+        // to display the error hint
+        return getExceptionHint(server, capabilities, args)
+                .thenAccept(hint -> AppExecutorUtil.getAppScheduledExecutorService().schedule(
+                        () -> ApplicationManager.getApplication().invokeLater(() -> display.show(editor, hint, offset)),
+                        1, TimeUnit.SECONDS));
+    }
+
+    /**
+     * Shows the text of an error hint in an editor, at an offset.
+     */
+    @FunctionalInterface
+    interface ErrorHintDisplay {
+        void show(@NotNull Editor editor, @NotNull String text, int offset);
     }
 
     /**
