@@ -13,15 +13,20 @@ package com.redhat.devtools.lsp4ij.dap.client;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.reflect.TypeToken;
+import com.intellij.openapi.project.Project;
 import com.redhat.devtools.lsp4ij.dap.configurations.DAPRunConfigurationOptions;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.lang.reflect.Type;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.List;
 import java.util.HashMap;
 import java.util.Map;
+
+import static com.redhat.devtools.lsp4ij.server.definition.launching.CommandUtils.resolveCommandLine;
 
 /**
  * Launch utilities.
@@ -54,9 +59,51 @@ public class LaunchUtils {
         }
     }
 
-    public static Map<String, Object> getDapParameters(@NotNull DAPRunConfigurationOptions dapOptions) {
-        LaunchContext context = new LaunchContext(dapOptions.getFile(), dapOptions.getWorkingDirectory());
-        return getDapParameters(dapOptions.getDapParameters(), context);
+    public static Map<String, Object> getDapParameters(
+            @NotNull DAPRunConfigurationOptions dapOptions) {
+        return getDapParameters(dapOptions, null);
+    }
+
+    public static Map<String, Object> getDapParameters(
+            @NotNull DAPRunConfigurationOptions dapOptions,
+            @Nullable Project project) {
+        LaunchContext context = new LaunchContext(
+                dapOptions.getFile(), dapOptions.getWorkingDirectory());
+        Map<String, Object> parameters =
+                getDapParameters(dapOptions.getDapParameters(), context);
+
+        if (project == null || parameters.isEmpty()) {
+            return parameters;
+        }
+
+        Map<String, Object> expanded = new HashMap<>();
+        for (Map.Entry<String, Object> entry : parameters.entrySet()) {
+            expanded.put(entry.getKey(), expandDapValue(entry.getValue(), project));
+        }
+        return expanded;
+    }
+
+    private static Object expandDapValue(Object value, @NotNull Project project) {
+        if (value instanceof String stringValue) {
+            return resolveCommandLine(stringValue, project);
+        }
+        if (value instanceof Map<?, ?> map) {
+            Map<String, Object> expanded = new HashMap<>();
+            for (Map.Entry<?, ?> entry : map.entrySet()) {
+                if (entry.getKey() instanceof String key) {
+                    expanded.put(key, expandDapValue(entry.getValue(), project));
+                }
+            }
+            return expanded;
+        }
+        if (value instanceof List<?> list) {
+            List<Object> expanded = new ArrayList<>();
+            for (Object item : list) {
+                expanded.add(expandDapValue(item, project));
+            }
+            return expanded;
+        }
+        return value;
     }
 
     @Nullable

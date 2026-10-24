@@ -97,4 +97,45 @@ public class LaunchUtilsTest {
         int port = LaunchUtils.resolveAttachPort("notANumber", Map.of());
         assertEquals(-1, port);
     }
+
+    @Test
+    void testGetDapParameters_withNestedContextReplacement() {
+        String json = """
+                {
+                    "program": "${file}",
+                    "settings": {
+                        "cwd": "${workspaceFolder}"
+                    }
+                }
+                """;
+
+        Map<String, String> context = Map.of(
+                "${file}", "/project/src/app.js",
+                "${workspaceFolder}", "/project");
+
+        Map<String, Object> result = LaunchUtils.getDapParameters(json, context);
+
+        assertEquals("/project/src/app.js", result.get("program"));
+
+        Map<?, ?> settings = (Map<?, ?>) result.get("settings");
+        assertEquals("/project", settings.get("cwd"));
+    }
+
+    @Test
+    void testGetDapParameters_withArrayContextReplacement() {
+        String json = """
+                {
+                    "args": ["${file}", "--verbose"]
+                }
+                """;
+
+        Map<String, String> context = Map.of("${file}", "/project/src/app.js");
+
+        Map<String, Object> result = LaunchUtils.getDapParameters(json, context);
+
+        assertEquals(
+                java.util.List.of("/project/src/app.js", "--verbose"),
+                result.get("args"));
+    }
+
 }
