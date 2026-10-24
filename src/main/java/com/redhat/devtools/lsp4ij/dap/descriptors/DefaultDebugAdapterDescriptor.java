@@ -124,7 +124,7 @@ public class DefaultDebugAdapterDescriptor extends DebugAdapterDescriptor {
     @NotNull
     public Map<String, Object> getDapParameters() {
         if (options instanceof DAPRunConfigurationOptions dapOptions) {
-            return LaunchUtils.getDapParameters(dapOptions);
+            return LaunchUtils.getDapParameters(dapOptions, environment.getProject());
         }
         return Collections.emptyMap();
     }
