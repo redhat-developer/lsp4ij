@@ -1,4 +1,4 @@
-/*******************************************************************************
+﻿/*******************************************************************************
  * Copyright (c) 2025 Red Hat, Inc.
  * Distributed under license by Red Hat, Inc. All rights reserved.
  * This program is made available under the terms of the
@@ -136,6 +136,23 @@ public class LaunchUtilsTest {
         assertEquals(
                 java.util.List.of("/project/src/app.js", "--verbose"),
                 result.get("args"));
+}
+    @Test
+    void testGetDapParameters_withWindowsPathContext() {
+        String json = """
+                {
+                    "program": "${file}"
+                }
+                """;
+
+        Map<String, String> context =
+                new LaunchUtils.LaunchContext("C:\\work\\app.py", null);
+
+        Map<String, Object> result =
+                LaunchUtils.getDapParameters(json, context);
+
+        assertEquals("C:\\work\\app.py", result.get("program"));
     }
+
 
 }
