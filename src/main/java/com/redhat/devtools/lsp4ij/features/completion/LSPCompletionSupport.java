@@ -36,7 +36,7 @@ public class LSPCompletionSupport extends AbstractLSPDocumentFeatureSupport<LSPC
     private Integer previousOffset;
 
     public LSPCompletionSupport(@NotNull PsiFile file) {
-        super(file);
+        super(file, true, true);
     }
 
     public CompletableFuture<List<CompletionData>> getCompletions(LSPCompletionParams params) {

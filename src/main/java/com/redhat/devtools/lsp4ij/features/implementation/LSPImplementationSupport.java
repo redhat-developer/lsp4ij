@@ -35,7 +35,7 @@ public class LSPImplementationSupport extends AbstractLSPDocumentFeatureSupport<
     private Integer previousOffset;
 
     public LSPImplementationSupport(@NotNull PsiFile file) {
-        super(file);
+        super(file, true, true);
     }
 
     public CompletableFuture<List<LocationData>> getImplementations(LSPImplementationParams params) {

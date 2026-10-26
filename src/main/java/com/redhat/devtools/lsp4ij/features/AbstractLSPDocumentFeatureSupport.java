@@ -11,6 +11,7 @@
 package com.redhat.devtools.lsp4ij.features;
 
 import com.intellij.psi.PsiFile;
+import com.intellij.psi.util.PsiModificationTracker;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
 import com.redhat.devtools.lsp4ij.client.features.FileUriSupport;
@@ -35,18 +36,35 @@ public abstract class AbstractLSPDocumentFeatureSupport<Params, Result> extends 
     private final @NotNull PsiFile file;
     // The current modification stamp of the Psi file
     private long modificationStamp;
+    // The current Psi modification count of the project
+    private long projectModificationCount;
 
     // true if the future must be canceled when the Psi file is modified and false otherwise.
     private final boolean cancelWhenFileModified;
+
+    // true if the future must also be canceled when another Psi file of the project is modified and false otherwise.
+    private final boolean cancelWhenOtherFileModified;
 
     public AbstractLSPDocumentFeatureSupport(@NotNull PsiFile file) {
         this(file, true);
     }
 
     public AbstractLSPDocumentFeatureSupport(@NotNull PsiFile file, boolean cancelWhenFileModified) {
+        this(file, cancelWhenFileModified, false);
+    }
+
+    /**
+     * @param file                        the Psi file.
+     * @param cancelWhenFileModified      true if the future must be canceled when the Psi file is modified and false otherwise.
+     * @param cancelWhenOtherFileModified true if the future must also be canceled when another Psi file of the project is modified,
+     *                                    because the result depends on other files too (ex : hover, definition), and false otherwise.
+     */
+    public AbstractLSPDocumentFeatureSupport(@NotNull PsiFile file, boolean cancelWhenFileModified, boolean cancelWhenOtherFileModified) {
         this.file = file;
         this.modificationStamp = -1;
+        this.projectModificationCount = -1;
         this.cancelWhenFileModified = cancelWhenFileModified;
+        this.cancelWhenOtherFileModified = cancelWhenOtherFileModified;
     }
 
     /**
@@ -60,7 +78,8 @@ public abstract class AbstractLSPDocumentFeatureSupport<Params, Result> extends 
 
     @Override
     protected boolean checkValid() {
-        return !cancelWhenFileModified || this.file.getModificationStamp() == modificationStamp;
+        return !cancelWhenFileModified || (this.file.getModificationStamp() == modificationStamp
+                && (!cancelWhenOtherFileModified || getProjectModificationCount() == projectModificationCount));
     }
 
     /**
@@ -73,7 +92,15 @@ public abstract class AbstractLSPDocumentFeatureSupport<Params, Result> extends 
         CompletableFuture<Result> future = super.load(params);
         // Update the modification stamp with the current modification stamp of the Psi file
         this.modificationStamp = this.file.getModificationStamp();
+        if (cancelWhenOtherFileModified) {
+            // and the Psi modification count of the project, which counts the modifications of the other files too
+            this.projectModificationCount = getProjectModificationCount();
+        }
         return future;
+    }
+
+    private long getProjectModificationCount() {
+        return PsiModificationTracker.getInstance(file.getProject()).getModificationCount();
     }
 
     protected static CompletableFuture<List<LanguageServerItem>> getLanguageServers(@NotNull PsiFile file,

@@ -36,7 +36,7 @@ public class LSPHoverSupport extends AbstractLSPDocumentFeatureSupport<HoverPara
     private Integer previousOffset;
 
     public LSPHoverSupport(@NotNull PsiFile file) {
-        super(file);
+        super(file, true, true);
     }
 
     public CompletableFuture<List<HoverData>> getHover(LSPHoverParams params) {
