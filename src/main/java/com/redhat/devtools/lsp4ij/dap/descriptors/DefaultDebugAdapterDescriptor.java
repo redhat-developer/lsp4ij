@@ -17,6 +17,7 @@ import com.intellij.execution.configurations.RunConfigurationOptions;
 import com.intellij.execution.process.ProcessHandler;
 import com.intellij.execution.runners.ExecutionEnvironment;
 import com.intellij.openapi.actionSystem.CommonDataKeys;
+import com.intellij.openapi.actionSystem.DataContext;
 import com.intellij.openapi.fileEditor.FileEditorManager;
 import com.intellij.openapi.fileTypes.FileType;
 import com.intellij.openapi.fileTypes.FileTypeManager;
@@ -146,9 +147,11 @@ public class DefaultDebugAdapterDescriptor extends DebugAdapterDescriptor {
         if (options instanceof DAPRunConfigurationOptions dapOptions) {
             Project project = environment.getProject();
 
-            VirtualFile selectedFile =
-                    CommonDataKeys.VIRTUAL_FILE.getData(
-                            environment.getDataContext());
+            DataContext dataContext = environment.getDataContext();
+
+            VirtualFile selectedFile = dataContext != null
+                    ? CommonDataKeys.VIRTUAL_FILE.getData(dataContext)
+                    : null;
 
             if (selectedFile == null) {
                 VirtualFile[] selectedFiles =
