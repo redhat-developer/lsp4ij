@@ -526,12 +526,14 @@ public class DAPDebugProcess extends XDebugProcess implements Disposable {
     }
 
     /**
-     * Returns true if the DAP server of this debug session formats values, and false otherwise.
+     * Returns true if the DAP server of this debug session, or that of a child session, formats values, and false
+     * otherwise.
      *
-     * @return true if the DAP server of this debug session formats values, and false otherwise.
+     * @return true if the DAP server of this debug session, or that of a child session, formats values, and false
+     * otherwise.
      */
     public boolean isSupportsValueFormattingOptions() {
-        return parentClient != null && parentClient.isSupportsValueFormattingOptions();
+        return parentClient != null && parentClient.isSupportsValueFormattingOptionsInSessions();
     }
 
     public @Nullable DisassemblyFile getDisassemblyFile() {

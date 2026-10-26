@@ -909,6 +909,26 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
     }
 
     /**
+     * Returns true if the debug adapter, or that of a child session started with 'startDebugging', supports value
+     * formatting options, and false otherwise. A child session may be the one which runs the program, and its
+     * requests ask for values in the format of the debug session.
+     *
+     * @return true if the debug adapter, or that of a child session, supports value formatting options, and false
+     * otherwise.
+     */
+    public boolean isSupportsValueFormattingOptionsInSessions() {
+        if (isSupportsValueFormattingOptions()) {
+            return true;
+        }
+        for (DAPClient child : List.copyOf(childrenClient)) {
+            if (child.isSupportsValueFormattingOptionsInSessions()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
      * Returns the format in which values are asked for, as the user chose it in the Variables view, and null for the
      * debug adapter's own format.
      *
