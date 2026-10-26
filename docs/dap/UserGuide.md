@@ -63,6 +63,15 @@ Conditional breakpoints are also supported. Here is an example of a conditional 
 
 ![DAP Conditional Breakpoint](./images/DAP_conditional_breakpoint.png)
 
+### Logpoint
+
+A breakpoint whose `Suspend` option is unchecked logs instead of stopping. Its `"Breakpoint hit" message` and
+`Evaluate and log` expression are sent to the DAP server as a
+[logpoint](https://microsoft.github.io/debug-adapter-protocol//specification.html#Types_SourceBreakpoint), whose message
+the DAP server writes to the console without stopping the program; the expression is evaluated by the DAP server.
+A DAP server which doesn't support logpoints stops at it: LSP4IJ then evaluates the expression in the stopped frame,
+logs it, and resumes the program. A breakpoint which suspends logs its expression when it stops.
+
 ### Exception breakpoint
 
 Some DAP servers support exception breakpoints. If so, you must first run the configuration process, 
@@ -146,6 +155,13 @@ completion should be available in the expression editor by consuming the
 [Completion request](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_Completions):
 
 ![Completion](images/DAP_debugging_completion.png)
+
+## Hexadecimal values
+
+When the DAP server supports value formatting (`supportsValueFormattingOptions`), the context menu of the Variables and
+Watches views has `Show Values as Hexadecimal`, which asks the DAP server for numbers in hexadecimal
+([ValueFormat](https://microsoft.github.io/debug-adapter-protocol//specification.html#Types_ValueFormat)) in the
+variables, evaluations and set values of the debug session, and shows the values again.
 
 ## Set value
 

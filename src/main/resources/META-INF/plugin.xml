@@ -1210,6 +1210,12 @@
             <add-to-group group-id="DebuggingActionsGroup"/>
             <add-to-group group-id="XDebugger.Frames.Tree.Popup" anchor="last"/>
         </action>
+        <action id="DAP.HexadecimalValues"
+                class="com.redhat.devtools.lsp4ij.dap.client.variables.DAPHexadecimalValuesAction"
+                text="Show Values as Hexadecimal"
+                description="Ask the DAP server for numbers in hexadecimal">
+            <add-to-group group-id="XDebugger.ValueGroup" anchor="last"/>
+        </action>
     </actions>
 
 </idea-plugin>

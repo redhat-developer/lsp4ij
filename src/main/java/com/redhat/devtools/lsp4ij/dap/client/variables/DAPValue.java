@@ -62,6 +62,7 @@ public class DAPValue extends XNamedValue {
         int parentVariablesReference = variable.getVariablesReference();
         VariablesArguments varArgs = new VariablesArguments();
         varArgs.setVariablesReference(parentVariablesReference);
+        varArgs.setFormat(getClient().getValueFormat());
         server.variables(varArgs)
                 .thenAccept(variablesResponse -> {
                     XValueChildrenList list = new XValueChildrenList();
