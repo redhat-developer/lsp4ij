@@ -13,7 +13,13 @@ package com.redhat.devtools.lsp4ij.dap.client;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.reflect.TypeToken;
+import com.intellij.ide.macro.Macro;
+import com.intellij.ide.macro.MacroManager;
+import com.intellij.openapi.actionSystem.CommonDataKeys;
+import com.intellij.openapi.actionSystem.DataContext;
+import com.intellij.openapi.actionSystem.impl.SimpleDataContext;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.vfs.VirtualFile;
 import com.redhat.devtools.lsp4ij.dap.configurations.DAPRunConfigurationOptions;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import org.jetbrains.annotations.NotNull;
@@ -22,8 +28,8 @@ import org.jetbrains.annotations.Nullable;
 import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.List;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import static com.redhat.devtools.lsp4ij.server.definition.launching.CommandUtils.resolveCommandLine;
@@ -41,7 +47,6 @@ public class LaunchUtils {
     public static class LaunchContext extends HashMap<String, String> {
 
         public LaunchContext() {
-
         }
 
         public LaunchContext(@Nullable String file,
@@ -67,8 +72,17 @@ public class LaunchUtils {
     public static Map<String, Object> getDapParameters(
             @NotNull DAPRunConfigurationOptions dapOptions,
             @Nullable Project project) {
+        return getDapParameters(dapOptions, project, null);
+    }
+
+    public static Map<String, Object> getDapParameters(
+            @NotNull DAPRunConfigurationOptions dapOptions,
+            @Nullable Project project,
+            @Nullable VirtualFile selectedFile) {
+
         LaunchContext context = new LaunchContext(
                 dapOptions.getFile(), dapOptions.getWorkingDirectory());
+
         Map<String, Object> parameters =
                 getDapParameters(dapOptions.getDapParameters(), context);
 
@@ -76,33 +90,60 @@ public class LaunchUtils {
             return parameters;
         }
 
+        DataContext dataContext = selectedFile == null
+                ? null
+                : SimpleDataContext.builder()
+                        .add(CommonDataKeys.PROJECT, project)
+                        .add(CommonDataKeys.VIRTUAL_FILE, selectedFile)
+                        .build();
+
         Map<String, Object> expanded = new HashMap<>();
         for (Map.Entry<String, Object> entry : parameters.entrySet()) {
-            expanded.put(entry.getKey(), expandDapValue(entry.getValue(), project));
+            expanded.put(
+                    entry.getKey(),
+                    expandDapValue(entry.getValue(), project, dataContext));
         }
         return expanded;
     }
 
-    private static Object expandDapValue(Object value, @NotNull Project project) {
+    private static Object expandDapValue(
+            Object value,
+            @NotNull Project project,
+            @Nullable DataContext dataContext) {
+
         if (value instanceof String stringValue) {
-            return resolveCommandLine(stringValue, project);
+            if (dataContext == null) {
+                return resolveCommandLine(stringValue, project);
+            }
+
+            try {
+                return MacroManager.getInstance()
+                        .expandMacrosInString(stringValue, true, dataContext);
+            } catch (Macro.ExecutionCancelledException e) {
+                return stringValue;
+            }
         }
+
         if (value instanceof Map<?, ?> map) {
             Map<String, Object> expanded = new HashMap<>();
             for (Map.Entry<?, ?> entry : map.entrySet()) {
                 if (entry.getKey() instanceof String key) {
-                    expanded.put(key, expandDapValue(entry.getValue(), project));
+                    expanded.put(
+                            key,
+                            expandDapValue(entry.getValue(), project, dataContext));
                 }
             }
             return expanded;
         }
+
         if (value instanceof List<?> list) {
             List<Object> expanded = new ArrayList<>();
             for (Object item : list) {
-                expanded.add(expandDapValue(item, project));
+                expanded.add(expandDapValue(item, project, dataContext));
             }
             return expanded;
         }
+
         return value;
     }
 
@@ -115,8 +156,10 @@ public class LaunchUtils {
     }
 
     @NotNull
-    public static Map<String, Object> getDapParameters(@Nullable String launchJson,
-                                                       @Nullable Map<String, String> context) {
+    public static Map<String, Object> getDapParameters(
+            @Nullable String launchJson,
+            @Nullable Map<String, String> context) {
+
         if (launchJson == null || StringUtils.isBlank(launchJson)) {
             return Collections.emptyMap();
         }
@@ -131,47 +174,61 @@ public class LaunchUtils {
         }
 
         Gson gson = new GsonBuilder()
-                .registerTypeAdapter(new TypeToken<Map<String, Object>>(){}.getType(), new IntegerPreservingMapDeserializer())
+                .registerTypeAdapter(
+                        new TypeToken<Map<String, Object>>() {}.getType(),
+                        new IntegerPreservingMapDeserializer())
                 .create();
 
-        Type mapType = new TypeToken<Map<String, Object>>(){}.getType();
+        Type mapType = new TypeToken<Map<String, Object>>() {}.getType();
         return gson.fromJson(launchJson, mapType);
     }
 
-
     @NotNull
-    public static String resolveAttachAddress(@Nullable  String attachAddress, @NotNull Map<String, Object> parameters) {
+    public static String resolveAttachAddress(
+            @Nullable String attachAddress,
+            @NotNull Map<String, Object> parameters) {
+
         if (attachAddress == null || StringUtils.isBlank(attachAddress)) {
             return "";
         }
+
         if (attachAddress.charAt(0) == '$') {
             var keys = attachAddress.substring(1).split("[.]");
             Object current = parameters;
-            for (var key : keys) {
-                if (current instanceof Map) {
-                    current = ((Map) current).get(key);
-                }
-            }
-            if (current != null) {
-                return current.toString();
-            }
-            return "?";
-        }
-        return attachAddress;
-    }
 
-    public static int resolveAttachPort(@Nullable  String attachPort, Map<String, Object> parameters) {
-        if (attachPort == null || StringUtils.isBlank(attachPort)) {
-            return -1;
-        }
-        if (attachPort.charAt(0) == '$') {
-            var keys = attachPort.substring(1).split("[.]");
-            Object current = parameters;
             for (var key : keys) {
                 if (current instanceof Map) {
                     current = ((Map<?, ?>) current).get(key);
                 }
             }
+
+            if (current != null) {
+                return current.toString();
+            }
+            return "?";
+        }
+
+        return attachAddress;
+    }
+
+    public static int resolveAttachPort(
+            @Nullable String attachPort,
+            Map<String, Object> parameters) {
+
+        if (attachPort == null || StringUtils.isBlank(attachPort)) {
+            return -1;
+        }
+
+        if (attachPort.charAt(0) == '$') {
+            var keys = attachPort.substring(1).split("[.]");
+            Object current = parameters;
+
+            for (var key : keys) {
+                if (current instanceof Map) {
+                    current = ((Map<?, ?>) current).get(key);
+                }
+            }
+
             if (current instanceof Double value) {
                 return value.intValue();
             }
@@ -186,12 +243,13 @@ public class LaunchUtils {
             }
             return -1;
         }
+
         try {
             return Integer.parseInt(attachPort);
+        } catch (Exception e) {
+            // Do nothing.
         }
-        catch(Exception e) {
-            // Do nothing
-        }
+
         return -1;
     }
 }
