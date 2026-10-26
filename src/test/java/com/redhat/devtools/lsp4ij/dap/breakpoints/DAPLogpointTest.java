@@ -34,6 +34,8 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.Function;
+import java.util.stream.IntStream;
 
 /** A breakpoint which doesn't suspend is sent as a logpoint with what IntelliJ would log. */
 public class DAPLogpointTest extends HeavyPlatformTestCase {
@@ -75,6 +77,47 @@ public class DAPLogpointTest extends HeavyPlatformTestCase {
         }
     }
 
+    public void testRunToCursorOnALogpointKeepsItsId() throws Exception {
+        var dir = Files.createTempDirectory("dap-logpoints-");
+        var logs = breakpoint(dir.resolve("a.lua"), 1);
+        WriteAction.run(() -> {
+            logs.setSuspendPolicy(SuspendPolicy.NONE);
+            logs.setLogExpression("n");
+        });
+
+        var requests = new ArrayList<SetBreakpointsArguments>();
+        var handler = handler();
+        try {
+            handler.registerBreakpoint(logs);
+            handler.initialize(server(requests, arguments -> numbered(requests.size(), arguments)), new Capabilities()).join();
+            // "Run to Cursor" on the line of the logpoint: the debug adapter gets both, and gives each its own id
+            handler.registerTemporaryBreakpoint(logs.getSourcePosition()).join();
+
+            assertEquals(2, requests.get(1).getBreakpoints().length);
+            assertSame(logs, handler.findBreakpointById(201));
+            assertNull(handler.findBreakpointById(202));
+        } finally {
+            handler.dispose();
+            FileUtil.delete(dir.toFile());
+        }
+    }
+
+    /**
+     * Returns a verified breakpoint per source breakpoint of the given request, with the ids 101, 102, ... for the
+     * first request, 201, 202, ... for the second, and so on.
+     */
+    private static Breakpoint[] numbered(int request, SetBreakpointsArguments arguments) {
+        return IntStream.range(0, arguments.getBreakpoints().length)
+                .mapToObj(i -> {
+                    var breakpoint = new Breakpoint();
+                    breakpoint.setId(request * 100 + i + 1);
+                    breakpoint.setVerified(true);
+                    breakpoint.setLine(arguments.getBreakpoints()[i].getLine());
+                    return breakpoint;
+                })
+                .toArray(Breakpoint[]::new);
+    }
+
     private DAPBreakpointHandlerBase<XLineBreakpoint<DAPBreakpointProperties>> handler() throws Exception {
         var type = Arrays.stream(ConfigurationType.CONFIGURATION_TYPE_EP.getExtensions())
                 .filter(t -> t.getId().equals("DAPConfiguration")).findFirst().orElseThrow();
@@ -112,11 +155,17 @@ public class DAPLogpointTest extends HeavyPlatformTestCase {
     }
 
     private static IDebugProtocolServer server(List<SetBreakpointsArguments> requests) {
+        return server(requests, arguments -> new Breakpoint[0]);
+    }
+
+    private static IDebugProtocolServer server(List<SetBreakpointsArguments> requests,
+                                               Function<SetBreakpointsArguments, Breakpoint[]> breakpoints) {
         return (IDebugProtocolServer) Proxy.newProxyInstance(IDebugProtocolServer.class.getClassLoader(), new Class[]{IDebugProtocolServer.class}, (p, m, a) -> {
             if (m.getName().equals("setBreakpoints")) {
-                requests.add((SetBreakpointsArguments) a[0]);
+                var arguments = (SetBreakpointsArguments) a[0];
+                requests.add(arguments);
                 var response = new SetBreakpointsResponse();
-                response.setBreakpoints(new Breakpoint[0]);
+                response.setBreakpoints(breakpoints.apply(arguments));
                 return CompletableFuture.completedFuture(response);
             }
             if (m.getName().equals("equals")) return p == a[0];

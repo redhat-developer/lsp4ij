@@ -146,16 +146,20 @@ public abstract class DAPBreakpointHandlerBase<B extends XBreakpoint<?>> extends
                                                                            @Nullable TemporaryBreakpoint temporaryBreakpoint) {
         // Convert list of IJ XBreakpoint -> LSP SourceBreakpoint
         Map<Source, List<SourceBreakpoint>> targetBreakpoints = new HashMap<>();
+        // The IJ breakpoint of each source breakpoint, in the same order, and null for the temporary breakpoint
+        Map<Source, List<@Nullable B>> targetIJBreakpoints = new HashMap<>();
         for (B breakpoint : breakpoints) {
             var sourcePosition = breakpoint.getSourcePosition();
             if (sourcePosition != null) {
                 addSourceBreakpoint(sourcePosition, breakpoint.getConditionExpression(), getLogMessage(breakpoint), targetBreakpoints);
+                targetIJBreakpoints.computeIfAbsent(toDAPSource(sourcePosition), s -> new ArrayList<>()).add(breakpoint);
             }
         }
 
         if (temporaryBreakpoint != null) {
             if (temporaryBreakpoint.add()) {
                 addSourceBreakpoint(temporaryBreakpoint.sourcePosition(), null, null, targetBreakpoints);
+                targetIJBreakpoints.computeIfAbsent(toDAPSource(temporaryBreakpoint.sourcePosition()), s -> new ArrayList<>()).add(null);
             } else {
                 // Removed IntelliJ breakpoint
                 // Create a Source with empty source breakpoints if it doesn't exist,
@@ -177,15 +181,16 @@ public abstract class DAPBreakpointHandlerBase<B extends XBreakpoint<?>> extends
 
             // Call 'setBreakpoints' DAP request for each Source keys.
             final var arguments = createSetBreakpointsArguments(source, sourceBreakpoints);
+            List<@Nullable B> ijBreakpoints = targetIJBreakpoints.getOrDefault(source, List.of());
             if (debugProtocolServer != null) {
                 // Call 'setBreakpoints' DAP request for each Source keys
                 // and the given debug protocol server
-                setBreakpointsFutures.add(setBreakpoints(debugProtocolServer, arguments));
+                setBreakpointsFutures.add(setBreakpoints(debugProtocolServer, arguments, ijBreakpoints));
             } else {
                 // Call 'setBreakpoints' DAP request for each Source keys
                 // for each registered debug protocol server
                 for (var server : debugProtocolServers) {
-                    setBreakpointsFutures.add(setBreakpoints(server, arguments));
+                    setBreakpointsFutures.add(setBreakpoints(server, arguments, ijBreakpoints));
                 }
             }
 
@@ -198,8 +203,18 @@ public abstract class DAPBreakpointHandlerBase<B extends XBreakpoint<?>> extends
         return CompletableFuture.allOf(setBreakpointsFutures.toArray(EMPTY_COMPLETABLE_FUTURES));
     }
 
+    /**
+     * Sends the 'setBreakpoints' request, and gives each IJ breakpoint the id of its DAP breakpoint.
+     *
+     * @param debugProtocolServer the DAP server.
+     * @param arguments           the 'setBreakpoints' arguments.
+     * @param ijBreakpoints       the IJ breakpoint of each source breakpoint of the arguments, in the same order, and
+     *                            null for the temporary breakpoint.
+     * @return the future.
+     */
     private CompletableFuture<Void> setBreakpoints(@NotNull IDebugProtocolServer debugProtocolServer,
-                                                   @NotNull SetBreakpointsArguments arguments) {
+                                                   @NotNull SetBreakpointsArguments arguments,
+                                                   @NotNull List<@Nullable B> ijBreakpoints) {
         CompletableFuture<SetBreakpointsResponse> future = debugProtocolServer.setBreakpoints(arguments);
         return future
                 .thenAccept(response -> {
@@ -209,24 +224,35 @@ public abstract class DAPBreakpointHandlerBase<B extends XBreakpoint<?>> extends
                     }
                     for (int i = 0; i < breakpoints.length; i++) {
                         Breakpoint breakpointResponse = breakpoints[i];
-                        Source source = breakpointResponse.getSource();
-                        if (source == null) {
-                            source = arguments.getSource();
+                        B ijBreakpoint;
+                        if (breakpoints.length == ijBreakpoints.size()) {
+                            // The response has a breakpoint per source breakpoint, in the same order: when two are on
+                            // the same line, such as a breakpoint and the temporary breakpoint, each keeps its own id
+                            ijBreakpoint = ijBreakpoints.get(i);
+                        } else {
+                            ijBreakpoint = findBreakpoint(breakpointResponse, arguments, i);
                         }
-                        Integer line = breakpointResponse.getLine();
-                        if (line == null && arguments.getBreakpoints().length > i) {
-                            var sourceBreakpoint = arguments.getBreakpoints()[i];
-                            line = sourceBreakpoint.getLine();
-                        }
-                        if (source != null && line != null) {
-                            var ijBreakpoint = findBreakpoint(source, line);
-                            if (ijBreakpoint != null) {
-                                ijBreakpoint.putUserData(DAP_BREAKPOINT_ID, breakpointResponse.getId());
-                                updateBreakpoint(breakpointResponse, ijBreakpoint);
-                            }
+                        if (ijBreakpoint != null) {
+                            ijBreakpoint.putUserData(DAP_BREAKPOINT_ID, breakpointResponse.getId());
+                            updateBreakpoint(breakpointResponse, ijBreakpoint);
                         }
                     }
                 });
+    }
+
+    private @Nullable B findBreakpoint(@NotNull Breakpoint breakpointResponse,
+                                       @NotNull SetBreakpointsArguments arguments,
+                                       int index) {
+        Source source = breakpointResponse.getSource();
+        if (source == null) {
+            source = arguments.getSource();
+        }
+        Integer line = breakpointResponse.getLine();
+        if (line == null && arguments.getBreakpoints().length > index) {
+            var sourceBreakpoint = arguments.getBreakpoints()[index];
+            line = sourceBreakpoint.getLine();
+        }
+        return source != null && line != null ? findBreakpoint(source, line) : null;
     }
 
     private <B extends XBreakpoint<?>> boolean supportsBreakpointType(B breakpoint) {
