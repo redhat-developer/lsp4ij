@@ -163,6 +163,15 @@ Watches views has `Show Values as Hexadecimal`, which asks the DAP server for nu
 ([ValueFormat](https://microsoft.github.io/debug-adapter-protocol//specification.html#Types_ValueFormat)) in the
 variables, evaluations and set values of the debug session, and shows the values again.
 
+## Large variables
+
+A variable with more than 100 indexed children, such as a large array, whose
+[Variable](https://microsoft.github.io/debug-adapter-protocol//specification.html#Types_Variable) says how many it has
+(`indexedVariables`), shows its first 100 and a `...` node with how many more there are. Opening the node asks the
+DAP server for the next 100 ([`variables`](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_Variables)
+with `filter` `indexed`, `start` and `count`), so a large variable is read a page at a time. Its named children, when
+it says it has any (`namedVariables`), are asked for first.
+
 ## Set value
 
 If debug adapter [supports setting a variable to a value](https://microsoft.github.io/debug-adapter-protocol//specification.html#Types_Capabilities),

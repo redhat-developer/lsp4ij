@@ -16,7 +16,6 @@ import com.intellij.xdebugger.frame.presentation.XValuePresentation;
 import com.redhat.devtools.lsp4ij.dap.client.DAPClient;
 import com.redhat.devtools.lsp4ij.dap.client.DAPStackFrame;
 import org.eclipse.lsp4j.debug.Variable;
-import org.eclipse.lsp4j.debug.VariablesArguments;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -60,17 +59,10 @@ public class DAPValue extends XNamedValue {
         }
 
         int parentVariablesReference = variable.getVariablesReference();
-        VariablesArguments varArgs = new VariablesArguments();
-        varArgs.setVariablesReference(parentVariablesReference);
-        varArgs.setFormat(getClient().getValueFormat());
-        server.variables(varArgs)
-                .thenAccept(variablesResponse -> {
-                    XValueChildrenList list = new XValueChildrenList();
-                    for (Variable variable : variablesResponse.getVariables()) {
-                        list.add(variable.getName(), new DAPValue(stackFrame, variable, parentVariablesReference));
-                    }
-                    node.addChildren(list, true);
-                });
+        // a large variable, such as a large array, is read a page at a time
+        new DAPVariableChildren(server, variable, getClient().getValueFormat(),
+                child -> new DAPValue(stackFrame, child, parentVariablesReference))
+                .load(node);
     }
 
     @Nullable
