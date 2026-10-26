@@ -12,6 +12,7 @@ package com.redhat.devtools.lsp4ij.dap.client.variables;
 
 import com.intellij.xdebugger.frame.XFullValueEvaluator;
 import com.redhat.devtools.lsp4ij.dap.DAPBundle;
+import org.eclipse.lsp4j.debug.ValueFormat;
 import org.eclipse.lsp4j.debug.Variable;
 import org.eclipse.lsp4j.debug.VariablesArguments;
 import org.eclipse.lsp4j.debug.services.IDebugProtocolServer;
@@ -30,6 +31,7 @@ public class DAPLazyValueEvaluator extends XFullValueEvaluator {
 
     private final @NotNull IDebugProtocolServer server;
     private final int variablesReference;
+    private final @Nullable ValueFormat format;
     private final @NotNull Consumer<Variable> resolved;
     // The request for the value: a click while it runs waits for it instead of asking again, as asking may run code
     private @Nullable CompletableFuture<@Nullable Variable> request;
@@ -37,14 +39,17 @@ public class DAPLazyValueEvaluator extends XFullValueEvaluator {
     /**
      * @param server             the debug adapter.
      * @param variablesReference the lazy variable's variablesReference.
+     * @param format             the format the value is asked for in, or null for the debug adapter's own.
      * @param resolved           what shows the variable with its value, in place of the lazy one.
      */
     public DAPLazyValueEvaluator(@NotNull IDebugProtocolServer server,
                                  int variablesReference,
+                                 @Nullable ValueFormat format,
                                  @NotNull Consumer<Variable> resolved) {
         super(DAPBundle.message("dap.variables.lazy.show"));
         this.server = server;
         this.variablesReference = variablesReference;
+        this.format = format;
         this.resolved = resolved;
         // The value replaces the link in the tree instead of showing in a popup
         setShowValuePopup(false);
@@ -87,7 +92,7 @@ public class DAPLazyValueEvaluator extends XFullValueEvaluator {
      */
     private synchronized @NotNull CompletableFuture<@Nullable Variable> getRequest() {
         if (request == null) {
-            CompletableFuture<@Nullable Variable> newRequest = resolve(server, variablesReference);
+            CompletableFuture<@Nullable Variable> newRequest = resolve(server, variablesReference, format);
             request = newRequest;
             newRequest.whenComplete((variable, error) -> {
                 if (error != null || variable == null) {
@@ -111,11 +116,15 @@ public class DAPLazyValueEvaluator extends XFullValueEvaluator {
      *
      * @param server             the debug adapter.
      * @param variablesReference the lazy variable's variablesReference.
+     * @param format             the format the value is asked for in, or null for the debug adapter's own.
      * @return the variable with the value of a lazy variable, and null if there is none.
      */
-    static CompletableFuture<@Nullable Variable> resolve(@NotNull IDebugProtocolServer server, int variablesReference) {
+    static CompletableFuture<@Nullable Variable> resolve(@NotNull IDebugProtocolServer server,
+                                                         int variablesReference,
+                                                         @Nullable ValueFormat format) {
         VariablesArguments args = new VariablesArguments();
         args.setVariablesReference(variablesReference);
+        args.setFormat(format);
         return server.variables(args)
                 .thenApply(response -> response != null && response.getVariables() != null && response.getVariables().length > 0 ?
                         response.getVariables()[0] : null);

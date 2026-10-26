@@ -12,6 +12,7 @@ package com.redhat.devtools.lsp4ij.dap.client.variables;
 
 import com.intellij.testFramework.LightPlatformTestCase;
 import com.intellij.xdebugger.frame.XFullValueEvaluator.XFullValueEvaluationCallback;
+import org.eclipse.lsp4j.debug.ValueFormat;
 import org.eclipse.lsp4j.debug.Variable;
 import org.eclipse.lsp4j.debug.VariablePresentationHint;
 import org.eclipse.lsp4j.debug.VariablesArguments;
@@ -27,6 +28,7 @@ import java.util.concurrent.CompletableFuture;
 public class DAPLazyValueEvaluatorTest extends LightPlatformTestCase {
 
     private final List<Integer> asked = new ArrayList<>();
+    private final List<ValueFormat> formats = new ArrayList<>();
     private final List<String> evaluated = new ArrayList<>();
     private final List<String> errors = new ArrayList<>();
     private final List<Variable> resolved = new ArrayList<>();
@@ -40,7 +42,7 @@ public class DAPLazyValueEvaluatorTest extends LightPlatformTestCase {
 
     public void testTheValueReplacesTheLink() {
         var value = variable("size", "3", 0, false);
-        var evaluator = new DAPLazyValueEvaluator(server(CompletableFuture.completedFuture(response(value))), 12, resolved::add);
+        var evaluator = new DAPLazyValueEvaluator(server(CompletableFuture.completedFuture(response(value))), 12, null, resolved::add);
         assertFalse(evaluator.isShowValuePopup());
 
         evaluator.startEvaluation(callback());
@@ -52,8 +54,20 @@ public class DAPLazyValueEvaluatorTest extends LightPlatformTestCase {
         assertFalse(evaluator.isEnabled());
     }
 
+    public void testTheValueIsAskedForInTheSessionsFormat() {
+        var format = new ValueFormat();
+        format.setHex(true);
+        var evaluator = new DAPLazyValueEvaluator(server(CompletableFuture.completedFuture(response(variable("size", "0x3", 0, false)))),
+                12, format, resolved::add);
+
+        evaluator.startEvaluation(callback());
+
+        assertEquals(List.of(format), formats);
+        assertEquals(List.of("0x3"), evaluated);
+    }
+
     public void testNoValueIsAnError() {
-        var evaluator = new DAPLazyValueEvaluator(server(CompletableFuture.completedFuture(response())), 12, resolved::add);
+        var evaluator = new DAPLazyValueEvaluator(server(CompletableFuture.completedFuture(response())), 12, null, resolved::add);
 
         evaluator.startEvaluation(callback());
 
@@ -63,7 +77,7 @@ public class DAPLazyValueEvaluatorTest extends LightPlatformTestCase {
     }
 
     public void testAFailedRequestSaysWhy() {
-        var evaluator = new DAPLazyValueEvaluator(server(CompletableFuture.failedFuture(new IllegalStateException("getter threw"))), 12, resolved::add);
+        var evaluator = new DAPLazyValueEvaluator(server(CompletableFuture.failedFuture(new IllegalStateException("getter threw"))), 12, null, resolved::add);
 
         evaluator.startEvaluation(callback());
 
@@ -74,7 +88,7 @@ public class DAPLazyValueEvaluatorTest extends LightPlatformTestCase {
     public void testAClickWhileTheValueLoadsDoesNotAskAgain() {
         var value = variable("size", "3", 0, false);
         var answer = new CompletableFuture<VariablesResponse>();
-        var evaluator = new DAPLazyValueEvaluator(server(answer), 12, resolved::add);
+        var evaluator = new DAPLazyValueEvaluator(server(answer), 12, null, resolved::add);
 
         evaluator.startEvaluation(callback());
         evaluator.startEvaluation(callback());
@@ -88,7 +102,7 @@ public class DAPLazyValueEvaluatorTest extends LightPlatformTestCase {
     public void testAClickAfterAFailedRequestAsksAgain() {
         var value = variable("size", "3", 0, false);
         var evaluator = new DAPLazyValueEvaluator(server(CompletableFuture.failedFuture(new IllegalStateException("getter threw")),
-                CompletableFuture.completedFuture(response(value))), 12, resolved::add);
+                CompletableFuture.completedFuture(response(value))), 12, null, resolved::add);
 
         evaluator.startEvaluation(callback());
         evaluator.startEvaluation(callback());
@@ -124,7 +138,9 @@ public class DAPLazyValueEvaluatorTest extends LightPlatformTestCase {
         return (IDebugProtocolServer) Proxy.newProxyInstance(IDebugProtocolServer.class.getClassLoader(),
                 new Class[]{IDebugProtocolServer.class}, (proxy, method, args) -> switch (method.getName()) {
                     case "variables" -> {
-                        asked.add(((VariablesArguments) args[0]).getVariablesReference());
+                        var variablesArgs = (VariablesArguments) args[0];
+                        asked.add(variablesArgs.getVariablesReference());
+                        formats.add(variablesArgs.getFormat());
                         yield answers[Math.min(asked.size(), answers.length) - 1];
                     }
                     case "equals" -> proxy == args[0];

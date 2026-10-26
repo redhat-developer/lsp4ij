@@ -52,7 +52,8 @@ public class DAPValue extends XNamedValue {
         if (resolved == null && server != null && DAPLazyValueEvaluator.isLazy(variable)) {
             // Getting the value may run code: get it when the user asks for it
             node.setPresentation(icon, getPresentation(variable), false);
-            node.setFullValueEvaluator(new DAPLazyValueEvaluator(server, variable.getVariablesReference(), value -> {
+            var format = getClient().getValueFormat();
+            node.setFullValueEvaluator(new DAPLazyValueEvaluator(server, variable.getVariablesReference(), format, value -> {
                 resolved = value;
                 node.setPresentation(icon, getPresentation(value), value.getVariablesReference() > 0);
             }));
