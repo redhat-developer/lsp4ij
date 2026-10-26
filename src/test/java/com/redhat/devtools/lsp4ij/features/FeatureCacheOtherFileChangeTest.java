@@ -18,6 +18,7 @@ import com.redhat.devtools.lsp4ij.features.documentation.LSPDocumentationTarget;
 import com.redhat.devtools.lsp4ij.features.navigation.LSPDefinitionParams;
 import com.redhat.devtools.lsp4ij.features.navigation.LSPDefinitionSupport;
 import com.redhat.devtools.lsp4ij.fixtures.LSPCodeInsightFixtureTestCase;
+import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
 import com.redhat.devtools.lsp4ij.mock.MockLanguageServer;
 import org.eclipse.lsp4j.FoldingRangeRequestParams;
 import org.eclipse.lsp4j.Hover;
@@ -29,7 +30,9 @@ import org.eclipse.lsp4j.Range;
 import org.eclipse.lsp4j.TextDocumentIdentifier;
 
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * A file's cached hover and definition depend on other files too, and are asked for again when one of them changes.
@@ -68,6 +71,27 @@ public class FeatureCacheOtherFileChangeTest extends LSPCodeInsightFixtureTestCa
         // a line inserted above the definition moves it to the next line
         change(other);
         assertEquals(1, definitionLine(definitions));
+    }
+
+    public void testAnAnswerIsAskedForAgainWhenAnotherFileChangesWhileItIsAskedFor() {
+        var other = myFixture.configureByText("other.foo", "class Other");
+        var main = myFixture.configureByText("main.foo", "Other o");
+        var loads = new AtomicInteger();
+        var support = new AbstractLSPDocumentFeatureSupport<Object, Integer>(main, true, true) {
+            @Override
+            protected CompletableFuture<Integer> doLoad(Object params, CancellationSupport cancellationSupport) {
+                if (loads.incrementAndGet() == 1) {
+                    // the language server may answer before it learns of the change
+                    change(other);
+                }
+                return CompletableFuture.completedFuture(loads.get());
+            }
+        };
+        assertEquals(1, (int) support.getFeatureData(null).join());
+
+        // the first answer may be out of date, so it is asked for again, and then reused while nothing changes
+        assertEquals(2, (int) support.getFeatureData(null).join());
+        assertEquals(2, (int) support.getFeatureData(null).join());
     }
 
     public void testFoldingIsReusedWhenAnotherFileChanges() {
