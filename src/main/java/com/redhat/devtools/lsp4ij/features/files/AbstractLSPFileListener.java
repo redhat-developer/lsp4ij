@@ -21,12 +21,15 @@ import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.openapi.vfs.VirtualFilePropertyEvent;
 import com.intellij.openapi.vfs.newvfs.events.*;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
+import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import com.redhat.devtools.lsp4ij.LanguageServerWrapper;
+import com.redhat.devtools.lsp4ij.features.files.WillRenameFilesPreparation.FileRenamePlan;
 import com.redhat.devtools.lsp4ij.features.files.watcher.FileSystemWatcherManager;
 import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
 import com.redhat.devtools.lsp4ij.settings.GlobalLanguageServerSettings;
 import org.eclipse.lsp4j.*;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
+import org.eclipse.lsp4j.services.LanguageServer;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
@@ -60,10 +63,14 @@ import java.util.concurrent.TimeUnit;
  *   <li>{@code workspace/didChangeWatchedFiles}</li>
  * </ul>
  * <p>
- * The {@code workspace/will*} requests are sent during {@link #prepareChange}, which
- * IntelliJ calls on a <strong>background thread</strong>. This avoids blocking the EDT
- * while waiting for the language server response. The resulting {@link WorkspaceEdit}s
- * are then applied quickly under the write lock in {@code beforeVfsChange()}.
+ * The {@code workspace/will*} requests are sent during {@link #prepareChange}. For an
+ * operation made in the IDE, IntelliJ calls it in the write action that makes the change,
+ * so waiting there for the language server response blocks the UI. A rename or move
+ * refactoring therefore sends {@code workspace/willRenameFiles} before its write action
+ * and waits for the response under its progress (see {@link WillRenameFilesPreparation}),
+ * and {@link #prepareChange} uses that response instead of sending the request again.
+ * The resulting {@link WorkspaceEdit}s are then applied under the write lock in
+ * {@code beforeVfsChange()}.
  * <p>
  * Subclasses must implement the abstract hook methods to specify how IntelliJ
  * VFS events are converted into LSP {@link FileEvent}, {@link FileCreate},
@@ -84,6 +91,14 @@ public abstract class AbstractLSPFileListener implements FileEditorManagerListen
     }
 
     /**
+     * Returns the deadline, as an absolute {@link System#nanoTime()}, for the responses to
+     * {@code workspace/will*} requests sent now.
+     */
+    private static long getFileOperationsDeadlineNanos() {
+        return System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(getFileOperationsTimeoutMs());
+    }
+
+    /**
      * The associated language server wrapper.
      */
     protected final LanguageServerWrapper languageServerWrapper;
@@ -92,6 +107,12 @@ public abstract class AbstractLSPFileListener implements FileEditorManagerListen
      * Manages file system watchers declared by the LSP client.
      */
     protected final FileSystemWatcherManager fileSystemWatcherManager;
+
+    /**
+     * The {@code workspace/willRenameFiles} requests that a refactoring sent before its write action,
+     * which the VFS events of the refactoring use instead of sending the requests again.
+     */
+    private final List<PreparedRenames> preparedRenames = new ArrayList<>();
 
     /**
      * Creates a new LSP-aware file listener.
@@ -116,9 +137,7 @@ public abstract class AbstractLSPFileListener implements FileEditorManagerListen
         // These stamps are checked before applying edits to detect and discard
         // stale edits whose target documents were modified while waiting.
         Map<String, Long> documentStamps = captureDocumentStamps();
-        // Collect workspace edits on background thread (prepareChange runs off-EDT)
-        // so the UI is never blocked waiting for the language server response
-        List<WorkspaceEdit> workspaceEdits = collectWillEdits(supportedEvents);
+        List<WillEdit> workspaceEdits = collectWillEdits(supportedEvents, documentStamps);
         // The documents without an editor that the edits change, saved once the VFS event is over
         Set<Document> documentsToSave = new LinkedHashSet<>();
         return new ChangeApplier() {
@@ -129,10 +148,10 @@ public abstract class AbstractLSPFileListener implements FileEditorManagerListen
                     LOGGER.warn("Discarding workspace/will* edits: server connection was recycled");
                     return;
                 }
-                for (WorkspaceEdit edit : workspaceEdits) {
-                    if (areTargetDocumentsUnchanged(edit, documentStamps)) {
+                for (WillEdit edit : workspaceEdits) {
+                    if (areTargetDocumentsUnchanged(edit.edit(), edit.documentStamps())) {
                         // A document cannot be saved during a VFS event
-                        LSPIJUtils.applyWorkspaceEdit(edit, null, false, documentsToSave);
+                        LSPIJUtils.applyWorkspaceEdit(edit.edit(), null, false, documentsToSave);
                     } else {
                         LOGGER.warn("Discarding stale workspace/will* edit: target document(s) modified during request");
                     }
@@ -239,11 +258,8 @@ public abstract class AbstractLSPFileListener implements FileEditorManagerListen
 
     /**
      * Sends {@code workspace/will*} requests to the language server and collects the
-     * resulting {@link WorkspaceEdit}s.
-     * <p>
-     * This method is called from {@link #prepareChange}, which runs on a background thread,
-     * so blocking on the server response does not freeze the UI. The collected edits are
-     * then applied under the write lock in {@code beforeVfsChange()}.
+     * resulting {@link WorkspaceEdit}s, which are then applied under the write lock in
+     * {@code beforeVfsChange()}.
      * <p>
      * Per the LSP specification (§3.16.4), {@code workspace/will*} requests are only sent
      * for file operations triggered from within the client (user actions or workspace edits).
@@ -251,17 +267,18 @@ public abstract class AbstractLSPFileListener implements FileEditorManagerListen
      * are skipped, matching VS Code's behavior.
      * <p>
      * <b>Note on inside-IDE operations:</b> For file operations initiated by the user within
-     * the IDE, IntelliJ holds a write lock on the EDT and waits for the entire VFS pipeline
-     * (including {@code prepareChange()}) to complete. This means the EDT is indirectly
-     * blocked for the duration of the server response. The configurable
-     * {@code fileOperationsTimeout} setting bounds this wait. Unlike VS Code, which can show a cancellable progress
-     * notification because its UI thread is never blocked, IntelliJ's EDT is unavailable
-     * for UI updates during this period.
+     * the IDE, IntelliJ calls {@code prepareChange()} in the write action that makes the
+     * change, so the UI is blocked for the duration of the server response. The configurable
+     * {@code fileOperationsTimeout} setting bounds this wait. The renames and moves of a
+     * refactoring avoid it: their {@code workspace/willRenameFiles} response was received
+     * before the write action, and is used here without sending the request again.
      *
-     * @param events the list of VFS events
+     * @param events         the list of VFS events
+     * @param documentStamps the modification stamps of the opened documents
      * @return the non-null workspace edits returned by the server
      */
-    private @NotNull List<WorkspaceEdit> collectWillEdits(@NotNull List<? extends @NotNull VFileEvent> events) {
+    private @NotNull List<WillEdit> collectWillEdits(@NotNull List<? extends @NotNull VFileEvent> events,
+                                                     @NotNull Map<String, Long> documentStamps) {
         List<FileCreate> fileCreates = new ArrayList<>(); // workspace/willCreateFiles events
         List<FileDelete> fileDeletes = new ArrayList<>(); // workspace/willDeleteFiles events
         List<FileRename> fileRenames = new ArrayList<>(); // workspace/willRenameFiles events
@@ -310,33 +327,123 @@ public abstract class AbstractLSPFileListener implements FileEditorManagerListen
             }
         }
 
-        List<WorkspaceEdit> edits = new ArrayList<>();
+        var edits = new ArrayList<WillEdit>();
         var ls = languageServerWrapper.getLanguageServer();
         if (ls != null) {
-            long deadlineNanos = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(getFileOperationsTimeoutMs());
+            long deadlineNanos = getFileOperationsDeadlineNanos();
             if (!fileCreates.isEmpty()) {
                 var params = new CreateFilesParams(fileCreates);
                 var edit = getWorkspaceEdit(ls.getWorkspaceService().willCreateFiles(params), deadlineNanos);
                 if (edit != null) {
-                    edits.add(edit);
+                    edits.add(new WillEdit(edit, documentStamps));
                 }
             }
             if (!fileDeletes.isEmpty()) {
                 var params = new DeleteFilesParams(fileDeletes);
                 var edit = getWorkspaceEdit(ls.getWorkspaceService().willDeleteFiles(params), deadlineNanos);
                 if (edit != null) {
-                    edits.add(edit);
+                    edits.add(new WillEdit(edit, documentStamps));
                 }
             }
-            if (!fileRenames.isEmpty()) {
-                var params = new RenameFilesParams(fileRenames);
+            List<FileRename> unpreparedRenames = takePreparedRenames(fileRenames, ls, edits);
+            if (!unpreparedRenames.isEmpty()) {
+                var params = new RenameFilesParams(unpreparedRenames);
                 var edit = getWorkspaceEdit(ls.getWorkspaceService().willRenameFiles(params), deadlineNanos);
                 if (edit != null) {
-                    edits.add(edit);
+                    edits.add(new WillEdit(edit, documentStamps));
                 }
             }
         }
         return edits;
+    }
+
+    /**
+     * Sends a {@code workspace/willRenameFiles} request for the renames and moves that a refactoring
+     * is about to make, before its write action. The VFS events of the refactoring then use the
+     * response instead of sending the request again, once {@link #awaitWillRenameFiles()} waited for it.
+     *
+     * @param renames the files and directories the refactoring renames or moves
+     */
+    void sendWillRenameFiles(@NotNull List<FileRenamePlan> renames) {
+        var ls = languageServerWrapper.getLanguageServer();
+        if (ls == null || !languageServerWrapper.isActive() ||
+                !LanguageServerItem.isWillRenameFilesSupported(languageServerWrapper.getServerCapabilitiesSync())) {
+            return;
+        }
+        var fileRenames = new ArrayList<FileRename>();
+        renames.forEach(rename -> onFileRenameBefore(rename.newParent(), rename.file(), rename.newName(), fileRenames));
+        var unmade = new LinkedHashSet<>(fileRenames);
+        if (unmade.isEmpty()) {
+            return;
+        }
+        long deadlineNanos = getFileOperationsDeadlineNanos();
+        var documentStamps = captureDocumentStamps();
+        var request = ls.getWorkspaceService().willRenameFiles(new RenameFilesParams(List.copyOf(unmade)));
+        synchronized (preparedRenames) {
+            preparedRenames.add(new PreparedRenames(ls, unmade, documentStamps, request, deadlineNanos));
+        }
+    }
+
+    /**
+     * Waits for the responses to the requests that {@link #sendWillRenameFiles} sent, each for up to
+     * the file operations timeout.
+     */
+    void awaitWillRenameFiles() {
+        List<PreparedRenames> prepared;
+        synchronized (preparedRenames) {
+            prepared = List.copyOf(preparedRenames);
+        }
+        prepared.forEach(PreparedRenames::await);
+    }
+
+    /**
+     * Drops the responses that the VFS events of a refactoring did not use, once it is done,
+     * and cancels the requests still pending.
+     */
+    void clearWillRenameFiles() {
+        synchronized (preparedRenames) {
+            preparedRenames.forEach(renames -> renames.request.cancel(true));
+            preparedRenames.clear();
+        }
+    }
+
+    /**
+     * Takes the renames that a refactoring requested before its write action, and adds the edit of
+     * their response, once, to the given edits.
+     *
+     * @param fileRenames the renames of the VFS events
+     * @param ls          the language server to send requests to now
+     * @param edits       the edits to apply before the VFS events
+     * @return the renames that still need a request
+     */
+    private @NotNull List<FileRename> takePreparedRenames(@NotNull List<FileRename> fileRenames,
+                                                          @NotNull LanguageServer ls,
+                                                          @NotNull List<WillEdit> edits) {
+        synchronized (preparedRenames) {
+            if (preparedRenames.isEmpty()) {
+                return fileRenames;
+            }
+            var unprepared = new ArrayList<FileRename>();
+            for (FileRename fileRename : fileRenames) {
+                // A response from before the server connection was recycled does not apply to the new one
+                var prepared = preparedRenames.stream()
+                        .filter(renames -> renames.server == ls && renames.unmade.contains(fileRename))
+                        .findFirst()
+                        .orElse(null);
+                if (prepared == null) {
+                    unprepared.add(fileRename);
+                } else {
+                    prepared.unmade.remove(fileRename);
+                    // The edit of a request for several renames is applied before the first of them
+                    var edit = prepared.takeEdit();
+                    if (edit != null) {
+                        edits.add(new WillEdit(edit, prepared.documentStamps));
+                    }
+                }
+            }
+            preparedRenames.removeIf(renames -> renames.unmade.isEmpty());
+            return unprepared;
+        }
     }
 
     /**
@@ -694,6 +801,57 @@ public abstract class AbstractLSPFileListener implements FileEditorManagerListen
      */
     protected FileEvent fe(URI uri, FileChangeType type) {
         return new FileEvent(languageServerWrapper.toUriString(uri), type);
+    }
+
+    /**
+     * A {@code workspace/will*} edit, with the modification stamps of the opened documents
+     * from when its request was sent.
+     */
+    private record WillEdit(@NotNull WorkspaceEdit edit, @NotNull Map<String, Long> documentStamps) {
+    }
+
+    /**
+     * A {@code workspace/willRenameFiles} request that a refactoring sent before its write action.
+     */
+    private static final class PreparedRenames {
+
+        private final @NotNull LanguageServer server;
+        // The renames of the request whose VFS events have not come yet, guarded by preparedRenames
+        private final @NotNull Set<FileRename> unmade;
+        private final @NotNull Map<String, Long> documentStamps;
+        private final @NotNull CompletableFuture<WorkspaceEdit> request;
+        private final long deadlineNanos;
+        // Guarded by preparedRenames
+        private boolean editTaken;
+
+        private PreparedRenames(@NotNull LanguageServer server,
+                                @NotNull Set<FileRename> unmade,
+                                @NotNull Map<String, Long> documentStamps,
+                                @NotNull CompletableFuture<WorkspaceEdit> request,
+                                long deadlineNanos) {
+            this.server = server;
+            this.unmade = unmade;
+            this.documentStamps = documentStamps;
+            this.request = request;
+            this.deadlineNanos = deadlineNanos;
+        }
+
+        private void await() {
+            // Cancels the request when it times out
+            getWorkspaceEdit(request, deadlineNanos);
+        }
+
+        /**
+         * Returns the edit of the response the first time only, or {@code null} if the request
+         * has not completed, timed out or failed.
+         */
+        private @Nullable WorkspaceEdit takeEdit() {
+            if (editTaken) {
+                return null;
+            }
+            editTaken = true;
+            return request.isDone() && !request.isCompletedExceptionally() ? request.join() : null;
+        }
     }
 
 }

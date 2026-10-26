@@ -18,10 +18,13 @@ import com.intellij.openapi.fileTypes.MockLanguageFileType;
 import com.intellij.openapi.fileTypes.PlainTextFileType;
 import com.intellij.openapi.fileTypes.PlainTextLanguage;
 import com.intellij.openapi.vfs.VirtualFile;
+import com.intellij.psi.PsiDocumentManager;
 import com.intellij.psi.PsiFile;
 import com.intellij.psi.PsiFileFactory;
 import com.intellij.testFramework.LightPlatformTestCase;
 import com.intellij.testFramework.LightVirtualFile;
+import com.intellij.xdebugger.XDebuggerUtil;
+import com.intellij.xdebugger.evaluation.EvaluationMode;
 
 public class DAPDebuggerEditorsProviderTest extends LightPlatformTestCase {
 
@@ -35,6 +38,28 @@ public class DAPDebuggerEditorsProviderTest extends LightPlatformTestCase {
         PsiFile codeFragment = debuggerEditorsProvider.createExpressionCodeFragment(getProject(), "", textFile, true);
         assertEquals(PlainTextFileType.INSTANCE, codeFragment.getFileType());
         assertEquals(PlainTextLanguage.INSTANCE, codeFragment.getLanguage());
+    }
+
+    public void testFragmentIsPhysicalOnlyWhenAsked() {
+        PsiFile textFile = createFile("test.txt", "Hello, world.");
+        var provider = new DAPDebuggerEditorsProvider(PlainTextFileType.INSTANCE, null);
+
+        assertTrue(provider.createExpressionCodeFragment(getProject(), "n", textFile, true).isPhysical());
+        assertFalse(provider.createExpressionCodeFragment(getProject(), "n", textFile, false).isPhysical());
+    }
+
+    public void testTheDocumentOfAnExpressionEditorIsPhysical() {
+        // IntelliJ highlights and inspects the PSI of this document, as its logpoint editor does,
+        // and LocalInspectionsPass asserts that the file is physical
+        PsiFile textFile = createFile("test.txt", "Hello, world.");
+        var provider = new DAPDebuggerEditorsProvider(PlainTextFileType.INSTANCE, null);
+        var expression = XDebuggerUtil.getInstance().createExpression("n", null, null, EvaluationMode.EXPRESSION);
+
+        var document = provider.createDocument(getProject(), expression, textFile, EvaluationMode.EXPRESSION);
+
+        PsiFile fragment = PsiDocumentManager.getInstance(getProject()).getPsiFile(document);
+        assertNotNull(fragment);
+        assertTrue(fragment.isPhysical());
     }
 
     public void testWithDialectLanguage() {

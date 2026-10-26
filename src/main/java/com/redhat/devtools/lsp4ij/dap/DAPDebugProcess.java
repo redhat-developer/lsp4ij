@@ -334,6 +334,18 @@ public class DAPDebugProcess extends XDebugProcess implements Disposable {
     }
 
     @Override
+    public void startPausing() {
+        DAPClient client = parentClient;
+        if (client != null) {
+            client.pause()
+                    .exceptionally(error -> {
+                        print("Pausing failed: " + error.getMessage(), ConsoleViewContentType.ERROR_OUTPUT);
+                        return null;
+                    });
+        }
+    }
+
+    @Override
     public @Nullable XSmartStepIntoHandler<DAPStepIntoVariant> getSmartStepIntoHandler() {
         if (smartStepIntoHandler == null) {
             smartStepIntoHandler = new DAPSmartStepIntoHandler(getSession());

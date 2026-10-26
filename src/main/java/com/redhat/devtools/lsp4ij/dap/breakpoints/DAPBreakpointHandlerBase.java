@@ -19,6 +19,7 @@ import com.intellij.xdebugger.breakpoints.XBreakpoint;
 import com.intellij.xdebugger.breakpoints.XBreakpointType;
 import com.intellij.xdebugger.breakpoints.XLineBreakpoint;
 import com.redhat.devtools.lsp4ij.dap.descriptors.DebugAdapterDescriptor;
+import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import org.eclipse.lsp4j.debug.*;
 import org.eclipse.lsp4j.debug.services.IDebugProtocolServer;
 import org.jetbrains.annotations.NotNull;
@@ -28,6 +29,7 @@ import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Function;
 
 import static com.redhat.devtools.lsp4ij.dap.DAPIJUtils.*;
 
@@ -384,16 +386,48 @@ public abstract class DAPBreakpointHandlerBase<B extends XBreakpoint<?>> extends
      */
     private CompletableFuture<Void> sendExceptionBreakpointFilters(Collection<ExceptionBreakpointsFilter> applicableFilters,
                                                                    IDebugProtocolServer debugProtocolServer) {
-        SetExceptionBreakpointsArguments args = new SetExceptionBreakpointsArguments();
-        args.setFilters(
-                applicableFilters
-                        .stream()
-                        .map(ExceptionBreakpointsFilter::getFilter)
-                        .toArray(String[]::new));
+        boolean supportsFilterOptions = Boolean.TRUE.equals(getCapabilities(debugProtocolServer).getSupportsExceptionFilterOptions());
+        SetExceptionBreakpointsArguments args = createSetExceptionBreakpointsArguments(applicableFilters,
+                getExceptionBreakpointsPanel()::getCondition,
+                supportsFilterOptions);
         return debugProtocolServer
                 .setExceptionBreakpoints(args)
                 .thenAccept(r -> {
                 });
+    }
+
+    /**
+     * Returns the 'setExceptionBreakpoints' arguments for the given enabled filters. A filter which supports a
+     * condition and has one is sent with it in the filter options, when the DAP server supports them; any other
+     * filter is sent by its id.
+     *
+     * @param applicableFilters     the enabled exception breakpoint filters.
+     * @param conditions            the condition of a filter id, or null.
+     * @param supportsFilterOptions whether the DAP server supports exception filter options.
+     * @return the 'setExceptionBreakpoints' arguments.
+     */
+    static @NotNull SetExceptionBreakpointsArguments createSetExceptionBreakpointsArguments(@NotNull Collection<ExceptionBreakpointsFilter> applicableFilters,
+                                                                                           @NotNull Function<String, @Nullable String> conditions,
+                                                                                           boolean supportsFilterOptions) {
+        List<String> filters = new ArrayList<>();
+        List<ExceptionFilterOptions> filterOptions = new ArrayList<>();
+        for (var filter : applicableFilters) {
+            String condition = conditions.apply(filter.getFilter());
+            if (supportsFilterOptions && Boolean.TRUE.equals(filter.getSupportsCondition()) && StringUtils.isNotBlank(condition)) {
+                ExceptionFilterOptions options = new ExceptionFilterOptions();
+                options.setFilterId(filter.getFilter());
+                options.setCondition(condition);
+                filterOptions.add(options);
+            } else {
+                filters.add(filter.getFilter());
+            }
+        }
+        SetExceptionBreakpointsArguments args = new SetExceptionBreakpointsArguments();
+        args.setFilters(filters.toArray(String[]::new));
+        if (!filterOptions.isEmpty()) {
+            args.setFilterOptions(filterOptions.toArray(ExceptionFilterOptions[]::new));
+        }
+        return args;
     }
 
 }

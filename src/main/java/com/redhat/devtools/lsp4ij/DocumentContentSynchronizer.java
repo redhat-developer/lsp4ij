@@ -587,7 +587,7 @@ public class DocumentContentSynchronizer implements DocumentListener, Disposable
      *
      * @return the current version of the LSP {@link TextDocumentItem}.
      */
-    int getVersion() {
+    public int getVersion() {
         return version;
     }
 

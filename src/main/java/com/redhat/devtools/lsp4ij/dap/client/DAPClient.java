@@ -22,6 +22,7 @@ import com.intellij.openapi.progress.EmptyProgressIndicator;
 import com.intellij.util.concurrency.AppExecutorUtil;
 import com.intellij.openapi.progress.ProgressIndicator;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.ui.LightweightHint;
 import com.intellij.xdebugger.XDebugSession;
 import com.intellij.xdebugger.breakpoints.XBreakpoint;
@@ -48,6 +49,8 @@ import org.eclipse.lsp4j.jsonrpc.messages.ResponseMessage;
 
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.swing.*;
 import java.awt.*;
@@ -61,6 +64,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Function;
 import java.util.function.UnaryOperator;
 
 import static com.intellij.codeInsight.hint.HintManagerImpl.getHintPosition;
@@ -70,7 +74,12 @@ import static com.intellij.codeInsight.hint.HintManagerImpl.getHintPosition;
  */
 public class DAPClient implements IDebugProtocolClient, Disposable {
 
+    private static final Logger LOGGER = LoggerFactory.getLogger(DAPClient.class);
+
     public static final org.eclipse.lsp4j.debug.Thread[] EMPTY_THREADS = new org.eclipse.lsp4j.debug.Thread[0];
+
+    private static final int MAX_EXCEPTION_HINT_STACK_LINES = 10;
+    private static final long EXCEPTION_INFO_TIMEOUT_SECONDS = 1;
     /**
      * Any events we receive from the adapter that require further contact with the
      * adapter needs to be farmed off to another thread as the events arrive at the
@@ -382,34 +391,7 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
                                         if (StoppedEventArgumentsReason.EXCEPTION.equals(args.getReason())) {
                                             // The stopped event comes from an Exception
                                             // Show an error hint with the exception description in the proper line
-                                            var sourcePosition = context.getActiveExecutionStack() != null
-                                                    && context.getActiveExecutionStack().getTopFrame() != null ?
-                                                    context.getActiveExecutionStack().getTopFrame().getSourcePosition() : null;
-                                            if (sourcePosition != null) {
-                                                var file = sourcePosition.getFile();
-                                                Editor[] editors = LSPIJUtils.editorsForFile(file, getProject());
-                                                if (editors != null && editors.length > 0) {
-                                                    var editor = editors[0];
-                                                    int offset = sourcePosition.getOffset();
-
-                                                    // Wait briefly to be sure that scroll of the editor
-                                                    // has occurred before computing the error hint position.
-                                                    // TODO: remove this timer by detecting that scroll editor is finished
-                                                    // to display the error hint
-                                                    StringBuilder error = new StringBuilder("Exception has occurred: ");
-                                                    error.append(args.getText());
-                                                    if (StringUtils.isNotBlank(args.getDescription())) {
-                                                        error.append("\n");
-                                                        error.append(args.getDescription());
-                                                    }
-                                                    String errorMessage = error.toString();
-                                                    AppExecutorUtil.getAppScheduledExecutorService().schedule(() -> {
-                                                        ApplicationManager.getApplication().invokeLater(() -> {
-                                                            showErrorHint(editor, errorMessage, offset);
-                                                        });
-                                                    }, 1, TimeUnit.SECONDS);
-                                                }
-                                            }
+                                            showExceptionHint(getProject(), context, server, getCapabilities(), args, DAPClient::showErrorHint);
                                         }
                                     } else {
                                         session.breakpointReached(breakpoint, null, context);
@@ -419,16 +401,132 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
                 });
     }
 
+    /**
+     * Shows the error hint of an exception stop where the program stopped, in an editor of the top frame's file,
+     * with the text of {@link #getExceptionHint(IDebugProtocolServer, Capabilities, StoppedEventArguments)}. When no
+     * editor shows the file, nothing is asked of the debug adapter.
+     *
+     * @param project      the project.
+     * @param context      the suspend context of the stop.
+     * @param server       the debug adapter.
+     * @param capabilities the debug adapter capabilities.
+     * @param args         the stopped event, with the reason 'exception'.
+     * @param display      shows the text of the hint in the editor, at the offset where the program stopped.
+     * @return the future, completed once the text of the hint is known and its display scheduled.
+     */
+    static CompletableFuture<@Nullable Void> showExceptionHint(@NotNull Project project,
+                                                               @NotNull XSuspendContext context,
+                                                               @NotNull IDebugProtocolServer server,
+                                                               @NotNull Capabilities capabilities,
+                                                               @NotNull StoppedEventArguments args,
+                                                               @NotNull ErrorHintDisplay display) {
+        var stack = context.getActiveExecutionStack();
+        var topFrame = stack != null ? stack.getTopFrame() : null;
+        var position = topFrame != null ? topFrame.getSourcePosition() : null;
+        if (position == null) {
+            return CompletableFuture.completedFuture(null);
+        }
+        Editor[] editors = LSPIJUtils.editorsForFile(position.getFile(), project);
+        if (editors == null || editors.length == 0) {
+            return CompletableFuture.completedFuture(null);
+        }
+        Editor editor = editors[0];
+        int offset = position.getOffset();
+        // Wait briefly to be sure that scroll of the editor
+        // has occurred before computing the error hint position.
+        // TODO: remove this timer by detecting that scroll editor is finished
+        // to display the error hint
+        return getExceptionHint(server, capabilities, args)
+                .thenAccept(hint -> AppExecutorUtil.getAppScheduledExecutorService().schedule(
+                        () -> ApplicationManager.getApplication().invokeLater(() -> display.show(editor, hint, offset)),
+                        1, TimeUnit.SECONDS));
+    }
+
+    /**
+     * Shows the text of an error hint in an editor, at an offset.
+     */
+    @FunctionalInterface
+    interface ErrorHintDisplay {
+        void show(@NotNull Editor editor, @NotNull String text, int offset);
+    }
+
+    /**
+     * Returns the text of the error hint shown where the program stopped at an exception. When the debug adapter
+     * supports the 'exceptionInfo' request, the text has the exception's id, its description and the first lines
+     * of its stack trace; otherwise, or if the request fails, it has the stopped event's text and description.
+     *
+     * @param server       the debug adapter.
+     * @param capabilities the debug adapter capabilities.
+     * @param args         the stopped event, with the reason 'exception'.
+     * @return the text of the error hint.
+     */
+    static CompletableFuture<String> getExceptionHint(@NotNull IDebugProtocolServer server,
+                                                      @NotNull Capabilities capabilities,
+                                                      @NotNull StoppedEventArguments args) {
+        String stoppedHint = getExceptionHint(args.getText(), args.getDescription(), null);
+        if (!Boolean.TRUE.equals(capabilities.getSupportsExceptionInfoRequest()) || args.getThreadId() == null) {
+            return CompletableFuture.completedFuture(stoppedHint);
+        }
+        ExceptionInfoArguments exceptionInfoArgs = new ExceptionInfoArguments();
+        exceptionInfoArgs.setThreadId(args.getThreadId());
+        return server.exceptionInfo(exceptionInfoArgs)
+                // a debug adapter that doesn't answer must not keep the hint from being shown
+                .orTimeout(EXCEPTION_INFO_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+                .handle((info, error) -> {
+                    if (error != null || info == null) {
+                        return stoppedHint;
+                    }
+                    var details = info.getDetails();
+                    String exception = StringUtils.isNotBlank(info.getExceptionId()) || details == null ?
+                            info.getExceptionId() : details.getTypeName();
+                    return getExceptionHint(exception, info.getDescription(), details != null ? details.getStackTrace() : null);
+                });
+    }
+
+    private static String getExceptionHint(@Nullable String exception,
+                                            @Nullable String description,
+                                            @Nullable String stackTrace) {
+        StringBuilder hint = new StringBuilder("Exception has occurred: ");
+        hint.append(exception);
+        if (StringUtils.isNotBlank(description)) {
+            hint.append("\n");
+            hint.append(description);
+        }
+        if (StringUtils.isNotBlank(stackTrace)) {
+            // The hint shows where the exception comes from, not its whole stack
+            var lines = stackTrace.strip().lines().toList();
+            lines.stream()
+                    .limit(MAX_EXCEPTION_HINT_STACK_LINES)
+                    .forEach(line -> hint.append("\n").append(line));
+            if (lines.size() > MAX_EXCEPTION_HINT_STACK_LINES) {
+                hint.append("\n...");
+            }
+        }
+        return hint.toString();
+    }
+
     static void showErrorHint(@NotNull Editor editor, @NotNull String text, int offset) {
         if (ApplicationManager.getApplication().isUnitTestMode()) {
             return;
         }
+        String html = toHintHtml(text);
         if (ApplicationManager.getApplication().isDispatchThread()) {
-            doShowErrorHint(editor, text, offset);
+            doShowErrorHint(editor, html, offset);
         } else {
             ApplicationManager.getApplication()
-                    .invokeLater(() -> doShowErrorHint(editor, text, offset));
+                    .invokeLater(() -> doShowErrorHint(editor, html, offset));
         }
+    }
+
+    /**
+     * Returns the text of an error hint as the HTML the hint shows: its lines on lines of their own, and
+     * characters such as {@code <} as themselves.
+     *
+     * @param text the text of the error hint.
+     * @return the HTML of the error hint.
+     */
+    static @NotNull String toHintHtml(@NotNull String text) {
+        return StringUtil.escapeXmlEntities(text).replace("\n", "<br>");
     }
 
     private static void doShowErrorHint(@NotNull Editor editor, @NotNull String hintText, int offset) {
@@ -576,6 +674,42 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
         debugProtocolServer.stepIn(args);
     }
 
+    /**
+     * Pauses the debuggee. The 'pause' request pauses a thread, while IntelliJ pauses a whole debug session, in which
+     * no thread is selected while it runs: like VS Code when no thread is focused, this pauses the first thread the
+     * debug adapter reports. It does the same for each child session started with 'startDebugging', which may be the
+     * one that runs the program. The adapter's 'stopped' event then suspends the session.
+     *
+     * @return a future that completes once the 'pause' requests have been answered.
+     */
+    public CompletableFuture<Void> pause() {
+        var requests = new ArrayList<CompletableFuture<Void>>();
+        var server = debugProtocolServer;
+        if (server != null) {
+            requests.add(pauseFirstThread(server));
+        }
+        for (DAPClient child : List.copyOf(childrenClient)) {
+            requests.add(child.pause());
+        }
+        return CompletableFuture.allOf(requests.toArray(CompletableFuture[]::new));
+    }
+
+    /**
+     * Sends 'pause' for the first thread the debug adapter reports, if it reports any.
+     */
+    static CompletableFuture<Void> pauseFirstThread(@NotNull IDebugProtocolServer server) {
+        return server.threads()
+                .thenCompose(response -> {
+                    var threads = response != null ? response.getThreads() : null;
+                    if (threads == null || threads.length == 0) {
+                        return CompletableFuture.completedFuture(null);
+                    }
+                    PauseArguments args = new PauseArguments();
+                    args.setThreadId(threads[0].getId());
+                    return server.pause(args);
+                });
+    }
+
     public CompletableFuture<StepInTargetsResponse> stepInTargets(int frameId) {
         if (debugProtocolServer == null) {
             return CompletableFuture.completedFuture(null);
@@ -653,6 +787,66 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
             });
         }
         return result;
+    }
+
+    // Invalidated
+
+    @Override
+    public void invalidated(InvalidatedEventArguments args) {
+        invalidated(getSession(), args, () -> getThreads(true), this::reloadStackFrames);
+    }
+
+    /**
+     * Shows again what the debug adapter says is out of date, such as after an evaluation that changed the program
+     * while it is stopped: the threads, the stacks, the variables, or, when the event names no area, all of them.
+     * IntelliJ asks the debug adapter for variables each time its views show them, so rebuilding the views shows
+     * the new values; the stack frames are kept from the stop, so they are loaded again first.
+     *
+     * @param session        the debug session
+     * @param args           the invalidated event's arguments
+     * @param refreshThreads refreshes the threads panel
+     * @param reloadStacks   loads again the stack frames of the stopped thread with the given ID, or of every stopped
+     *                       thread for null
+     * @return a future that completes once the views are rebuilt, if they have to be
+     */
+    static CompletableFuture<Void> invalidated(@NotNull XDebugSession session,
+                                               @NotNull InvalidatedEventArguments args,
+                                               @NotNull Runnable refreshThreads,
+                                               @NotNull Function<Integer, CompletableFuture<Void>> reloadStacks) {
+        // the event may name an area more than once
+        List<String> areas = args.getAreas() != null ? Arrays.asList(args.getAreas()) : List.of();
+        boolean all = areas.isEmpty() || areas.contains(InvalidatedAreas.ALL);
+        if (all || areas.contains(InvalidatedAreas.THREADS)) {
+            refreshThreads.run();
+        }
+
+        boolean stacks = all || areas.contains(InvalidatedAreas.STACKS);
+        if (!session.isSuspended() || !stacks && !areas.contains(InvalidatedAreas.VARIABLES)) {
+            // a running program shows no stacks or variables
+            return CompletableFuture.completedFuture(null);
+        }
+        CompletableFuture<Void> reloaded = stacks ? reloadStacks.apply(args.getThreadId()) : CompletableFuture.completedFuture(null);
+        return reloaded
+                .exceptionally(error -> {
+                    // the other areas are shown again even so
+                    LOGGER.warn("Error while loading the stack frames again after a DAP invalidated event", error);
+                    return null;
+                })
+                .thenRun(session::rebuildViews);
+    }
+
+    /**
+     * Loads again the stack frames of the stopped thread with the given ID, or of every stopped thread for null.
+     */
+    private CompletableFuture<Void> reloadStackFrames(@Nullable Integer threadId) {
+        if (!(getSession().getSuspendContext() instanceof DAPSuspendContext context)) {
+            return CompletableFuture.completedFuture(null);
+        }
+        return CompletableFuture.allOf(Arrays.stream(context.getExecutionStacks())
+                .map(DAPExecutionStack.class::cast)
+                .filter(stack -> threadId == null || stack.getThreadId() == threadId)
+                .map(DAPExecutionStack::reloadStackFrames)
+                .toArray(CompletableFuture[]::new));
     }
 
     // Capabilities

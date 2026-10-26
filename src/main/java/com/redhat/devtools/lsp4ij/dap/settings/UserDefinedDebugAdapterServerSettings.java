@@ -298,12 +298,24 @@ public class UserDefinedDebugAdapterServerSettings implements PersistentStateCom
         @XCollection(elementTypes = ExceptionBreakpointsFilter.class)
         private Collection<ExceptionBreakpointsFilter> exceptionBreakpointsFilters;
 
+        @Tag("conditions")
+        @XCollection
+        private Map<String /* filter id */, String> exceptionBreakpointsFilterConditions = new TreeMap<>();
+
         public void setExceptionBreakpointsFilters(Collection<ExceptionBreakpointsFilter> exceptionBreakpointsFilters) {
             this.exceptionBreakpointsFilters = exceptionBreakpointsFilters;
         }
 
         public Collection<ExceptionBreakpointsFilter> getExceptionBreakpointsFilters() {
             return exceptionBreakpointsFilters;
+        }
+
+        public void setExceptionBreakpointsFilterConditions(Map<String, String> exceptionBreakpointsFilterConditions) {
+            this.exceptionBreakpointsFilterConditions = exceptionBreakpointsFilterConditions;
+        }
+
+        public Map<String, String> getExceptionBreakpointsFilterConditions() {
+            return exceptionBreakpointsFilterConditions;
         }
     }
 
