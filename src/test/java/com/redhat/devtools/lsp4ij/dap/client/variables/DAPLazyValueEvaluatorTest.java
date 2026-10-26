@@ -71,6 +71,34 @@ public class DAPLazyValueEvaluatorTest extends LightPlatformTestCase {
         assertTrue(evaluator.isEnabled());
     }
 
+    public void testAClickWhileTheValueLoadsDoesNotAskAgain() {
+        var value = variable("size", "3", 0, false);
+        var answer = new CompletableFuture<VariablesResponse>();
+        var evaluator = new DAPLazyValueEvaluator(server(answer), 12, resolved::add);
+
+        evaluator.startEvaluation(callback());
+        evaluator.startEvaluation(callback());
+        answer.complete(response(value));
+
+        // getting the value may run code: it is asked for once
+        assertEquals(List.of(12), asked);
+        assertEquals(List.of("3", "3"), evaluated);
+    }
+
+    public void testAClickAfterAFailedRequestAsksAgain() {
+        var value = variable("size", "3", 0, false);
+        var evaluator = new DAPLazyValueEvaluator(server(CompletableFuture.failedFuture(new IllegalStateException("getter threw")),
+                CompletableFuture.completedFuture(response(value))), 12, resolved::add);
+
+        evaluator.startEvaluation(callback());
+        evaluator.startEvaluation(callback());
+
+        assertEquals(List.of(12, 12), asked);
+        assertEquals(List.of("getter threw"), errors);
+        assertEquals(List.of("3"), evaluated);
+        assertFalse(evaluator.isEnabled());
+    }
+
     private static Variable variable(String name, String value, int reference, boolean lazy) {
         var variable = new Variable();
         variable.setName(name);
@@ -88,12 +116,16 @@ public class DAPLazyValueEvaluatorTest extends LightPlatformTestCase {
         return response;
     }
 
-    private IDebugProtocolServer server(CompletableFuture<VariablesResponse> answer) {
+    /**
+     * Returns a debug adapter which gives the answers in turn, the last one to every request after it.
+     */
+    @SafeVarargs
+    private IDebugProtocolServer server(CompletableFuture<VariablesResponse>... answers) {
         return (IDebugProtocolServer) Proxy.newProxyInstance(IDebugProtocolServer.class.getClassLoader(),
                 new Class[]{IDebugProtocolServer.class}, (proxy, method, args) -> switch (method.getName()) {
                     case "variables" -> {
                         asked.add(((VariablesArguments) args[0]).getVariablesReference());
-                        yield answer;
+                        yield answers[Math.min(asked.size(), answers.length) - 1];
                     }
                     case "equals" -> proxy == args[0];
                     case "hashCode" -> System.identityHashCode(proxy);

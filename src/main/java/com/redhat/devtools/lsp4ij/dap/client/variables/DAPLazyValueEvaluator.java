@@ -31,6 +31,8 @@ public class DAPLazyValueEvaluator extends XFullValueEvaluator {
     private final @NotNull IDebugProtocolServer server;
     private final int variablesReference;
     private final @NotNull Consumer<Variable> resolved;
+    // The request for the value: a click while it runs waits for it instead of asking again, as asking may run code
+    private @Nullable CompletableFuture<@Nullable Variable> request;
 
     /**
      * @param server             the debug adapter.
@@ -61,7 +63,7 @@ public class DAPLazyValueEvaluator extends XFullValueEvaluator {
 
     @Override
     public void startEvaluation(@NotNull XFullValueEvaluationCallback callback) {
-        resolve(server, variablesReference)
+        getRequest()
                 .whenComplete((variable, error) -> {
                     if (error != null) {
                         Throwable cause = error instanceof CompletionException && error.getCause() != null ? error.getCause() : error;
@@ -77,6 +79,30 @@ public class DAPLazyValueEvaluator extends XFullValueEvaluator {
                     resolved.accept(variable);
                     callback.evaluated(variable.getValue() != null ? variable.getValue() : "");
                 });
+    }
+
+    /**
+     * Returns the request for the value, the one which runs or gave the value, or a new one. A request which fails or
+     * gives no variable is asked again at the next click.
+     */
+    private synchronized @NotNull CompletableFuture<@Nullable Variable> getRequest() {
+        if (request == null) {
+            CompletableFuture<@Nullable Variable> newRequest = resolve(server, variablesReference);
+            request = newRequest;
+            newRequest.whenComplete((variable, error) -> {
+                if (error != null || variable == null) {
+                    forget(newRequest);
+                }
+            });
+            return newRequest;
+        }
+        return request;
+    }
+
+    private synchronized void forget(@NotNull CompletableFuture<@Nullable Variable> failed) {
+        if (request == failed) {
+            request = null;
+        }
     }
 
     /**
