@@ -174,7 +174,7 @@ public abstract class BreakpointHandlerBase<B extends XBreakpoint<?>> extends XB
      * @return the IntelliJ breakpoint from the DAP breakpoint id and null otherwise.
      */
     @Nullable
-    private B findBreakpointById(@Nullable Integer id) {
+    public B findBreakpointById(@Nullable Integer id) {
         if (id == null) {
             return null;
         }

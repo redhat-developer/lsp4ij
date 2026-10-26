@@ -25,6 +25,7 @@ import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.ui.LightweightHint;
 import com.intellij.xdebugger.XDebugSession;
+import com.intellij.xdebugger.breakpoints.SuspendPolicy;
 import com.intellij.xdebugger.breakpoints.XBreakpoint;
 import com.intellij.xdebugger.frame.XSuspendContext;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
@@ -66,6 +67,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
+import java.util.function.Supplier;
 import java.util.function.UnaryOperator;
 
 import static com.intellij.codeInsight.hint.HintManagerImpl.getHintPosition;
@@ -398,7 +400,8 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
         }
         StackFrame topFrame = frames[0];
         DAPSuspendContext context = getSuspendContext(threads, stoppedThread, frames);
-        XBreakpoint<?> breakpoint = isBreakpointStop(args) ? debugProcess.getBreakpointHandler().findBreakpoint(topFrame) : null;
+        var breakpointHandler = debugProcess.getBreakpointHandler();
+        XBreakpoint<?> breakpoint = getStopBreakpoint(args, breakpointHandler::findBreakpointById, () -> breakpointHandler.findBreakpoint(topFrame));
         if (breakpoint != null) {
             breakpointReached(getSession(), server, breakpoint, context, topFrame.getId(), stoppedThread.getId())
                     .exceptionally(this::reportBreakpointFailure);
@@ -422,6 +425,44 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
         Integer[] hitBreakpointIds = args.getHitBreakpointIds();
         return StoppedEventArgumentsReason.BREAKPOINT.equals(args.getReason())
                 || (hitBreakpointIds != null && hitBreakpointIds.length > 0);
+    }
+
+    /**
+     * Returns the IntelliJ breakpoint which stopped the program, and null if none did. When the debug adapter names
+     * the breakpoints which stopped the program, one which suspends is preferred, and a breakpoint which is not an
+     * IntelliJ breakpoint, such as the temporary breakpoint of "Run to Cursor", keeps the program stopped: the program
+     * is resumed only when each breakpoint which stopped it doesn't suspend. When it names none, the breakpoint is the
+     * one on the line where the program stopped.
+     *
+     * @param args             the stopped event.
+     * @param breakpointsById  returns the IntelliJ breakpoint of a DAP breakpoint id, and null if there is none.
+     * @param breakpointOnLine returns the IntelliJ breakpoint on the line where the program stopped, and null if there
+     *                         is none.
+     * @return the IntelliJ breakpoint which stopped the program, and null if none did.
+     */
+    static @Nullable XBreakpoint<?> getStopBreakpoint(@NotNull StoppedEventArguments args,
+                                                      @NotNull Function<Integer, ? extends @Nullable XBreakpoint<?>> breakpointsById,
+                                                      @NotNull Supplier<? extends @Nullable XBreakpoint<?>> breakpointOnLine) {
+        if (!isBreakpointStop(args)) {
+            return null;
+        }
+        Integer[] hitBreakpointIds = args.getHitBreakpointIds();
+        if (hitBreakpointIds == null || hitBreakpointIds.length == 0) {
+            return breakpointOnLine.get();
+        }
+        XBreakpoint<?> stopBreakpoint = null;
+        boolean otherBreakpoint = false;
+        for (Integer id : hitBreakpointIds) {
+            XBreakpoint<?> breakpoint = breakpointsById.apply(id);
+            if (breakpoint == null) {
+                otherBreakpoint = true;
+            } else if (breakpoint.getSuspendPolicy() != SuspendPolicy.NONE) {
+                return breakpoint;
+            } else if (stopBreakpoint == null) {
+                stopBreakpoint = breakpoint;
+            }
+        }
+        return otherBreakpoint ? null : stopBreakpoint;
     }
 
     /**
