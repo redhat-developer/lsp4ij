@@ -36,6 +36,10 @@ The `Configuration` tab to specify the working directory and the file you want t
 
   ![DAP Configuration Type/Configuration](./images/DAP_config_type_configuration.png)
 
+### IntelliJ macro expansion
+
+IntelliJ platform macros in DAP configuration parameters are expanded when the debug configuration is prepared. This allows you to use macros such as `$FilePath$` in parameters that depend on the file being debugged, instead of manually specifying the file path.
+
 ## Breakpoints
 
 ### Adding breakpoint
