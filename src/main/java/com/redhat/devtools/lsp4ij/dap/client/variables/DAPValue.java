@@ -62,7 +62,13 @@ public class DAPValue extends XNamedValue {
         node.setPresentation(icon, getPresentation(shown), shown.getVariablesReference() > 0);
     }
 
-    private @NotNull Variable getShownVariable() {
+    /**
+     * Returns the variable which this value shows: the variable with the value of a lazy variable once the user asked
+     * for it, and the variable itself otherwise.
+     *
+     * @return the variable which this value shows.
+     */
+    @NotNull Variable getShownVariable() {
         Variable value = resolved;
         return value != null ? value : variable;
     }
