@@ -378,8 +378,9 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
     }
 
     /**
-     * Suspends the session where the given thread stopped. At a breakpoint, the session is told which one; elsewhere,
-     * the session is suspended at the top frame, and an exception which stopped the thread is shown there.
+     * Suspends the session where the given thread stopped. When a breakpoint stopped it, the session is told which
+     * one; otherwise, the session is suspended at the top frame, and an exception which stopped the thread is shown
+     * there.
      *
      * @param server        the debug adapter.
      * @param args          the stopped event.
@@ -397,7 +398,7 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
         }
         StackFrame topFrame = frames[0];
         DAPSuspendContext context = getSuspendContext(threads, stoppedThread, frames);
-        XBreakpoint<?> breakpoint = debugProcess.getBreakpointHandler().findBreakpoint(topFrame);
+        XBreakpoint<?> breakpoint = isBreakpointStop(args) ? debugProcess.getBreakpointHandler().findBreakpoint(topFrame) : null;
         if (breakpoint != null) {
             breakpointReached(getSession(), server, breakpoint, context, topFrame.getId(), stoppedThread.getId())
                     .exceptionally(this::reportBreakpointFailure);
@@ -407,6 +408,20 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
         if (StoppedEventArgumentsReason.EXCEPTION.equals(args.getReason())) {
             showExceptionHint(getProject(), context, server, getCapabilities(), args, DAPClient::showErrorHint);
         }
+    }
+
+    /**
+     * Returns whether the debug adapter says that a breakpoint stopped the program. A step, a pause or an exception
+     * which stops on the line of a breakpoint doesn't stop at that breakpoint, which would resume the program if it
+     * doesn't suspend.
+     *
+     * @param args the stopped event.
+     * @return true if a breakpoint stopped the program and false otherwise.
+     */
+    static boolean isBreakpointStop(@NotNull StoppedEventArguments args) {
+        Integer[] hitBreakpointIds = args.getHitBreakpointIds();
+        return StoppedEventArgumentsReason.BREAKPOINT.equals(args.getReason())
+                || (hitBreakpointIds != null && hitBreakpointIds.length > 0);
     }
 
     /**
