@@ -181,6 +181,7 @@ public class DAPStackFrame extends XStackFrame {
                         XValueChildrenList children = new XValueChildrenList();
                         VariablesArguments variablesArgs = new VariablesArguments();
                         variablesArgs.setVariablesReference(parentVariablesReference);
+                        variablesArgs.setFormat(client.getValueFormat());
                         server.variables(variablesArgs)
                                 .thenAccept(variablesResponse -> {
                                     children.addBottomGroup(new DAPValueGroup(this, scope.getName(),

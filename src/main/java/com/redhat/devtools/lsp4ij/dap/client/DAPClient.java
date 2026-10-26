@@ -33,6 +33,7 @@ import com.redhat.devtools.lsp4ij.console.explorer.TracingMessageConsumer;
 import com.redhat.devtools.lsp4ij.dap.DAPDebugProcess;
 import com.redhat.devtools.lsp4ij.dap.DebugMode;
 import com.redhat.devtools.lsp4ij.dap.TransportStreams;
+import com.redhat.devtools.lsp4ij.dap.client.variables.DAPValueFormat;
 import com.redhat.devtools.lsp4ij.dap.descriptors.DebugAdapterDescriptor;
 import com.redhat.devtools.lsp4ij.dap.disassembly.DisassemblyFile;
 import com.redhat.devtools.lsp4ij.dap.runInTerminal.RunInTerminalManager;
@@ -872,6 +873,7 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
         args.setExpression(expression);
         args.setFrameId(frameId);
         args.setContext(context);
+        args.setFormat(getValueFormat());
         return debugProtocolServer.evaluate(args);
     }
 
@@ -901,7 +903,8 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
         args.setName(name);
         args.setVariablesReference(variablesReference);
         args.setValue(value);
-        args.setFormat(new ValueFormat());
+        ValueFormat format = getValueFormat();
+        args.setFormat(format != null ? format : new ValueFormat());
         return debugProtocolServer.setVariable(args);
     }
 
@@ -1037,6 +1040,45 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
      */
     public boolean isSupportsStepInTargetsRequest() {
         return Boolean.TRUE.equals(getCapabilities().getSupportsStepInTargetsRequest());
+    }
+
+    /**
+     * Returns true if the debug adapter supports value formatting options and false otherwise.
+     *
+     * @return true if the debug adapter supports value formatting options and false otherwise.
+     */
+    public boolean isSupportsValueFormattingOptions() {
+        return DAPValueFormat.isSupported(getCapabilities());
+    }
+
+    /**
+     * Returns true if the debug adapter, or that of a child session started with 'startDebugging', supports value
+     * formatting options, and false otherwise. A child session may be the one which runs the program, and its
+     * requests ask for values in the format of the debug session.
+     *
+     * @return true if the debug adapter, or that of a child session, supports value formatting options, and false
+     * otherwise.
+     */
+    public boolean isSupportsValueFormattingOptionsInSessions() {
+        if (isSupportsValueFormattingOptions()) {
+            return true;
+        }
+        for (DAPClient child : List.copyOf(childrenClient)) {
+            if (child.isSupportsValueFormattingOptionsInSessions()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Returns the format in which values are asked for, as the user chose it in the Variables view, and null for the
+     * debug adapter's own format.
+     *
+     * @return the format in which values are asked for, and null for the debug adapter's own format.
+     */
+    public @Nullable ValueFormat getValueFormat() {
+        return debugProcess.getValueFormat().toValueFormat(getCapabilities());
     }
 
     public boolean canDisassemble() {
