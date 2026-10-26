@@ -89,13 +89,15 @@ public abstract class AbstractLSPDocumentFeatureSupport<Params, Result> extends 
      * @return the LSP response results.
      */
     protected synchronized CompletableFuture<Result> load(Params params) {
+        // Read the current modification stamp of the Psi file, and the Psi modification count of the project, which
+        // counts the modifications of the other files too, before the LSP requests are sent: a modification made while
+        // they are sent makes their result out of date
+        long modificationStamp = this.file.getModificationStamp();
+        long projectModificationCount = cancelWhenOtherFileModified ? getProjectModificationCount() : -1;
         CompletableFuture<Result> future = super.load(params);
-        // Update the modification stamp with the current modification stamp of the Psi file
-        this.modificationStamp = this.file.getModificationStamp();
-        if (cancelWhenOtherFileModified) {
-            // and the Psi modification count of the project, which counts the modifications of the other files too
-            this.projectModificationCount = getProjectModificationCount();
-        }
+        // Update them after super.load(), which checks the current LSP requests against the previous ones
+        this.modificationStamp = modificationStamp;
+        this.projectModificationCount = projectModificationCount;
         return future;
     }
 
