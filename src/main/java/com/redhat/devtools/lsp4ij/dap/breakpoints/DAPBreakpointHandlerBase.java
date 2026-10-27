@@ -250,9 +250,10 @@ public abstract class DAPBreakpointHandlerBase<B extends XBreakpoint<?>> extends
      * A forwarded native line breakpoint and a DAP breakpoint can be on the same line. Only the DAP
      * breakpoint is sent: two breakpoints at one location with different settings (condition, log,
      * suspend policy) cannot be merged without silently dropping one of them, and the DAP protocol
-     * leaves it to each debug adapter how it handles duplicates. The native breakpoint is marked as
-     * invalid for this debug session only (its tooltip explains why); it stays enabled and keeps
-     * working with the language's own debugger.
+     * leaves it to each debug adapter how it handles duplicates. The native breakpoint is shown as
+     * inactive for this debug session only, with the icon IntelliJ uses for a breakpoint which is
+     * inactive because of another breakpoint; it stays enabled and keeps working with the language's
+     * own debugger.
      */
     @Override
     protected void onBreakpointsChanged(@NotNull B breakpoint) {
@@ -274,7 +275,9 @@ public abstract class DAPBreakpointHandlerBase<B extends XBreakpoint<?>> extends
             if (shadowedBreakpoints.add(breakpoint)) {
                 // The breakpoint is not sent anymore: forget the DAP id it had before
                 breakpoint.putUserData(DAP_BREAKPOINT_ID, null);
-                debugSession.setBreakpointInvalid(lineBreakpoint, SHADOWED_BREAKPOINT_MESSAGE);
+                // Not an error: the inactive dependent icon instead of the invalid one
+                debugSession.updateBreakpointPresentation(lineBreakpoint,
+                        lineBreakpoint.getType().getInactiveDependentIcon(), SHADOWED_BREAKPOINT_MESSAGE);
             }
         } else if (shadowedBreakpoints.remove(breakpoint)) {
             // Reset the presentation; the response of the debug adapter updates it when the breakpoint is sent

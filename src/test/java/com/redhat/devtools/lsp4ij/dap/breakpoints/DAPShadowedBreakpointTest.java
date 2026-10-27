@@ -2,6 +2,7 @@
 package com.redhat.devtools.lsp4ij.dap.breakpoints;
 
 import com.intellij.execution.executors.DefaultDebugExecutor;
+import com.intellij.icons.AllIcons;
 import com.intellij.execution.runners.ExecutionEnvironmentBuilder;
 import com.intellij.openapi.application.WriteAction;
 import com.intellij.openapi.vfs.LocalFileSystem;
@@ -50,7 +51,7 @@ public class DAPShadowedBreakpointTest extends HeavyPlatformTestCase {
             if (m.getName().equals("setBreakpointInvalid")) {
                 presentations.add("invalid:" + a[1]);
             } else if (m.getName().equals("updateBreakpointPresentation")) {
-                presentations.add("reset:" + a[2]);
+                presentations.add(presentation(a));
             }
             return null;
         });
@@ -78,7 +79,7 @@ public class DAPShadowedBreakpointTest extends HeavyPlatformTestCase {
             // A DAP breakpoint on the same line: only the DAP breakpoint is sent, the native one is marked
             handler.registerBreakpoint(dapBreakpoint);
             assertNull(single(requests).getCondition());
-            assertEquals(List.of("invalid:" + DAPBreakpointHandlerBase.SHADOWED_BREAKPOINT_MESSAGE), presentations);
+            assertEquals(List.of("inactive:" + DAPBreakpointHandlerBase.SHADOWED_BREAKPOINT_MESSAGE), presentations);
             requests.clear();
             presentations.clear();
 
@@ -108,7 +109,7 @@ public class DAPShadowedBreakpointTest extends HeavyPlatformTestCase {
             switch (m.getName()) {
                 case "setBreakpointInvalid" -> presentations.add(target + "invalid:" + a[1]);
                 case "setBreakpointVerified" -> presentations.add(target + "verified");
-                case "updateBreakpointPresentation" -> presentations.add(target + "reset:" + a[2]);
+                case "updateBreakpointPresentation" -> presentations.add(target + presentation(a));
                 default -> {
                 }
             }
@@ -133,7 +134,7 @@ public class DAPShadowedBreakpointTest extends HeavyPlatformTestCase {
             handler.registerBreakpoint(dapBreakpoint);
             handler.initialize(server, new Capabilities()).join();
             assertNull(single(requests).getCondition());
-            assertEquals(List.of("native invalid:" + DAPBreakpointHandlerBase.SHADOWED_BREAKPOINT_MESSAGE,
+            assertEquals(List.of("native inactive:" + DAPBreakpointHandlerBase.SHADOWED_BREAKPOINT_MESSAGE,
                     "dap invalid:pending native script resolution"), presentations);
             requests.clear();
             presentations.clear();
@@ -157,6 +158,15 @@ public class DAPShadowedBreakpointTest extends HeavyPlatformTestCase {
             handler.dispose();
             com.intellij.openapi.util.io.FileUtil.delete(dir.toFile());
         }
+    }
+
+    /** Describes an 'updateBreakpointPresentation' call: a reset (no icon) or the inactive dependent icon. */
+    private static String presentation(Object[] args) {
+        if (args[1] == null) {
+            return "reset:" + args[2];
+        }
+        assertSame(AllIcons.Debugger.Db_dep_line_breakpoint, args[1]);
+        return "inactive:" + args[2];
     }
 
     private static SourceBreakpoint single(List<SetBreakpointsArguments> requests) {
