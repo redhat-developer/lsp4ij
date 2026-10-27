@@ -19,6 +19,7 @@ import com.intellij.xdebugger.breakpoints.SuspendPolicy;
 import com.intellij.xdebugger.breakpoints.XBreakpoint;
 import com.intellij.xdebugger.breakpoints.XBreakpointType;
 import com.intellij.xdebugger.breakpoints.XLineBreakpoint;
+import com.redhat.devtools.lsp4ij.dap.DAPBundle;
 import com.redhat.devtools.lsp4ij.dap.descriptors.DebugAdapterDescriptor;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import org.eclipse.lsp4j.debug.*;
@@ -40,8 +41,6 @@ import static com.redhat.devtools.lsp4ij.dap.DAPIJUtils.*;
 public abstract class DAPBreakpointHandlerBase<B extends XBreakpoint<?>> extends BreakpointHandlerBase<B> {
 
     private static final SourceBreakpoint[] EMPTY_SOURCE_BREAKPOINTS = new SourceBreakpoint[0];
-
-    static final String SHADOWED_BREAKPOINT_MESSAGE = "Ignored in this DAP debug session: a DAP breakpoint on the same line takes precedence.";
 
     private final @NotNull DAPExceptionBreakpointsPanel exceptionBreakpointsPanel;
     private final Set<B> shadowedBreakpoints = ConcurrentHashMap.newKeySet();
@@ -277,7 +276,7 @@ public abstract class DAPBreakpointHandlerBase<B extends XBreakpoint<?>> extends
                 breakpoint.putUserData(DAP_BREAKPOINT_ID, null);
                 // Not an error: the inactive dependent icon instead of the invalid one
                 debugSession.updateBreakpointPresentation(lineBreakpoint,
-                        lineBreakpoint.getType().getInactiveDependentIcon(), SHADOWED_BREAKPOINT_MESSAGE);
+                        lineBreakpoint.getType().getInactiveDependentIcon(), DAPBundle.message("dap.breakpoints.shadowed"));
             }
         } else if (shadowedBreakpoints.remove(breakpoint)) {
             // Reset the presentation; the response of the debug adapter updates it when the breakpoint is sent

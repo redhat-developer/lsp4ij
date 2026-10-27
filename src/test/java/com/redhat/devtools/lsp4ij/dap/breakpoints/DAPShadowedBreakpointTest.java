@@ -14,6 +14,7 @@ import com.intellij.xdebugger.breakpoints.XBreakpointProperties;
 import com.intellij.xdebugger.breakpoints.XBreakpointType;
 import com.intellij.xdebugger.breakpoints.XLineBreakpoint;
 import com.intellij.xdebugger.breakpoints.XLineBreakpointType;
+import com.redhat.devtools.lsp4ij.dap.DAPBundle;
 import com.redhat.devtools.lsp4ij.dap.configurations.DAPRunConfigurationOptions;
 import org.eclipse.lsp4j.debug.*;
 import org.eclipse.lsp4j.debug.services.IDebugProtocolServer;
@@ -79,7 +80,7 @@ public class DAPShadowedBreakpointTest extends HeavyPlatformTestCase {
             // A DAP breakpoint on the same line: only the DAP breakpoint is sent, the native one is marked
             handler.registerBreakpoint(dapBreakpoint);
             assertNull(single(requests).getCondition());
-            assertEquals(List.of("inactive:" + DAPBreakpointHandlerBase.SHADOWED_BREAKPOINT_MESSAGE), presentations);
+            assertEquals(List.of("inactive:" + DAPBundle.message("dap.breakpoints.shadowed")), presentations);
             requests.clear();
             presentations.clear();
 
@@ -134,7 +135,7 @@ public class DAPShadowedBreakpointTest extends HeavyPlatformTestCase {
             handler.registerBreakpoint(dapBreakpoint);
             handler.initialize(server, new Capabilities()).join();
             assertNull(single(requests).getCondition());
-            assertEquals(List.of("native inactive:" + DAPBreakpointHandlerBase.SHADOWED_BREAKPOINT_MESSAGE,
+            assertEquals(List.of("native inactive:" + DAPBundle.message("dap.breakpoints.shadowed"),
                     "dap invalid:pending native script resolution"), presentations);
             requests.clear();
             presentations.clear();
