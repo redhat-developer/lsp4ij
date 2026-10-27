@@ -10,6 +10,7 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.features.codeAction.intention;
 
+import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.LSPRequestConstants;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
@@ -23,12 +24,16 @@ import org.eclipse.lsp4j.CodeActionParams;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 
 import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.isDoneNormally;
+import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.awaitWithCheckCanceled;
 
 /**
  * LSP code action support which loads and caches code actions by consuming:
@@ -39,19 +44,41 @@ import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.isDoneNorma
  */
 public class LSPIntentionCodeActionSupport extends AbstractLSPDocumentFeatureSupport<CodeActionParams, List<CodeActionData>> implements LSPLazyCodeActionProvider {
 
+    private static final Logger LOGGER = LoggerFactory.getLogger(LSPIntentionCodeActionSupport.class);
+
     private CodeActionParams previousParams;
 
     public LSPIntentionCodeActionSupport(@NotNull PsiFile file) {
         super(file);
     }
 
-    public CompletableFuture<List<CodeActionData>> getCodeActions(CodeActionParams params) {
-        if (previousParams != null && !previousParams.equals(params)) {
-            // the caret editor has changed, cancel the previous loading of textDocument/codeAction.
+    /**
+     * Get or load code actions for the given parameters.
+     * If the parameters have changed from the previous call (e.g., caret moved),
+     * cancel the in-flight request and start a new one.
+     *
+     * @param params the code action parameters (range, context, etc.)
+     * @return a future that will complete with the list of code actions
+     */
+    public CompletableFuture<List<CodeActionData>> getCodeActions(@NotNull CodeActionParams params) {
+        if (previousParams != null && hasChanged(params)) {
+            // The caret or selection has changed, cancel the previous loading of textDocument/codeAction
+            // to avoid wasting resources on obsolete results
             super.cancel();
         }
         previousParams = params;
         return super.getFeatureData(params);
+    }
+
+    /**
+     * Check if the code action parameters have changed since the last request.
+     * Used to determine if we should cancel the previous request and start a new one.
+     *
+     * @param params the new parameters to check
+     * @return true if parameters changed (or this is the first request), false otherwise
+     */
+    public boolean hasChanged(CodeActionParams params) {
+        return previousParams == null || !previousParams.equals(params);
     }
 
     @Override
@@ -116,11 +143,26 @@ public class LSPIntentionCodeActionSupport extends AbstractLSPDocumentFeatureSup
     @Override
     public @Nullable Either<CodeActionData, Boolean> getCodeActionAt(int index) {
         var future = super.getValidLSPFuture();
+        // This method is called from ShowIntentionsPass inside a ReadAction.
+        // Use awaitWithCheckCanceled to cooperate with IntelliJ's threading model:
+        // when a WriteAction is requested, the progress indicator is cancelled
+        // → ProcessCanceledException → ReadAction released → WriteAction proceeds.
+        // IntelliJ reschedules the pass automatically.
+        // See https://github.com/redhat-developer/lsp4ij/issues/1648
+        if (future != null) {
+            try {
+                awaitWithCheckCanceled(future);
+            } catch (ProcessCanceledException e) {
+                throw e;
+            } catch (CancellationException e) {
+                return null;
+            }
+        }
+
         if (isDoneNormally(future)) {
             List<CodeActionData> codeActions = future.getNow(null);
             if (codeActions != null) {
                 if (codeActions.size() > index) {
-                    // The LSP code actions are loaded and it matches the given index
                     return Either.forLeft(codeActions.get(index));
                 }
                 return Either.forRight(Boolean.FALSE);

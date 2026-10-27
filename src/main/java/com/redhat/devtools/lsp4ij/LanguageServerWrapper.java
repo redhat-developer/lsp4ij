@@ -15,6 +15,7 @@ import com.google.gson.JsonObject;
 import com.intellij.notification.Notification;
 import com.intellij.openapi.Disposable;
 import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.application.ModalityState;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.fileEditor.FileEditorManager;
 import com.intellij.openapi.fileEditor.FileEditorManagerListener;
@@ -27,12 +28,15 @@ import com.intellij.openapi.vfs.VirtualFileManager;
 import com.intellij.openapi.vfs.impl.BulkVirtualFileListenerAdapter;
 import com.intellij.psi.PsiFile;
 import com.intellij.util.Alarm;
+import com.intellij.util.concurrency.AppExecutorUtil;
 import com.intellij.util.messages.MessageBusConnection;
 import com.redhat.devtools.lsp4ij.client.LanguageClientImpl;
+import com.redhat.devtools.lsp4ij.client.WorkspaceFolderNotificationManager;
 import com.redhat.devtools.lsp4ij.client.features.FileUriSupport;
 import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
 import com.redhat.devtools.lsp4ij.console.explorer.TracingMessageConsumer;
 import com.redhat.devtools.lsp4ij.features.diagnostics.LSPDiagnosticUtils;
+import com.redhat.devtools.lsp4ij.features.files.AbstractLSPFileListener;
 import com.redhat.devtools.lsp4ij.features.files.operations.FileOperationsManager;
 import com.redhat.devtools.lsp4ij.installation.ServerInstallationContext;
 import com.redhat.devtools.lsp4ij.installation.ServerInstallationStatus;
@@ -71,6 +75,7 @@ import java.util.function.UnaryOperator;
 
 import static com.redhat.devtools.lsp4ij.LSPIJUtils.findResourceFor;
 import static com.redhat.devtools.lsp4ij.features.diagnostics.LSPDiagnosticUtils.clearProblem;
+import static com.redhat.devtools.lsp4ij.internal.ApplicationUtils.runCancellableReadAction;
 import static com.redhat.devtools.lsp4ij.internal.CancellationSupport.showNotificationError;
 import static com.redhat.devtools.lsp4ij.internal.IntelliJPlatformUtils.getClientInfo;
 
@@ -98,13 +103,38 @@ public class LanguageServerWrapper implements Disposable {
     protected final Map<URI /* file Uri */, OpenedDocument> openedDocuments;
     @NotNull
     protected final Map<URI /* file Uri */, ClosedDocument> closedDocuments;
+    // Lock object to prevent deadlock when accessing both openedDocuments and closedDocuments
+    private final Object documentsLock = new Object();
+    // A new synchronizer must not restart at version 1 after close/reopen: a delayed edit for the
+    // previous incarnation could then look current. LSP versions only have to increase, not be
+    // consecutive, so one counter for all documents of this connection keeps them unique.
+    private final AtomicInteger documentVersion = new AtomicInteger();
+    // Guarded by documentsLock. Ordinary lookups promote scoped connections to the
+    // existing editor/feature lifetime; a temporary request must never close those.
+    private final Map<URI, ScopedDocumentConnection> scopedDocuments = new HashMap<>();
+
+    private static final class ScopedDocumentConnection {
+        private int owners;
+        private boolean persistent;
+
+        private ScopedDocumentConnection(boolean persistent) {
+            this.persistent = persistent;
+        }
+    }
+
+    private record DocumentConnectionClaim(URI uri, ScopedDocumentConnection connection,
+                                           AtomicBoolean released) {
+    }
     @Nullable
     protected final URI initialPath;
     protected final InitializeParams initParams = new InitializeParams();
     @NotNull
     private final LanguageServerDefinition serverDefinition;
     private final ExecutorService dispatcher;
+    private final Object notificationLock = new Object();
+    private @NotNull CompletableFuture<LanguageServer> lastNotification = CompletableFuture.completedFuture(null);
     private final ExecutorService listener;
+    private final ExecutorService messageWriter;
     private final SimpleModificationTracker modificationTracker = new SimpleModificationTracker();
     /**
      * Map containing unregistration handlers for dynamic capability registrations.
@@ -114,14 +144,14 @@ public class LanguageServerWrapper implements Disposable {
     private final LSPFileListener fileListener;
     private final AtomicInteger keepAliveCounter = new AtomicInteger();
     protected StreamConnectionProvider lspStreamProvider;
-    private MessageBusConnection messageBusConnection;
+    private volatile MessageBusConnection messageBusConnection;
     private Future<?> launcherFuture;
     private int numberOfRestartAttempts;
     private @Nullable CompletableFuture<Void> initializeFuture;
-    private LanguageServer languageServer;
+    private volatile LanguageServer languageServer;
     private LanguageClientImpl languageClient;
     private ServerCapabilities serverCapabilities;
-    private Timer timer;
+    private volatile @Nullable Alarm stopAlarm = null;
     private ServerStatus serverStatus;
     private boolean disposed;
     private LanguageServerException serverError;
@@ -129,6 +159,7 @@ public class LanguageServerWrapper implements Disposable {
     private List<String> currentProcessCommandLines;
     private boolean initiallySupportsWorkspaceFolders = false;
     private FileOperationsManager fileOperationsManager;
+    private WorkspaceFolderNotificationManager workspaceFolderNotificationManager;
 
     private LSPClientFeatures clientFeatures;
     // error notification displayed when server start fails.
@@ -136,7 +167,7 @@ public class LanguageServerWrapper implements Disposable {
     private @Nullable TracingMessageConsumer tracing;
     private volatile @Nullable ConcurrentLinkedQueue<LSPTrace> traces;
     private @Nullable Alarm traceFlushAlarm;
-    private InitializingContext currentInitializingContext;
+    private volatile @Nullable InitializingContext currentInitializingContext;
     private @NotNull TextDocumentSyncOptions syncOptions;
 
     /* Backwards compatible constructor */
@@ -153,22 +184,47 @@ public class LanguageServerWrapper implements Disposable {
         this.initialProject = project;
         this.initialPath = initialPath;
         this.serverDefinition = serverDefinition;
-        this.openedDocuments = new HashMap<>();
-        this.closedDocuments = new HashMap<>();
+        this.openedDocuments = new ConcurrentHashMap<>();
+        this.closedDocuments = new ConcurrentHashMap<>();
         this.fileListener = new LSPFileListener(this);
         VirtualFileManager.getInstance().addAsyncFileListener(fileListener, this);
 
         String projectName = sanitize(!serverDefinition.isSingleton() ? ("@" + project.getName()) : "");  //$NON-NLS-1$//$NON-NLS-2$
+
+        // Worker threads must not inherit the plugin classloader, or they pin it and block dynamic unload.
+        var workerCtxClassLoader = ApplicationManager.class.getClassLoader();
         String dispatcherThreadNameFormat = "LS-" + serverDefinition.getId() + projectName + "#dispatcher"; //$NON-NLS-1$ //$NON-NLS-2$
-        this.dispatcher = Executors
-                .newSingleThreadExecutor(new ThreadFactoryBuilder().setNameFormat(dispatcherThreadNameFormat).build());
+        this.dispatcher = Executors.newSingleThreadExecutor(new ThreadFactoryBuilder()
+                .setNameFormat(dispatcherThreadNameFormat)
+                .setThreadFactory(r -> {
+                    var t = new Thread(r);
+                    t.setContextClassLoader(workerCtxClassLoader);
+                    return t;
+                })
+                .build());
 
         // Executor service passed through to the LSP4j layer when we attempt to start the LS. It will be used
         // to create a listener that sits on the input stream and processes inbound messages (responses, or server-initiated
         // requests).
+        String messageWriterThreadNameFormat = "LS-" + serverDefinition.getId() + projectName + "#messageWriter"; //$NON-NLS-1$ //$NON-NLS-2$
+        this.messageWriter = Executors.newSingleThreadExecutor(new ThreadFactoryBuilder()
+                .setNameFormat(messageWriterThreadNameFormat)
+                .setThreadFactory(r -> {
+                    var t = new Thread(r);
+                    t.setContextClassLoader(workerCtxClassLoader);
+                    return t;
+                })
+                .build());
+
         String listenerThreadNameFormat = "LS-" + serverDefinition.getId() + projectName + "#listener-%d"; //$NON-NLS-1$ //$NON-NLS-2$
-        this.listener = Executors
-                .newCachedThreadPool(new ThreadFactoryBuilder().setNameFormat(listenerThreadNameFormat).build());
+        this.listener = Executors.newCachedThreadPool(new ThreadFactoryBuilder()
+                .setNameFormat(listenerThreadNameFormat)
+                .setThreadFactory(r -> {
+                    var t = new Thread(r);
+                    t.setContextClassLoader(workerCtxClassLoader);
+                    return t;
+                })
+                .build());
         updateStatus(ServerStatus.none);
 
         // When project is disposed, we dispose the language server
@@ -206,6 +262,7 @@ public class LanguageServerWrapper implements Disposable {
 
     void stopDispatcher() {
         this.dispatcher.shutdownNow();
+        this.messageWriter.shutdownNow();
 
         // Only really needed for testing - the listener (an instance of ConcurrentMessageProcessor) should exit
         // as soon as the input stream from the LS is closed, and a cached thread pool will recycle idle
@@ -213,6 +270,24 @@ public class LanguageServerWrapper implements Disposable {
         // If we don't do this then a full test run will generate a lot of threads because we create new
         // instances of this class for each test
         this.listener.shutdownNow();
+
+        // Wait briefly for threads to actually exit.
+        try {
+            if (!this.dispatcher.awaitTermination(2, TimeUnit.SECONDS)) {
+                LOGGER.warn("Dispatcher executor for language server '{}' did not terminate within 2s; classloader unload may be blocked",
+                        serverDefinition.getId());
+            }
+            if (!this.messageWriter.awaitTermination(2, TimeUnit.SECONDS)) {
+                LOGGER.warn("Message writer executor for language server '{}' did not terminate within 2s; classloader unload may be blocked",
+                        serverDefinition.getId());
+            }
+            if (!this.listener.awaitTermination(2, TimeUnit.SECONDS)) {
+                LOGGER.warn("Listener executor for language server '{}' did not terminate within 2s; classloader unload may be blocked",
+                        serverDefinition.getId());
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
     }
 
     public synchronized void stopAndDisable() {
@@ -270,8 +345,12 @@ public class LanguageServerWrapper implements Disposable {
                     // 1. send a textDocument/didOpen notification
                     // 2. refresh code vision, inlay hints, folding for all opened editors
                     // which edit the files associated to the language server.
-                    LanguageServiceAccessor.getInstance(getProject()).
-                            sendDidOpenAndRefreshEditorFeatureForOpenedFiles(serverDefinition, getProject());
+                    Project p = getProject();
+                    if (p.isDefault() || p.isDisposed()) {
+                        return;
+                    }
+                    LanguageServiceAccessor.getInstance(p).
+                            sendDidOpenAndRefreshEditorFeatureForOpenedFiles(serverDefinition, p);
                 });
     }
 
@@ -290,7 +369,41 @@ public class LanguageServerWrapper implements Disposable {
      * @throws LanguageServerException thrown when the language server cannot be started
      */
     public synchronized void start() throws LanguageServerException {
+        // Check for errors in LSP messages
+        // launcherFuture manages request/reponse LSP messages from the server
+        if (serverError == null) {
+            // If the launcher is done, check if there was an error
+            if (launcherFuture != null && launcherFuture.isDone()) {
+                // There is an error with messages. Ex: invalid int id)
+                // {
+                //  "id" : 1779401475267,
+                //  "jsonrpc" : "2.0",
+                //  "method" : "client/registerCapability",
+                //  "params" : {
+                try {
+                    // Try to get the result with a short timeout
+                    launcherFuture.get(5, TimeUnit.MILLISECONDS);
+                } catch (InterruptedException e) {
+                    // Interrupted - no action needed
+                } catch (ExecutionException e) {
+                    // An error occurred in LSP message processing
+                    serverError = new LanguageServerException(e.getCause());
+                } catch (TimeoutException e) {
+                    // Timeout - no error detected
+                }
+                // Show error notification if serverError was set
+                // The server will be stopped automatically after several attempts
+                showNotificationStartServerError();
+            }
+        }
         if (serverError != null) {
+            if (this.initializeFuture != null && !this.initializeFuture.isDone()) {
+                // A restart attempt is still initializing: serverError is only cleared once it
+                // succeeds, so stopping here would kill that attempt and spawn another process
+                // on every start() call (e.g. on each Search Everywhere keystroke).
+                // See: https://github.com/redhat-developer/lsp4ij/issues/1673
+                return;
+            }
             // Here the language server has been not possible
             // we stop it and attempts a new restart if needed
             stop();
@@ -317,7 +430,7 @@ public class LanguageServerWrapper implements Disposable {
         if (this.initializeFuture == null) {
             final VirtualFile rootURI = getRootURI();
             this.launcherFuture = new CompletableFuture<>();
-            var context = this.currentInitializingContext = new InitializingContext();
+            @NotNull var context = this.currentInitializingContext = new InitializingContext();
             // Use IntelliJ pooled thread instead of ForkJoinPool.commonPool() to avoid
             // ForkJoinPool.helpAsyncBlocker() executing blocking operations (like OSProcessHandler.waitFor())
             // in the current thread when called from ReadAction.
@@ -368,7 +481,7 @@ public class LanguageServerWrapper implements Disposable {
                         // Throws the CannotStartProcessException exception if process is not alive.
                         // This use case comes for instance when the start process command fails (not a valid start command)
                         provider.ensureIsAlive();
-                        startFuture.complete(currentInitializingContext);
+                        startFuture.complete(context);
                 } catch (Exception e) {
                     startFuture.completeExceptionally(e);
                 }
@@ -395,7 +508,7 @@ public class LanguageServerWrapper implements Disposable {
                                 // To avoid having some lock problem when message is written in the stream output
                                 // (when there are a lot of messages to write it)
                                 // we consume the message in async mode
-                                CompletableFuture.runAsync(() -> consumer.consume(message))
+                                CompletableFuture.runAsync(() -> consumer.consume(message), messageWriter)
                                         .exceptionally(e -> {
                                             // Log in the LSP console the error
                                             getLanguageServerLifecycleManager().onError(this, e);
@@ -445,11 +558,13 @@ public class LanguageServerWrapper implements Disposable {
                         return initializingContext;
                     })
                     .thenApply(initializingContext -> {
-                        messageBusConnection = ApplicationManager.getApplication().getMessageBus().connect();
+                        messageBusConnection = ApplicationManager.getApplication().getMessageBus().connect(this);
                         messageBusConnection.subscribe(FileEditorManagerListener.FILE_EDITOR_MANAGER, fileListener);
 
                         fileOperationsManager = new FileOperationsManager(this);
                         fileOperationsManager.setServerCapabilities(serverCapabilities);
+
+                        workspaceFolderNotificationManager = new WorkspaceFolderNotificationManager(this);
 
                         this.lspStreamProvider = initializingContext.provider;
                         this.languageClient = initializingContext.languageClient;
@@ -457,6 +572,7 @@ public class LanguageServerWrapper implements Disposable {
                         this.launcherFuture = initializingContext.launcherFuture;
 
                         updateStatus(ServerStatus.started);
+                        languageClient.updateWorkspaceDiagnosticProviders();
                         return initializingContext;
                     })
                     .thenRun(() -> {
@@ -512,7 +628,9 @@ public class LanguageServerWrapper implements Disposable {
         initParams.setClientInfo(getClientInfo());
         initParams.setTrace(provider.getTrace(rootURI));
 
-        var folders = LSPIJUtils.toWorkspaceFolders(initialProject, getClientFeatures());
+        var folders = getClientFeatures()
+            .getWorkspaceFolderFeature()
+            .getInitialWorkspaceFolders(initialProject);
         initParams.setWorkspaceFolders(folders);
 
         // Customize initialize params if needed
@@ -541,11 +659,13 @@ public class LanguageServerWrapper implements Disposable {
     }
 
     private void removeStopTimer(boolean stopping) {
-        if (timer != null) {
-            timer.cancel();
-            timer = null;
-            if (!stopping) {
-                updateStatus(ServerStatus.started);
+        Alarm stopAlarm = this.stopAlarm;
+        if (stopAlarm != null) {
+            if (stopAlarm.getActiveRequestCount() > 0) {
+                stopAlarm.cancelAllRequests();
+                if (!stopping) {
+                    updateStatus(ServerStatus.started);
+                }
             }
         }
     }
@@ -556,7 +676,10 @@ public class LanguageServerWrapper implements Disposable {
         // If this is an "interesting" status change, increment the project-level modification tracker and the wrapper's
         // modification tracker before firing events
         if (statusChanged) {
-            LanguageServiceAccessor.getInstance(getProject()).incrementModificationCount();
+            Project p = getProject();
+            if (!p.isDefault() && !p.isDisposed()) {
+                LanguageServiceAccessor.getInstance(p).incrementModificationCount();
+            }
             incrementModificationCount();
             getLanguageServerLifecycleManager().onStatusChanged(this);
             if (languageClient != null) {
@@ -567,19 +690,26 @@ public class LanguageServerWrapper implements Disposable {
     }
 
     private void startStopTimer() {
-        timer = new Timer("Stop Language Server Timer"); //$NON-NLS-1$
         updateStatus(ServerStatus.stopping);
-        timer.schedule(new TimerTask() {
-            @Override
-            public void run() {
-                try {
-                    stop();
-                } catch (Throwable t) {
-                    //Need to catch time task exceptions, or it will cancel the timer
-                    LOGGER.error("Failed to stop language server {}", LanguageServerWrapper.this.serverDefinition.getId(), t);
+        int delayMs = (int) TimeUnit.SECONDS.toMillis(serverDefinition.getLastDocumentDisconnectedTimeout());
+        getStopAlarm().addRequest(() -> {
+            try {
+                stop();
+            } catch (Throwable t) {
+                LOGGER.error("Failed to stop language server {}", serverDefinition.getId(), t);
+            }
+        }, delayMs);
+    }
+
+    private @NotNull Alarm getStopAlarm() {
+        if (stopAlarm == null) {
+            synchronized (this) {
+                if (stopAlarm == null) {
+                    stopAlarm = new Alarm(Alarm.ThreadToUse.POOLED_THREAD, this);
                 }
             }
-        }, TimeUnit.SECONDS.toMillis(this.serverDefinition.getLastDocumentDisconnectedTimeout()));
+        }
+        return stopAlarm;
     }
 
     /**
@@ -624,6 +754,73 @@ public class LanguageServerWrapper implements Disposable {
      */
     CompletableFuture<@Nullable LanguageServer> connect(@NotNull VirtualFile file,
                                                         @NotNull LanguageServerWrapper.LSPFileConnectionInfo fileConnectionInfo) {
+        synchronized (documentsLock) {
+            promoteConnection(toUri(file));
+        }
+        return connectDocument(file, fileConnectionInfo, null);
+    }
+
+    CompletableFuture<@Nullable LanguageServer> connect(@NotNull VirtualFile file,
+                                                        @NotNull LSPFileConnectionInfo info,
+                                                        @NotNull DocumentConnectionScope scope) {
+        URI uri = toUri(file);
+        if (uri == null) {
+            return CompletableFuture.completedFuture(null);
+        }
+        DocumentConnectionClaim claim;
+        synchronized (documentsLock) {
+            var connection = scopedDocuments.computeIfAbsent(uri,
+                    ignored -> new ScopedDocumentConnection(openedDocuments.containsKey(uri)));
+            connection.owners++;
+            claim = new DocumentConnectionClaim(uri, connection, new AtomicBoolean());
+        }
+        scope.register(() -> releaseConnection(file, claim));
+        return connectDocument(file, info, claim);
+    }
+
+    private void promoteConnection(@Nullable URI uri) {
+        var connection = scopedDocuments.get(uri);
+        if (connection != null) {
+            connection.persistent = true;
+        }
+    }
+
+    private boolean isCurrent(@Nullable DocumentConnectionClaim claim) {
+        return claim == null || (!claim.released().get()
+                && scopedDocuments.get(claim.uri()) == claim.connection());
+    }
+
+    private void releaseConnection(@NotNull VirtualFile file, @NotNull DocumentConnectionClaim claim) {
+        if (!claim.released().compareAndSet(false, true)) {
+            return;
+        }
+        // File opening and the final editor-ownership check are serialized on the EDT.
+        // Do not wait for the EDT here: formatting can run under a read action during save.
+        ApplicationManager.getApplication().invokeLater(() -> {
+            synchronized (documentsLock) {
+                var connection = scopedDocuments.get(claim.uri());
+                if (connection != claim.connection() || --connection.owners != 0) {
+                    return;
+                }
+                scopedDocuments.remove(claim.uri());
+                if (connection.persistent || (!initialProject.isDisposed()
+                        && FileEditorManager.getInstance(initialProject).isFileOpen(file))) {
+                    return;
+                }
+                disconnect(claim.uri(), false);
+            }
+            // As when an editor closes, a server started only for this request then follows the
+            // idle-shutdown policy. Stopping takes this wrapper's monitor before documentsLock,
+            // so it runs after the lock is released.
+            if (!isDisposed()) {
+                maybeShutdown();
+            }
+        }, ModalityState.any());
+    }
+
+    private CompletableFuture<@Nullable LanguageServer> connectDocument(@NotNull VirtualFile file,
+                                                                        @NotNull LSPFileConnectionInfo fileConnectionInfo,
+                                                                        @Nullable DocumentConnectionClaim claim) {
         removeStopTimer(false);
 
         URI fileUri = toUri(file);
@@ -633,9 +830,20 @@ public class LanguageServerWrapper implements Disposable {
         }
 
         boolean waitForDidOpen = fileConnectionInfo.waitForDidOpen();
-        var ls = getLanguageServerWhenDidOpen(fileUri, waitForDidOpen);
-        if (ls != null) {
-            return ls;
+        DocumentContentSynchronizer connected;
+        synchronized (documentsLock) {
+            if (!isCurrent(claim)) {
+                return CompletableFuture.completedFuture(null);
+            }
+            if (claim == null) {
+                promoteConnection(fileUri);
+            }
+            connected = getConnectedSynchronizer(fileUri);
+        }
+        if (connected != null) {
+            // After the lock: the didOpen can need the synchronized start(), and stop() takes that monitor
+            // before documentsLock
+            return getLanguageServerWhenDidOpen(connected, waitForDidOpen);
         }
 
         // start language server if needed
@@ -649,12 +857,6 @@ public class LanguageServerWrapper implements Disposable {
         return initializeFuture.thenComposeAsync(theVoid -> {
             // Here, the "initialize" future is initialized
 
-            // Check if file is already opened (without synchronized block)
-            var ls2 = getLanguageServerWhenDidOpen(fileUri, waitForDidOpen);
-            if (ls2 != null) {
-                return ls2;
-            }
-
             // Here the file is not already connected
             // To connect the file, we need the document instance to add LSP document listener to manage didOpen, didChange, etc.
             Document optionalDocument = fileConnectionInfo.document();
@@ -663,70 +865,130 @@ public class LanguageServerWrapper implements Disposable {
                 return CompletableFuture.completedFuture(null);
             }
 
-            synchronized (closedDocuments) {
+            // Compute workspace folder BEFORE synchronized block to avoid slow I/O operations in critical section
+            WorkspaceFolder folderToNotify = null;
+            if (workspaceFolderNotificationManager != null) {
+                folderToNotify = workspaceFolderNotificationManager.computeWorkspaceFolderToNotify(file);
+            }
+
+            // Before the lock: getInitializedServer() calls the synchronized start(), and stop() takes that
+            // monitor before documentsLock
+            var initializedServer = folderToNotify != null ? getInitializedServer() : null;
+            DocumentContentSynchronizer synchronizer;
+            synchronized (documentsLock) {
+                if (!isCurrent(claim)) {
+                    return CompletableFuture.completedFuture(null);
+                }
+                if (claim == null) {
+                    promoteConnection(fileUri);
+                }
+                // Remove from closed documents and check if already opened
                 closedDocuments.remove(fileUri);
-            }
-            synchronized (openedDocuments) {
+
                 // Check again if file is already opened (within synchronized block)
-                ls2 = getLanguageServerWhenDidOpen(fileUri, waitForDidOpen);
-                if (ls2 != null) {
-                    return ls2;
-                }
+                var alreadyConnected = getConnectedSynchronizer(fileUri);
+                if (alreadyConnected != null) {
+                    synchronizer = alreadyConnected;
+                } else {
 
-                DocumentContentSynchronizer synchronizer = createDocumentContentSynchronizer(toUriString(fileUri), file, document, fileConnectionInfo.documentText(), fileConnectionInfo.languageId());
-                // Synchronizer usually is disposed when document editor is closed.
-                // But in case of closing the project, it does not close all editors,
-                // so to ensure synchronizer is disposed we also register it here
-                Disposer.register(this, synchronizer);
-                document.addDocumentListener(synchronizer, synchronizer);
-                OpenedDocument data = new OpenedDocument(new LanguageServerItem(languageServer, this), file, synchronizer);
-                LanguageServerWrapper.this.openedDocuments.put(fileUri, data);
+                    // Mark the workspace folder as notified and queue its notification before the document's
+                    // didOpen, so that the server knows the folder first. Queuing does not wait.
+                    if (folderToNotify != null && workspaceFolderNotificationManager.markFolderAsNotified(folderToNotify)) {
+                        sendNotification(initializedServer, workspaceFolderNotificationManager.folderAddedNotification(folderToNotify));
+                    }
 
-                if (waitForDidOpen) {
-                    return getLanguageServerWhenDidOpen(synchronizer.getDidOpenFuture());
+                    synchronizer = createDocumentContentSynchronizer(
+                            toUriString(fileUri), file, document, fileConnectionInfo);
+                    // Synchronizer usually is disposed when document editor is closed.
+                    // But in case of closing the project, it does not close all editors,
+                    // so to ensure synchronizer is disposed we also register it here
+                    Disposer.register(this, synchronizer);
+                    document.addDocumentListener(synchronizer, synchronizer);
+                    OpenedDocument data = new OpenedDocument(new LanguageServerItem(languageServer, this), file, synchronizer);
+                    LanguageServerWrapper.this.openedDocuments.put(fileUri, data);
+                    invalidateWorkspaceDiagnosticCache(fileUri);
+                    if (!waitForDidOpen) {
+                        return CompletableFuture.completedFuture(languageServer);
+                    }
                 }
-                return CompletableFuture.completedFuture(languageServer);
             }
+            // After the lock: the didOpen can need the synchronized start(), and stop() takes that monitor
+            // before documentsLock
+            return getLanguageServerWhenDidOpen(synchronizer, waitForDidOpen);
         });
     }
 
-    @Nullable
-    private CompletableFuture<LanguageServer> getLanguageServerWhenDidOpen(@Nullable URI fileUri, boolean waitForDidOpen) {
+    /**
+     * Returns the synchronizer of the document if it is already connected, and null otherwise. The caller holds
+     * documentsLock.
+     */
+    private @Nullable DocumentContentSynchronizer getConnectedSynchronizer(@Nullable URI fileUri) {
         if (fileUri == null) {
             return null;
         }
         var openedDocument = openedDocuments.get(fileUri);
-        if (openedDocument != null && openedDocument.getSynchronizer() != null) {
-            if (!waitForDidOpen) {
-                return CompletableFuture.completedFuture(languageServer);
-            }
-            // The file is already connected.
-            // returns the language server instance when didOpen happened
-            var didOpenFuture = openedDocument.getSynchronizer().getDidOpenFuture();
-            return getLanguageServerWhenDidOpen(didOpenFuture);
-        }
-        return null;
+        return openedDocument != null ? openedDocument.getSynchronizer() : null;
     }
 
-    private CompletableFuture<LanguageServer> getLanguageServerWhenDidOpen(@NotNull CompletableFuture<LanguageServer> didOpenFuture) {
-        if (didOpenFuture.isDone()) {
-            // The didOpen has happened, no need to wait for the didOpen
-            // to return the language server
-            return CompletableFuture.completedFuture(languageServer);
+    /**
+     * Returns the language server once the connected document can be used with it. The caller must not hold
+     * documentsLock: asking for the didOpen can start the server, in the synchronized start(), and stop() takes that
+     * monitor before documentsLock.
+     */
+    private CompletableFuture<LanguageServer> getLanguageServerWhenDidOpen(@NotNull DocumentContentSynchronizer synchronizer,
+                                                                          boolean waitForDidOpen) {
+        if (!waitForDidOpen) {
+            // The caller can hold a write action, so wait only for the changes already sent, which needs
+            // no read access. LanguageServiceAccessor sends the pending ones before it connects.
+            var changesSent = synchronizer.getLastChangeSent();
+            return changesSent.isDone() ? CompletableFuture.completedFuture(languageServer) : whenChangesSent(changesSent);
         }
-        // The didOpen has not happened, wait for the end of didOpen
-        // to return the language server
+        // The file is already connected.
+        // returns the language server instance when didOpen, and the changes made since, have been sent
+        return getLanguageServerWhenDidOpen(synchronizer);
+    }
+
+    private CompletableFuture<LanguageServer> getLanguageServerWhenDidOpen(@NotNull DocumentContentSynchronizer synchronizer) {
+        var didOpenFuture = synchronizer.getDidOpenFuture();
+        if (didOpenFuture.isDone() && !didOpenFuture.isCompletedExceptionally()) {
+            // The didOpen has happened, no need to wait for the didOpen
+            // to return the language server, only for the changes made since
+            var changesSent = synchronizer.getChangesSent();
+            if (changesSent.isDone()) {
+                return CompletableFuture.completedFuture(languageServer);
+            }
+            return whenChangesSent(changesSent);
+        }
+        // The didOpen has not happened, or it failed, as for a document closed before it was opened:
+        // wait for the end of didOpen to return the language server, or its failure
         return didOpenFuture
-                .thenApplyAsync(theVoid -> languageServer);
+                .thenCompose(ls -> whenChangesSent(synchronizer.getChangesSent()));
+    }
+
+    /**
+     * Returns the language server once the given changes have been dispatched, so that a request sent
+     * with it reaches the server after them. A change that could not be sent does not fail the request.
+     */
+    private CompletableFuture<LanguageServer> whenChangesSent(@NotNull CompletableFuture<Void> changesSent) {
+        // Continue on a pooled thread, not on the dispatcher that completed the changes
+        return changesSent.handleAsync((result, error) -> languageServer);
+    }
+
+    /**
+     * Allocates a document version on the current connection, unique across documents and reopen.
+     * File opens and document notifications can originate on different threads.
+     */
+    int nextDocumentVersion() {
+        return documentVersion.updateAndGet(Math::incrementExact);
     }
 
     @NotNull
     private DocumentContentSynchronizer createDocumentContentSynchronizer(@NotNull String fileUri,
                                                                           @NotNull VirtualFile file,
                                                                           @NotNull Document document,
-                                                                          @Nullable String documentText,
-                                                                          @Nullable String languageId) {
-        return new DocumentContentSynchronizer(this, fileUri, file, document, documentText, languageId);
+                                                                          @NotNull LSPFileConnectionInfo connectionInfo) {
+        return new DocumentContentSynchronizer(this, fileUri, file, document,
+                connectionInfo.documentText(), connectionInfo.documentModificationStamp(), connectionInfo.languageId());
     }
 
     public @NotNull TextDocumentSyncOptions getSyncOptions() {
@@ -776,14 +1038,18 @@ public class LanguageServerWrapper implements Disposable {
         if (fileUri == null) {
             return;
         }
-        OpenedDocument openedDocument = this.openedDocuments.remove(fileUri);
-        if (openedDocument != null) {
-            // Remove the listener from the old document stored in synchronizer
-            DocumentContentSynchronizer synchronizer = openedDocument.getSynchronizer();
-            if (synchronizer != null) {
-                Disposer.dispose(synchronizer);
+        synchronized (documentsLock) {
+            scopedDocuments.remove(fileUri);
+            OpenedDocument openedDocument = this.openedDocuments.remove(fileUri);
+            if (openedDocument != null) {
+                // Remove the listener from the old document stored in synchronizer
+                DocumentContentSynchronizer synchronizer = openedDocument.getSynchronizer();
+                if (synchronizer != null) {
+                    Disposer.dispose(synchronizer);
+                }
+                clearProblem(Collections.singleton(fileUri), getClientFeatures(), getProject());
+                invalidateWorkspaceDiagnosticCache(fileUri);
             }
-            clearProblem(Collections.singleton(fileUri), getClientFeatures(), getProject());
         }
         if (stopIfNoOpenedFiles) {
             maybeShutdown();
@@ -858,9 +1124,17 @@ public class LanguageServerWrapper implements Disposable {
             if (file != null) {
                 openedDocument = new OpenedDocument(new LanguageServerItem(languageServer, this), file, null);
                 openedDocuments.put(fileUri, openedDocument);
+                invalidateWorkspaceDiagnosticCache(fileUri);
             }
         }
         return openedDocument;
+    }
+
+    private void invalidateWorkspaceDiagnosticCache(@NotNull URI fileUri) {
+        var client = languageClient;
+        if (client != null) {
+            client.invalidateWorkspaceDiagnosticCache(fileUri);
+        }
     }
 
     /**
@@ -882,7 +1156,7 @@ public class LanguageServerWrapper implements Disposable {
     public @Nullable ClosedDocument getClosedDocument(URI fileUri, boolean force) {
         var closedDocument = closedDocuments.get(fileUri);
         if (closedDocument == null && force) {
-            synchronized (closedDocuments) {
+            synchronized (documentsLock) {
                 closedDocument = closedDocuments.get(fileUri);
                 if (closedDocument == null) {
                     closedDocument = new ClosedDocument();
@@ -898,6 +1172,14 @@ public class LanguageServerWrapper implements Disposable {
     }
 
     /**
+     * Returns the listener that sends the file operations and the watched file changes to this server.
+     */
+    @ApiStatus.Internal
+    public @NotNull AbstractLSPFileListener getFileListener() {
+        return fileListener;
+    }
+
+    /**
      * Starts the language server and returns a CompletableFuture waiting for the
      * server to be initialized. If done in the UI stream, a job will be created
      * displaying that the server is being initialized
@@ -910,8 +1192,11 @@ public class LanguageServerWrapper implements Disposable {
             // The language server cannot be started, return a null language server
             return CompletableFuture.completedFuture(null);
         }
-        if (initializeFuture != null && !this.initializeFuture.isDone()) {
-            return initializeFuture.thenApply(r -> this.languageServer);
+        var initialized = initializeFuture;
+        if (initialized != null) {
+            // Also once it is done: a failed initialization then reaches the caller, instead of a
+            // server that never initialized
+            return initialized.thenApply(r -> this.languageServer);
         }
         return CompletableFuture.completedFuture(this.languageServer);
     }
@@ -926,8 +1211,31 @@ public class LanguageServerWrapper implements Disposable {
         // Enqueues a notification on the dispatch thread associated with the wrapped language server. This
         // ensures the interleaving of document updates and other requests in the UI is mirrored in the
         // order in which they get dispatched to the server
-        return getInitializedServer()
-                .thenApplyAsync(fn, this.dispatcher);
+        return sendNotification(getInitializedServer(), fn);
+    }
+
+    /**
+     * Sends a notification to the given initialized server, after the notifications sent before it.
+     * Unlike {@link #sendNotification(Function)}, this neither starts the server nor takes any lock other
+     * than the one ordering the notifications, so a caller can hold its own lock while sending.
+     *
+     * @param initializedServer the server, as returned by {@link #getInitializedServer()}
+     * @param fn                LS notification to send
+     */
+    CompletableFuture<LanguageServer> sendNotification(@NotNull CompletableFuture<LanguageServer> initializedServer,
+                                                       @NotNull Function<LanguageServer, LanguageServer> fn) {
+        synchronized (notificationLock) {
+            // Each notification is dispatched after the previous one. Waiting for the initialized
+            // server alone does not keep their order: the dependents of one future complete in
+            // reverse order of registration, so notifications queued during initialization would
+            // reach the dispatcher last to first. A failed notification does not hold back the next.
+            CompletableFuture<LanguageServer> notification = lastNotification
+                    .handle((result, error) -> null)
+                    .thenCompose(previous -> initializedServer)
+                    .thenApplyAsync(fn, this.dispatcher);
+            lastNotification = notification;
+            return notification;
+        }
     }
 
     /**
@@ -940,11 +1248,38 @@ public class LanguageServerWrapper implements Disposable {
         return serverCapabilities;
     }
 
+    /**
+     * Updates workspace diagnostic providers from this server's capabilities.
+     * Does nothing until a language client is attached.
+     */
+    @ApiStatus.Internal
+    public void updateWorkspaceDiagnosticProviders() {
+        var client = languageClient;
+        if (client != null) {
+            client.updateWorkspaceDiagnosticProviders();
+        }
+    }
+
     public void registerCapability(RegistrationParams params) {
-        if (initializeFuture == null) {
+        registerCapability(params, null);
+    }
+
+    /**
+     * Registers the capabilities that the server of the given client asks for, unless that client's connection has
+     * stopped.
+     *
+     * @param params the registrations
+     * @param client the client that received them, and null not to check which connection they come from
+     */
+    public void registerCapability(RegistrationParams params, @Nullable LanguageClientImpl client) {
+        var registrationContext = currentInitializingContext;
+        var initialization = initializeFuture;
+        if (initialization == null || registrationContext == null
+                || client != null && registrationContext.languageClient != client) {
+            // A registration from a connection that has stopped, as after a restart
             return;
         }
-        initializeFuture.thenRun(() -> {
+        initialization.thenRun(() -> {
             params.getRegistrations().forEach(reg -> {
                 if (LSPNotificationConstants.WORKSPACE_DID_CHANGE_WORKSPACE_FOLDERS.equals(reg.getMethod())) {
                     // register 'workspace/didChangeWorkspaceFolders' capability
@@ -966,10 +1301,37 @@ public class LanguageServerWrapper implements Disposable {
                         DidChangeWatchedFilesRegistrationOptions options = JSONUtils.getLsp4jGson()
                                 .fromJson((JsonObject) reg.getRegisterOptions(),
                                         DidChangeWatchedFilesRegistrationOptions.class);
-                        fileListener.registerFileSystemWatchers(reg.getId(), options.getWatchers());
-                        addRegistration(reg, () -> fileListener.unregisterFileSystemWatchers(reg.getId()));
+                        synchronized (LanguageServerWrapper.this) {
+                            // The callback can run once its server has stopped, and stop() has dropped its watchers
+                            if (isDisposed() || registrationContext != currentInitializingContext) {
+                                return;
+                            }
+                            fileListener.registerFileSystemWatchers(reg.getId(), options.getWatchers());
+                            addRegistration(reg, () -> fileListener.unregisterFileSystemWatchers(reg.getId()));
+                        }
                     } catch (Exception e) {
                         LOGGER.error("Error while getting 'workspace/didChangeWatchedFiles' capability", e);
+                    }
+                } else if (LSPRequestConstants.WORKSPACE_TEXT_DOCUMENT_CONTENT.equals(reg.getMethod())) {
+                    // register 'workspace/textDocumentContent' capability
+                    try {
+                        TextDocumentContentRegistrationOptions options = JSONUtils.getLsp4jGson()
+                                .fromJson((JsonObject) reg.getRegisterOptions(),
+                                        TextDocumentContentRegistrationOptions.class);
+                        List<String> schemes = options.getSchemes();
+                        if (schemes != null && !schemes.isEmpty()) {
+                            synchronized (LanguageServerWrapper.this) {
+                                // The callback can run once its server has stopped, whose schemes must not
+                                // reach the capabilities of the next connection
+                                if (isDisposed() || registrationContext != currentInitializingContext) {
+                                    return;
+                                }
+                                addRegistration(reg, () -> unregisterDocumentContentSchemes(schemes));
+                                registerDocumentContentSchemes(schemes);
+                            }
+                        }
+                    } catch (Exception e) {
+                        LOGGER.error("Error while getting 'workspace/textDocumentContent' capability", e);
                     }
                 } else if (LSPRequestConstants.WORKSPACE_EXECUTE_COMMAND.equals(reg.getMethod())) {
                     // register 'workspace/executeCommand' capability
@@ -1079,6 +1441,49 @@ public class LanguageServerWrapper implements Disposable {
                 existingCommands.removeAll(commands);
             }
         }
+    }
+
+    /**
+     * Adds the URI schemes of a dynamic 'workspace/textDocumentContent' registration to the server capabilities, which
+     * the document content provider reads them from.
+     */
+    synchronized void registerDocumentContentSchemes(@NotNull List<String> schemes) {
+        ServerCapabilities serverCapabilities = this.getServerCapabilitiesSync();
+        if (serverCapabilities != null) {
+            WorkspaceServerCapabilities workspace = serverCapabilities.getWorkspace();
+            if (workspace == null) {
+                workspace = new WorkspaceServerCapabilities();
+                serverCapabilities.setWorkspace(workspace);
+            }
+            TextDocumentContentRegistrationOptions content = workspace.getTextDocumentContent();
+            if (content == null) {
+                content = new TextDocumentContentRegistrationOptions(new ArrayList<>());
+                workspace.setTextDocumentContent(content);
+            }
+            List<String> existingSchemes = new ArrayList<>(content.getSchemes() != null ? content.getSchemes() : List.of());
+            existingSchemes.addAll(schemes);
+            content.setSchemes(existingSchemes);
+        }
+    }
+
+    /**
+     * Removes the URI schemes of a dynamic 'workspace/textDocumentContent' registration, and retires the documents
+     * of the schemes the server no longer provides.
+     */
+    void unregisterDocumentContentSchemes(@NotNull List<String> schemes) {
+        synchronized (this) {
+            ServerCapabilities serverCapabilities = this.getServerCapabilitiesSync();
+            WorkspaceServerCapabilities workspace = serverCapabilities != null ? serverCapabilities.getWorkspace() : null;
+            TextDocumentContentRegistrationOptions content = workspace != null ? workspace.getTextDocumentContent() : null;
+            if (content != null && content.getSchemes() != null) {
+                // Once per registered scheme: another registration can provide the same scheme
+                List<String> remainingSchemes = new ArrayList<>(content.getSchemes());
+                schemes.forEach(remainingSchemes::remove);
+                content.setSchemes(remainingSchemes);
+            }
+        }
+        // Outside this monitor: retiring reads the schemes, and closes editors later on the EDT
+        getClientFeatures().retireUnprovidedDocumentContent();
     }
 
     public boolean canOperate(@NotNull VirtualFile file) {
@@ -1300,29 +1705,117 @@ public class LanguageServerWrapper implements Disposable {
     }
 
     /**
-     * Update diagnostics for the given file URi.
+     * Updates a file's cached diagnostics for one provider.
      *
-     * @param file        the virtual file.
-     * @param identifier  the diagnostic identifier (lsp4ij.publish, lsp4ij.push, custom identifier).
-     * @param diagnostics the diagnostics to update.
+     * @param file        the file whose diagnostic cache is updated
+     * @param identifier  the diagnostic provider's cache identifier
+     * @param diagnostics the replacement diagnostics; an empty list clears this
+     *                    provider's diagnostics
+     * @param version     the report's document version, or {@code null} if
+     *                    absent
      */
     public void updateDiagnostics(@NotNull VirtualFile file,
                                   @NotNull String identifier,
-                                  @NotNull List<Diagnostic> diagnostics) {
+                                  @NotNull List<Diagnostic> diagnostics,
+                                  @Nullable Integer version) {
         var clientFeatures = getClientFeatures();
         var fileUri = FileUriSupport.getFileUri(file, clientFeatures);
         if (fileUri == null) {
             return;
         }
-        boolean isOpen = FileEditorManager.getInstance(getProject()).isFileOpen(file);
+        boolean isOpen = getOpenedDocument(fileUri, false) != null
+                || FileEditorManager.getInstance(getProject()).isFileOpen(file);
         final LSPDocumentBase openedOrClosedDocument = isOpen ? getOpenedDocument(fileUri, true) : getClosedDocument(fileUri, true);
         if (openedOrClosedDocument == null) {
             return;
         }
-        boolean hasErrors = false;
+        updateDiagnostics(file, openedOrClosedDocument, identifier, diagnostics, version);
+    }
+
+    /**
+     * Clears a removed workspace provider's diagnostics from cached documents.
+     * Retains other providers and open-document diagnostics owned by an active
+     * document pull provider with the same identifier.
+     *
+     * @param identifier the provider identifier, or {@code null} for the
+     *                   default pull provider
+     */
+    @ApiStatus.Internal
+    public void clearDocumentDiagnostics(@Nullable String identifier) {
+        clearClosedDocumentDiagnostics(identifier);
+        String cacheIdentifier = identifier != null ? identifier : LSPDocumentBase.PULL_DIAGNOSTIC_IDENTIFIER;
+        for (var document : getOpenedDocuments()) {
+            var synchronizer = document.getSynchronizer();
+            if (synchronizer != null && synchronizer.isPullDiagnosticsSupported()
+                    && Objects.equals(identifier, getClientFeatures().getDiagnosticFeature().getDiagnosticIdentifier())) {
+                continue;
+            }
+            updateDiagnostics(document.getFile(), document, cacheIdentifier, List.of(), null);
+        }
+    }
+
+    /**
+     * Clears one provider's diagnostics from all cached closed documents.
+     * Diagnostics from other providers are retained.
+     *
+     * @param identifier the provider identifier, or {@code null} for the
+     *                   default pull provider
+     */
+    @ApiStatus.Internal
+    public void clearClosedDocumentDiagnostics(@Nullable String identifier) {
+        String cacheIdentifier = identifier != null ? identifier : LSPDocumentBase.PULL_DIAGNOSTIC_IDENTIFIER;
+        for (var entry : closedDocuments.entrySet()) {
+            clearClosedDocumentDiagnostics(entry.getKey(), entry.getValue(), cacheIdentifier);
+        }
+    }
+
+    /**
+     * Clears one provider's diagnostics from a cached closed document.
+     * Retains other providers, other files and open-document diagnostics.
+     *
+     * @param identifier the provider identifier, or {@code null} for the
+     *                   default pull provider
+     * @param uri        the URI of the closed document to clear
+     */
+    @ApiStatus.Internal
+    public void clearClosedDocumentDiagnostics(@Nullable String identifier, @NotNull String uri) {
+        var features = getClientFeatures();
+        VirtualFile file = FileUriSupport.findFileByUri(uri, features);
+        URI fileUri = file != null ? FileUriSupport.getFileUri(file, features) : URI.create(uri);
+        var document = fileUri != null ? getClosedDocument(fileUri, false) : null;
+        if (document != null) {
+            String cacheIdentifier = identifier != null ? identifier : LSPDocumentBase.PULL_DIAGNOSTIC_IDENTIFIER;
+            clearClosedDocumentDiagnostics(fileUri, document, cacheIdentifier);
+        }
+    }
+
+    private void clearClosedDocumentDiagnostics(URI fileUri, ClosedDocument document, String cacheIdentifier) {
+        var features = getClientFeatures();
+        String uri = FileUriSupport.toString(fileUri, features);
+        VirtualFile file = uri != null ? FileUriSupport.findFileByUri(uri, features) : null;
+        if (file != null && file.isValid() && !getProject().isDisposed()) {
+            updateDiagnostics(file, document, cacheIdentifier, List.of(), null);
+        } else {
+            document.updateDiagnostics(cacheIdentifier, List.of(), null);
+        }
+    }
+
+    private void updateDiagnostics(@NotNull VirtualFile file, @NotNull LSPDocumentBase openedOrClosedDocument,
+                                   @NotNull String identifier, @NotNull List<Diagnostic> diagnostics,
+                                   @Nullable Integer version) {
+        var clientFeatures = getClientFeatures();
+        boolean hasErrors;
         synchronized (openedOrClosedDocument) {
             hasErrors = openedOrClosedDocument.hasErrors();
-            openedOrClosedDocument.updateDiagnostics(identifier, diagnostics);
+            openedOrClosedDocument.updateDiagnostics(identifier, diagnostics, version);
+            try {
+                // Notify in cache-update order, using the accepted/merged cache
+                // rather than the incoming report (which may have been stale).
+                clientFeatures.getDiagnosticFeature().diagnosticsUpdated(file,
+                        List.copyOf(openedOrClosedDocument.getDiagnostics()));
+            } catch (Exception e) {
+                LOGGER.warn("Failed to notify diagnostic update for {}", file, e);
+            }
         }
 
         if ((hasErrors != openedOrClosedDocument.hasErrors()) && clientFeatures.getDiagnosticFeature().canReportProblem(file)) {
@@ -1564,6 +2057,11 @@ public class LanguageServerWrapper implements Disposable {
                 }
                 this.serverCapabilities = null;
                 this.dynamicRegistrations.clear();
+                // Dropping the registrations does not run their unregistration, so drop the watchers they added
+                fileListener.clearFileSystemWatchers();
+                if (clientFeatures != null) {
+                    clientFeatures.getWorkspaceFolderFeature().reset();
+                }
             }
 
             if (isDisposed()) {
@@ -1573,21 +2071,30 @@ public class LanguageServerWrapper implements Disposable {
             } else {
                 // We need to shutdown, kill and stop the process in a thread to avoid for instance
                 // stopping the new process created with a new start.
+                // Use the IntelliJ application pool instead of ForkJoinPool.commonPool() to avoid
+                // ForkJoinPool.helpAsyncBlocker() executing the blocking shutdown (up to 5 seconds)
+                // in the current thread when stop() is called from a ReadAction.
+                // See: https://github.com/redhat-developer/lsp4ij/issues/1672
                 return CompletableFuture.runAsync(() -> {
                     shutdownAll(languageServer, lspStreamProvider, launcherFuture);
-                    boolean delayedCurrent = currentInitializingContext == null || initializingContext.equals(currentInitializingContext);
+                    boolean delayedCurrent = currentInitializingContext == null || currentInitializingContext.equals(initializingContext);
                     if (delayedCurrent) {
                         updateStatus(ServerStatus.stopped);
                     }
-                });
+                }, AppExecutorUtil.getAppExecutorService());
             }
         } finally {
             if (current) {
                 this.launcherFuture = null;
                 this.lspStreamProvider = null;
+                synchronized (documentsLock) {
+                    scopedDocuments.clear();
+                }
                 while (!this.openedDocuments.isEmpty()) {
                     disconnect(this.openedDocuments.keySet().iterator().next(), false);
                 }
+                // Old replies are refused by connection identity, so the new connection can start afresh.
+                documentVersion.set(0);
                 if (!closedDocuments.isEmpty()) {
                     Set<URI> fileUris = new HashSet<>(closedDocuments.keySet());
                     closedDocuments.clear();
@@ -1598,6 +2105,7 @@ public class LanguageServerWrapper implements Disposable {
 
                 if (messageBusConnection != null) {
                     messageBusConnection.disconnect();
+                    messageBusConnection = null;
                 }
             }
         }
@@ -1675,6 +2183,7 @@ public class LanguageServerWrapper implements Disposable {
             return;
         }
         this.disposed = true;
+        fileListener.disposeFileSystemWatchers();
         stopAndRefreshEditorFeature(refreshEditorFeature, false);
         stopDispatcher();
         if (clientFeatures != null) {
@@ -1687,16 +2196,37 @@ public class LanguageServerWrapper implements Disposable {
         return disposed;
     }
 
+    /**
+     * Carries the didOpen text and its editor stamp together across asynchronous connection setup.
+     * A stamp of -1 means no stamp was captured; when text is null, both are read at didOpen.
+     */
     record LSPFileConnectionInfo(@Nullable Document document, @Nullable String documentText,
-                                 @Nullable String languageId, boolean waitForDidOpen) {
+                                long documentModificationStamp, @Nullable String languageId, boolean waitForDidOpen) {
+        LSPFileConnectionInfo(@Nullable Document document, @Nullable String documentText,
+                              @Nullable String languageId, boolean waitForDidOpen) {
+            this(document, documentText, -1, languageId, waitForDidOpen);
+        }
     }
 
     public LanguageServerWrapper.@NotNull LSPFileConnectionInfo createFileConnectionInfo(@NotNull VirtualFile file,
                                                                                          @NotNull Document document,
                                                                                          boolean waitForDidOpen) {
+        // Capture both under one read action. Using a later stamp with this text could authorize
+        // an edit for content the server never saw. The consumer must not reread text during a VFS rename.
+        if (ApplicationManager.getApplication().isReadAccessAllowed()) {
+            return captureFileConnectionInfo(file, document, waitForDidOpen);
+        }
+        // The capture has no side effects, so a cancellable read can retry it after a pending write action.
+        return runCancellableReadAction(() -> captureFileConnectionInfo(file, document, waitForDidOpen), this);
+    }
+
+    private @NotNull LSPFileConnectionInfo captureFileConnectionInfo(@NotNull VirtualFile file,
+                                                                   @NotNull Document document,
+                                                                   boolean waitForDidOpen) {
         String text = document.getText();
+        long modificationStamp = document.getModificationStamp();
         String languageId = getServerDefinition().getLanguageId(file, getProject());
-        return new LanguageServerWrapper.LSPFileConnectionInfo(document, text, languageId, waitForDidOpen);
+        return new LSPFileConnectionInfo(document, text, modificationStamp, languageId, waitForDidOpen);
     }
 
     // LSP traces

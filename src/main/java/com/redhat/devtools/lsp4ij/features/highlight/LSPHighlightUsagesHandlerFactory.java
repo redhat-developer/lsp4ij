@@ -24,6 +24,7 @@ import com.redhat.devtools.lsp4ij.LSPFileSupport;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
 import com.redhat.devtools.lsp4ij.client.indexing.ProjectIndexingManager;
+import com.redhat.devtools.lsp4ij.internal.SimpleLanguageUtils;
 import org.eclipse.lsp4j.DocumentHighlight;
 import org.eclipse.lsp4j.DocumentHighlightKind;
 import org.eclipse.lsp4j.TextDocumentIdentifier;
@@ -37,10 +38,9 @@ import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
 
 import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.isDoneNormally;
-import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.waitUntilDone;
+import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.awaitWithCheckCanceled;
 
 
 /**
@@ -59,7 +59,13 @@ public class LSPHighlightUsagesHandlerFactory implements HighlightUsagesHandlerF
             return null;
         }
         List<LSPHighlightPsiElement> targets = getTargets(editor, file);
-        return targets.isEmpty() ? null : new LSPHighlightUsagesHandler(editor, file, targets);
+        if (targets.isEmpty()) {
+            // For a TEXT or textmate file, returning null here would make the IDE cache the empty result
+            // for the whole file, and it would stop sending 'textDocument/documentHighlight' until the document changes.
+            // See https://github.com/redhat-developer/lsp4ij/issues/1300
+            return SimpleLanguageUtils.isSupported(file.getLanguage()) ? new LSPHighlightUsagesHandler(editor, file, targets) : null;
+        }
+        return new LSPHighlightUsagesHandler(editor, file, targets);
     }
 
     private List<LSPHighlightPsiElement> getTargets(Editor editor, PsiFile psiFile) {
@@ -79,17 +85,10 @@ public class LSPHighlightUsagesHandlerFactory implements HighlightUsagesHandlerF
         LSPHighlightSupport highlightSupport = LSPFileSupport.getSupport(psiFile).getHighlightSupport();
         CompletableFuture<List<DocumentHighlight>> highlightFuture = highlightSupport.getHighlights(params);
         try {
-            waitUntilDone(highlightFuture, psiFile);
-        } catch (ProcessCanceledException e) {//Since 2024.2 ProcessCanceledException extends CancellationException so we can't use multicatch to keep backward compatibility
-            //TODO delete block when minimum required version is 2024.2
-            highlightSupport.cancel();
-            return Collections.emptyList();
+            awaitWithCheckCanceled(highlightFuture);
+        } catch (ProcessCanceledException e) {
+            throw e;
         } catch (CancellationException e) {
-            // cancel the LSP requests textDocument/documentHighlight
-            highlightSupport.cancel();
-            return Collections.emptyList();
-        } catch (ExecutionException e) {
-            LOGGER.error("Error while consuming LSP 'textDocument/documentHighlight' request", e);
             return Collections.emptyList();
         }
 

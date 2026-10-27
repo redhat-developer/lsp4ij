@@ -49,6 +49,13 @@ import static com.redhat.devtools.lsp4ij.settings.LanguageServerView.isEquals;
 public abstract class LanguageServerSettings implements PersistentStateComponent<LanguageServerSettings.MyState> {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(LanguageServerSettings.class);
+
+    /**
+     * Default timeout in milliseconds for {@code workspace/will*} file operation requests.
+     * Similar to VS Code's {@code files.participants.timeout} setting.
+     */
+    public static final int DEFAULT_FILE_OPERATIONS_TIMEOUT = 5000;
+
     private final List<LanguageServerSettingsListener> listeners = ContainerUtil.createConcurrentList();
     private volatile MyState myState = new MyState();
 
@@ -140,12 +147,20 @@ public abstract class LanguageServerSettings implements PersistentStateComponent
                 existingSettings.setServerTrace(newSettings.getServerTrace());
             }
 
+            // Workspace folders
+            boolean workspaceFolderStrategyConfigurationChanged = newSettings.getWorkspaceFolderStrategyConfiguration() != null && !(isEquals(existingSettings.getWorkspaceFolderStrategyConfiguration(), newSettings.getWorkspaceFolderStrategyConfiguration()));
+            if (workspaceFolderStrategyConfigurationChanged) {
+                existingSettings.setWorkspaceFolderStrategyConfiguration(newSettings.getWorkspaceFolderStrategyConfiguration());
+            }
+
             if (configurationContentChanged || expandConfigurationChanged || configurationSchemaContentChanged || experimentalContentChanged ||
-                    debugPortChanged || debugSuspendChanged || errorReportingKindChanged || serverTraceChanged){
+                    debugPortChanged || debugSuspendChanged || errorReportingKindChanged || serverTraceChanged ||
+                    workspaceFolderStrategyConfigurationChanged){
                 // There are some changes, fire the changed event.
                 return handleChanged(languageServerId, existingSettings, notify,
                         configurationContentChanged, expandConfigurationChanged, configurationSchemaContentChanged, initializationOptionsContentChanged, experimentalContentChanged,
-                        debugPortChanged, debugSuspendChanged, errorReportingKindChanged, serverTraceChanged);
+                        debugPortChanged, debugSuspendChanged, errorReportingKindChanged, serverTraceChanged,
+                        workspaceFolderStrategyConfigurationChanged);
             }
         } else {
             // The settings don't exist
@@ -160,11 +175,14 @@ public abstract class LanguageServerSettings implements PersistentStateComponent
             boolean debugSuspendChanged = newSettings.isDebugSuspend();
             boolean errorReportingKindChanged = newSettings.getErrorReportingKind() != null && !(isEquals(ErrorReportingKind.getDefaultValue(), newSettings.getErrorReportingKind()));
             boolean serverTraceChanged = newSettings.getServerTrace() != null && !(isEquals(ServerTrace.getDefaultValue(), newSettings.getServerTrace()));
+            boolean workspaceFolderStrategyConfigurationChanged = !StringUtils.isBlank(newSettings.getWorkspaceFolderStrategyConfiguration());
             if  (configurationContentChanged || expandConfigurationChanged || configurationSchemaContentChanged || experimentalContentChanged ||
-                    debugPortChanged || debugSuspendChanged || errorReportingKindChanged || serverTraceChanged) {
+                    debugPortChanged || debugSuspendChanged || errorReportingKindChanged || serverTraceChanged ||
+                    workspaceFolderStrategyConfigurationChanged) {
                 return handleChanged(languageServerId, newSettings, notify,
                         configurationContentChanged, expandConfigurationChanged, configurationSchemaContentChanged, initializationOptionsContentChanged, experimentalContentChanged,
-                        debugPortChanged, debugSuspendChanged, errorReportingKindChanged, serverTraceChanged);
+                        debugPortChanged, debugSuspendChanged, errorReportingKindChanged, serverTraceChanged,
+                        workspaceFolderStrategyConfigurationChanged);
             }
         }
         return null;
@@ -183,7 +201,8 @@ public abstract class LanguageServerSettings implements PersistentStateComponent
             boolean debugPortChanged,
             boolean debugSuspendChanged,
             boolean errorReportingKindChanged,
-            boolean serverTraceChanged) {
+            boolean serverTraceChanged,
+            boolean workspaceFolderStrategyConfigurationChanged) {
         if (listeners.isEmpty()) {
             return null;
         }
@@ -198,7 +217,8 @@ public abstract class LanguageServerSettings implements PersistentStateComponent
                 debugPortChanged,
                 debugSuspendChanged,
                 errorReportingKindChanged,
-                serverTraceChanged);
+                serverTraceChanged,
+                workspaceFolderStrategyConfigurationChanged);
         if (notify) {
             handleChanged(event);
         }
@@ -272,6 +292,24 @@ public abstract class LanguageServerSettings implements PersistentStateComponent
         listeners.remove(listener);
     }
 
+    /**
+     * Returns the timeout in milliseconds for {@code workspace/will*} file operation requests.
+     *
+     * @return the timeout in milliseconds
+     */
+    public int getFileOperationsTimeout() {
+        return myState.fileOperationsTimeout;
+    }
+
+    /**
+     * Sets the timeout in milliseconds for {@code workspace/will*} file operation requests.
+     *
+     * @param timeout the timeout in milliseconds
+     */
+    public void setFileOperationsTimeout(int timeout) {
+        myState.fileOperationsTimeout = timeout;
+    }
+
     public static class LanguageServerDefinitionSettings {
 
         private String configurationContent;
@@ -289,6 +327,8 @@ public abstract class LanguageServerSettings implements PersistentStateComponent
         private boolean debugSuspend;
         private ServerTrace serverTrace;
         private ErrorReportingKind errorReportingKind;
+
+        private String workspaceFolderStrategyConfiguration;
 
         public String getConfigurationContent() {
             return configurationContent;
@@ -422,6 +462,15 @@ public abstract class LanguageServerSettings implements PersistentStateComponent
             return this;
         }
 
+        public String getWorkspaceFolderStrategyConfiguration() {
+            return workspaceFolderStrategyConfiguration;
+        }
+
+        public LanguageServerDefinitionSettings setWorkspaceFolderStrategyConfiguration(String workspaceFolderStrategyConfiguration) {
+            this.workspaceFolderStrategyConfiguration = workspaceFolderStrategyConfiguration;
+            return this;
+        }
+
     }
 
     public static class MyState {
@@ -430,6 +479,17 @@ public abstract class LanguageServerSettings implements PersistentStateComponent
         public Map<String, LanguageServerDefinitionSettings> myState = new TreeMap<>();
         public Map<String, Boolean> showNotificationErrorForCommand;
         private boolean showSaveTipOnConfigurationChange = true;
+
+        /**
+         * Timeout in milliseconds for {@code workspace/will*} file operation requests.
+         * When a file is created, deleted, or renamed from within the IDE, the language
+         * server may be asked to compute a workspace edit before the operation proceeds.
+         * If the server does not respond within this timeout, the edit is skipped and
+         * the file operation continues.
+         * <p>
+         * Similar to VS Code's {@code files.participants.timeout} (default 5000ms).
+         */
+        public int fileOperationsTimeout = DEFAULT_FILE_OPERATIONS_TIMEOUT;
 
         MyState() {
             showNotificationErrorForCommand = Stream.of(LSPCommandContext.ExecutedBy.values())

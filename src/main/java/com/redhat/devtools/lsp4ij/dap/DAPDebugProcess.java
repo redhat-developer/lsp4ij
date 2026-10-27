@@ -35,6 +35,7 @@ import com.intellij.xdebugger.breakpoints.XBreakpointHandler;
 import com.intellij.xdebugger.evaluation.XDebuggerEditorsProvider;
 import com.intellij.xdebugger.frame.XStackFrame;
 import com.intellij.xdebugger.frame.XSuspendContext;
+import com.intellij.xdebugger.stepping.XSmartStepIntoHandler;
 import com.intellij.xdebugger.ui.XDebugTabLayouter;
 import com.redhat.devtools.lsp4ij.dap.breakpoints.DAPBreakpointHandlerBase;
 import com.redhat.devtools.lsp4ij.dap.breakpoints.DAPExceptionBreakpointsPanel;
@@ -42,14 +43,18 @@ import com.redhat.devtools.lsp4ij.dap.client.DAPClient;
 import com.redhat.devtools.lsp4ij.dap.client.DAPStackFrame;
 import com.redhat.devtools.lsp4ij.dap.client.DAPSuspendContext;
 import com.redhat.devtools.lsp4ij.dap.client.files.DAPFileRegistry;
+import com.redhat.devtools.lsp4ij.dap.client.variables.DAPValueFormat;
 import com.redhat.devtools.lsp4ij.dap.configurations.DAPCommandLineState;
 import com.redhat.devtools.lsp4ij.dap.descriptors.DebugAdapterDescriptor;
 import com.redhat.devtools.lsp4ij.dap.disassembly.DAPAlternativeSourceHandler;
 import com.redhat.devtools.lsp4ij.dap.disassembly.DisassemblyFile;
 import com.redhat.devtools.lsp4ij.dap.disassembly.breakpoints.DisassemblyBreakpointHandlerBase;
+import com.redhat.devtools.lsp4ij.dap.stepping.DAPSmartStepIntoHandler;
+import com.redhat.devtools.lsp4ij.dap.stepping.DAPStepIntoVariant;
 import com.redhat.devtools.lsp4ij.dap.threads.ThreadsPanel;
 import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
 import com.redhat.devtools.lsp4ij.internal.CompletableFutures;
+import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.awaitWithCheckCanceled;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import com.redhat.devtools.lsp4ij.settings.ServerTrace;
 import com.redhat.devtools.lsp4ij.settings.ui.InstallerPanel;
@@ -86,10 +91,14 @@ public class DAPDebugProcess extends XDebugProcess implements Disposable {
     private final @NotNull DAPAlternativeSourceHandler alternativeSourceHandler;
     private final long sessionId;
 
+    // Smart Step Into
+    private DAPSmartStepIntoHandler smartStepIntoHandler;
+
     private @Nullable CompletableFuture<Void> connectToServerFuture;
     private Status status;
     private Supplier<TransportStreams> streamsSupplier;
     private DAPClient parentClient;
+    private final @NotNull DAPValueFormat valueFormat = new DAPValueFormat();
 
     public DAPDebugProcess(@NotNull DAPCommandLineState dapState,
                            @NotNull XDebugSession session,
@@ -128,7 +137,7 @@ public class DAPDebugProcess extends XDebugProcess implements Disposable {
                 try {
                     // Wait for DAP server is ready...
                     serverReadyFuture.track();
-                    CompletableFutures.waitUntilDone(serverReadyFuture);
+                    awaitWithCheckCanceled(serverReadyFuture);
                     if (CompletableFutures.isDoneNormally(serverReadyFuture)) {
                         // At this step the DAP server is started and ready to consume it with DAP clients
 
@@ -155,7 +164,7 @@ public class DAPDebugProcess extends XDebugProcess implements Disposable {
                         connectToServerFuture = parentClient.connectToServer(indicator);
 
                         // Wait for DAP client is connecting to the DAP server...
-                        CompletableFutures.waitUntilDone(connectToServerFuture);
+                        awaitWithCheckCanceled(connectToServerFuture);
                         DAPDebugProcess.this.status = Status.STARTED;
 
                         // Refresh Threads panel
@@ -317,6 +326,26 @@ public class DAPDebugProcess extends XDebugProcess implements Disposable {
         }
     }
 
+    @Override
+    public void startPausing() {
+        DAPClient client = parentClient;
+        if (client != null) {
+            client.pause()
+                    .exceptionally(error -> {
+                        print("Pausing failed: " + error.getMessage(), ConsoleViewContentType.ERROR_OUTPUT);
+                        return null;
+                    });
+        }
+    }
+
+    @Override
+    public @Nullable XSmartStepIntoHandler<DAPStepIntoVariant> getSmartStepIntoHandler() {
+        if (smartStepIntoHandler == null) {
+            smartStepIntoHandler = new DAPSmartStepIntoHandler(getSession());
+        }
+        return smartStepIntoHandler;
+    }
+
     private @Nullable SteppingGranularity getSteppingGranularity(@NotNull DAPClient client) {
         return client.canDisassemble() && getAlternativeSourceHandler()
                 .getAlternativeSourceKindState().getValue() ? SteppingGranularity.INSTRUCTION : null;
@@ -351,7 +380,7 @@ public class DAPDebugProcess extends XDebugProcess implements Disposable {
     }
 
     public void print(@Nullable String message, @NotNull ConsoleViewContentType type) {
-        if (message == null || StringUtils.isBlank(message)) {
+        if (StringUtils.isEmpty(message)) {
             return;
         }
         if (message.charAt(message.length() - 1) != '\n') {
@@ -485,6 +514,26 @@ public class DAPDebugProcess extends XDebugProcess implements Disposable {
     @Override
     public @Nullable DAPAlternativeSourceHandler getAlternativeSourceHandler() {
         return alternativeSourceHandler;
+    }
+
+    /**
+     * Returns the format in which the clients of this debug session ask for values.
+     *
+     * @return the format in which the clients of this debug session ask for values.
+     */
+    public @NotNull DAPValueFormat getValueFormat() {
+        return valueFormat;
+    }
+
+    /**
+     * Returns true if the DAP server of this debug session, or that of a child session, formats values, and false
+     * otherwise.
+     *
+     * @return true if the DAP server of this debug session, or that of a child session, formats values, and false
+     * otherwise.
+     */
+    public boolean isSupportsValueFormattingOptions() {
+        return parentClient != null && parentClient.isSupportsValueFormattingOptionsInSessions();
     }
 
     public @Nullable DisassemblyFile getDisassemblyFile() {

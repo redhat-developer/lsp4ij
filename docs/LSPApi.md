@@ -6,6 +6,7 @@ The [LSPClientFeatures](https://github.com/redhat-developer/lsp4ij/blob/main/src
 - [LSP codeLens feature](#lsp-codeLens-feature)
 - [LSP color feature](#lsp-color-feature)
 - [LSP completion feature](#lsp-completion-feature)
+- [LSP inlineCompletion feature](#lsp-inlineCompletion-feature)
 - [LSP diagnostic feature](#lsp-diagnostic-feature) 
 - [LSP declaration feature](#lsp-declaration-feature)
 - [LSP definition feature](#lsp-definition-feature)
@@ -27,6 +28,7 @@ The [LSPClientFeatures](https://github.com/redhat-developer/lsp4ij/blob/main/src
 - [LSP typeDefinition feature](#lsp-typeDefinition-feature)
 - [LSP usage feature](#lsp-usage-feature)
 - [LSP workspace symbol feature](#lsp-workspace-symbol-feature)
+- [LSP workspace folder feature](#lsp-workspace-folder-feature)
 - [LSP breadcrumbs feature](#lsp-breadcrumbs-feature)
 - [LSP editor behavior feature](#lsp-editor-behavior-feature)
 - [JSON-RPC communication feature](#json-rpc-communication-feature)
@@ -125,7 +127,7 @@ public class MyLanguageServerFactory implements LanguageServerFactory {
 
 ### Disable a given LSP Feature
 
-All `LSP*Feature` classes extend [AbstractLSPDocumentFeature](https://github.com/redhat-developer/lsp4ij/blob/main/src/main/java/com/redhat/devtools/lsp4ij/client/features/LSPAbstractFeature.java), which declares the `isEnabled` method that returns `true` by default:
+All `LSP*Feature` classes extend [AbstractLSPDocumentFeature](https://github.com/redhat-developer/lsp4ij/blob/main/src/main/java/com/redhat/devtools/lsp4ij/client/features/AbstractLSPDocumentFeature.java), which declares the `isEnabled` method that returns `true` by default:
 
 ```java
 public boolean isEnabled(@NotNull PsiFile file) {
@@ -137,7 +139,7 @@ By overriding this method, you can return `false` to disable a given LSP feature
 
 ### Supported LSP Feature
 
-All `LSP*Feature` classes extend [AbstractLSPDocumentFeature](https://github.com/redhat-developer/lsp4ij/blob/main/src/main/java/com/redhat/devtools/lsp4ij/client/features/LSPAbstractFeature.java), which declares the `isSupported` method that uses the server capabilities:
+All `LSP*Feature` classes extend [AbstractLSPDocumentFeature](https://github.com/redhat-developer/lsp4ij/blob/main/src/main/java/com/redhat/devtools/lsp4ij/client/features/AbstractLSPDocumentFeature.java), which declares the `isSupported` method that uses the server capabilities:
 
 ```java
 public boolean isSupported(@NotNull PsiFile file) {
@@ -247,6 +249,15 @@ public class MyLSPCodeLensFeature extends LSPCodeLensFeature {
 | boolean isItemTextBold(CompletionItem item)                                           | Returns the IntelliJ lookup item text bold from the given LSP completion item and null otherwise.                                                                                                                                  | `item.getKind() == CompletionItemKind.Keyword`                                        |
 | boolean useContextAwareSorting(PsiFile file)                                          | Returns `true` if client-side context-aware completion sorting should be used for the specified file and `false` otherwise.                                                                                                        | `false`                                                                               |
 | boolean useTemplateForInvocationOnlySnippet(PsiFile file)                             | Returns `true` if an editor template should be used for invocation-only snippets and `false` otherwise.                                                                                                                            | `true`                                                                                |
+
+## LSP InlineCompletion Feature
+
+| API                           | Description                                                                                                                                                                                                                        | Default Behaviour           |
+|-------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------------------|
+| boolean isEnabled(PsiFile file)  | Returns `true` if the LSP feature is enabled for the given file and `false` otherwise.                                                                                                                                             | `true`                      |
+| boolean isSupported(PsiFile file) | Returns `true` if the LSP feature is supported for the given file and `false` otherwise. <br/>This supported state is called after starting the language server, which matches the file and user with the LSP server capabilities. | Check the server capability |
+
+The inline completion feature integrates with IntelliJ's inline completion API to provide AI-assisted code completion suggestions that appear as you type.
 
 ## LSP Diagnostic Feature
 
@@ -746,10 +757,16 @@ or, if appropriate, the the child/descendant element that represents the declara
 
 ## LSP Usage Feature
 
-| API                               | Description                                                                                                                                                                                                                        | Default Behaviour           |
-|-----------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------------------|
-| boolean isEnabled(PsiFile file)   | Returns `true` if the LSP feature is enabled for the given file and `false` otherwise.                                                                                                                                             | `true`                      |
-| boolean isSupported(PsiFile file) | Returns `true` if the LSP feature is supported for the given file and `false` otherwise. <br/>This supported state is called after starting the language server, which matches the file and user with the LSP server capabilities. | Check the server capability |
+The LSP Usage Feature determines whether the "Find Usages" functionality is available for a given file or element. This feature aggregates support from multiple LSP capabilities (declaration, type definition, definition, references, and implementation).
+
+| API                                                    | Description                                                                                                                                                                                                                                                                                                                                                                    | Default Behaviour                                                                                                                                                                            |
+|--------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| boolean isEnabled(PsiFile file)                        | Returns `true` if the LSP feature is enabled for the given file and `false` otherwise.                                                                                                                                                                                                                                                                                         | `true`                                                                                                                                                                                       |
+| boolean isSupported(PsiFile file)                      | Returns `true` if the LSP feature is supported for the given file and `false` otherwise. <br/>This supported state is called after starting the language server, which matches the file and user with the LSP server capabilities.                                                                                                                                             | Delegates to `isUsageSupported(PsiFile)`                                                                                                                                                     |
+| boolean isUsageSupported(PsiFile file)                 | Returns `true` if the file supports usage searching based on the language server's capabilities for declaration, type definition, definition, references, or implementation features.                                                                                                                                                                                          | Checks if at least one of the following features is supported: declaration, type definition, definition, references, or implementation                                                       |
+| boolean isUsageSupported(PsiElement element)           | Returns `true` if the given PSI element supports usage searching and `false` otherwise. <br/>For semantic token elements, this delegates to `isUsageSupported(LSPSemanticTokenPsiElement)`. Non-semantic token elements are considered supported by default.                                                                                                                  | `true` for non-semantic token elements; delegates to semantic token check otherwise                                                                                                         |
+| boolean isUsageSupported(LSPSemanticTokenPsiElement element) | Returns `true` if the given semantic token element supports usage searching and `false` otherwise. <br/>Excludes certain semantic token types that do not represent referenceable symbols (comments, keywords, modifiers, operators).                                                                                                                                         | `false` for comments, keywords, modifiers, and operators; `true` for all other semantic token types                                                                                          |
+| ReadWriteAccessDetector.Access getReadWriteAccess(LSPUsagePsiElement reference) | Returns whether a result of `textDocument/references` reads or writes the searched symbol, or `null` when that is not known. <br/>The LSP does not report it, so an integration that can tell - from its own parser, for example - overrides this method. A reference with a known access has the usage type "Value read" or "Value write", shows a read or write access icon, and can be hidden with the read and write access filters of Find Usages and Show Usages. Rider does not group language server usages by usage type, so there the icon and the filters are what changes. Called in a read action, and only for references. | `null`: references have the usage type "References" and no access |
 
 ## LSP Workspace Symbol Feature
 
@@ -758,6 +775,76 @@ or, if appropriate, the the child/descendant element that represents the declara
 | boolean isEnabled()         | Returns `true` if the LSP feature is enabled and `false` otherwise.                                                                                                                      | `true` when server is starting/started |
 | boolean isSupported()       | Returns `true` if the LSP feature is supported and `false` otherwise. <br/>This supported state is called after starting the language server, which matches the LSP server capabilities. | Check the server capability            |
 | boolean supportsGotoClass() | Returns `true` if the LSP feature is efficient enough to support the IDE's Go To Class action which may be invoked frequently and `false` otherwise.                                     | `false`                                |
+
+## LSP Workspace Folder Feature
+
+The `LSPWorkspaceFolderFeature` manages how workspace folders are discovered and sent to the language server via [workspace/workspaceFolders](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_workspaceFolders) and [workspace/didChangeWorkspaceFolders](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_didChangeWorkspaceFolders).
+
+See [Workspace Folders](./DeveloperGuide.md#workspace-folders) for complete documentation.
+
+| API                                                               | Description                                                                                                       | Default Behaviour                                              |
+|-------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------|
+| WorkspaceFolderStrategy getStrategy()                             | Returns the workspace folder strategy.                                                                            | `ProjectWorkspaceFolderStrategy`                               |
+| WorkspaceFolderStrategy createStrategy()                          | Creates the default workspace folder strategy. Override this method to provide a different default strategy.      | Returns a `ProjectWorkspaceFolderStrategy`                     |
+| List\<WorkspaceFolder\> getInitialWorkspaceFolders(Project)         | Returns the initial workspace folders to send during initialization.                                              | Delegates to the configured strategy                           |
+| WorkspaceFolder computeWorkspaceFolderToNotify(VirtualFile)       | Computes the workspace folder to notify for the given file without marking it as notified.                        | Checks if folder needs notification based on lazy loading mode |
+| boolean markFolderAsNotified(WorkspaceFolder)                     | Marks a workspace folder as notified.                                                                              | Adds folder URI to internal tracking set                       |
+| void reset()                                                      | Clears the tracking of notified workspace folders. This should be called when the language server is restarted.   | Clears the internal tracking set                               |
+
+### Customizing Workspace Folder Strategy
+
+To customize workspace folder discovery, extend `LSPWorkspaceFolderFeature` and override `createStrategy()`:
+
+```java
+package my.language.server;
+
+import com.redhat.devtools.lsp4ij.client.features.LSPWorkspaceFolderFeature;
+import com.redhat.devtools.lsp4ij.features.workspaceFolder.MarkersWorkspaceFolderStrategy;
+import com.redhat.devtools.lsp4ij.features.workspaceFolder.WorkspaceFolderStrategy;
+import org.jetbrains.annotations.NotNull;
+
+public class MyWorkspaceFolderFeature extends LSPWorkspaceFolderFeature {
+    
+    @Override
+    protected @NotNull WorkspaceFolderStrategy createStrategy() {
+        // Use marker-based discovery for Python projects
+        return new MarkersWorkspaceFolderStrategy("pyproject.toml", "setup.py");
+    }
+}
+```
+
+Then register it in your `LSPClientFeatures`:
+
+```java
+package my.language.server;
+
+import com.redhat.devtools.lsp4ij.LanguageServerFactory;
+import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
+import org.jetbrains.annotations.NotNull;
+
+public class MyLanguageServerFactory implements LanguageServerFactory {
+    
+    @Override
+    public @NotNull LSPClientFeatures createClientFeatures() {
+        LSPClientFeatures clientFeatures = new LSPClientFeatures();
+        clientFeatures.setWorkspaceFolderFeature(new MyWorkspaceFolderFeature());
+        return clientFeatures;
+    }
+}
+```
+
+### Available Workspace Folder Strategies
+
+LSP4IJ provides several built-in strategies:
+
+- **[ProjectWorkspaceFolderStrategy](https://github.com/redhat-developer/lsp4ij/blob/main/src/main/java/com/redhat/devtools/lsp4ij/features/workspaceFolder/ProjectWorkspaceFolderStrategy.java)** (default): Uses IntelliJ project base directories
+- **[SourceRootsWorkspaceFolderStrategy](https://github.com/redhat-developer/lsp4ij/blob/main/src/main/java/com/redhat/devtools/lsp4ij/features/workspaceFolder/SourceRootsWorkspaceFolderStrategy.java)**: Uses module source roots
+- **[MarkersWorkspaceFolderStrategy](https://github.com/redhat-developer/lsp4ij/blob/main/src/main/java/com/redhat/devtools/lsp4ij/features/workspaceFolder/MarkersWorkspaceFolderStrategy.java)**: Discovers workspace folders by walking up the directory tree looking for marker files (e.g., `pyproject.toml`, `package.json`)
+- **[ConfigurableWorkspaceFolderStrategy](https://github.com/redhat-developer/lsp4ij/blob/main/src/main/java/com/redhat/devtools/lsp4ij/features/workspaceFolder/ConfigurableWorkspaceFolderStrategy.java)**: Configurable strategy using JSON configuration
+
+All strategies support both eager loading (all folders sent during initialization) and lazy loading (folders sent progressively as files are opened).
+
+For more details, see the [Workspace Folders documentation](./DeveloperGuide.md#workspace-folders).
 
 ## LSP Breadcrumbs Feature
 
@@ -1000,3 +1087,14 @@ public class MyLanguageServerFactory implements LanguageServerFactory {
     }
 }
 ```
+
+### Observing diagnostic cache updates
+
+Override `LSPDiagnosticFeature.diagnosticsUpdated(VirtualFile, List<Diagnostic>)`
+to maintain a Problems view or another diagnostic consumer. It receives the
+current merged cache after a report is processed, including closed-file updates
+and empty lists that clear diagnostics. Notifications may repeat unchanged data;
+the supplied diagnostics are read-only and must not be mutated. The callback is
+synchronous under the document cache lock: copy any needed presentation data,
+return promptly, and schedule UI work separately. Use client lifecycle callbacks
+to discard retained results when the server stops or is disposed.

@@ -11,6 +11,7 @@
 package com.redhat.devtools.lsp4ij.mock;
 
 import com.intellij.openapi.project.Project;
+import com.redhat.devtools.lsp4ij.client.LanguageClientImpl;
 import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
 import com.redhat.devtools.lsp4ij.server.StreamConnectionProvider;
 import com.redhat.devtools.lsp4ij.server.definition.ClientConfigurableLanguageServerDefinition;
@@ -29,23 +30,27 @@ public class MockLanguageServerDefinition extends LanguageServerDefinition imple
 
     private final boolean clientConfigurable;
     private final ClientConfigurationSettings clientConfigurationSettings = new ClientConfigurationSettings();
+    private final @NotNull MockLanguageServer server;
 
-    public MockLanguageServerDefinition(boolean clientConfigurable) {
-        this(SERVER_ID, clientConfigurable);
+    private static volatile @Nullable LanguageClientImpl lastLanguageClient;
+
+    public MockLanguageServerDefinition(boolean clientConfigurable, boolean useServerSingleton) {
+        this(SERVER_ID, clientConfigurable, useServerSingleton);
     }
 
-    public MockLanguageServerDefinition(@NotNull String serverId) {
-        this(serverId, false);
+    public MockLanguageServerDefinition(@NotNull String serverId, boolean useServerSingleton) {
+        this(serverId, false, useServerSingleton);
     }
 
-    private MockLanguageServerDefinition(@NotNull String serverId, boolean clientConfigurable) {
+    private MockLanguageServerDefinition(@NotNull String serverId, boolean clientConfigurable, boolean useServerSingleton) {
         super(serverId, "name", null, true, 5, true);
         this.clientConfigurable = clientConfigurable;
+        this.server = useServerSingleton ? null : new MockLanguageServer(MockLanguageServer::defaultServerCapabilities);
     }
 
     @Override
     public @NotNull StreamConnectionProvider createConnectionProvider(@NotNull Project project) {
-        return new MockConnectionProvider();
+        return new MockConnectionProvider(server);
     }
 
     @Override
@@ -58,5 +63,24 @@ public class MockLanguageServerDefinition extends LanguageServerDefinition imple
     @Nullable
     public ClientConfigurationSettings getLanguageServerClientConfiguration() {
         return clientConfigurable ? clientConfigurationSettings : null;
+    }
+
+    public @NotNull MockLanguageServer getServer() {
+        return server;
+    }
+
+    @Override
+    public @NotNull LanguageClientImpl createLanguageClient(@NotNull Project project) {
+        var client = super.createLanguageClient(project);
+        lastLanguageClient = client;
+        return client;
+    }
+
+    /**
+     * @return the language client created last, which a test can use while its server initializes, before
+     * the wrapper has it
+     */
+    public static @Nullable LanguageClientImpl getLastLanguageClient() {
+        return lastLanguageClient;
     }
 }

@@ -27,6 +27,9 @@ import org.eclipse.lsp4j.debug.services.IDebugProtocolServer;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.concurrent.CompletableFuture;
@@ -40,6 +43,8 @@ import java.util.concurrent.CompletableFuture;
  * @param <B> the type of XBreakpoint handled
  */
 public class DisassemblyBreakpointHandlerBase<B extends XBreakpoint<?>> extends BreakpointHandlerBase<B> {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(DisassemblyBreakpointHandlerBase.class);
 
     /**
      * Constructs a new handler for disassembly breakpoints.
@@ -112,9 +117,13 @@ public class DisassemblyBreakpointHandlerBase<B extends XBreakpoint<?>> extends 
                 if (instr != null) {
                     String instructionReference = instr.instructionReference();
                     BigInteger referenceAddress = file.getReferenceAddress(instructionReference);
-                    int offset = referenceAddress != null
-                            ? instr.address().subtract(referenceAddress).intValue()
-                            : instr.address().intValue();
+                    BigInteger offsetBig = referenceAddress != null
+                            ? instr.address().subtract(referenceAddress)
+                            : instr.address();
+                    if (offsetBig.bitLength() >= 32) {
+                        LOGGER.warn("Instruction breakpoint offset exceeds int range: {}", offsetBig);
+                    }
+                    int offset = offsetBig.intValue();
                     InstructionBreakpoint instructionBreakpoint = new InstructionBreakpoint();
                     instructionBreakpoint.setInstructionReference(instructionReference);
                     instructionBreakpoint.setOffset(offset);

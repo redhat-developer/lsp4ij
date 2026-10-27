@@ -10,18 +10,22 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.features.codeLens;
 
+import com.intellij.openapi.Disposable;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.ModalityState;
 import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.editor.event.EditorFactoryEvent;
 import com.intellij.openapi.editor.event.EditorFactoryListener;
+import com.intellij.openapi.util.Disposer;
 import com.intellij.openapi.util.Key;
 import com.intellij.util.concurrency.AppExecutorUtil;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.awt.*;
+
+import static com.redhat.devtools.lsp4ij.internal.ApplicationUtils.runCancellableReadAction;
 
 /**
  * Listens to editor events and manages the context for unresolved code lenses.
@@ -76,6 +80,10 @@ public class LSPCodeLensEditorFactoryListener implements EditorFactoryListener {
     }
 
     private static void updateViewportLinesAndRefreshCodeVision(@NotNull CodeLensDataResult result, LSPCodeLensSupport codeLensSupport, UnresolvedCodeLensViewportContext context) {
+        if (!context.isViewportInitialized()) {
+            // Viewport not initialized yet, cannot determine what to resolve
+            return;
+        }
         if (!result.hasToResolve(context.getFirstViewportLine(), context.getLastViewportLine())) {
             // No codelens to resolve to the current viewport
             return;
@@ -104,7 +112,7 @@ public class LSPCodeLensEditorFactoryListener implements EditorFactoryListener {
                 return false;
             }
             // Update viewport lines in blocking ReadAction
-            ReadAction.run(() -> context.updateViewportLines(newRect));
+            runCancellableReadAction(() -> context.updateViewportLines(newRect), context);
         } else {
             // We are in ReadAction
             context.updateViewportLines(newRect);
@@ -124,9 +132,29 @@ public class LSPCodeLensEditorFactoryListener implements EditorFactoryListener {
     private void attachScrollListener(@NotNull Editor editor) {
         // Initialize context
         final var context = getCodeLensResolveContext(editor);
+
         // Adding a listener for visible area changes
         editor.getScrollingModel().addVisibleAreaListener((e) -> {
             Rectangle newRect = e.getNewRectangle();
+
+            // Initialize viewport on first event (when editor is fully rendered)
+            if (!context.isViewportInitialized() && newRect.width > 0 && newRect.height > 0) {
+                // First time - initialize viewport even if it hasn't "changed"
+                // updateViewportLines requires EDT access
+                if (!ApplicationManager.getApplication().isDispatchThread()) {
+                    // Not on EDT, schedule on EDT
+                    ApplicationManager.getApplication().invokeLater(() -> {
+                        if (!editor.isDisposed() && !context.isViewportInitialized()) {
+                            context.updateViewportLines(newRect);
+                        }
+                    }, ModalityState.defaultModalityState());
+                    return; // Exit early as viewport update will happen asynchronously
+                }
+                // We're on EDT, update viewport lines directly
+                context.updateViewportLines(newRect);
+                // Don't return - continue to process the event normally
+            }
+
             if (newRect.equals(e.getOldRectangle())) {
                 // View port range has not changed
                 return;
@@ -189,7 +217,7 @@ public class LSPCodeLensEditorFactoryListener implements EditorFactoryListener {
         Editor editor = event.getEditor();
         UnresolvedCodeLensViewportContext context = editor.getUserData(UNRESOLVED_CODELENS_CONTEXT_KEY);
         if (context != null) {
-            context.dispose();
+            Disposer.dispose(context);
             editor.putUserData(UNRESOLVED_CODELENS_CONTEXT_KEY, null);
         }
         editor.putUserData(CODELENS_SUPPORT_KEY, null);

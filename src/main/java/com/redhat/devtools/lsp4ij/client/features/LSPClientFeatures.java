@@ -17,6 +17,9 @@ import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.LSPRequestConstants;
 import com.redhat.devtools.lsp4ij.LanguageServerWrapper;
 import com.redhat.devtools.lsp4ij.ServerStatus;
+import com.redhat.devtools.lsp4ij.features.documentContent.DocumentContentFile;
+import com.redhat.devtools.lsp4ij.features.documentContent.DocumentContentProvider;
+import com.redhat.devtools.lsp4ij.features.documentContent.DocumentContentTargets;
 import com.redhat.devtools.lsp4ij.installation.ServerInstallationStatus;
 import com.redhat.devtools.lsp4ij.installation.ServerInstaller;
 import com.redhat.devtools.lsp4ij.server.DefaultLauncherBuilder;
@@ -32,6 +35,8 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.net.URI;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * LSP  client features.
@@ -45,6 +50,8 @@ public class LSPClientFeatures implements Disposable, FileUriSupport {
 
     private FileUriSupport fileUriSupport;
 
+    private final AtomicReference<DocumentContentProvider> documentContentProvider = new AtomicReference<>();
+
     private LSPCallHierarchyFeature callHierarchyFeature;
 
     private LSPCodeActionFeature codeActionFeature;
@@ -54,6 +61,8 @@ public class LSPClientFeatures implements Disposable, FileUriSupport {
     private LSPDocumentColorFeature documentColorFeature;
 
     private LSPCompletionFeature completionFeature;
+
+    private LSPInlineCompletionFeature inlineCompletionFeature;
 
     private LSPDeclarationFeature declarationFeature;
 
@@ -102,8 +111,11 @@ public class LSPClientFeatures implements Disposable, FileUriSupport {
     private LSPWorkspaceSymbolFeature workspaceSymbolFeature;
 
     private LSPConfigurationFeature configurationFeature;
-    
+
     private EditorBehaviorFeature editorBehaviorFeature;
+
+    private LSPWorkspaceFolderFeature workspaceFolderFeature;
+    private @Nullable LanguageServerDefinition serverDefinition;
 
     public LSPClientFeatures() {
         setFileUriSupport(FileUriSupport.DEFAULT);
@@ -211,6 +223,9 @@ public class LSPClientFeatures implements Disposable, FileUriSupport {
      */
     @Override
     public @Nullable URI getFileUri(@NotNull VirtualFile file) {
+        if (file instanceof DocumentContentFile contentFile) {
+            return contentFile.getUri();
+        }
         return fileUriSupport != null ? fileUriSupport.getFileUri(file) : null;
     }
 
@@ -222,12 +237,45 @@ public class LSPClientFeatures implements Disposable, FileUriSupport {
      */
     @Override
     public @Nullable VirtualFile findFileByUri(@NotNull String fileUri) {
-        return fileUriSupport != null ? fileUriSupport.findFileByUri(fileUri) : null;
+        var provider = documentContentProvider.get();
+        var content = provider != null ? provider.findFile(fileUri) : null;
+        return content != null ? content : fileUriSupport != null ? fileUriSupport.findFileByUri(fileUri) : null;
     }
 
     @Override
     public String toString(@NotNull VirtualFile file) {
+        if (file instanceof DocumentContentFile contentFile) {
+            return contentFile.getUri().toString();
+        }
         return fileUriSupport != null ? fileUriSupport.toString(file) : null;
+    }
+
+    /** Installs one connection's document provider, retiring any previous connection. */
+    public void installDocumentContentProvider(@NotNull DocumentContentProvider provider) {
+        var previous = documentContentProvider.getAndSet(provider);
+        if (previous != null && previous != provider) {
+            previous.dispose();
+        }
+    }
+
+    /** A retired client must not detach its replacement's provider. */
+    public void removeDocumentContentProvider(@NotNull DocumentContentProvider provider) {
+        documentContentProvider.compareAndSet(provider, null);
+        provider.dispose();
+    }
+
+    /** Retires the server-provided documents whose URI scheme the server no longer provides. */
+    public void retireUnprovidedDocumentContent() {
+        var provider = documentContentProvider.get();
+        if (provider != null) {
+            provider.retireUnprovided();
+        }
+    }
+
+    public <T> CompletableFuture<T> prepareDocumentContent(T result, @NotNull LanguageServer server) {
+        var provider = documentContentProvider.get();
+        return provider != null && provider.owns(server)
+                ? DocumentContentTargets.prepare(result, provider) : CompletableFuture.completedFuture(result);
     }
 
     @Override
@@ -357,6 +405,9 @@ public class LSPClientFeatures implements Disposable, FileUriSupport {
      */
     @NotNull
     public final LanguageServerDefinition getServerDefinition() {
+        if (serverDefinition != null) {
+            return serverDefinition;
+        }
         return getServerWrapper().getServerDefinition();
     }
 
@@ -547,6 +598,38 @@ public class LSPClientFeatures implements Disposable, FileUriSupport {
     public final LSPClientFeatures setCompletionFeature(@NotNull LSPCompletionFeature completionFeature) {
         completionFeature.setClientFeatures(this);
         this.completionFeature = completionFeature;
+        return this;
+    }
+
+    /**
+     * Returns the LSP inline completion feature.
+     *
+     * @return the LSP inline completion feature.
+     */
+    @NotNull
+    public final LSPInlineCompletionFeature getInlineCompletionFeature() {
+        if (inlineCompletionFeature == null) {
+            initInlineCompletionFeature();
+        }
+        return inlineCompletionFeature;
+    }
+
+    private synchronized void initInlineCompletionFeature() {
+        if (inlineCompletionFeature != null) {
+            return;
+        }
+        setInlineCompletionFeature(new LSPInlineCompletionFeature());
+    }
+
+    /**
+     * Initialize the LSP inline completion feature.
+     *
+     * @param inlineCompletionFeature the LSP inline completion feature.
+     * @return the LSP client features.
+     */
+    public final LSPClientFeatures setInlineCompletionFeature(@NotNull LSPInlineCompletionFeature inlineCompletionFeature) {
+        inlineCompletionFeature.setClientFeatures(this);
+        this.inlineCompletionFeature = inlineCompletionFeature;
         return this;
     }
 
@@ -1344,6 +1427,38 @@ public class LSPClientFeatures implements Disposable, FileUriSupport {
     }
 
     /**
+     * Returns the LSP workspace folder feature.
+     *
+     * @return the LSP workspace folder feature.
+     */
+    @NotNull
+    public final LSPWorkspaceFolderFeature getWorkspaceFolderFeature() {
+        if (workspaceFolderFeature == null) {
+            initWorkspaceFolderFeature();
+        }
+        return workspaceFolderFeature;
+    }
+
+    private synchronized void initWorkspaceFolderFeature() {
+        if (workspaceFolderFeature != null) {
+            return;
+        }
+        setWorkspaceFolderFeature(new LSPWorkspaceFolderFeature());
+    }
+
+    /**
+     * Initialize the LSP workspace folder feature.
+     *
+     * @param workspaceFolderFeature the LSP workspace folder feature.
+     * @return the LSP client features.
+     */
+    public final LSPClientFeatures setWorkspaceFolderFeature(@NotNull LSPWorkspaceFolderFeature workspaceFolderFeature) {
+        workspaceFolderFeature.setClientFeatures(this);
+        this.workspaceFolderFeature = workspaceFolderFeature;
+        return this;
+    }
+
+    /**
      * Set the language server wrapper.
      *
      * @param serverWrapper the language server wrapper.
@@ -1351,6 +1466,16 @@ public class LSPClientFeatures implements Disposable, FileUriSupport {
     @ApiStatus.Internal
     public final void setServerWrapper(LanguageServerWrapper serverWrapper) {
         this.serverWrapper = serverWrapper;
+    }
+
+    /**
+     * Set the language server definition.
+     *
+     * @param serverDefinition the language server definition.
+     */
+    @ApiStatus.Internal
+    public final void setServerDefinition(LanguageServerDefinition serverDefinition) {
+        this.serverDefinition = serverDefinition;
     }
 
     /**
@@ -1368,6 +1493,10 @@ public class LSPClientFeatures implements Disposable, FileUriSupport {
      */
     @Override
     public void dispose() {
+        var provider = documentContentProvider.getAndSet(null);
+        if (provider != null) {
+            provider.dispose();
+        }
         if (callHierarchyFeature != null) {
             callHierarchyFeature.dispose();
         }
@@ -1440,6 +1569,9 @@ public class LSPClientFeatures implements Disposable, FileUriSupport {
         if (workspaceSymbolFeature != null) {
             workspaceSymbolFeature.dispose();
         }
+        if (workspaceFolderFeature != null) {
+            workspaceFolderFeature.reset();
+        }
     }
 
     public void setServerCapabilities(@NotNull ServerCapabilities serverCapabilities) {
@@ -1491,11 +1623,17 @@ public class LSPClientFeatures implements Disposable, FileUriSupport {
         if (inlayHintFeature != null) {
             inlayHintFeature.setServerCapabilities(serverCapabilities);
         }
+        if (inlineCompletionFeature != null) {
+            inlineCompletionFeature.setServerCapabilities(serverCapabilities);
+        }
         if (referencesFeature != null) {
             referencesFeature.setServerCapabilities(serverCapabilities);
         }
         if (renameFeature != null) {
             renameFeature.setServerCapabilities(serverCapabilities);
+        }
+        if (selectionRangeFeature != null) {
+            selectionRangeFeature.setServerCapabilities(serverCapabilities);
         }
         if (semanticTokensFeature != null) {
             semanticTokensFeature.setServerCapabilities(serverCapabilities);
@@ -1572,6 +1710,9 @@ public class LSPClientFeatures implements Disposable, FileUriSupport {
                     getImplementationFeature().getImplementationCapabilityRegistry();
             // register 'textDocument/inlayHint' capability
             case LSPRequestConstants.TEXT_DOCUMENT_INLAY_HINT -> getInlayHintFeature().getInlayHintCapabilityRegistry();
+            // register 'textDocument/inlineCompletion' capability
+            case LSPRequestConstants.TEXT_DOCUMENT_INLINE_COMPLETION ->
+                    getInlineCompletionFeature().getInlineCompletionCapabilityRegistry();
             // register 'textDocument/callHierarchy' capability
             case LSPRequestConstants.TEXT_DOCUMENT_CALL_HIERARCHY ->
                     getCallHierarchyFeature().getCallHierarchyCapabilityRegistry();

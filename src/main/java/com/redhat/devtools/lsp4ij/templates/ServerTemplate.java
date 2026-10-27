@@ -66,10 +66,14 @@ public abstract class ServerTemplate {
     public static final String PATTERNS_JSON_PROPERTY = "patterns";
     public static final String FILE_TYPE_MAPPINGS_JSON_PROPERTY = "fileTypeMappings";
 
+    // Working directory
+    public static final String WORKING_DIR_JSON_PROPERTY = "workingDir";
+
     private String id;
     private String name;
     private @Nullable String url;
     private Map<String /* OS */, String /* program args */> programArgs;
+    private @Nullable String workingDir;
     private @Nullable EnvironmentVariablesData envData;
 
     private List<ServerMappingSettings> fileTypeMappings;
@@ -130,6 +134,14 @@ public abstract class ServerTemplate {
 
     public void setProgramArgs(Map<String, String> programArgs) {
         this.programArgs = programArgs;
+    }
+
+    public @Nullable String getWorkingDir() {
+        return workingDir;
+    }
+
+    public void setWorkingDir(@Nullable String workingDir) {
+        this.workingDir = workingDir;
     }
 
     public @Nullable EnvironmentVariablesData getEnvData() {

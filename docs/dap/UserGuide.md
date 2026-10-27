@@ -36,6 +36,41 @@ The `Configuration` tab to specify the working directory and the file you want t
 
   ![DAP Configuration Type/Configuration](./images/DAP_config_type_configuration.png)
 
+
+
+
+### IntelliJ macro expansion
+
+You can use [built-in IntelliJ macros](https://www.jetbrains.com/help/idea/built-in-macros.html) in DAP configuration parameters. This allows you to reference project and file paths without hardcoding absolute paths.
+
+For example, you can use `$PROJECT_DIR$` to reference the root of the project:
+
+```json
+{
+  "program": "$PROJECT_DIR$/src/main.js"
+}
+```
+
+You can also use `$FilePath$` to reference the path of the currently selected editor file:
+
+```json
+{
+  "program": "$FilePath$"
+}
+```
+
+Here are some useful standard built-in macros that you can use:
+
+- `$WORKSPACE_DIR$`: The path to the workspace where the current project belongs. The workspace is the root of the open file hierarchy and can include multiple projects.
+- `$PROJECT_DIR$`: The root of the project.
+- `$USER_HOME$`: The user's home directory.
+- `$FilePath$`: The path of the currently selected editor file.
+
+Macro expansion is applied to string values in DAP parameters, including values nested inside objects and arrays.
+
+
+
+
 ## Breakpoints
 
 ### Adding breakpoint
@@ -63,6 +98,15 @@ Conditional breakpoints are also supported. Here is an example of a conditional 
 
 ![DAP Conditional Breakpoint](./images/DAP_conditional_breakpoint.png)
 
+### Logpoint
+
+A breakpoint whose `Suspend` option is unchecked logs instead of stopping. Its `"Breakpoint hit" message` and
+`Evaluate and log` expression are sent to the DAP server as a
+[logpoint](https://microsoft.github.io/debug-adapter-protocol//specification.html#Types_SourceBreakpoint), whose message
+the DAP server writes to the console without stopping the program; the expression is evaluated by the DAP server.
+A DAP server which doesn't support logpoints stops at it: LSP4IJ then evaluates the expression in the stopped frame,
+logs it, and resumes the program. A breakpoint which suspends logs its expression when it stops.
+
 ### Exception breakpoint
 
 Some DAP servers support exception breakpoints. If so, you must first run the configuration process, 
@@ -76,12 +120,46 @@ are based on the default configuration provided by the DAP server.
 
 You can then select or deselect the exception breakpoints you want to use.
 
+An exception breakpoint which the DAP server allows to be conditional (`supportsCondition`) can be given a condition
+in the `Condition` column, such as the exception types to stop at; until then, the column shows what the DAP server
+says the condition means. The condition is sent with the
+[exception filter options](https://microsoft.github.io/debug-adapter-protocol//specification.html#Types_ExceptionFilterOptions)
+when the DAP server supports them (`supportsExceptionFilterOptions`), and kept with the selected exception breakpoints.
+
 Take a sample JavaScript file containing an error:
 
 ![DAP exception breakpoint / Syntax error](./images/DAP_exception_breakpoint_sample.png)
 
 In this example, no breakpoints are defined. 
 However, when you start the DAP server, it stops at the line with the line error:
+
+###  Smart Step Into
+
+[Smart Step Into](https://www.jetbrains.com/help/idea/stepping-through-the-program.html#smart-step-into) is available
+if the DAP server supports [StepInTargets](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_StepInTargets).
+
+When you're stopped at a breakpoint on a line with multiple function calls, press **Shift+F7** (or select **Smart Step Into** from the debug menu).
+A popup will appear showing all available functions you can step into. 
+Use the arrow keys to navigate between functions, and press **Enter** to step into the selected one.
+You can also click directly on a function name in the editor.
+
+For example, on this line:
+```python
+result = multiply(add(x, y), subtract(x, y))
+```
+
+Smart Step Into will let you choose between `multiply`, `add`, and `subtract`.
+
+The feature also handles duplicate function names on the same line correctly. For instance:
+```python
+result = add(1, 2) + add(3, 4)
+```
+
+Each `add` call will be highlighted separately, allowing you to step into the specific occurrence you want.
+
+Here's a demo with [Python Debugpy](./user-defined-dap/python-debugpy.md) which supports [StepInTargets](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_StepInTargets):
+
+![DAP Smart Step Into](./images/DAP_SmartStepIntoDemo.gif)
 
 ![DAP exception breakpoint / Syntax error](./images/DAP_exception_breakpoint_sample_stop.png)
 
@@ -112,6 +190,29 @@ completion should be available in the expression editor by consuming the
 [Completion request](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_Completions):
 
 ![Completion](images/DAP_debugging_completion.png)
+
+## Hexadecimal values
+
+When the DAP server supports value formatting (`supportsValueFormattingOptions`), the context menu of the Variables and
+Watches views has `Show Values as Hexadecimal`, which asks the DAP server for numbers in hexadecimal
+([ValueFormat](https://microsoft.github.io/debug-adapter-protocol//specification.html#Types_ValueFormat)) in the
+variables, evaluations and set values of the debug session, and shows the values again.
+
+## Large variables
+
+A variable with more than 100 indexed children, such as a large array, whose
+[Variable](https://microsoft.github.io/debug-adapter-protocol//specification.html#Types_Variable) says how many it has
+(`indexedVariables`), shows its first 100 and a `...` node with how many more there are. Opening the node asks the
+DAP server for the next 100 ([`variables`](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_Variables)
+with `filter` `indexed`, `start` and `count`), so a large variable is read a page at a time. Its named children, when
+it says it has any (`namedVariables`), are asked for first.
+
+## Lazy variables
+
+A variable which the DAP server marks as lazy
+([presentationHint.lazy](https://microsoft.github.io/debug-adapter-protocol//specification.html#Types_VariablePresentationHint)),
+such as a property computed by a getter, is shown with a `Show value` link instead of its value, since getting the value
+may run code. Clicking the link asks the DAP server for the value, which then replaces the link and can be expanded.
 
 ## Set value
 
@@ -219,7 +320,8 @@ LSP4IJ provides DAP templates that allow to initialize a given DAP server very q
 
 - [CodeLLDB](./user-defined-dap/codelldb.md) which allows you to debug `Rust`,`Swift`, etc. files.
 - [Go Delve DAP server](./user-defined-dap/go-delve.md) which allows you to debug `Go` files.
-- [Julia DAP server](./user-defined-dap/julia.md) which allows you to debug `Julia` files. 
+- [Julia DAP server](./user-defined-dap/julia.md) which allows you to debug `Julia` files.
+- [Perl DAP server](./user-defined-dap/perl-dap.md) which allows you to debug `Perl` files. 
 - [Python Debugpy DAP server](./user-defined-dap/python-debugpy.md) which allows you to debug `Python` files.
 - [Ruby rdbg DAP server](./user-defined-dap/ruby-rdbg.md) which allows you to debug `Ruby` files.
 - [Swift DAP Server](./user-defined-dap/swift-lldb.md) which allows you to debug `Swift` files.

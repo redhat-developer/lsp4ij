@@ -37,11 +37,10 @@ import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
 
 import static com.redhat.devtools.lsp4ij.features.documentation.LSPDocumentationHelper.getValidMarkupContents;
 import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.isDoneNormally;
-import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.waitUntilDone;
+import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.awaitWithCheckCanceled;
 
 /**
  * LSP {@link DocumentationTargetProvider} implementation used to consume
@@ -74,15 +73,11 @@ public class LSPDocumentationTargetProvider implements DocumentationTargetProvid
         CompletableFuture<List<HoverData>> hoverFuture = hoverSupport.getHover(params);
 
         try {
-            waitUntilDone(hoverFuture, psiFile);
+            awaitWithCheckCanceled(hoverFuture);
         } catch (ProcessCanceledException e) {
-            // cancel the LSP requests textDocument/hover
-            hoverSupport.cancel();
+            throw e;
         } catch (CancellationException e) {
-            // cancel the LSP requests textDocument/hover
-            hoverSupport.cancel();
-        } catch (ExecutionException e) {
-            LOGGER.error("Error while consuming LSP 'textDocument/hover' request", e);
+            // ignore
         }
 
         if (isDoneNormally(hoverFuture)) {

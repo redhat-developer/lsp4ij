@@ -32,6 +32,18 @@ public interface EditorFeature {
     EditorFeatureType getFeatureType();
 
     /**
+     * Check if this feature should be processed for the given file.
+     * By default, returns true for all files.
+     * Override this method to add specific conditions (e.g., only for selected file).
+     *
+     * @param file the Psi file.
+     * @return true if the feature should be processed, false otherwise.
+     */
+    default boolean shouldProcess(@NotNull PsiFile file) {
+        return true;
+    }
+
+    /**
      * Clear notification stamp from the given editor.
      *
      * @param editor the editor.

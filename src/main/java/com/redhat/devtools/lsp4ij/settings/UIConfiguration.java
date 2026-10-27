@@ -40,6 +40,9 @@ public class UIConfiguration {
     // Installer tab configuration
     private boolean showInstaller;
 
+    // Workspace folders tab configuration
+    private boolean showWorkspaceFolders;
+
     /**
      * Returns whether the server name should be displayed in the UI.
      *
@@ -218,5 +221,23 @@ public class UIConfiguration {
      */
     public void setShowInstaller(boolean showInstaller) {
         this.showInstaller = showInstaller;
+    }
+
+    /**
+     * Returns whether the workspace folders tab is shown.
+     *
+     * @return true if shown, false otherwise
+     */
+    public boolean isShowWorkspaceFolders() {
+        return showWorkspaceFolders;
+    }
+
+    /**
+     * Sets whether the workspace folders tab is shown.
+     *
+     * @param showWorkspaceFolders true to show the workspace folders tab, false to hide it
+     */
+    public void setShowWorkspaceFolders(boolean showWorkspaceFolders) {
+        this.showWorkspaceFolders = showWorkspaceFolders;
     }
 }

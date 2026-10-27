@@ -1,0 +1,34 @@
+{
+  "id": "perl-dap",
+  "name": "Perl Debugging",
+  "launch": {
+    "windows": "<<insert base directory>>/perl-dap.exe",
+    "default": "<<insert base directory>>/perl-dap"
+  },
+  "fileTypeMappings": [
+    {
+      "fileType": {
+        "name": "Perl",
+        "patterns": [
+          "*.pl",
+          "*.PL",
+          "*.cgi",
+          "*.fcgi",
+          "*.pm",
+          "*.xs",
+          "*.xsi",
+          "*.pod",
+          "*.t",
+          "*.psgi",
+          "*.mason",
+          "*.mas",
+          "*.tt",
+          "*.tt2",
+          "*.ep",
+          "*.i"
+        ]
+      },
+      "languageId": "perl"
+    }
+  ]
+}

@@ -10,6 +10,7 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij;
 
+import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.fileEditor.FileEditorManager;
 import com.intellij.openapi.fileEditor.FileEditorManagerEvent;
 import com.intellij.openapi.fileEditor.FileEditorManagerListener;
@@ -17,9 +18,16 @@ import com.intellij.openapi.project.Project;
 import com.intellij.openapi.project.ProjectManagerListener;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiFile;
+import com.intellij.util.concurrency.AppExecutorUtil;
+import com.intellij.util.messages.MessageBusConnection;
 import com.redhat.devtools.lsp4ij.client.indexing.ProjectIndexingManager;
 import com.redhat.devtools.lsp4ij.lifecycle.LanguageServerLifecycleManager;
 import org.jetbrains.annotations.NotNull;
+
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Manages the connection between open editor files and Language Servers:
@@ -31,19 +39,20 @@ import org.jetbrains.annotations.NotNull;
  */
 public class ConnectDocumentToLanguageServerSetupParticipant implements ProjectManagerListener, FileEditorManagerListener {
 
-    private static void connectToLanguageServer(@NotNull VirtualFile file, @NotNull Project project) {
-        PsiFile psiFile = LSPIJUtils.getPsiFile(file, project);
-        if (psiFile != null) {
-            // Force the startup of all Language Servers mapped to this file.
-            LanguageServiceAccessor.getInstance(project)
-                    .getLanguageServers(psiFile, null, null);
-        }
+    // Store connections per project to properly dispose them
+    private final Map<Project, MessageBusConnection> projectConnections = new ConcurrentHashMap<>();
+
+    private static void connectToLanguageServer(@NotNull PsiFile psiFile, @NotNull Project project) {
+        LanguageServiceAccessor.getInstance(project)
+                .getLanguageServers(psiFile, null, null);
     }
 
     @Override
     public void projectOpened(@NotNull Project project) {
         // Subscribe to file open/close/selection events for this project.
-        project.getMessageBus().connect().subscribe(FileEditorManagerListener.FILE_EDITOR_MANAGER, this);
+        MessageBusConnection connection = project.getMessageBus().connect();
+        connection.subscribe(FileEditorManagerListener.FILE_EDITOR_MANAGER, this);
+        projectConnections.put(project, connection);
     }
 
     @Override
@@ -51,6 +60,12 @@ public class ConnectDocumentToLanguageServerSetupParticipant implements ProjectM
         // Stop active Language Servers and clean up resources before the project is closed.
         LanguageServerLifecycleManager.getInstance(project).dispose();
         LanguageServiceAccessor.getInstance(project).projectClosing(project);
+
+        // Properly dispose MessageBusConnection to prevent memory leak
+        MessageBusConnection connection = projectConnections.remove(project);
+        if (connection != null) {
+            connection.disconnect();
+        }
     }
 
     @Override
@@ -68,6 +83,11 @@ public class ConnectDocumentToLanguageServerSetupParticipant implements ProjectM
         }
         var project = event.getManager().getProject();
 
+        // Don't start Language Servers if the project is being disposed/closed
+        if (project.isDisposed()) {
+            return;
+        }
+
         // Since file-to-server matching requires a read action,
         // and Language Server startup may be expensive,
         // schedule the connection asynchronously after indexing is finished.
@@ -75,30 +95,45 @@ public class ConnectDocumentToLanguageServerSetupParticipant implements ProjectM
         // and isFileSupported() calls off EDT to avoid slow operation violations.
         ProjectIndexingManager
                 .waitForIndexingAll()
-                .thenApplyAsync(unused -> {
-                    if (!LanguageServersRegistry.getInstance().isFileSupported(file, project)) {
-                        return null;
+                .thenAccept(unused -> {
+                    // Double-check project is still valid after async operations
+                    if (project.isDisposed()) {
+                        return;
                     }
-                    PsiFile psiFile = LSPIJUtils.getPsiFile(file, project);
-                    if (psiFile == null || LSPFileSupport.hasSupport(psiFile)) {
-                        // No PsiFile available, or the file is already connected to a Language Server.
-                        return null;
-                    }
-                    connectToLanguageServer(file, project);
-                    return null;
+                    // Execute in non-blocking ReadAction since getPsiFile and connectToLanguageServer require it
+                    ReadAction.nonBlocking(() -> {
+                                if (project.isDisposed()) {
+                                    return;
+                                }
+                                PsiFile psiFile = LSPIJUtils.getPsiFile(file, project);
+                                if (psiFile == null || LSPFileSupport.hasSupport(psiFile)) {
+                                    // No PsiFile available, or the file is already connected to a Language Server.
+                                    return;
+                                }
+                                connectToLanguageServer(psiFile, project);
+                            })
+                            .expireWhen(() -> project.isDisposed())
+                            .submit(AppExecutorUtil.getAppExecutorService());
                 });
     }
 
     @Override
     public void fileClosed(@NotNull FileEditorManager source, @NotNull VirtualFile file) {
-        // When a file is closed:
-        PsiFile psiFile = LSPIJUtils.getPsiFile(file, source.getProject());
-        if (psiFile != null) {
-            if (LSPFileSupport.hasSupport(psiFile)) {
-                // If the file is associated with a Language Server,
-                // release its resources (code lenses, inlay hints, color providers, etc.).
-                LSPFileSupport.getSupport(psiFile).dispose();
-            }
+        var project = source.getProject();
+        if (project.isDisposed()) {
+            return;
         }
+        ReadAction.nonBlocking(() -> {
+                    if (project.isDisposed()) {
+                        return;
+                    }
+                    PsiFile psiFile = LSPIJUtils.getPsiFile(file, project);
+                    if (psiFile != null && LSPFileSupport.hasSupport(psiFile)) {
+                        LSPFileSupport.getSupport(psiFile).dispose();
+                    }
+                })
+                .coalesceBy(this, file, project)
+                .expireWhen(() -> project.isDisposed())
+                .submit(AppExecutorUtil.getAppExecutorService());
     }
 }

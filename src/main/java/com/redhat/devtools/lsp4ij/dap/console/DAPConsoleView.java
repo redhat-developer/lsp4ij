@@ -94,7 +94,7 @@ public class DAPConsoleView extends ConsoleViewImpl {
             }
             return s;
         }
-        return null;
+        return text;
     }
 
     private static boolean isContentLengthDapTrace(@NotNull String text) {

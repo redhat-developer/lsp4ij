@@ -16,10 +16,12 @@ package com.redhat.devtools.lsp4ij;
 import org.eclipse.lsp4j.Diagnostic;
 import org.eclipse.lsp4j.DiagnosticSeverity;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.Collection;
-import java.util.Collections;
 import java.util.List;
+import java.util.HashMap;
+import java.util.Map;
 
 import static com.redhat.devtools.lsp4ij.features.diagnostics.LSPDiagnosticUtils.isDiagnosticsChanged;
 
@@ -30,27 +32,57 @@ import static com.redhat.devtools.lsp4ij.features.diagnostics.LSPDiagnosticUtils
  */
 public class ClosedDocument extends LSPDocumentBase {
 
-    private List<Diagnostic> diagnostics;
-    private boolean hasErrors;
+    private final Map<String, List<Diagnostic>> diagnosticsPerIdentifier = new HashMap<>();
+    // Publish the diagnostics and their derived error status together.
+    private volatile DiagnosticSnapshot snapshot = new DiagnosticSnapshot(List.of(), false);
 
+    /**
+     * Replaces one provider's diagnostics in this closed document's cache.
+     * Diagnostics from other providers are retained.
+     *
+     * @param identifier  the diagnostic provider's cache identifier
+     * @param diagnostics the replacement diagnostics; an empty list removes
+     *                    this provider's diagnostics
+     * @param version     the report's version, ignored for closed files
+     * @return {@code true} if the merged diagnostic list changed
+     */
     @Override
-    public boolean updateDiagnostics(@NotNull String identifier,
-                                     @NotNull List<Diagnostic> diagnostics) {
-        boolean changed = isDiagnosticsChanged(this.diagnostics != null ? this.diagnostics : Collections.emptyList(), diagnostics);
-        this.diagnostics = diagnostics;
-        hasErrors = diagnostics
+    public synchronized boolean updateDiagnostics(@NotNull String identifier,
+                                     @NotNull List<Diagnostic> diagnostics, @Nullable Integer version) {
+        if (diagnostics.isEmpty()) {
+            diagnosticsPerIdentifier.remove(identifier);
+        } else {
+            diagnosticsPerIdentifier.put(identifier, List.copyOf(diagnostics));
+        }
+        var combined = diagnosticsPerIdentifier.values().stream().flatMap(List::stream).distinct().toList();
+        boolean changed = isDiagnosticsChanged(snapshot.diagnostics(), combined);
+        boolean hasErrors = combined
                 .stream()
                 .anyMatch(diagnostic -> diagnostic.getSeverity() != null && diagnostic.getSeverity() == DiagnosticSeverity.Error);
+        snapshot = new DiagnosticSnapshot(combined, hasErrors);
         return changed;
     }
 
+    /**
+     * Returns the merged diagnostic snapshot for this closed document.
+     *
+     * @return an unmodifiable collection with duplicate diagnostics removed
+     */
     @Override
     public Collection<Diagnostic> getDiagnostics() {
-        return diagnostics != null ? diagnostics : Collections.emptyList();
+        return snapshot.diagnostics();
     }
 
+    /**
+     * Returns whether this closed document's cached diagnostics contain errors.
+     *
+     * @return {@code true} if at least one diagnostic has error severity
+     */
     @Override
     public boolean hasErrors() {
-        return hasErrors;
+        return snapshot.hasErrors();
+    }
+
+    private record DiagnosticSnapshot(List<Diagnostic> diagnostics, boolean hasErrors) {
     }
 }

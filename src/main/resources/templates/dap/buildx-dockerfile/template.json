@@ -2,6 +2,7 @@
   "id": "buildx-dockerfile",
   "name": "Docker: Dockerfile Build Debugging",
   "launch": {
+    "windows": "docker.exe buildx dap build",
     "default": "docker buildx dap build"
   },
   "env": {

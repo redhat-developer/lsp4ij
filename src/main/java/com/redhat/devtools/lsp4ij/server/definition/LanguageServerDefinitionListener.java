@@ -76,31 +76,37 @@ public interface LanguageServerDefinitionListener {
 
         public final boolean nameChanged;
         public final boolean commandChanged;
+        public final boolean workingDirChanged;
         public final boolean userEnvironmentVariablesChanged;
         public final boolean includeSystemEnvironmentVariablesChanged;
         public final boolean mappingsChanged;
         public final boolean clientConfigurationContentChanged;
         public final boolean installerConfigurationContentChanged;
+        public final boolean workspaceFolderStrategyConfigurationChanged;
 
         public LanguageServerChangedEvent(@NotNull UpdatedBy updatedBy,
                                           @NotNull Project project,
                                           @NotNull LanguageServerDefinition serverDefinition,
                                           boolean nameChanged,
                                           boolean commandChanged,
+                                          boolean workingDirChanged,
                                           boolean userEnvironmentVariablesChanged,
                                           boolean includeSystemEnvironmentVariablesChanged,
                                           boolean mappingsChanged,
                                           boolean clientConfigurationContentChanged,
-                                          boolean installerConfigurationContentChanged) {
+                                          boolean installerConfigurationContentChanged,
+                                          boolean workspaceFolderStrategyConfigurationChanged) {
             super(updatedBy, project);
             this.serverDefinition = serverDefinition;
             this.nameChanged = nameChanged;
             this.commandChanged = commandChanged;
+            this.workingDirChanged = workingDirChanged;
             this.userEnvironmentVariablesChanged = userEnvironmentVariablesChanged;
             this.includeSystemEnvironmentVariablesChanged = includeSystemEnvironmentVariablesChanged;
             this.mappingsChanged = mappingsChanged;
             this.clientConfigurationContentChanged = clientConfigurationContentChanged;
             this.installerConfigurationContentChanged = installerConfigurationContentChanged;
+            this.workspaceFolderStrategyConfigurationChanged = workspaceFolderStrategyConfigurationChanged;
         }
     }
 

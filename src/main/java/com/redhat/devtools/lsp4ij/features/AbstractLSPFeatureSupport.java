@@ -29,7 +29,7 @@ import java.util.concurrent.CompletableFuture;
 public abstract class AbstractLSPFeatureSupport<Params, Result> {
 
     // The current LSP requests for all language servers applying to a given Psi file, project
-    private @Nullable CompletableFuture<Result> future;
+    private volatile @Nullable CompletableFuture<Result> future;
 
     // The current cancellation support
     private @Nullable CancellationSupport cancellationSupport;
@@ -38,11 +38,10 @@ public abstract class AbstractLSPFeatureSupport<Params, Result> {
      * Returns the (cached or not) LSP requests for all language servers applying to a given Psi file or project.
      *
      * @param params the LSP parameters expected to execute LSP requests.
-     * @return the (cached or not) LSP requests for all language servers applying to a given Psi file or project and null otherwise
-     * (rare case when the future is loaded and cancel is occurred in the same time which set the future to null).
+     * @return the (cached or not) LSP requests for all language servers applying to a given Psi file or project.
      */
     @Nullable
-    public CompletableFuture<Result> getFeatureData(Params params) {
+    public synchronized CompletableFuture<Result> getFeatureData(Params params) {
         if (!isValidLSPFuture()) {
             // - the LSP requests have never been executed
             // - or the LSP requests has failed
@@ -59,7 +58,9 @@ public abstract class AbstractLSPFeatureSupport<Params, Result> {
      * @return true if the current LSP requests is valid and false otherwise.
      */
     protected boolean isValidLSPFuture() {
-        return future != null && !future.isCompletedExceptionally() && checkValid();
+        // Read the field once: a concurrent cancel() can clear it between two reads.
+        CompletableFuture<Result> current = future;
+        return current != null && !current.isCompletedExceptionally() && checkValid();
     }
 
     protected abstract boolean checkValid();
@@ -69,7 +70,7 @@ public abstract class AbstractLSPFeatureSupport<Params, Result> {
      *
      * @return the current valid LSP request and null otherwise.
      */
-    public @Nullable CompletableFuture<Result> getValidLSPFuture() {
+    public synchronized @Nullable CompletableFuture<Result> getValidLSPFuture() {
         return isValidLSPFuture() ? future : null;
     }
 
@@ -104,16 +105,16 @@ public abstract class AbstractLSPFeatureSupport<Params, Result> {
     protected abstract CompletableFuture<Result> doLoad(Params params, CancellationSupport cancellationSupport);
 
     /**
-     * Cancel all LSP requests.
+     * Cancel all LSP requests. Serialized with reading and loading the cached requests, so a
+     * caller never receives a future that a concurrent cancellation has just replaced.
      */
-    public void cancel() {
+    public synchronized void cancel() {
         // Store the CancellationSupport in a local variable to prevent from NPE (very rare case)
         CancellationSupport cancellation = cancellationSupport;
-        var future = this.future;
-        CancellationSupport.cancel(future);
-        this.future = null;
         if (cancellation != null) {
             cancellation.cancel();
         }
+        this.future = null;
     }
+
 }

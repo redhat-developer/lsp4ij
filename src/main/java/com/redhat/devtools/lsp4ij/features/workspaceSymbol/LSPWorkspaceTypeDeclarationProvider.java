@@ -40,10 +40,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
 
 import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.isDoneNormally;
-import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.waitUntilDone;
+import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.awaitWithCheckCanceled;
 
 /**
  * Implements the IDE's standard Go To Type Declaration action using LSP textDocument/typeDefinition. -->
@@ -84,7 +83,7 @@ public class LSPWorkspaceTypeDeclarationProvider implements TypeDeclarationPlace
         }
 
         if (!LanguageServiceAccessor.getInstance(project)
-                .hasAny(file, ls -> ls.getClientFeatures().getTypeDefinitionFeature().isTypeDefinitionSupported(file))) {
+                .hasAny(file, ls -> ls.getClientFeatures().getTypeDefinitionFeature().isSupported(file))) {
             return null;
         }
 
@@ -92,15 +91,10 @@ public class LSPWorkspaceTypeDeclarationProvider implements TypeDeclarationPlace
         var params = new LSPTypeDefinitionParams(new TextDocumentIdentifier(), LSPIJUtils.toPosition(offset, document), offset);
         CompletableFuture<List<LocationData>> typeDefinitionsFuture = typeDefinitionSupport.getTypeDefinitions(params);
         try {
-            waitUntilDone(typeDefinitionsFuture, file);
-        } catch (ProcessCanceledException ex) {
-            // cancel the LSP requests textDocument/typeDefinition
-            typeDefinitionSupport.cancel();
-        } catch (CancellationException ex) {
-            // cancel the LSP requests textDocument/typeDefinition
-            typeDefinitionSupport.cancel();
-        } catch (ExecutionException e) {
-            LOGGER.error("Error while consuming LSP 'textDocument/typeDefinition' request", e);
+            awaitWithCheckCanceled(typeDefinitionsFuture);
+        } catch (ProcessCanceledException e) {
+            throw e;
+        } catch (CancellationException e) {
         }
 
         if (isDoneNormally(typeDefinitionsFuture)) {

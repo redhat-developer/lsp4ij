@@ -116,6 +116,8 @@ public class UserDefinedLanguageServerSettings implements PersistentStateCompone
 
         private String commandLine;
 
+        private String workingDir;
+
         private Map<String, String> userEnvironmentVariables;
 
         private boolean includeSystemEnvironmentVariables = true;
@@ -125,6 +127,8 @@ public class UserDefinedLanguageServerSettings implements PersistentStateCompone
         private String installerConfigurationContent;
 
         private boolean installAlreadyDone;
+
+        private String workspaceFolderStrategyConfiguration;
 
         @XCollection(elementTypes = ServerMappingSettings.class)
         private List<ServerMappingSettings> mappings;
@@ -167,6 +171,14 @@ public class UserDefinedLanguageServerSettings implements PersistentStateCompone
 
         public void setCommandLine(String commandLine) {
             this.commandLine = commandLine;
+        }
+
+        public String getWorkingDir() {
+            return workingDir;
+        }
+
+        public void setWorkingDir(String workingDir) {
+            this.workingDir = workingDir;
         }
 
         /**
@@ -236,6 +248,14 @@ public class UserDefinedLanguageServerSettings implements PersistentStateCompone
 
         public void setInstallAlreadyDone(boolean installAlreadyDone) {
             this.installAlreadyDone = installAlreadyDone;
+        }
+
+        public String getWorkspaceFolderStrategyConfiguration() {
+            return workspaceFolderStrategyConfiguration;
+        }
+
+        public void setWorkspaceFolderStrategyConfiguration(String workspaceFolderStrategyConfiguration) {
+            this.workspaceFolderStrategyConfiguration = workspaceFolderStrategyConfiguration;
         }
     }
 

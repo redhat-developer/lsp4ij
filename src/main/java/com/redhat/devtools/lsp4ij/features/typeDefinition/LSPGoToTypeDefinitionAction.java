@@ -29,9 +29,7 @@ import org.slf4j.LoggerFactory;
 import java.util.List;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
-
-import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.waitUntilDone;
+import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.awaitWithCheckCanceled;
 
 /**
  * LSP Go To TypeDefinition.
@@ -53,22 +51,17 @@ public class LSPGoToTypeDefinitionAction extends AbstractLSPGoToAction {
         var params = new LSPTypeDefinitionParams(new TextDocumentIdentifier(), LSPIJUtils.toPosition(offset, document), offset);
         CompletableFuture<List<LocationData>> typeDefinitionsFuture = typeDefinitionSupport.getTypeDefinitions(params);
         try {
-            waitUntilDone(typeDefinitionsFuture, psiFile);
-        } catch (ProcessCanceledException ex) {
-            // cancel the LSP requests textDocument/typeDefinition
-            typeDefinitionSupport.cancel();
-        } catch (CancellationException ex) {
-            // cancel the LSP requests textDocument/typeDefinition
-            typeDefinitionSupport.cancel();
-        } catch (ExecutionException e) {
-            LOGGER.error("Error while consuming LSP 'textDocument/typeDefinition' request", e);
+            awaitWithCheckCanceled(typeDefinitionsFuture);
+        } catch (ProcessCanceledException e) {
+            throw e;
+        } catch (CancellationException ignore) {
         }
         return typeDefinitionsFuture;
     }
 
     @Override
     protected boolean canSupportFeature(@NotNull LSPClientFeatures clientFeatures, @NotNull PsiFile file) {
-        return clientFeatures.getTypeDefinitionFeature().isTypeDefinitionSupported(file);
+        return clientFeatures.getTypeDefinitionFeature().isSupported(file);
     }
 
     @Override

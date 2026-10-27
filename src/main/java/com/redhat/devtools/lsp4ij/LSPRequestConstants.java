@@ -21,6 +21,7 @@ public class LSPRequestConstants {
     public static final String WORKSPACE_WILL_DELETE_FILES = "workspace/willDeleteFiles";
     public static final String WORKSPACE_WILL_RENAME_FILES = "workspace/willRenameFiles";
     public static final String WORKSPACE_SYMBOL = "workspace/symbol";
+    public static final String WORKSPACE_TEXT_DOCUMENT_CONTENT = "workspace/textDocumentContent";
 
     // textDocument/* LSP requests
 
@@ -40,7 +41,9 @@ public class LSPRequestConstants {
     public static final String TEXT_DOCUMENT_INLAY_HINT = "textDocument/inlayHint";
     public static final String INLAY_HINT_RESOLVE = "inlayHint/resolve";
     public static final String TEXT_DOCUMENT_DOCUMENT_COLOR = "textDocument/documentColor";
+    public static final String TEXT_DOCUMENT_COLOR_PRESENTATION = "textDocument/colorPresentation";
     public static final String TEXT_DOCUMENT_COMPLETION = "textDocument/completion";
+    public static final String TEXT_DOCUMENT_INLINE_COMPLETION = "textDocument/inlineCompletion";
     public static final String TEXT_DOCUMENT_DOCUMENT_HIGHLIGHT = "textDocument/documentHighlight";
     public static final String TEXT_DOCUMENT_FORMATTING = "textDocument/formatting";
     public static final String TEXT_DOCUMENT_RANGE_FORMATTING = "textDocument/rangeFormatting";

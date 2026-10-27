@@ -41,11 +41,10 @@ import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeoutException;
+
 
 import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.isDoneNormally;
-import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.waitUntilDone;
+import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.awaitWithCheckCanceled;
 
 /**
  * LSP folding range builder.
@@ -86,6 +85,7 @@ public class LSPFoldingRangeBuilder extends CustomFoldingBuilder {
 
     /**
      * Returns true if there is a started language server which supports LSP foldingRanges and false otherwise.
+     *
      * @param file the Psi file
      * @return true if there is a started language server which supports LSP foldingRanges and false otherwise.
      */
@@ -118,21 +118,10 @@ public class LSPFoldingRangeBuilder extends CustomFoldingBuilder {
         var params = new FoldingRangeRequestParams(new TextDocumentIdentifier());
         CompletableFuture<List<FoldingRange>> foldingRangesFuture = foldingRangeSupport.getFoldingRanges(params);
         try {
-            waitUntilDone(foldingRangesFuture, file, timeout);
-        } catch (
-                ProcessCanceledException e) {//Since 2024.2 ProcessCanceledException extends CancellationException so we can't use multicatch to keep backward compatibility
-            //TODO delete block when minimum required version is 2024.2
-            foldingRangeSupport.cancel();
-            return Collections.emptyList();
+            awaitWithCheckCanceled(foldingRangesFuture);
+        } catch (ProcessCanceledException e) {
+            throw e;
         } catch (CancellationException e) {
-            // cancel the LSP requests textDocument/foldingRanges
-            foldingRangeSupport.cancel();
-            return Collections.emptyList();
-        } catch(TimeoutException e) {
-            // Ignore timeout error
-            return Collections.emptyList();
-        } catch (ExecutionException e) {
-            LOGGER.error("Error while consuming LSP 'textDocument/foldingRanges' request", e);
             return Collections.emptyList();
         }
 
@@ -205,7 +194,7 @@ public class LSPFoldingRangeBuilder extends CustomFoldingBuilder {
     private static int getStartOffset(@NotNull FoldingRange foldingRange, @NotNull Document document) {
         if (foldingRange.getStartCharacter() == null) {
             // Be defensive against language servers that return lines that are out of bounds for the document
-            return document.getLineEndOffset(Math.max(foldingRange.getStartLine(), 0));
+            return document.getLineEndOffset(toDocumentLine(foldingRange.getStartLine(), document));
         }
         return LSPIJUtils.toOffset(new Position(foldingRange.getStartLine(), foldingRange.getStartCharacter()), document);
     }
@@ -213,9 +202,17 @@ public class LSPFoldingRangeBuilder extends CustomFoldingBuilder {
     private static int getEndOffset(@NotNull FoldingRange foldingRange, @NotNull Document document) {
         if (foldingRange.getEndCharacter() == null) {
             // Be defensive against language servers that return lines that are out of bounds for the document
-            return document.getLineEndOffset(Math.min(foldingRange.getEndLine(), document.getLineCount() - 1));
+            return document.getLineEndOffset(toDocumentLine(foldingRange.getEndLine(), document));
         }
         return LSPIJUtils.toOffset(new Position(foldingRange.getEndLine(), foldingRange.getEndCharacter()), document);
+    }
+
+    /**
+     * Returns the given line clamped to the lines of the document, in both directions. A reply can name
+     * lines the document no longer has, for instance when it was computed before lines were deleted.
+     */
+    private static int toDocumentLine(int line, @NotNull Document document) {
+        return Math.max(0, Math.min(line, document.getLineCount() - 1));
     }
 
     @Override

@@ -35,7 +35,7 @@ public class LSPDefinitionSupport extends AbstractLSPDocumentFeatureSupport<LSPD
     private Integer previousOffset;
 
     public LSPDefinitionSupport(@NotNull PsiFile file) {
-        super(file);
+        super(file, true, true);
     }
 
     public CompletableFuture<List<LocationData>> getDefinitions(LSPDefinitionParams params) {
@@ -85,7 +85,7 @@ public class LSPDefinitionSupport extends AbstractLSPDocumentFeatureSupport<LSPD
         updateTextDocumentUri(params.getTextDocument(), file, languageServer);
         return cancellationSupport.execute(languageServer
                         .getTextDocumentService()
-                        .definition(params), languageServer, LSPRequestConstants.TEXT_DOCUMENT_DECLARATION)
+                        .definition(params), languageServer, LSPRequestConstants.TEXT_DOCUMENT_DEFINITION)
                 .thenApplyAsync(locations -> LSPIJUtils.getLocations(locations, languageServer));
     }
 }

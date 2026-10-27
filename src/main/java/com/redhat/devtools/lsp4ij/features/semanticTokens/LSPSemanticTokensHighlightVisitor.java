@@ -14,7 +14,6 @@ package com.redhat.devtools.lsp4ij.features.semanticTokens;
 import com.intellij.codeInsight.daemon.impl.HighlightVisitor;
 import com.intellij.codeInsight.daemon.impl.analysis.HighlightInfoHolder;
 import com.intellij.openapi.progress.ProcessCanceledException;
-import com.intellij.openapi.progress.util.ProgressIndicatorUtils;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.LSPFileSupport;
@@ -34,6 +33,7 @@ import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 
 import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.isDoneNormally;
+import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.awaitWithCheckCanceled;
 
 /**
  * LSP 'textDocument/semanticTokens' support by implementing IntelliJ {@link HighlightVisitor}.
@@ -50,8 +50,7 @@ import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.isDoneNorma
  * pending write action (e.g. opening the Git Push dialog) will be blocked on the
  * EDT, causing a visible UI freeze.
  * <br>
- * We use {@link ProgressIndicatorUtils#awaitWithCheckCanceled} instead of the
- * previous {@code CompletableFutures.waitUntilDone}, because it cooperates with
+ * We use {@link ProgressIndicatorUtils#awaitWithCheckCanceled} because it cooperates with
  * IntelliJ's read/write lock protocol: it yields to write actions by throwing
  * {@link ProcessCanceledException} when the current progress indicator is
  * cancelled, allowing the framework to release the read lock and reschedule
@@ -170,17 +169,8 @@ public class LSPSemanticTokensHighlightVisitor implements HighlightVisitor {
      * Fetches semantic tokens from the LSP server for the given file.
      *
      * <p>
-     * <b>Why {@link ProgressIndicatorUtils#awaitWithCheckCanceled} and not
-     * {@code CompletableFutures.waitUntilDone}?</b>
-     * <br>
      * This method is called from {@link #analyze}, which runs inside a read action.
-     * The old {@code waitUntilDone} polled {@code future.get(25ms)} in a tight loop
-     * while holding the read lock for the entire duration. If the LSP server was slow
-     * to respond, any write action (e.g. opening the Git Push dialog via
-     * {@code EditorTextField.setText}) would be stuck waiting for the read lock on
-     * the EDT, causing a UI freeze (see issue #1437).
-     * <br>
-     * {@code ProgressIndicatorUtils.awaitWithCheckCanceled} integrates with
+     * {@code awaitWithCheckCanceled} integrates with
      * IntelliJ's concurrency model: when a write action is requested, the current
      * progress indicator is cancelled → ProcessCanceledException is thrown →
      * the read lock is released → the write action can proceed immediately.
@@ -210,7 +200,7 @@ public class LSPSemanticTokensHighlightVisitor implements HighlightVisitor {
         try {
             // Wait for the LSP future while cooperating with IntelliJ's lock model.
             // See class Javadoc for a detailed explanation of why this is safe.
-            ProgressIndicatorUtils.awaitWithCheckCanceled(semanticTokensFuture);
+            awaitWithCheckCanceled(semanticTokensFuture);
 
         } catch (ProcessCanceledException e) {
             // A write action requested priority, or the pass was cancelled for another
@@ -222,7 +212,7 @@ public class LSPSemanticTokensHighlightVisitor implements HighlightVisitor {
         } catch (CancellationException e) {
             // The CompletableFuture itself was cancelled (e.g. the file was closed,
             // or the language server shut down). Nothing to do — propagate as-is.
-            throw e;
+            return null;
         }
 
         // Primary staleness check: if the file was modified while we were waiting,

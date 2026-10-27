@@ -71,7 +71,7 @@ public abstract class LSPCodeInsightFixtureTestCase extends UsefulTestCase {
     }
 
     private void registerServer() {
-        serverDefinition = new MockLanguageServerDefinition(clientConfigurable);
+        serverDefinition = new MockLanguageServerDefinition(clientConfigurable, true);
         List<ServerMappingSettings> mappings = List.of(ServerMappingSettings.createFileNamePatternsMappingSettings(List.of(fileNamePatterns), languageId));
         LanguageServersRegistry.getInstance().addServerDefinition(myFixture.getProject(), serverDefinition, mappings);
     }

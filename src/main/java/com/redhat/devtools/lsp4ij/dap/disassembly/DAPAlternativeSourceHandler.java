@@ -13,6 +13,7 @@ package com.redhat.devtools.lsp4ij.dap.disassembly;
 import com.intellij.openapi.Disposable;
 import com.intellij.openapi.fileEditor.FileEditorManagerEvent;
 import com.intellij.openapi.fileEditor.FileEditorManagerListener;
+import com.intellij.util.messages.MessageBusConnection;
 import com.intellij.xdebugger.XAlternativeSourceHandler;
 import com.intellij.xdebugger.XSourcePosition;
 import com.intellij.xdebugger.frame.XStackFrame;
@@ -50,6 +51,11 @@ public class DAPAlternativeSourceHandler implements XAlternativeSourceHandler, D
     private final FileEditorManagerListener selectedFileListener;
 
     /**
+     * MessageBusConnection to properly dispose the listener.
+     */
+    private final MessageBusConnection messageBusConnection;
+
+    /**
      * Constructs a new DAPAlternativeSourceHandler for the given DAP debug process.
      *
      * @param debugProcess the debug process this handler is associated with
@@ -70,8 +76,9 @@ public class DAPAlternativeSourceHandler implements XAlternativeSourceHandler, D
         };
 
         // Subscribe the listener to the project's message bus
-        debugProcess.getProject().getMessageBus().connect()
-                .subscribe(FileEditorManagerListener.FILE_EDITOR_MANAGER, selectedFileListener);
+        // Store connection to properly dispose it later
+        this.messageBusConnection = debugProcess.getProject().getMessageBus().connect(this);
+        this.messageBusConnection.subscribe(FileEditorManagerListener.FILE_EDITOR_MANAGER, selectedFileListener);
     }
 
     /**
@@ -114,7 +121,9 @@ public class DAPAlternativeSourceHandler implements XAlternativeSourceHandler, D
      */
     @Override
     public void dispose() {
-        debugProcess.getProject().getMessageBus().connect(debugProcess)
-                .subscribe(FileEditorManagerListener.FILE_EDITOR_MANAGER, selectedFileListener);
+        // Properly disconnect the MessageBusConnection to prevent memory leak
+        if (messageBusConnection != null) {
+            messageBusConnection.disconnect();
+        }
     }
 }

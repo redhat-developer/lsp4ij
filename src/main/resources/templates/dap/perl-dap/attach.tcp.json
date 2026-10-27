@@ -1,0 +1,8 @@
+{
+  "type": "perl",
+  "request": "attach",
+  "name": "Attach by TCP",
+  "host": "localhost",
+  "port": 13603,
+  "timeout": 5000
+}

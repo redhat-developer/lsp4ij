@@ -18,6 +18,7 @@ import com.intellij.openapi.fileChooser.FileChooser;
 import com.intellij.openapi.fileChooser.FileChooserDescriptor;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.DialogWrapper;
+import com.intellij.openapi.util.Disposer;
 import com.intellij.openapi.ui.ValidationInfo;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.ui.DocumentAdapter;
@@ -86,6 +87,7 @@ public class NewLanguageServerDialog extends DialogWrapper {
         createTemplatePanel(builder);
         // Create server name,  command line, mappings, configuration UI
         this.languageServerPanel = new LanguageServerPanel(builder, null, createUIConfiguration(), false, project);
+        Disposer.register(getDisposable(), languageServerPanel);
         languageServerPanel.setCommandLineUpdater(new CommandLineUpdater() {
             @Override
             public String getCommandLine() {
@@ -237,6 +239,9 @@ public class NewLanguageServerDialog extends DialogWrapper {
 
         // Update installer configuration
         this.languageServerPanel.setInstallerConfigurationContent(template.getInstallerConfiguration());
+
+        // Update workspace folder configuration
+        this.languageServerPanel.setWorkspaceFolderStrategyConfiguration(template.getWorkspaceFolderConfiguration());
     }
 
     @Override
@@ -304,12 +309,16 @@ public class NewLanguageServerDialog extends DialogWrapper {
         String experimental = this.languageServerPanel.getExperimentalContent();
         String clientConfiguration = this.languageServerPanel.getClientConfigurationContent();
         String installerConfiguration = this.languageServerPanel.getInstallerConfigurationContent();
+        String workspaceFolderStrategyConfiguration = "";
+        String workingDir = this.languageServerPanel.getWorkingDir();
+
         UserDefinedLanguageServerDefinition definition = new UserDefinedLanguageServerDefinition(serverId,
                 templateId,
                 serverName,
                 serverUrl,
                 "",
                 commandLine != null ? commandLine : "",
+                workingDir,
                 userEnvironmentVariables != null ? userEnvironmentVariables : Collections.emptyMap(),
                 includeSystemEnvironmentVariables,
                 configuration,
@@ -318,7 +327,8 @@ public class NewLanguageServerDialog extends DialogWrapper {
                 initializationOptions,
                 experimental,
                 clientConfiguration,
-                installerConfiguration);
+                installerConfiguration,
+                workspaceFolderStrategyConfiguration);
         definition.setUrl(this.languageServerPanel.getServerUrl());
         LanguageServersRegistry.getInstance().addServerDefinition(project, definition, mappingSettings);
     }

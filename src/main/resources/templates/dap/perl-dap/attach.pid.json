@@ -1,0 +1,6 @@
+{
+  "type": "perl",
+  "request": "attach",
+  "name": "Attach by PID",
+  "processId": 12345
+}

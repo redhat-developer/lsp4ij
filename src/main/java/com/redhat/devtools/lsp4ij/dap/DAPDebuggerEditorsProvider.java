@@ -14,6 +14,7 @@ import com.intellij.lang.Language;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.impl.DocumentImpl;
 import com.intellij.openapi.fileTypes.FileType;
+import com.intellij.openapi.fileTypes.LanguageFileType;
 import com.intellij.openapi.fileTypes.PlainTextFileType;
 import com.intellij.openapi.project.Project;
 import com.intellij.psi.PsiElement;
@@ -66,15 +67,29 @@ public class DAPDebuggerEditorsProvider extends XDebuggerEditorsProviderBase {
             // Get file type / language of the file which is debugging when debugger is suspended.
             fileType = file.getFileType();
             language = file.getLanguage();
+            // If the file's language is a more specific dialect of the file type's language, degrade to the file type's
+            if (fileType instanceof LanguageFileType languageFileType) {
+                Language fileTypeLanguage = languageFileType.getLanguage();
+                if (!language.is(fileTypeLanguage) && language.isKindOf(fileTypeLanguage)) {
+                    language = fileTypeLanguage;
+                }
+            }
         }
-        return createExpressionCodeFragment(project, text, fileType, language);
+        return createExpressionCodeFragment(project, text, fileType, language, isPhysical);
     }
 
+    /**
+     * Creates the code fragment of an expression in the given file type and language.
+     *
+     * @param isPhysical true if the fragment must be physical, as IntelliJ asks for the document of an expression
+     *                   editor, which it highlights and inspects.
+     */
     protected @NotNull PsiFile createExpressionCodeFragment(@NotNull Project project,
                                                             @NotNull String text,
                                                             @NotNull FileType fileType,
-                                                            @NotNull Language language) {
-        return new DAPExpressionCodeFragment(text, fileType, language, getDebugProcess(), project);
+                                                            @NotNull Language language,
+                                                            boolean isPhysical) {
+        return new DAPExpressionCodeFragment(text, fileType, language, getDebugProcess(), project, isPhysical);
     }
 
     protected @Nullable DAPDebugProcess getDebugProcess() {

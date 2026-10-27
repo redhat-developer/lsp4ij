@@ -37,11 +37,10 @@ import org.slf4j.LoggerFactory;
 import java.util.List;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
 
 import static com.redhat.devtools.lsp4ij.features.documentLink.LSPDocumentLinkPsiElement.isHttpUrl;
 import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.isDoneNormally;
-import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.waitUntilDone;
+import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.awaitWithCheckCanceled;
 
 /**
  * {@link GotoDeclarationHandler} implementation used to open LSP document link with CTrl+Click.
@@ -55,15 +54,13 @@ public class LSPDocumentLinkGotoDeclarationHandler implements GotoDeclarationHan
         if (sourceElement == null) {
             return PsiElement.EMPTY_ARRAY;
         }
-        PsiFile psiFile = sourceElement.getContainingFile();
-        if (!LanguageServersRegistry.getInstance().isFileSupported(psiFile)) {
+        Project project = sourceElement.getProject();
+        if (project.isDisposed()) {
             return PsiElement.EMPTY_ARRAY;
         }
-        Document document = editor.getDocument();
-        VirtualFile file = LSPIJUtils.getFile(document);
-        Module module = LSPIJUtils.getModule(file, sourceElement.getProject());
-        Project project = module != null ? module.getProject() : null;
-        if (project == null || project.isDisposed()) {
+
+        PsiFile psiFile = sourceElement.getContainingFile();
+        if (!LanguageServersRegistry.getInstance().isFileSupported(psiFile)) {
             return PsiElement.EMPTY_ARRAY;
         }
 
@@ -71,24 +68,17 @@ public class LSPDocumentLinkGotoDeclarationHandler implements GotoDeclarationHan
         var params = new DocumentLinkParams(new TextDocumentIdentifier());
         CompletableFuture<List<DocumentLinkData>> documentLinkFuture = documentLinkSupport.getDocumentLinks(params);
         try {
-            waitUntilDone(documentLinkFuture, psiFile);
-        } catch (
-                ProcessCanceledException e) {//Since 2024.2 ProcessCanceledException extends CancellationException so we can't use multicatch to keep backward compatibility
-            //TODO delete block when minimum required version is 2024.2
-            documentLinkSupport.cancel();
-            return null;
-        } catch (CancellationException e) {
-            // cancel the LSP requests textDocument/documentLink
-            documentLinkSupport.cancel();
-            return null;
-        } catch (ExecutionException e) {
-            LOGGER.error("Error while consuming LSP 'textDocument/documentLink' request", e);
+            awaitWithCheckCanceled(documentLinkFuture);
+        } catch (ProcessCanceledException e) {
+            throw e;
+        } catch (CancellationException ignore) {
             return null;
         }
 
         if (isDoneNormally(documentLinkFuture)) {
             List<DocumentLinkData> documentLinks = documentLinkFuture.getNow(null);
             if (documentLinks != null) {
+                Document document = editor.getDocument();
                 for (DocumentLinkData documentLinkData : documentLinks) {
                     DocumentLink documentLink = documentLinkData.documentLink();
                     TextRange range = LSPIJUtils.toTextRange(documentLink.getRange(), document);

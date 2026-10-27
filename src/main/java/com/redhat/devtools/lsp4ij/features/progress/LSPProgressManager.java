@@ -71,6 +71,15 @@ public class LSPProgressManager implements Disposable {
             progressMap.remove(token);
             return;
         }
+        if (progressInfo.isTaskStarted()) {
+            // A task has already been started for this progress.
+            // Non-compliant servers may send multiple 'begin' with the same token.
+            // Without this check, we would create multiple IntelliJ tasks reading from the same queue,
+            // causing a race condition where notifications are consumed by different tasks.
+            // --> don't create another background task.
+            return;
+        }
+        progressInfo.setTaskStarted(true);
         String title = languageServerWrapper.getClientFeatures().getProgressFeature()
                 .getProgressTaskTitle(progressInfo.getTitle());
         boolean cancellable = progressInfo.isCancellable();
@@ -108,6 +117,12 @@ public class LSPProgressManager implements Disposable {
                                         onProgressBegin((WorkDoneProgressBegin) progressNotification, indicator);
                                 case report -> // 'report' has been notified
                                         onProgressReport((WorkDoneProgressReport) progressNotification, indicator);
+                                case end -> {
+                                    // 'end' has been notified
+                                    // Process 'end' in the background task (with ProgressIndicator context)
+                                    // rather than in the notification thread, ensuring consistent UI updates.
+                                    onProgressEnd((WorkDoneProgressEnd) progressNotification);
+                                }
                             }
                         }
                     }
@@ -186,14 +201,18 @@ public class LSPProgressManager implements Disposable {
                 WorkDoneProgressBegin begin = (WorkDoneProgressBegin) progressNotification;
                 progress.setTitle(begin.getTitle());
                 progress.setCancellable(begin.getCancellable() != null && begin.getCancellable());
+                // Increment begin count to track active progress operations.
+                // This handles non-compliant servers that may send multiple 'begin' with the same token.
+                // The progress is marked as done only when all 'begin' have their corresponding 'end'.
+                progress.incrementBeginCount();
                 // The IJ task is created on 'begin' and not on 'create' to initialize
                 // the Task with the 'begin' title.
                 createTask(progress);
             }
             case end -> {
-                WorkDoneProgressEnd end = (WorkDoneProgressEnd) progressNotification;
-                onProgressEnd(end);
-                progress.setDone(true);
+                // Decrement begin count. The progress is automatically marked as done when count reaches 0,
+                // ensuring all 'begin' notifications have been matched with their 'end'.
+                progress.decrementBeginCount();
             }
         }
     }

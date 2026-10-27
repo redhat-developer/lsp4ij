@@ -27,8 +27,8 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.net.URI;
-import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Predicate;
 
 /**
@@ -51,7 +51,7 @@ public abstract class TextDocumentServerCapabilityRegistry<T extends TextDocumen
     public TextDocumentServerCapabilityRegistry(@NotNull LSPClientFeatures clientFeatures,
                                                 @Nullable EditorFeatureType editorFeatureType) {
         this.clientFeatures = clientFeatures;
-        this.dynamicCapabilities = new ArrayList<>();
+        this.dynamicCapabilities = new CopyOnWriteArrayList<>();
         this.editorFeatureType = editorFeatureType;
     }
 
@@ -138,7 +138,8 @@ public abstract class TextDocumentServerCapabilityRegistry<T extends TextDocumen
             for (var filter : filters) {
                 boolean hasLanguage = !StringUtils.isEmpty(filter.getLanguage());
                 boolean hasScheme = !StringUtils.isEmpty(filter.getScheme());
-                boolean hasPattern = !StringUtils.isEmpty(filter.getPattern());
+                var pattern = filter.getPattern();
+                boolean hasPattern = pattern != null && (pattern.isLeft() ? !StringUtils.isEmpty(pattern.getLeft()) : true);
 
                 boolean matchDocumentSelector = false;
                 // Matches language?

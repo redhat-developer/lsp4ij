@@ -198,6 +198,9 @@ public class CommandExecutor {
                     .getInitializedServer();
         }
         if (preferredLanguageServerId != null) {
+            if (project.isDisposed()) {
+                return null;
+            }
             return LanguageServerManager.getInstance(project)
                     .getLanguageServer(preferredLanguageServerId)
                     .thenApply(ls -> ls != null ? ls.getServer() : null);

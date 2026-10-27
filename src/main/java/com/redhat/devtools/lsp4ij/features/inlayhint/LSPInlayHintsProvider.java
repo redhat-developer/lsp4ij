@@ -21,7 +21,6 @@ import com.redhat.devtools.lsp4ij.LSPFileSupport;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import com.redhat.devtools.lsp4ij.features.AbstractLSPDeclarativeInlayHintsProvider;
-import com.redhat.devtools.lsp4ij.internal.PsiFileChangedException;
 import org.eclipse.lsp4j.*;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
 import org.jetbrains.annotations.NotNull;
@@ -34,12 +33,11 @@ import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.isDoneNormally;
-import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.waitUntilDone;
+import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.awaitWithCheckCanceled;
 
 /**
  * LSP textDocument/inlayHint support.
@@ -49,6 +47,18 @@ public class LSPInlayHintsProvider extends AbstractLSPDeclarativeInlayHintsProvi
     private static final Logger LOGGER = LoggerFactory.getLogger(LSPInlayHintsProvider.class);
 
     public static final String PROVIDER_ID = "LSPInlayHintsProvider";
+    private static final HintFormat TYPE_HINT_FORMAT =
+        HintFormat.Companion.getDefault()
+                .withFontSize(HintFontSize.ABitSmallerThanInEditor);
+
+    private static final HintFormat PARAMETER_HINT_FORMAT =
+        TYPE_HINT_FORMAT.withColorKind(HintColorKind.Parameter);
+
+    private static HintFormat getHintFormat(@NotNull InlayHint inlayHint) {
+        return inlayHint.getKind() == InlayHintKind.Parameter
+                ? PARAMETER_HINT_FORMAT
+                : TYPE_HINT_FORMAT;
+    }
 
     @Override
     protected void doCollect(@NotNull PsiFile psiFile,
@@ -61,33 +71,24 @@ public class LSPInlayHintsProvider extends AbstractLSPDeclarativeInlayHintsProvi
         CompletableFuture<List<InlayHintData>> future = inlayHintSupport.getInlayHints(params);
 
         try {
-            // Wait until the future and stop the wait if there are some ProcessCanceledException.
-            waitUntilDone(future, psiFile);
-            if (isDoneNormally(future)) {
+            awaitWithCheckCanceled(future);
+        } catch (ProcessCanceledException e) {
+            throw e;
+        } catch (CancellationException e) {
+            return;
+        }
 
-                // Collect inlay hints
-                List<Pair<Integer, InlayHintData>> inlayHints = new ArrayList<>();
-                List<InlayHintData> data = future.getNow(Collections.emptyList());
-                fillInlayHints(editor.getDocument(), data, inlayHints);
+        if (isDoneNormally(future)) {
+            List<Pair<Integer, InlayHintData>> inlayHints = new ArrayList<>();
+            List<InlayHintData> data = future.getNow(Collections.emptyList());
+            fillInlayHints(editor.getDocument(), data, inlayHints);
 
-                // Render inlay hints and collect all unfinished inlayHint/resolve futures
-                inlayHints.stream()
-                        .collect(Collectors.groupingBy(p -> p.first))
-                        .forEach((offset, list) -> {
-                            var position = new InlineInlayPosition(offset, false, 0);
-                            buildInlayHints(psiFile, list, position, inlayHintsSink);
-                        });
-            }
-        } catch (PsiFileChangedException e) {
-            // The file content has changed, cancel the LSP textDocument/inlayHint requests.
-            inlayHintSupport.cancel();
-        } catch (ProcessCanceledException e) {//Since 2024.2 ProcessCanceledException extends CancellationException so we can't use multicatch to keep backward compatibility
-            // the future which collects all textDocument/inlayHint for all servers is not finished
-            // add it to the pending futures to refresh again the UI when this future will be finished.
-            inlayHintSupport.refreshEditorFeatureWhenReady();
-        } catch (CancellationException ignore) {
-        } catch (ExecutionException e) {
-            LOGGER.error("Error while consuming LSP 'textDocument/inlayHint' request", e);
+            inlayHints.stream()
+                    .collect(Collectors.groupingBy(p -> p.first))
+                    .forEach((offset, list) -> {
+                        var position = new InlineInlayPosition(offset, false, 0);
+                        buildInlayHints(psiFile, list, position, inlayHintsSink);
+                    });
         }
     }
 
@@ -116,7 +117,7 @@ public class LSPInlayHintsProvider extends AbstractLSPDeclarativeInlayHintsProvi
         elements.forEach(p -> {
             Either<String, List<InlayHintLabelPart>> label = p.second.inlayHint().getLabel();
             if (label.isLeft()) {
-                buildBasicInlayHint(label.getLeft(), position, sink);
+                buildBasicInlayHint(label.getLeft(), p.second, position, sink);
             } else {
                 buildMultipartInlayHint(psiFile, label.getRight(), p.second, position, sink);
             }
@@ -124,9 +125,10 @@ public class LSPInlayHintsProvider extends AbstractLSPDeclarativeInlayHintsProvi
     }
 
     private void buildBasicInlayHint(@NotNull String label,
+                                     @NotNull InlayHintData hintData,
                                      @NotNull InlayPosition position,
                                      @NotNull InlayTreeSink sink) {
-        sink.addPresentation(position, null, null, true, builder -> {
+        sink.addPresentation(position, null, null, getHintFormat(hintData.inlayHint()), builder -> {
             builder.text(label, null);
             return null;
         });
@@ -159,7 +161,7 @@ public class LSPInlayHintsProvider extends AbstractLSPDeclarativeInlayHintsProvi
             }
             index++;
         }
-        sink.addPresentation(position, null, tooltip.toString(), true, builder -> {
+        sink.addPresentation(position, null, hasTooltip ? tooltip.toString() : null, getHintFormat(hintData.inlayHint()), builder -> {
             for (var build: builds) {
                 build.accept(builder);
             }
@@ -191,7 +193,9 @@ public class LSPInlayHintsProvider extends AbstractLSPDeclarativeInlayHintsProvi
             data = null;
         }
         return new InlayHintPartBuildInfo(tooltipStr, builder -> {
-            builder.text(text, data);
+            if (!text.isEmpty()) {
+                builder.text(text, data);
+            }
         });
     }
 

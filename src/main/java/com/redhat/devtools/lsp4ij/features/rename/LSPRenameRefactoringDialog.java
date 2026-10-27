@@ -14,7 +14,6 @@
 package com.redhat.devtools.lsp4ij.features.rename;
 
 import com.intellij.openapi.application.ApplicationManager;
-import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.command.WriteCommandAction;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.fileTypes.FileTypes;
@@ -47,6 +46,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
 
+import static com.redhat.devtools.lsp4ij.internal.ApplicationUtils.runCancellableReadAction;
 import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.waitUntilDoneAsync;
 
 /**
@@ -193,6 +193,14 @@ class LSPRenameRefactoringDialog extends RefactoringDialog {
             } else {
                 // Apply the rename from the LSP WorkspaceEdit list
                 WriteCommandAction.runWriteCommandAction(psiFile.getProject(), () -> {
+                    // Check all server responses before changing any document or external reference.
+                    for (var workspaceEditData : workspaceEdits) {
+                        String reason = workspaceEditData.snapshot().validate(workspaceEditData.edit());
+                        if (reason != null) {
+                            LSPRenameHandler.showErrorHint(editor, reason);
+                            return;
+                        }
+                    }
                     workspaceEdits.forEach(workspaceEditData -> LSPIJUtils.applyWorkspaceEdit(workspaceEditData.edit()));
 
                     // Update any found external references with the new name
@@ -239,10 +247,10 @@ class LSPRenameRefactoringDialog extends RefactoringDialog {
                 @Override
                 public void run(@NotNull ProgressIndicator progressIndicator) {
                     progressIndicator.setIndeterminate(true);
-                    ReadAction.run(() -> LSPExternalReferencesFinder.processExternalReferences(file, offset, reference -> {
+                    runCancellableReadAction(() -> LSPExternalReferencesFinder.processExternalReferences(file, offset, reference -> {
                         externalReferences.add(reference);
                         return true;
-                    }));
+                    }), project);
                 }
             });
         }

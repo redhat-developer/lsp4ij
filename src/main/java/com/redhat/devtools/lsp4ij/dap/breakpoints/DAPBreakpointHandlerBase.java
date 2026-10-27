@@ -15,9 +15,11 @@ import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.xdebugger.XDebugSession;
 import com.intellij.xdebugger.XExpression;
 import com.intellij.xdebugger.XSourcePosition;
+import com.intellij.xdebugger.breakpoints.SuspendPolicy;
 import com.intellij.xdebugger.breakpoints.XBreakpoint;
 import com.intellij.xdebugger.breakpoints.XBreakpointType;
 import com.redhat.devtools.lsp4ij.dap.descriptors.DebugAdapterDescriptor;
+import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import org.eclipse.lsp4j.debug.*;
 import org.eclipse.lsp4j.debug.services.IDebugProtocolServer;
 import org.jetbrains.annotations.NotNull;
@@ -26,6 +28,7 @@ import org.jetbrains.annotations.Nullable;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.Function;
 
 import static com.redhat.devtools.lsp4ij.dap.DAPIJUtils.*;
 
@@ -81,6 +84,7 @@ public abstract class DAPBreakpointHandlerBase<B extends XBreakpoint<?>> extends
 
     private static void addSourceBreakpoint(@NotNull XSourcePosition sourcePosition,
                                             @Nullable XExpression conditionExpression,
+                                            @Nullable String logMessage,
                                             @NotNull Map<Source, List<SourceBreakpoint>> targetBreakpoints) {
         Source source = toDAPSource(sourcePosition);
         int lineNumber = getLineNumber(sourcePosition);
@@ -90,9 +94,40 @@ public abstract class DAPBreakpointHandlerBase<B extends XBreakpoint<?>> extends
             // Breakpoint with condition
             sourceBreakpoint.setCondition(conditionExpression.getExpression());
         }
+        if (logMessage != null) {
+            // Logpoint: the debug adapter logs the message instead of stopping
+            sourceBreakpoint.setLogMessage(logMessage);
+        }
         List<SourceBreakpoint> sourceBreakpoints = targetBreakpoints
                 .computeIfAbsent(source, s -> new ArrayList<>());
         sourceBreakpoints.add(sourceBreakpoint);
+    }
+
+    /**
+     * Returns the DAP log message of a breakpoint which doesn't suspend, and null otherwise.
+     * <p>
+     * For such a breakpoint, IntelliJ logs "Breakpoint reached" and the value of the "Evaluate and log" expression.
+     * As a DAP logpoint, the debug adapter logs them without stopping, with the expression in braces to be
+     * interpolated. A debug adapter which doesn't support logpoints ignores the message and stops: the client then
+     * evaluates the expression, logs and resumes.
+     *
+     * @param breakpoint the IntelliJ breakpoint.
+     * @return the DAP log message of a breakpoint which doesn't suspend, and null otherwise.
+     */
+    static @Nullable String getLogMessage(@NotNull XBreakpoint<?> breakpoint) {
+        if (breakpoint.getSuspendPolicy() != SuspendPolicy.NONE) {
+            return null;
+        }
+        List<String> parts = new ArrayList<>();
+        XSourcePosition sourcePosition = breakpoint.getSourcePosition();
+        if (breakpoint.isLogMessage() && sourcePosition != null) {
+            parts.add("Breakpoint reached at " + sourcePosition.getFile().getName() + ":" + getLineNumber(sourcePosition));
+        }
+        XExpression logExpression = breakpoint.getLogExpressionObject();
+        if (logExpression != null && StringUtils.isNotBlank(logExpression.getExpression())) {
+            parts.add("{" + logExpression.getExpression() + "}");
+        }
+        return parts.isEmpty() ? null : String.join("\n", parts);
     }
 
     private static @NotNull Source toDAPSource(@NotNull XSourcePosition sourcePosition) {
@@ -111,16 +146,20 @@ public abstract class DAPBreakpointHandlerBase<B extends XBreakpoint<?>> extends
                                                                            @Nullable TemporaryBreakpoint temporaryBreakpoint) {
         // Convert list of IJ XBreakpoint -> LSP SourceBreakpoint
         Map<Source, List<SourceBreakpoint>> targetBreakpoints = new HashMap<>();
+        // The IJ breakpoint of each source breakpoint, in the same order, and null for the temporary breakpoint
+        Map<Source, List<@Nullable B>> targetIJBreakpoints = new HashMap<>();
         for (B breakpoint : breakpoints) {
             var sourcePosition = breakpoint.getSourcePosition();
             if (sourcePosition != null) {
-                addSourceBreakpoint(sourcePosition, breakpoint.getConditionExpression(), targetBreakpoints);
+                addSourceBreakpoint(sourcePosition, breakpoint.getConditionExpression(), getLogMessage(breakpoint), targetBreakpoints);
+                targetIJBreakpoints.computeIfAbsent(toDAPSource(sourcePosition), s -> new ArrayList<>()).add(breakpoint);
             }
         }
 
         if (temporaryBreakpoint != null) {
             if (temporaryBreakpoint.add()) {
-                addSourceBreakpoint(temporaryBreakpoint.sourcePosition(), null, targetBreakpoints);
+                addSourceBreakpoint(temporaryBreakpoint.sourcePosition(), null, null, targetBreakpoints);
+                targetIJBreakpoints.computeIfAbsent(toDAPSource(temporaryBreakpoint.sourcePosition()), s -> new ArrayList<>()).add(null);
             } else {
                 // Removed IntelliJ breakpoint
                 // Create a Source with empty source breakpoints if it doesn't exist,
@@ -142,15 +181,16 @@ public abstract class DAPBreakpointHandlerBase<B extends XBreakpoint<?>> extends
 
             // Call 'setBreakpoints' DAP request for each Source keys.
             final var arguments = createSetBreakpointsArguments(source, sourceBreakpoints);
+            List<@Nullable B> ijBreakpoints = targetIJBreakpoints.getOrDefault(source, List.of());
             if (debugProtocolServer != null) {
                 // Call 'setBreakpoints' DAP request for each Source keys
                 // and the given debug protocol server
-                setBreakpointsFutures.add(setBreakpoints(debugProtocolServer, arguments));
+                setBreakpointsFutures.add(setBreakpoints(debugProtocolServer, arguments, ijBreakpoints));
             } else {
                 // Call 'setBreakpoints' DAP request for each Source keys
                 // for each registered debug protocol server
                 for (var server : debugProtocolServers) {
-                    setBreakpointsFutures.add(setBreakpoints(server, arguments));
+                    setBreakpointsFutures.add(setBreakpoints(server, arguments, ijBreakpoints));
                 }
             }
 
@@ -163,8 +203,18 @@ public abstract class DAPBreakpointHandlerBase<B extends XBreakpoint<?>> extends
         return CompletableFuture.allOf(setBreakpointsFutures.toArray(EMPTY_COMPLETABLE_FUTURES));
     }
 
+    /**
+     * Sends the 'setBreakpoints' request, and gives each IJ breakpoint the id of its DAP breakpoint.
+     *
+     * @param debugProtocolServer the DAP server.
+     * @param arguments           the 'setBreakpoints' arguments.
+     * @param ijBreakpoints       the IJ breakpoint of each source breakpoint of the arguments, in the same order, and
+     *                            null for the temporary breakpoint.
+     * @return the future.
+     */
     private CompletableFuture<Void> setBreakpoints(@NotNull IDebugProtocolServer debugProtocolServer,
-                                                   @NotNull SetBreakpointsArguments arguments) {
+                                                   @NotNull SetBreakpointsArguments arguments,
+                                                   @NotNull List<@Nullable B> ijBreakpoints) {
         CompletableFuture<SetBreakpointsResponse> future = debugProtocolServer.setBreakpoints(arguments);
         return future
                 .thenAccept(response -> {
@@ -174,24 +224,35 @@ public abstract class DAPBreakpointHandlerBase<B extends XBreakpoint<?>> extends
                     }
                     for (int i = 0; i < breakpoints.length; i++) {
                         Breakpoint breakpointResponse = breakpoints[i];
-                        Source source = breakpointResponse.getSource();
-                        if (source == null) {
-                            source = arguments.getSource();
+                        B ijBreakpoint;
+                        if (breakpoints.length == ijBreakpoints.size()) {
+                            // The response has a breakpoint per source breakpoint, in the same order: when two are on
+                            // the same line, such as a breakpoint and the temporary breakpoint, each keeps its own id
+                            ijBreakpoint = ijBreakpoints.get(i);
+                        } else {
+                            ijBreakpoint = findBreakpoint(breakpointResponse, arguments, i);
                         }
-                        Integer line = breakpointResponse.getLine();
-                        if (line == null && arguments.getBreakpoints().length > i) {
-                            var sourceBreakpoint = arguments.getBreakpoints()[i];
-                            line = sourceBreakpoint.getLine();
-                        }
-                        if (source != null && line != null) {
-                            var ijBreakpoint = findBreakpoint(source, line);
-                            if (ijBreakpoint != null) {
-                                ijBreakpoint.putUserData(DAP_BREAKPOINT_ID, breakpointResponse.getId());
-                                updateBreakpoint(breakpointResponse, ijBreakpoint);
-                            }
+                        if (ijBreakpoint != null) {
+                            ijBreakpoint.putUserData(DAP_BREAKPOINT_ID, breakpointResponse.getId());
+                            updateBreakpoint(breakpointResponse, ijBreakpoint);
                         }
                     }
                 });
+    }
+
+    private @Nullable B findBreakpoint(@NotNull Breakpoint breakpointResponse,
+                                       @NotNull SetBreakpointsArguments arguments,
+                                       int index) {
+        Source source = breakpointResponse.getSource();
+        if (source == null) {
+            source = arguments.getSource();
+        }
+        Integer line = breakpointResponse.getLine();
+        if (line == null && arguments.getBreakpoints().length > index) {
+            var sourceBreakpoint = arguments.getBreakpoints()[index];
+            line = sourceBreakpoint.getLine();
+        }
+        return source != null && line != null ? findBreakpoint(source, line) : null;
     }
 
     private <B extends XBreakpoint<?>> boolean supportsBreakpointType(B breakpoint) {
@@ -302,16 +363,48 @@ public abstract class DAPBreakpointHandlerBase<B extends XBreakpoint<?>> extends
      */
     private CompletableFuture<Void> sendExceptionBreakpointFilters(Collection<ExceptionBreakpointsFilter> applicableFilters,
                                                                    IDebugProtocolServer debugProtocolServer) {
-        SetExceptionBreakpointsArguments args = new SetExceptionBreakpointsArguments();
-        args.setFilters(
-                applicableFilters
-                        .stream()
-                        .map(ExceptionBreakpointsFilter::getFilter)
-                        .toArray(String[]::new));
+        boolean supportsFilterOptions = Boolean.TRUE.equals(getCapabilities(debugProtocolServer).getSupportsExceptionFilterOptions());
+        SetExceptionBreakpointsArguments args = createSetExceptionBreakpointsArguments(applicableFilters,
+                getExceptionBreakpointsPanel()::getCondition,
+                supportsFilterOptions);
         return debugProtocolServer
                 .setExceptionBreakpoints(args)
                 .thenAccept(r -> {
                 });
+    }
+
+    /**
+     * Returns the 'setExceptionBreakpoints' arguments for the given enabled filters. A filter which supports a
+     * condition and has one is sent with it in the filter options, when the DAP server supports them; any other
+     * filter is sent by its id.
+     *
+     * @param applicableFilters     the enabled exception breakpoint filters.
+     * @param conditions            the condition of a filter id, or null.
+     * @param supportsFilterOptions whether the DAP server supports exception filter options.
+     * @return the 'setExceptionBreakpoints' arguments.
+     */
+    static @NotNull SetExceptionBreakpointsArguments createSetExceptionBreakpointsArguments(@NotNull Collection<ExceptionBreakpointsFilter> applicableFilters,
+                                                                                           @NotNull Function<String, @Nullable String> conditions,
+                                                                                           boolean supportsFilterOptions) {
+        List<String> filters = new ArrayList<>();
+        List<ExceptionFilterOptions> filterOptions = new ArrayList<>();
+        for (var filter : applicableFilters) {
+            String condition = conditions.apply(filter.getFilter());
+            if (supportsFilterOptions && Boolean.TRUE.equals(filter.getSupportsCondition()) && StringUtils.isNotBlank(condition)) {
+                ExceptionFilterOptions options = new ExceptionFilterOptions();
+                options.setFilterId(filter.getFilter());
+                options.setCondition(condition);
+                filterOptions.add(options);
+            } else {
+                filters.add(filter.getFilter());
+            }
+        }
+        SetExceptionBreakpointsArguments args = new SetExceptionBreakpointsArguments();
+        args.setFilters(filters.toArray(String[]::new));
+        if (!filterOptions.isEmpty()) {
+            args.setFilterOptions(filterOptions.toArray(ExceptionFilterOptions[]::new));
+        }
+        return args;
     }
 
 }

@@ -54,8 +54,8 @@ You can find more documentation in:
 
 ## Articles
 
- * [Meet LSP4IJ, a new LSP Client for JetBrains-based IDEs](https://idetools.dev/blog/lsp4ij-announcement/)
- * [Meet LSP4IJ, a new Debug Adapter Protocol for JetBrains-based IDEs](https://idetools.dev/blog/lsp4ij-dap-announcement/)
+ * [Meet LSP4IJ, a new LSP Client for JetBrains-based IDEs](https://github.com/redhat-developer/idetools.dev/blob/main/blog/2024-06-20-lsp4ij-announcement.md)
+ * [Meet LSP4IJ, a new Debug Adapter Protocol for JetBrains-based IDEs](https://github.com/redhat-developer/idetools.dev/blob/main/blog/2025-03-10-lsp4ij-dap-annoucement.md)
 
 ## Who is using LSP4IJ?
 
@@ -66,6 +66,7 @@ Here are some projects that use LSP4IJ:
  * [IntelliJ SumnekoLua](https://github.com/CppCXY/Intellij-SumnekoLua)
  * [Haskell LSP for IntelliJ](https://github.com/rockofox/intellij-haskell-lsp)
  * [Zowe™ COBOL Language Support](https://github.com/zowe/zowe-cobol-language-support-intellij)
+ * [Nim using nimlangserver](https://codeberg.org/laamella-gad/nim-intellij-plugin)
  * [ZigBrains](https://github.com/FalsePattern/ZigBrains)
  * [Pyright for PyCharm](https://github.com/InSyncWithFoo/pyright-for-pycharm)
  * [Intellij EmmyLua2](https://github.com/EmmyLua/Intellij-EmmyLua2)
@@ -100,6 +101,15 @@ Here are some projects that use LSP4IJ:
  * [OPA IDEA Plugin](https://github.com/open-policy-agent/opa-idea-plugin)
  * [aer Local Apex Debugger](https://www.octoberswimmer.com/tools/aer/docs/intellij-debugging/)
  * [SOSA Analyzer](https://github.com/secure-software-engineering/sosa-analyzer/pulls)
+ * [Rider Unreal Angelscript](https://github.com/scriptacus/rider-unreal-angelscript)
+ * [agnix](https://github.com/agent-sh/agnix)
+ * [Xonsh plugin for JetBrains IDEs](https://github.com/nahoj/xonsh-jetbrains)
+ * [Dart](https://github.com/flutter/dart-intellij-third-party)
+ * [Semantic Web Language Server](https://github.com/SemanticWebLanguageServer/swls)
+ * [Language 1C (BSL) Plugin](https://github.com/1c-syntax/intellij-language-1c-bsl)
+ * [ARO Programming Language](https://github.com/arolang/aro)
+ * [BBj Language Support for IntelliJ](https://github.com/BBx-Kitchen/bbj-language-server)
+ * [Ecstasy Language Support](https://plugins.jetbrains.com/plugin/31202-ecstasy-language-support)
 
 ## Requirements
 
@@ -151,10 +161,6 @@ You can easily install nightly builds from the nightly channel:
 - install the latest `LSP4IJ` version
 
 Nightly builds are published once a day.
-
-Data and Telemetry
-==================
-If the [Red Hat Telemetry](https://github.com/redhat-developer/intellij-redhat-telemetry) plugin is installed, the LSP4IJ plugin will collect anonymous [usage data](USAGE_DATA.md) and send it to Red Hat servers to help improve our products and services. Read our [privacy statement](https://developers.redhat.com/article/tool-data-collection) to learn more. This extension respects the Red Hat Telemetry setting which you can learn more about at [https://github.com/redhat-developer/intellij-redhat-telemetry#telemetry-reporting](https://github.com/redhat-developer/intellij-redhat-telemetry#telemetry-reporting)
 
 ## Feedback
 

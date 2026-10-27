@@ -13,7 +13,7 @@ package com.redhat.devtools.lsp4ij.internal.editor;
 import org.jetbrains.annotations.ApiStatus;
 
 /**
- * The editor feature type ro refresh.
+ * The editor feature type to refresh.
  */
 @ApiStatus.Internal
 public enum EditorFeatureType {
@@ -21,5 +21,9 @@ public enum EditorFeatureType {
     DECLARATIVE_INLAY_HINT,
     INLAY_HINT,
     FOLDING,
+    SEMANTIC_TOKENS,
+    STRUCTURE_VIEW,
+    LSP_DIAGNOSTICS,
+    LSP_DOCUMENT_LINK,
     ALL
 }

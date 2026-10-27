@@ -14,13 +14,18 @@ import com.intellij.notification.Notification;
 import com.intellij.notification.NotificationListener;
 import com.intellij.notification.NotificationType;
 import com.intellij.notification.Notifications;
+import com.intellij.openapi.Disposable;
 import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.extensions.ExtensionPointListener;
+import com.intellij.openapi.extensions.PluginDescriptor;
 import com.intellij.openapi.progress.ProgressIndicator;
 import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.progress.Task;
 import com.redhat.devtools.lsp4ij.ServerMessageHandler;
 import com.redhat.devtools.lsp4ij.installation.PrintableProgressIndicator;
 import org.jetbrains.annotations.NotNull;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Manages the installation of Language Servers(LSP) and Debug Adapter Protocol (DAP) servers
@@ -38,18 +43,44 @@ import org.jetbrains.annotations.NotNull;
  * {@link #getInstance()}.
  * </p>
  */
-public class ServerInstallerManager extends InstallerTaskRegistry {
+public class ServerInstallerManager extends InstallerTaskRegistry implements Disposable {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(ServerInstallerManager.class);
 
     private ServerInstallerManager() {
         super();
         var beans = InstallerTaskFactoryPointBean.EP_NAME.getExtensions();
         for (InstallerTaskFactoryPointBean bean : beans) {
-            try {
-                super.registerFactory(bean.type, bean.getInstance());
-            } catch (Exception e) {
-                // Do nothing
-            }
+            registerFactoryFromBean(bean);
         }
+        InstallerTaskFactoryPointBean.EP_NAME.getPoint().addExtensionPointListener(
+                new ExtensionPointListener<>() {
+                    @Override
+                    public void extensionAdded(@NotNull InstallerTaskFactoryPointBean bean,
+                                               @NotNull PluginDescriptor pluginDescriptor) {
+                        registerFactoryFromBean(bean);
+                    }
+
+                    @Override
+                    public void extensionRemoved(@NotNull InstallerTaskFactoryPointBean bean,
+                                                 @NotNull PluginDescriptor pluginDescriptor) {
+                        unregisterFactory(bean.type);
+                    }
+                },
+                /* invokeForLoadedExtensions */ false,
+                /* parentDisposable */ this);
+    }
+
+    private void registerFactoryFromBean(@NotNull InstallerTaskFactoryPointBean bean) {
+        try {
+            registerFactory(bean.type, bean.getInstance());
+        } catch (Exception e) {
+            LOGGER.warn("Failed to instantiate installerTaskFactory for type='{}'", bean.type, e);
+        }
+    }
+
+    @Override
+    public void dispose() {
     }
 
     /**

@@ -32,6 +32,20 @@
         ]
       },
       "languageId": "dockerbake"
+    },
+    {
+      "fileType": {
+        "name": "Docker File",
+        "patterns": [
+          ".dockerfile",
+          ".containerfile",
+          "Dockerfile.*",
+          "Containerfile.*",
+          "Dockerfile.*",
+          "Containerfile.*"
+        ]
+      },
+      "languageId": "dockerfile"
     }
   ]
 }

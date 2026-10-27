@@ -68,7 +68,7 @@ public class ServerMessageHandler {
     private static Icon messageTypeToIcon(MessageType type) {
         return switch (type) {
             case Error -> AllIcons.General.Error;
-            case Info, Log -> AllIcons.General.Information;
+            case Info, Log, Debug -> AllIcons.General.Information;
             case Warning -> AllIcons.General.Warning;
         };
     }
@@ -76,7 +76,7 @@ public class ServerMessageHandler {
     private static NotificationType messageTypeToNotificationType(MessageType type) {
         return switch (type) {
             case Error -> NotificationType.ERROR;
-            case Info, Log -> NotificationType.INFORMATION;
+            case Info, Log, Debug -> NotificationType.INFORMATION;
             case Warning -> NotificationType.WARNING;
         };
     }
@@ -183,7 +183,8 @@ public class ServerMessageHandler {
         CompletableFuture<ShowDocumentResult> future = new CompletableFuture<>();
         ApplicationManager.getApplication()
                 .executeOnPooledThread(() -> {
-                    if (LSPIJUtils.openInEditor(uri, selection.getStart(), selection.getEnd(), focusEditor, false, fileUriSupport, project)) {
+                    if (LSPIJUtils.openInEditor(uri, selection != null ? selection.getStart() : null,
+                            selection != null ? selection.getEnd() : null, focusEditor, false, fileUriSupport, project)) {
                         future.complete(SHOW_DOCUMENT_RESULT_WITH_SUCCESS);
                     }
                     future.complete(SHOW_DOCUMENT_RESULT_WITH_FAILURE);

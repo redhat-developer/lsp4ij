@@ -328,4 +328,28 @@ public class BootstrapPropertiesCompletionTest extends LSPCompletionFixtureTestC
         // 2. Test new editor content after applying the first completion item
         assertApplyCompletionItem(0, "com.ibm.hpel.trace.bufferingEnabled=false<caret>");
     }
+
+    // ------------ Completion triggered on a blank line
+    // see https://github.com/redhat-developer/lsp4ij/issues/993
+
+    private static final String SIMPLEST_COMPLETION_LIST = """
+            [
+              {
+                "label": "com.ibm.ws.logging.max.files"
+              }
+            ]""";
+
+    public void testCompletionOnBlankLineKeepsLineSeparator() {
+        assertCompletion("bootstrap.properties",
+                "foo=bar\n<caret>\n", SIMPLEST_COMPLETION_LIST,
+                "com.ibm.ws.logging.max.files");
+        assertApplyCompletionItem(0, "foo=bar\ncom.ibm.ws.logging.max.files<caret>\n");
+    }
+
+    public void testCompletionOnBlankLineKeepsIndentation() {
+        assertCompletion("bootstrap.properties",
+                "foo=bar\n   <caret>", SIMPLEST_COMPLETION_LIST,
+                "com.ibm.ws.logging.max.files");
+        assertApplyCompletionItem(0, "foo=bar\n   com.ibm.ws.logging.max.files<caret>");
+    }
 }

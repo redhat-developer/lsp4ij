@@ -1,0 +1,32 @@
+{
+  "perl-lsp.serverPath": "",
+  "perl-lsp.autoDownload": true,
+  "perl-lsp.includePaths": [
+    "lib",
+    "local/lib/perl5"
+  ],
+  "perl-lsp.enableDiagnostics": true,
+  "perl-lsp.enableSemanticTokens": true,
+  "perl-lsp.enableFormatting": true,
+  "perl-lsp.formatOnSave": false,
+  "perl-lsp.perltidyConfig": "",
+  "perl-lsp.perlcritic.enabled": false,
+  "perl-lsp.perlcritic.severity": 3,
+  "perl-lsp.perlcritic.profile": "",
+  "perl-lsp.perlcritic.theme": "",
+  "perl-lsp.enableRefactoring": true,
+  "perl-lsp.enableTestIntegration": true,
+  "perl-lsp.autoPopulateNewFiles": true,
+  "perl-lsp.aiCompletion.enabled": false,
+  "perl-lsp.aiCompletion.streaming.enabled": true,
+  "perl-lsp.channel": "latest",
+  "perl-lsp.versionTag": "",
+  "perl-lsp.downloadBaseUrl": "",
+  "perl-lsp.linuxLibc": "auto",
+  "perl-lsp.updateCheckInterval": 24,
+  "perl-lsp.autoUpdate": false,
+  "perl-lsp.featureProfile": "auto",
+  "perl-lsp.disabledFeatures": [],
+  "perl-lsp.trace.server": "off",
+  "perl-lsp.mcp.servers": []
+}

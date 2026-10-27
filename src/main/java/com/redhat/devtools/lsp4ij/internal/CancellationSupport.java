@@ -64,7 +64,8 @@ public class CancellationSupport implements CancelChecker {
 
     private final List<CompletableFuture<?>> futuresToCancel;
 
-    private boolean cancelled;
+    // cancel() and execute() can run on different threads.
+    private volatile boolean cancelled;
 
     public CancellationSupport() {
         this.futuresToCancel = new CopyOnWriteArrayList<>();
@@ -123,6 +124,14 @@ public class CancellationSupport implements CancelChecker {
                 // In this error case, the future will return null as response instead of throwing the ResponseErrorException error
                 // to avoid breaking the LSP request response of another language server (when file is associated to several language servers)
                 future = future.handle(handleLSPFeatureResult(languageServer, featureName, handleLanguageServerError));
+                // Navigation consumers resolve PSI synchronously. Fetch server-owned URIs
+                // before they enter read actions, without changing ordinary query results.
+                future = future.thenCompose(result -> languageServer.getClientFeatures()
+                        .prepareDocumentContent(result, languageServer.getServer()));
+                this.futuresToCancel.add(future);
+                if (cancelled) {
+                    CancellationSupport.cancel(future);
+                }
             }
         }
         return future;
@@ -158,9 +167,19 @@ public class CancellationSupport implements CancelChecker {
                     // - Caused by: java.util.concurrent.CancellationException
                     //	at java.base/java.util.concurrent.CompletableFuture.cancel(CompletableFuture.java:2478)
                     // To fix those issues, we ignore CancellationException in this case.
+                    // Note: ProcessCanceledException extends CancellationException, so it's also caught here
+                    return null;
+                }
+                // Check if the error is a CompletionException wrapping a CancellationException (including ProcessCanceledException)
+                if (error instanceof CompletionException && error.getCause() instanceof CancellationException) {
+                    // Same as above, but for wrapped cancellation exceptions
                     return null;
                 }
                 if (error instanceof MessageIssueException) {
+                    return null;
+                }
+                // Check if the error is a CompletionException wrapping a MessageIssueException
+                if (error instanceof CompletionException && error.getCause() instanceof MessageIssueException) {
                     return null;
                 }
                 if (error instanceof RuntimeException) {

@@ -14,8 +14,11 @@ import com.intellij.execution.configuration.EnvironmentVariablesComponent;
 import com.intellij.execution.configuration.EnvironmentVariablesData;
 import com.intellij.ide.BrowserUtil;
 import com.intellij.openapi.Disposable;
+import com.intellij.openapi.fileChooser.FileChooserDescriptorFactory;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.util.Disposer;
 import com.intellij.openapi.ui.ComboBox;
+import com.intellij.openapi.ui.TextFieldWithBrowseButton;
 import com.intellij.openapi.util.NlsContexts;
 import com.intellij.ui.ContextHelpLabel;
 import com.intellij.ui.HyperlinkLabel;
@@ -30,6 +33,7 @@ import com.intellij.util.ui.FormBuilder;
 import com.intellij.util.ui.UIUtil;
 import com.intellij.util.ui.components.BorderLayoutPanel;
 import com.redhat.devtools.lsp4ij.LanguageServerBundle;
+import com.redhat.devtools.lsp4ij.features.workspaceFolder.WorkspaceFolderStrategy;
 import com.redhat.devtools.lsp4ij.installation.CommandLineUpdater;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import com.redhat.devtools.lsp4ij.settings.ErrorReportingKind;
@@ -67,11 +71,13 @@ public class LanguageServerPanel implements Disposable {
     private final PortField debugPortField = new PortField();
     private final JBCheckBox debugSuspendCheckBox = new JBCheckBox(LanguageServerBundle.message("language.server.debug.suspend"));
     private final boolean canExecuteInstaller;
+    private final WorkspaceFolderStrategy workspaceFolderStrategy;
     private final JBCheckBox expandConfigurationCheckBox = new JBCheckBox(LanguageServerBundle.message("language.server.configuration.expand"));
     private HyperlinkLabel editJsonSchemaAction;
     private JBTextField serverName;
     private @Nullable EnvironmentVariablesComponent environmentVariables;
     private CommandLineWidget commandLine;
+    private TextFieldWithBrowseButton workingDir;
     private ServerMappingsPanel mappingsPanel;
     private @Nullable SchemaBackedJsonTextField configurationWidget;
     private String configurationSchemaContent;
@@ -81,13 +87,24 @@ public class LanguageServerPanel implements Disposable {
     private @Nullable InstallerPanel installerPanel;
     private @Nullable String serverUrl;
     private HyperlinkLabel serverUrlHyperlink;
+    private WorkspaceFoldersPanel workspaceFoldersPanel;
 
     public LanguageServerPanel(@NotNull FormBuilder builder,
                                @Nullable JComponent description,
                                @NotNull UIConfiguration uiConfiguration,
                                boolean canExecuteInstaller,
                                @Nullable Project project) {
+        this(builder, description, uiConfiguration, canExecuteInstaller, null, project);
+    }
+
+    public LanguageServerPanel(@NotNull FormBuilder builder,
+                               @Nullable JComponent description,
+                               @NotNull UIConfiguration uiConfiguration,
+                               boolean canExecuteInstaller,
+                               @Nullable WorkspaceFolderStrategy workspaceFolderStrategy,
+                               @Nullable Project project) {
         this.canExecuteInstaller = canExecuteInstaller;
+        this.workspaceFolderStrategy = workspaceFolderStrategy;
         this.project = project;
         createUI(builder, description, uiConfiguration);
     }
@@ -152,6 +169,53 @@ public class LanguageServerPanel implements Disposable {
         });
     }
 
+    /**
+     * Update preview working directory label with expanded macro response if needed.
+     *
+     * @param workingDir         the working directory field which could contains macro syntax.
+     * @param previewLabel       the preview label.
+     * @param project            the project.
+     * @see <a href="https://www.jetbrains.com/help/idea/built-in-macros.html">Built In Macro</a>
+     */
+    private static void updatePreviewWorkingDir(@NotNull TextFieldWithBrowseButton workingDir,
+                                                @NotNull JLabel previewLabel,
+                                                @NotNull Project project) {
+        workingDir.getTextField().getDocument().addDocumentListener(new DocumentListener() {
+            @Override
+            public void insertUpdate(DocumentEvent e) {
+                updateLabel(previewLabel);
+            }
+
+            private void updateLabel(JLabel previewLabel) {
+                String text = workingDir.getText();
+                if (text.isBlank()) {
+                    previewLabel.setToolTipText("");
+                    previewLabel.setText("");
+                    return;
+                }
+                String preview = resolveCommandLine(text, project);
+                if (preview.equals(text)) {
+                    previewLabel.setToolTipText("");
+                    previewLabel.setText("");
+                } else {
+                    previewLabel.setToolTipText(preview);
+                    String shortPreview = preview.length() > COMMAND_LENGTH_MAX ? preview.substring(0, COMMAND_LENGTH_MAX) + "..." : preview;
+                    previewLabel.setText(shortPreview);
+                }
+            }
+
+            @Override
+            public void removeUpdate(DocumentEvent e) {
+                updateLabel(previewLabel);
+            }
+
+            @Override
+            public void changedUpdate(DocumentEvent e) {
+                updateLabel(previewLabel);
+            }
+        });
+    }
+
     private static JLabel createLabelForComponent(@NotNull @NlsContexts.Label String labelText, @NotNull JComponent component) {
         JLabel label = new JLabel(UIUtil.replaceMnemonicAmpersand(labelText));
         label.setLabelFor(component);
@@ -171,6 +235,9 @@ public class LanguageServerPanel implements Disposable {
 
         // Configuration tab to fill LSP Configuration + LSP Initialize Options
         addConfigurationTab(tabbedPane, uiConfiguration);
+
+        // Workspace Folders tab
+        addWorkspaceFoldersTab(tabbedPane, uiConfiguration);
 
         // Installer tab to fill installer of the LSP server
         addInstallerTab(tabbedPane, uiConfiguration);
@@ -196,6 +263,8 @@ public class LanguageServerPanel implements Disposable {
             serverTab.addComponent(environmentVariables);
             // Command line
             createCommandLineField(serverTab);
+            // Working directory
+            createWorkingDirField(serverTab);
         }
     }
 
@@ -209,7 +278,7 @@ public class LanguageServerPanel implements Disposable {
 
     private void addMappingsTab(@NotNull JBTabbedPane tabbedPane,
                                 @NotNull UIConfiguration configuration) {
-        FormBuilder mappingsTab = addTab(tabbedPane, LanguageServerBundle.message("language.server.tab.mappings"));
+        FormBuilder mappingsTab = addTab(tabbedPane, LanguageServerBundle.message("language.server.tab.mappings"), false);
         this.mappingsPanel = new ServerMappingsPanel(mappingsTab, configuration.isServerMappingsEditable());
     }
 
@@ -257,6 +326,7 @@ public class LanguageServerPanel implements Disposable {
         }
         FormBuilder installerTab = addTab(tabbedPane, LanguageServerBundle.message("language.server.tab.installer"), false);
         this.installerPanel = new InstallerPanel(installerTab, canExecuteInstaller, project);
+        Disposer.register(this, installerPanel);
     }
 
     public void setCommandLineUpdater(@Nullable CommandLineUpdater commandLineUpdater) {
@@ -275,6 +345,21 @@ public class LanguageServerPanel implements Disposable {
         if (installerPanel != null) {
             this.installerPanel.addPostInstallAction(action);
         }
+    }
+
+    private void addWorkspaceFoldersTab(@NotNull JBTabbedPane tabbedPane, @NotNull UIConfiguration uiConfiguration) {
+        if (!uiConfiguration.isShowWorkspaceFolders()) {
+            return;
+        }
+        workspaceFoldersPanel = new WorkspaceFoldersPanel(project, workspaceFolderStrategy);
+        Disposer.register(this, workspaceFoldersPanel);
+        JScrollPane scrollPane = new JBScrollPane(workspaceFoldersPanel);
+        tabbedPane.addTab(LanguageServerBundle.message("language.server.tab.workspaceFolders"), scrollPane);
+    }
+
+    @Nullable
+    public WorkspaceFoldersPanel getWorkspaceFoldersPanel() {
+        return workspaceFoldersPanel;
     }
 
     private void addDebugTab(@NotNull JBTabbedPane tabbedPane,
@@ -339,6 +424,15 @@ public class LanguageServerPanel implements Disposable {
         updatePreviewCommand(commandLine, previewCommandLabel, project);
         builder.addLabeledComponent(LanguageServerBundle.message("language.server.command"), scrollPane, true);
         builder.addComponent(previewCommandLabel, 0);
+    }
+
+    private void createWorkingDirField(@NotNull FormBuilder builder) {
+        workingDir = new TextFieldWithBrowseButton();
+        workingDir.addBrowseFolderListener(null, null, project, FileChooserDescriptorFactory.createSingleFolderDescriptor());
+        JLabel previewWorkingDirLabel = createLabelForComponent("", workingDir);
+        updatePreviewWorkingDir(workingDir, previewWorkingDirLabel, project);
+        builder.addLabeledComponent(LanguageServerBundle.message("language.server.workingDir"), workingDir);
+        builder.addComponent(previewWorkingDirLabel, 0);
     }
 
     private void createConfigurationField(@NotNull FormBuilder builder) {
@@ -414,6 +508,17 @@ public class LanguageServerPanel implements Disposable {
             return;
         }
         this.commandLine.setText(commandLine != null ? commandLine : "");
+    }
+
+    public @Nullable String getWorkingDir() {
+        return workingDir != null ? workingDir.getText() : null;
+    }
+
+    public void setWorkingDir(@Nullable String workingDir) {
+        if (this.workingDir == null) {
+            return;
+        }
+        this.workingDir.setText(workingDir != null ? workingDir : "");
     }
 
     public ServerMappingsPanel getMappingsPanel() {
@@ -507,6 +612,13 @@ public class LanguageServerPanel implements Disposable {
         installerConfigurationWidget.setCaretPosition(0);
     }
 
+    public void setWorkspaceFolderStrategyConfiguration(@Nullable String workspaceFolderStrategyConfiguration) {
+        if (workspaceFoldersPanel == null) {
+            return;
+        }
+        workspaceFoldersPanel.setJsonConfiguration(workspaceFolderStrategyConfiguration);
+    }
+
     public JBCheckBox getDebugSuspendCheckBox() {
         return debugSuspendCheckBox;
     }
@@ -542,9 +654,7 @@ public class LanguageServerPanel implements Disposable {
         if (configurationWidget != null) {
             configurationWidget.resetJsonSchema();
         }
-        if (installerPanel != null) {
-            installerPanel.dispose();
-        }
+        // InstallerPanel and WorkspaceFoldersPanel are automatically disposed via Disposer.register
     }
 
 }

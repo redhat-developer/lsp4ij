@@ -13,10 +13,14 @@ package com.redhat.devtools.lsp4ij;
 
 import com.intellij.lang.Language;
 import com.intellij.lang.LanguageUtil;
+import com.intellij.openapi.Disposable;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.application.WriteAction;
 import com.intellij.openapi.application.ex.ApplicationInfoEx;
+import com.intellij.openapi.command.CommandProcessor;
+import com.intellij.openapi.command.undo.BasicUndoableAction;
+import com.intellij.openapi.command.undo.UndoManager;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.editor.EditorFactory;
@@ -40,10 +44,13 @@ import com.intellij.openapi.vfs.*;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
 import com.intellij.psi.PsiManager;
+import com.intellij.psi.PsiWhiteSpace;
 import com.redhat.devtools.lsp4ij.client.features.FileUriSupport;
 import com.redhat.devtools.lsp4ij.internal.SimpleLanguageUtils;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import com.redhat.devtools.lsp4ij.internal.uri.UriConverterManager;
+
+import static com.redhat.devtools.lsp4ij.internal.ApplicationUtils.runCancellableReadAction;
 import com.redhat.devtools.lsp4ij.usages.LocationData;
 import org.apache.commons.io.FileUtils;
 import org.eclipse.lsp4j.*;
@@ -58,9 +65,11 @@ import java.io.File;
 import java.io.IOException;
 import java.net.*;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Consumer;
 
 /**
  * Utilities class for LSP.
@@ -73,21 +82,45 @@ public class LSPIJUtils {
 
     private static final String ENCODED_HASH_SEPARATOR = "%23";
 
-    private static final Comparator<TextEdit> TEXT_EDITS_ASCENDING_COMPARATOR = (a, b) -> {
-        int diff = a.getRange().getStart().getLine() - b.getRange().getStart().getLine();
-        if (diff == 0) {
-            return a.getRange().getStart().getCharacter() - b.getRange().getStart().getCharacter();
-        }
-        return diff;
-    };
+    /**
+     * Helper record to track original index of TextEdit for stable sorting.
+     */
+    private record IndexedTextEdit(int index, TextEdit edit) {}
 
-    private static final Comparator<TextEdit> TEXT_EDITS_DESCENDING_COMPARATOR = (a, b) -> {
-        int diff = b.getRange().getStart().getLine() - a.getRange().getStart().getLine();
-        if (diff == 0) {
-            return b.getRange().getStart().getCharacter() - a.getRange().getStart().getCharacter();
+    /**
+     * Sort text edits by position, preserving array order for edits at the same position
+     * as required by LSP spec.
+     *
+     * @param edits the text edits to sort
+     * @return a new sorted list of text edits
+     */
+    private static List<TextEdit> sortTextEdits(List<? extends TextEdit> edits) {
+        // No need to sort if there's 0 or 1 edit
+        if (edits.size() <= 1) {
+            return new ArrayList<>(edits);
         }
-        return diff;
-    };
+
+        // Create indexed entries to preserve original order for edits at the same position
+        List<IndexedTextEdit> indexedEdits = new ArrayList<>(edits.size());
+        for (int i = 0; i < edits.size(); i++) {
+            indexedEdits.add(new IndexedTextEdit(i, edits.get(i)));
+        }
+
+        // Sort text edits by position, then by index when positions are equal.
+        // The index preserves the original array order for same-position edits,
+        // as required by the LSP spec.
+        indexedEdits.sort(Comparator
+            .comparingInt((IndexedTextEdit e) -> e.edit.getRange().getStart().getLine())
+            .thenComparingInt(e -> e.edit.getRange().getStart().getCharacter())
+            .thenComparingInt((IndexedTextEdit e) -> e.index));
+
+        // Extract sorted edits
+        List<TextEdit> result = new ArrayList<>(indexedEdits.size());
+        for (IndexedTextEdit indexed : indexedEdits) {
+            result.add(indexed.edit);
+        }
+        return result;
+    }
 
     /**
      * Open the LSP location in an editor.
@@ -463,7 +496,7 @@ public class LSPIJUtils {
         if (ApplicationManager.getApplication().isReadAccessAllowed()) {
             return doGetFileLanguage(file, project);
         }
-        return ReadAction.compute(() -> doGetFileLanguage(file, project));
+        return runCancellableReadAction(() -> doGetFileLanguage(file, project), project);
     }
 
     @Nullable
@@ -511,10 +544,22 @@ public class LSPIJUtils {
      * @return the file, or null if the document wasn't created from a virtual file.
      */
     public static @Nullable VirtualFile getFile(@NotNull Document document) {
+        return getFile(document, null);
+    }
+
+    /**
+     * Returns the virtual file corresponding to the specified document.
+     *
+     * @param document         the document for which the virtual file is requested.
+     * @param parentDisposable the parent disposable to expire the read action when disposed, or null to use ApplicationManager.
+     * @return the file, or null if the document wasn't created from a virtual file.
+     */
+    public static @Nullable VirtualFile getFile(@NotNull Document document, @Nullable Disposable parentDisposable) {
         if (ApplicationManager.getApplication().isReadAccessAllowed()) {
             return FileDocumentManager.getInstance().getFile(document);
         }
-        return ReadAction.compute(() -> FileDocumentManager.getInstance().getFile(document));
+        Disposable disposable = parentDisposable != null ? parentDisposable : ApplicationManager.getApplication();
+        return runCancellableReadAction(() -> FileDocumentManager.getInstance().getFile(document), disposable);
     }
 
     /**
@@ -528,7 +573,7 @@ public class LSPIJUtils {
         if (ApplicationManager.getApplication().isReadAccessAllowed()) {
             return doGetPsiFile(file, project);
         }
-        return ReadAction.compute(() -> doGetPsiFile(file, project));
+        return runCancellableReadAction(() -> doGetPsiFile(file, project), project);
     }
 
     /**
@@ -572,10 +617,22 @@ public class LSPIJUtils {
      * @return the document corresponding to the virtual file, or {@code null} if no document could be found
      */
     public static @Nullable Document getDocument(@NotNull VirtualFile file) {
+        return getDocument(file, null);
+    }
+
+    /**
+     * Returns the document corresponding to the virtual file.
+     *
+     * @param file             the virtual file
+     * @param parentDisposable the parent disposable to expire the read action when disposed, or null to use ApplicationManager.
+     * @return the document corresponding to the virtual file, or {@code null} if no document could be found
+     */
+    public static @Nullable Document getDocument(@NotNull VirtualFile file, @Nullable Disposable parentDisposable) {
         if (ApplicationManager.getApplication().isReadAccessAllowed()) {
             return FileDocumentManager.getInstance().getDocument(file);
         }
-        return ReadAction.compute(() -> FileDocumentManager.getInstance().getDocument(file));
+        Disposable disposable = parentDisposable != null ? parentDisposable : ApplicationManager.getApplication();
+        return runCancellableReadAction(() -> FileDocumentManager.getInstance().getDocument(file), disposable);
     }
 
     /**
@@ -585,8 +642,14 @@ public class LSPIJUtils {
      * @return the document corresponding to the PSI element, or {@code null} if no document could be found
      */
     public static @Nullable Document getDocument(@NotNull PsiElement element) {
-        VirtualFile virtualFile = getFile(element);
-        return virtualFile != null ? getDocument(virtualFile) : null;
+        if (ApplicationManager.getApplication().isReadAccessAllowed()) {
+            PsiFile psiFile = element.getContainingFile();
+            return psiFile != null ? psiFile.getViewProvider().getDocument() : null;
+        }
+        return runCancellableReadAction(() -> {
+            PsiFile psiFile = element.getContainingFile();
+            return psiFile != null ? psiFile.getViewProvider().getDocument() : null;
+        }, element.getProject());
     }
 
     /**
@@ -595,7 +658,7 @@ public class LSPIJUtils {
      * @param documentUri the uri of the Document to return
      * @return the @{@link Document} associated to <code>documentUri</code>, or <code>null</code>
      */
-    public static @Nullable Document getDocument(URI documentUri) {
+    public static @Nullable Document getDocument(@Nullable URI documentUri) {
         if (documentUri == null) {
             return null;
         }
@@ -611,7 +674,7 @@ public class LSPIJUtils {
         if (ApplicationManager.getApplication().isReadAccessAllowed()) {
             return ProjectFileIndex.getInstance(project).getModuleForFile(file, false);
         }
-        return ReadAction.compute(() -> ProjectFileIndex.getInstance(project).getModuleForFile(file, false));
+        return runCancellableReadAction(() -> ProjectFileIndex.getInstance(project).getModuleForFile(file, false), project);
     }
 
     /**
@@ -869,6 +932,10 @@ public class LSPIJUtils {
     private static TextRange findBestTextRangeAt(@Nullable PsiFile file, int offset) {
         PsiElement element = file != null ? file.findElementAt(Math.max(offset - 1, 0)) : null;
         if (element != null) {
+            if (element instanceof PsiWhiteSpace || element.getText().isBlank()) {
+                // foo  |  bar --> there is no word at the given offset
+                return null;
+            }
             TextRange textRange = element.getTextRange();
             if (offset == textRange.getEndOffset()) {
                 // my.property|
@@ -921,6 +988,61 @@ public class LSPIJUtils {
 
     public static void applyWorkspaceEdit(@NotNull WorkspaceEdit edit,
                                           @Nullable String label) {
+        applyWorkspaceEdit(edit, label, true);
+    }
+
+    /**
+     * Applies the workspace edit.
+     *
+     * @param edit                       the workspace edit.
+     * @param label                      the label of the edit.
+     * @param saveDocumentsWithoutEditor true to save the changed documents that are not open in an editor once the
+     *                                   edit is applied, and false otherwise, as inside a VFS event, where a document
+     *                                   cannot be saved. A language server reads such a document from disk, since
+     *                                   no didOpen gives it the content, so until the document is saved it does not
+     *                                   see the edit. A document with unsaved changes from before the edit is not
+     *                                   saved, so that the edit does not persist them. Inside a command, the same
+     *                                   documents are saved again after Undo and Redo of the edit.
+     * @return the changed documents that are not open in an editor and had no unsaved changes before the edit, for
+     * a caller that has to save them later, with {@link #saveDocumentsWithoutEditor(Set)}.
+     */
+    @ApiStatus.Internal
+    public static @NotNull Set<Document> applyWorkspaceEdit(@NotNull WorkspaceEdit edit,
+                                                           @Nullable String label,
+                                                           boolean saveDocumentsWithoutEditor) {
+        Set<Document> documentsToSave = new LinkedHashSet<>();
+        applyWorkspaceEdit(edit, label, saveDocumentsWithoutEditor, documentsToSave);
+        return documentsToSave;
+    }
+
+    /**
+     * Applies the workspace edit as {@link #applyWorkspaceEdit(WorkspaceEdit, String, boolean)} does, and stops at
+     * a resource operation that cannot be applied: the changes after it can address its new URI, which is then
+     * another file, or none. The changes before it stay applied.
+     *
+     * @param documentsToSave receives the changed documents that are not open in an editor and had no unsaved
+     *                        changes before the edit, as they are changed, so that a caller still has them when
+     *                        the edit stops.
+     * @return why the edit stopped, and null if it was applied.
+     */
+    @ApiStatus.Internal
+    public static @Nullable String applyWorkspaceEdit(@NotNull WorkspaceEdit edit,
+                                                      @Nullable String label,
+                                                      boolean saveDocumentsWithoutEditor,
+                                                      @NotNull Set<Document> documentsToSave) {
+        // Documents without an editor and without unsaved changes, captured before their first edit
+        Consumer<Document> beforeEdit = document -> {
+            if (EditorFactory.getInstance().getEditors(document).length == 0
+                    && !FileDocumentManager.getInstance().isDocumentUnsaved(document)) {
+                if (saveDocumentsWithoutEditor && documentsToSave.isEmpty()) {
+                    // Undo reverts the changes that follow this action before it reaches it, so this
+                    // saves the documents in their state after Undo
+                    saveOnUndoOrRedo(documentsToSave, true);
+                }
+                documentsToSave.add(document);
+            }
+        };
+        String failure = null;
         if (edit.getDocumentChanges() != null) {
             for (Either<TextDocumentEdit, ResourceOperation> change : edit.getDocumentChanges()) {
                 if (change.isLeft()) {
@@ -929,17 +1051,27 @@ public class LSPIJUtils {
                     if (file != null) {
                         Document document = getDocument(file);
                         if (document != null) {
-                            applyEdits(null, document, textDocumentEdit.getEdits(), false);
+                            // Extract TextEdit from Either<TextEdit, SnippetTextEdit>
+                            List<TextEdit> textEdits = textDocumentEdit.getEdits().stream()
+                                    .filter(Either::isLeft)
+                                    .map(Either::getLeft)
+                                    .toList();
+                            beforeEdit.accept(document);
+                            applyEdits(null, document, textEdits, false);
                         }
                     }
                 } else if (change.isRight()) {
                     ResourceOperation resourceOperation = change.getRight();
                     if (resourceOperation instanceof CreateFile createFile) {
-                        applyCreateFile(createFile);
+                        applyCreateFile(createFile, beforeEdit);
                     } else if (resourceOperation instanceof DeleteFile deleteFile) {
                         applyDeleteFile(deleteFile);
                     } else if (resourceOperation instanceof RenameFile renameFile) {
-                        applyRenameFile(renameFile);
+                        failure = applyRenameFile(renameFile);
+                        if (failure != null) {
+                            LOGGER.warn("Workspace edit stopped: {}", failure);
+                            break;
+                        }
                     }
                 }
             }
@@ -957,20 +1089,77 @@ public class LSPIJUtils {
                 if (file != null) {
                     Document document = getDocument(file);
                     if (document != null) {
+                        beforeEdit.accept(document);
                         applyEdits(null, document, change.getValue(), false);
                     }
                 }
             }
         }
+
+        if (saveDocumentsWithoutEditor && !documentsToSave.isEmpty()) {
+            saveDocumentsWithoutEditor(documentsToSave);
+            // Redo applies the changes before it reaches this action, so this saves them after Redo
+            saveOnUndoOrRedo(documentsToSave, false);
+        }
+        return failure;
     }
 
-    private static void applyCreateFile(CreateFile createFile) {
+    /**
+     * Saves the given documents that still have a valid file and are not open in an editor.
+     *
+     * @param documents the documents, as returned by {@link #applyWorkspaceEdit(WorkspaceEdit, String, boolean)}.
+     */
+    @ApiStatus.Internal
+    public static void saveDocumentsWithoutEditor(@NotNull Set<Document> documents) {
+        // A later operation of the edit can have deleted the file; a rename keeps its document
+        for (Document document : documents) {
+            VirtualFile file = FileDocumentManager.getInstance().getFile(document);
+            if (file != null && file.isValid() && EditorFactory.getInstance().getEditors(document).length == 0) {
+                FileDocumentManager.getInstance().saveDocument(document);
+            }
+        }
+    }
+
+    /**
+     * Registers, in the current command, an action that saves the documents without an editor on Undo or on Redo.
+     * Outside a command the edit cannot be undone, so nothing is registered.
+     */
+    private static void saveOnUndoOrRedo(@NotNull Set<Document> documents, boolean onUndo) {
+        Project project = CommandProcessor.getInstance().getCurrentCommandProject();
+        if (project == null) {
+            return;
+        }
+        UndoManager.getInstance(project).undoableActionPerformed(new BasicUndoableAction() {
+            @Override
+            public void undo() {
+                if (onUndo) {
+                    saveDocumentsWithoutEditor(documents);
+                }
+            }
+
+            @Override
+            public void redo() {
+                if (!onUndo) {
+                    saveDocumentsWithoutEditor(documents);
+                }
+            }
+
+            @Override
+            public boolean isGlobal() {
+                // The documents have no editor, so the edit can only be undone from the global stack
+                return true;
+            }
+        });
+    }
+
+    private static void applyCreateFile(CreateFile createFile, Consumer<Document> beforeEdit) {
         VirtualFile targetFile = findResourceFor(createFile.getUri());
         if (targetFile != null && createFile.getOptions() != null) {
             if (!createFile.getOptions().getIgnoreIfExists()) {
                 Document document = getDocument(targetFile);
                 if (document != null) {
                     TextEdit textEdit = new TextEdit(new Range(toPosition(0, document), toPosition(document.getTextLength(), document)), "");
+                    beforeEdit.accept(document);
                     applyEdits(null, document, Collections.singletonList(textEdit), false);
                 }
             }
@@ -996,7 +1185,12 @@ public class LSPIJUtils {
         }
     }
 
-    private static void applyRenameFile(RenameFile renameFile) {
+    /**
+     * Applies the rename file operation.
+     *
+     * @return why the rename cannot be applied, and null if it was applied or its destination is kept
+     */
+    private static @Nullable String applyRenameFile(RenameFile renameFile) {
         // "documentChanges": [
         //  {
         //    "oldUri": "file://.../foo.clj",
@@ -1004,20 +1198,73 @@ public class LSPIJUtils {
         //    "kind": "rename"
         //  }
         //]
+        String oldUri = renameFile.getOldUri();
+        String newUri = renameFile.getNewUri();
+        VirtualFile resource = findResourceFor(oldUri);
+        if (resource == null) {
+            return "Rename source does not exist: " + oldUri;
+        }
+        var destination = Paths.get(URI.create(newUri));
+        Path destinationParent = destination.getParent();
+        if (destinationParent == null) {
+            return "Rename destination has no directory: " + newUri;
+        }
+        if (resource.isDirectory() && destinationParent.startsWith(resource.toNioPath())) {
+            return "A directory cannot be moved inside itself: " + newUri;
+        }
+        String name = destination.getFileName().toString();
+        VirtualFile parent;
         try {
-            VirtualFile resource = findResourceFor(renameFile.getOldUri());
-            if (resource != null) {
-                // TODO: use renameFile.getOptions()
-
-                // The IJ rename works only with a file name which is hosted in the same directory
-                // as the old file
-                var path = Paths.get(URI.create(renameFile.getNewUri()));
-                String newFileName = path.toFile().getName();
-                resource.rename(null, newFileName);
+            // A missing destination directory is created, as by VS Code
+            parent = VfsUtil.createDirectoryIfMissing(destinationParent.toString());
+        } catch (IOException e) {
+            return "Unable to create the directory of " + newUri + ": " + e.getMessage();
+        }
+        if (parent == null || !parent.isDirectory()) {
+            return "Rename destination directory does not exist: " + newUri;
+        }
+        VirtualFile existing = parent.findChild(name);
+        if (resource.equals(existing)) {
+            // The resource itself, as when only the case of its name changes on a case-insensitive file system
+            existing = null;
+        }
+        var options = renameFile.getOptions();
+        boolean overwrite = options != null && Boolean.TRUE.equals(options.getOverwrite());
+        if (existing != null && !overwrite) {
+            if (options != null && Boolean.TRUE.equals(options.getIgnoreIfExists())) {
+                return null;
+            }
+            return "Rename destination already exists: " + newUri;
+        }
+        boolean moving = !parent.equals(resource.getParent());
+        boolean renaming = !resource.getName().equals(name);
+        // Moving first would collide with a file of the old name in the destination directory, so the
+        // resource is renamed first then, unless that collides too. A temporary name would send the server
+        // file operations it did not request.
+        VirtualFile atOldName = parent.findChild(resource.getName());
+        boolean renameFirst = moving && renaming && atOldName != null && !atOldName.equals(existing);
+        VirtualFile atNewName = resource.getParent().findChild(name);
+        if (renameFirst && atNewName != null && !atNewName.equals(resource)) {
+            return "Cannot rename " + oldUri + " to " + newUri
+                    + ": its name is taken in both directories";
+        }
+        try {
+            if (existing != null) {
+                existing.delete(null);
+            }
+            if (renameFirst) {
+                resource.rename(null, name);
+            }
+            if (moving) {
+                resource.move(null, parent);
+            }
+            if (renaming && !renameFirst) {
+                resource.rename(null, name);
             }
         } catch (IOException e) {
-            LOGGER.warn(e.getLocalizedMessage(), e);
+            return "Unable to rename " + oldUri + " to " + newUri + ": " + e.getMessage();
         }
+        return null;
     }
 
     /**
@@ -1163,6 +1410,11 @@ public class LSPIJUtils {
                                      @NotNull List<TextEdit> edits,
                                      boolean saveDocument) {
         // Create an owned copy to insulate against modification of the provided list while processing it
+        // We don't sort here because:
+        // 1. RangeMarkers capture positions from the original document (S1 in LSP spec)
+        // 2. All edits refer to the original document, not intermediate states
+        // 3. RangeMarkers automatically adjust as edits are applied
+        // 4. The original array order must be preserved for same-position edits
         List<TextEdit> ownedEdits = new ArrayList<>(edits);
 
         if (ownedEdits.isEmpty()) {
@@ -1317,13 +1569,9 @@ public class LSPIJUtils {
      */
     public static String applyEdits(@NotNull Document document,
                                     @NotNull List<? extends TextEdit> edits) {
-        // Create an owned mutable copy since we're going to modify the list
-        List<TextEdit> mutableEdits = new ArrayList<>(edits);
+        // Sort text edits by position, preserving array order for same-position edits
+        List<TextEdit> mutableEdits = sortTextEdits(edits);
 
-        // Sort text edits
-        if (mutableEdits.size() > 1) {
-            mutableEdits.sort(TEXT_EDITS_ASCENDING_COMPARATOR);
-        }
         String text = document.getText();
         int lastModifiedOffset = 0;
         List<String> spans = new ArrayList<>(mutableEdits.size() + 1);
@@ -1352,7 +1600,7 @@ public class LSPIJUtils {
         if (ApplicationManager.getApplication().isReadAccessAllowed()) {
             return editor.getSettings().getTabSize(project);
         }
-        return ReadAction.compute(() -> editor.getSettings().getTabSize(project));
+        return runCancellableReadAction(() -> editor.getSettings().getTabSize(project), project);
     }
 
     public static boolean isInsertSpaces(@NotNull Editor editor) {
@@ -1360,7 +1608,7 @@ public class LSPIJUtils {
         if (ApplicationManager.getApplication().isReadAccessAllowed()) {
             return !editor.getSettings().isUseTabCharacter(project);
         }
-        return ReadAction.compute(() -> !editor.getSettings().isUseTabCharacter(project));
+        return runCancellableReadAction(() -> !editor.getSettings().isUseTabCharacter(project), project);
     }
 
     /**

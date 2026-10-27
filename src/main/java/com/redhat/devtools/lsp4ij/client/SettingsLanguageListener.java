@@ -63,6 +63,9 @@ public class SettingsLanguageListener implements LanguageServerSettingsListener 
     }
 
     private void restartLanguageServer() {
+        if (project.isDefault() || project.isDisposed()) {
+            return;
+        }
         LanguageServiceAccessor.getInstance(project)
                 .getStartedServers()
                 .forEach(ls -> {

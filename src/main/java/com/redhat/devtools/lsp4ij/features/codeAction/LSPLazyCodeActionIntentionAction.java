@@ -13,18 +13,20 @@
  *******************************************************************************/
 package com.redhat.devtools.lsp4ij.features.codeAction;
 
+import com.intellij.codeInsight.hint.HintManager;
 import com.intellij.codeInsight.intention.IntentionAction;
 import com.intellij.codeInspection.util.IntentionFamilyName;
 import com.intellij.codeInspection.util.IntentionName;
 import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.command.WriteCommandAction;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.project.Project;
 import com.intellij.psi.PsiFile;
-import com.intellij.util.DocumentUtil;
 import com.intellij.util.IncorrectOperationException;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LanguageServerBundle;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
+import com.redhat.devtools.lsp4ij.WorkspaceEditSnapshot;
 import com.redhat.devtools.lsp4ij.commands.CommandExecutor;
 import com.redhat.devtools.lsp4ij.commands.LSPCommandContext;
 import org.eclipse.lsp4j.CodeAction;
@@ -39,7 +41,6 @@ import java.util.concurrent.TimeUnit;
  * The lazy IJ Quick fix / Intention.
  */
 public class LSPLazyCodeActionIntentionAction implements IntentionAction {
-
 
     private LSPLazyCodeActionProvider lazyCodeActions;
 
@@ -88,17 +89,17 @@ public class LSPLazyCodeActionIntentionAction implements IntentionAction {
         if (codeAction != null) {
             if (codeAction.getEdit() == null && codeAction.getCommand() == null
                     && languageServer.getClientFeatures().getCodeActionFeature().isResolveCodeActionSupported(file)) {
-                // Unresolved code action "edit" property. Resolve it.
+                // Unresolved code action "edit" property. Resolve it. The reply arrives after this
+                // intention's command has ended, so capture the documents now: the edit is applied only
+                // to the text it was made for, in a command of its own that Undo reverts.
+                var snapshot = WorkspaceEditSnapshot.capture(languageServer);
                 if (ApplicationManager.getApplication().isUnitTestMode()) {
                     // In Test mode, collect the resolve code actions synchronously, otherwise tests will fail
                     try {
                         var resolved = languageServer.getServer().getTextDocumentService().resolveCodeAction(codeAction)
                                 .get(10000, TimeUnit.MILLISECONDS);
-                        ApplicationManager.getApplication().invokeLater(() -> {
-                            DocumentUtil.writeInRunUndoTransparentAction(() -> {
-                                apply(resolved != null ? resolved : codeAction, file, editor, languageServer);
-                            });
-                        });
+                        ApplicationManager.getApplication().invokeLater(() ->
+                                applyResolved(resolved != null ? resolved : codeAction, snapshot, project, file, editor, languageServer));
                     } catch (InterruptedException e) {
                         Thread.currentThread().interrupt();
                     } catch (Exception e) {
@@ -111,11 +112,8 @@ public class LSPLazyCodeActionIntentionAction implements IntentionAction {
                             .thenApply(ls ->
                                     ls.getTextDocumentService().resolveCodeAction(codeAction)
                                             .thenAccept(resolved -> {
-                                                ApplicationManager.getApplication().invokeLater(() -> {
-                                                    DocumentUtil.writeInRunUndoTransparentAction(() -> {
-                                                        apply(resolved != null ? resolved : codeAction, file, editor, languageServer);
-                                                    });
-                                                });
+                                                ApplicationManager.getApplication().invokeLater(() ->
+                                                        applyResolved(resolved != null ? resolved : codeAction, snapshot, project, file, editor, languageServer));
                                             })
                             );
                 }
@@ -127,6 +125,32 @@ public class LSPLazyCodeActionIntentionAction implements IntentionAction {
         } else {
             // Should never get here
         }
+    }
+
+    /**
+     * Applies a code action resolved after its intention's command ended, in a command of its own, and
+     * only if its edit still applies to the documents it was resolved for.
+     */
+    private void applyResolved(@NotNull CodeAction resolved,
+                               @NotNull WorkspaceEditSnapshot snapshot,
+                               @NotNull Project project,
+                               @NotNull PsiFile file,
+                               @NotNull Editor editor,
+                               @NotNull LanguageServerItem languageServer) {
+        if (project.isDisposed()) {
+            return;
+        }
+        WriteCommandAction.runWriteCommandAction(project, resolved.getTitle(), null, () -> {
+            // Validate every target before applying any part of the edit, without releasing write access
+            String reason = resolved.getEdit() != null ? snapshot.validate(resolved.getEdit()) : null;
+            if (reason != null) {
+                if (!editor.isDisposed()) {
+                    HintManager.getInstance().showErrorHint(editor, reason);
+                }
+                return;
+            }
+            apply(resolved, file, editor, languageServer);
+        });
     }
 
     private void apply(@Nullable CodeAction codeaction,

@@ -13,14 +13,12 @@
  *******************************************************************************/
 package com.redhat.devtools.lsp4ij.internal;
 
-import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.progress.ProgressIndicator;
 import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.progress.Task;
+import com.intellij.openapi.progress.util.ProgressIndicatorUtils;
 import com.intellij.psi.PsiFile;
-import com.redhat.devtools.lsp4ij.client.indexing.ProjectIndexingManager;
-import com.redhat.devtools.lsp4ij.server.LanguageServerException;
 import org.eclipse.lsp4j.jsonrpc.CancelChecker;
 import org.eclipse.lsp4j.jsonrpc.CompletableFutures.FutureCancelChecker;
 import org.jetbrains.annotations.NotNull;
@@ -95,90 +93,6 @@ public class CompletableFutures {
         return future != null && future.isDone() && !future.isCancelled() && !future.isCompletedExceptionally();
     }
 
-    public static void waitUntilDone(@Nullable CompletableFuture<?> future) throws ExecutionException, ProcessCanceledException {
-        waitUntilDone(future, null);
-    }
-
-    /**
-     * Wait for the done of the given future and stop the wait if {@link ProcessCanceledException} is thrown.
-     *
-     * @param future the future to wait.
-     * @param file   the Psi file.
-     */
-    public static void waitUntilDone(@Nullable CompletableFuture<?> future,
-                                     @Nullable PsiFile file) throws ExecutionException, ProcessCanceledException {
-        try {
-            waitUntilDone(future, file, null);
-        } catch (TimeoutException e) {
-            // Should never occur since timeout is null
-            throw new RuntimeException(e);
-        }
-    }
-
-    /**
-     * Wait for the done of the given future and stop the wait if {@link ProcessCanceledException} is thrown.
-     *
-     * @param future  the future to wait.
-     * @param file    the Psi file.
-     * @param timeout wait for the given timeout and null otherwise.
-     */
-    public static void waitUntilDone(@Nullable CompletableFuture<?> future,
-                                     @Nullable PsiFile file,
-                                     @Nullable Integer timeout) throws ExecutionException, ProcessCanceledException, TimeoutException {
-        if (future == null) {
-            return;
-        }
-        long start = System.currentTimeMillis();
-        final long modificationStamp = file != null ? file.getModificationStamp() : -1;
-        while (!future.isDone()) {
-            try {
-                // check progress canceled
-                ProgressManager.checkCanceled();
-                // check psi file
-                if (file != null) {
-                    if (modificationStamp != file.getModificationStamp()) {
-                        throw new PsiFileChangedException();
-                    }
-                }
-                // wait for 25 ms
-                future.get(25, TimeUnit.MILLISECONDS);
-            } catch (CancellationException e) {
-                // race condition, a cancel has occurred when future.get(...) is called.
-                throw e;
-            } catch (TimeoutException ignore) {
-                long time = System.currentTimeMillis() - start;
-                if (timeout != null && time > timeout) {
-                    throw ignore;
-                }
-                if (file != null && !future.isDone() && System.currentTimeMillis() - start > 5000 &&
-                        (ProjectIndexingManager.isIndexingAll() || ApplicationManager.getApplication().isDispatchThread())) {
-                    // When some projects are being indexed,
-                    // the language server startup can take a long time
-                    // and the LSP feature (ex: codeLens)
-                    // waits for the language server startup.
-                    // This wait can block IJ, here we stop the wait (and we could lose some LSP feature)
-                    throw new CancellationException("Some projects are indexing");
-                }
-                // Ignore timeout
-            } catch (ExecutionException | CompletionException e) {
-                Throwable cause = e.getCause();
-                if (cause instanceof ProcessCanceledException pce) {
-                    throw pce;
-                }
-                if (cause instanceof LanguageServerException) {
-                    // Server cannot be started, throws a ProcessCanceledException to ignore the error.
-                    throw new ProcessCanceledException(cause);
-                }
-                if (cause instanceof CancellationException ce) {
-                    throw ce;
-                }
-                throw e;
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-            }
-        }
-    }
-
     /**
      * Wait in Task (which is cancellable) for the done of the given future and stop the wait if {@link ProcessCanceledException} is thrown.
      *
@@ -197,26 +111,42 @@ public class CompletableFutures {
             @Override
             public void run(@NotNull ProgressIndicator indicator) {
                 try {
-                    waitUntilDone(future, file);
+                    ProgressIndicatorUtils.awaitWithCheckCanceled(future);
                 } catch (
                         ProcessCanceledException e) {//Since 2024.2 ProcessCanceledException extends CancellationException so we can't use multicatch to keep backward compatibility
-                    //TODO delete block when minimum required version is 2024.2
-                    // Case when user click on cancel of progress Task.
                     CancellationSupport.cancel(future);
+                    throw e;
                 } catch (CancellationException e) {
                     CancellationSupport.cancel(future);
                 } catch (Exception e) {
-                    // Do nothing, error should be handled by the block code
-                    // which consumes the future:
-                    // future.handler((response, error) -> ....
+                    // Errors are handled by the caller's future.handle((response, error) -> ...)
                 }
             }
         });
+    }
+
+    public static void awaitWithCheckCanceled(@Nullable Future<?> future) {
+        if (future == null) {
+            return;
+        }
+        ProgressIndicatorUtils.awaitWithCheckCanceled(future);
     }
 
     public static CompletableFuture<Void> allOf(CompletableFuture<?>... cfs) {
         var allOff = CompletableFuture.allOf(cfs);
         CancellationSupport.forwardCancellation(allOff, cfs);
         return allOff;
+    }
+
+    /**
+     * Returns an exception handler that silently ignores all exceptions.
+     * Useful for operations where errors (including cancellations) can be safely ignored,
+     * such as real-time color picker updates where rapid changes may cancel pending requests.
+     *
+     * @param <T> the type of the CompletableFuture result
+     * @return a function that returns null for any exception
+     */
+    public static <T> Function<Throwable, T> ignoreAllExceptions() {
+        return ex -> null;
     }
 }

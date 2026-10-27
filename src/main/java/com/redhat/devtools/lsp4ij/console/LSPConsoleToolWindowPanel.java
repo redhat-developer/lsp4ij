@@ -20,15 +20,19 @@ import com.intellij.openapi.actionSystem.ActionManager;
 import com.intellij.openapi.actionSystem.ActionToolbar;
 import com.intellij.openapi.actionSystem.DefaultActionGroup;
 import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.application.ModalityState;
+import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.OnePixelDivider;
 import com.intellij.openapi.ui.SimpleToolWindowPanel;
 import com.intellij.openapi.util.Disposer;
 import com.intellij.openapi.wm.ToolWindowManager;
+import com.intellij.openapi.ui.LoadingDecorator;
 import com.intellij.ui.CardLayoutPanel;
 import com.intellij.ui.OnePixelSplitter;
 import com.intellij.ui.components.JBScrollPane;
 import com.intellij.ui.components.JBTabbedPane;
+import com.intellij.util.concurrency.AppExecutorUtil;
 import com.intellij.util.ui.JBUI;
 import com.redhat.devtools.lsp4ij.LanguageServerBundle;
 import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
@@ -70,6 +74,7 @@ public class LSPConsoleToolWindowPanel extends SimpleToolWindowPanel implements 
     private LanguageServerExplorer explorer;
 
     private ConsolesPanel consoles;
+    private LoadingDecorator loadingDecorator;
     private boolean disposed;
 
     public LSPConsoleToolWindowPanel(@NotNull Project project) {
@@ -96,6 +101,7 @@ public class LSPConsoleToolWindowPanel extends SimpleToolWindowPanel implements 
             case Info -> ConsoleViewContentType.LOG_INFO_OUTPUT;
             case Log -> ConsoleViewContentType.LOG_VERBOSE_OUTPUT;
             case Warning -> ConsoleViewContentType.LOG_WARNING_OUTPUT;
+            case Debug -> ConsoleViewContentType.LOG_DEBUG_OUTPUT;
         };
     }
 
@@ -218,13 +224,20 @@ public class LSPConsoleToolWindowPanel extends SimpleToolWindowPanel implements 
 
     private void createUI() {
         explorer = new LanguageServerExplorer(this);
+        Disposer.register(this, explorer);
         var scrollPane = new JBScrollPane(explorer);
         this.consoles = new ConsolesPanel();
-        var splitPane = createSplitPanel(scrollPane, consoles);
+
+        // Wrap consoles with a loading decorator to show spinner during panel construction
+        this.loadingDecorator = new LoadingDecorator(consoles, this, 0);
+
+        var splitPane = createSplitPanel(scrollPane, loadingDecorator.getComponent());
         super.setContent(splitPane);
         super.revalidate();
         super.repaint();
-        explorer.load();
+
+        // Load language server definitions and started servers asynchronously
+        explorer.loadAsync();
     }
 
     public Project getProject() {
@@ -235,7 +248,33 @@ public class LSPConsoleToolWindowPanel extends SimpleToolWindowPanel implements 
         if (consoles == null || isDisposed()) {
             return;
         }
-        consoles.select(treeNode, true);
+
+        // Check if panel already exists in cache
+        boolean panelExists = consoles.getValue(treeNode, false) != null;
+
+        // Only show loading spinner if we need to create a new panel
+        if (!panelExists && loadingDecorator != null) {
+            loadingDecorator.startLoading(false);
+        }
+
+        ReadAction.nonBlocking(() -> {
+            // Read action needed for document access during UI construction
+            return treeNode;
+        })
+        .expireWith(this)
+        .finishOnUiThread(ModalityState.defaultModalityState(), (node) -> {
+            try {
+                if (consoles != null && !isDisposed()) {
+                    consoles.select(node, true);
+                }
+            } finally {
+                // Hide loading spinner only if it was started
+                if (!panelExists && loadingDecorator != null && !isDisposed()) {
+                    loadingDecorator.stopLoading();
+                }
+            }
+        })
+        .submit(AppExecutorUtil.getAppExecutorService());
     }
 
     /**
@@ -265,7 +304,33 @@ public class LSPConsoleToolWindowPanel extends SimpleToolWindowPanel implements 
         if (consoles == null || isDisposed()) {
             return;
         }
-        consoles.select(processTreeNode, true);
+
+        // Check if panel already exists in cache
+        boolean panelExists = consoles.getValue(processTreeNode, false) != null;
+
+        // Only show loading spinner if we need to create a new panel
+        if (!panelExists && loadingDecorator != null) {
+            loadingDecorator.startLoading(false);
+        }
+
+        ReadAction.nonBlocking(() -> {
+            // Read action needed for document access during UI construction
+            return processTreeNode;
+        })
+        .expireWith(this)
+        .finishOnUiThread(ModalityState.defaultModalityState(), (node) -> {
+            try {
+                if (consoles != null && !isDisposed()) {
+                    consoles.select(node, true);
+                }
+            } finally {
+                // Hide loading spinner only if it was started
+                if (!panelExists && loadingDecorator != null && !isDisposed()) {
+                    loadingDecorator.stopLoading();
+                }
+            }
+        })
+        .submit(AppExecutorUtil.getAppExecutorService());
     }
 
     /**
@@ -564,13 +629,25 @@ public class LSPConsoleToolWindowPanel extends SimpleToolWindowPanel implements 
 
         @Override
         public void dispose() {
+            var project = getProject();
             for (LanguageServerSettingsListener settingsChangeListener : settingsChangeListeners) {
-                ProjectLanguageServerSettings.getInstance(getProject()).removeSettingsListener(settingsChangeListener);
-                GlobalLanguageServerSettings.getInstance().removeSettingsListener(settingsChangeListener);
+                if (!project.isDisposed()) {
+                    var projectSettings = ProjectLanguageServerSettings.getInstance(project);
+                    if (projectSettings != null) {
+                        projectSettings.removeSettingsListener(settingsChangeListener);
+                    }
+                }
+                var globalSettings = GlobalLanguageServerSettings.getInstance();
+                if (globalSettings != null) {
+                    globalSettings.removeSettingsListener(settingsChangeListener);
+                }
             }
             settingsChangeListeners.clear();
-            for (var serverDefinitionListener : serverDefinitionListeners) {
-                LanguageServersRegistry.getInstance().removeLanguageServerDefinitionListener(serverDefinitionListener);
+            var registry = LanguageServersRegistry.getInstance();
+            if (registry != null) {
+                for (var serverDefinitionListener : serverDefinitionListeners) {
+                    registry.removeLanguageServerDefinitionListener(serverDefinitionListener);
+                }
             }
             serverDefinitionListeners.clear();
             super.dispose();

@@ -1,0 +1,67 @@
+{
+  "id": "candor-lsp",
+  "name": "Candor Language Server",
+  "programArgs": {
+    "windows": "cmd /C candor-lsp.cmd",
+    "default": "candor-lsp"
+  },
+  "fileTypeMappings": [
+    {
+      "fileType": {
+        "name": "JAVA",
+        "patterns": [
+          "*.java"
+        ]
+      },
+      "languageId": "java"
+    },
+    {
+      "fileType": {
+        "name": "Kotlin",
+        "patterns": [
+          "*.kt",
+          "*.kts"
+        ]
+      },
+      "languageId": "kotlin"
+    },
+    {
+      "fileType": {
+        "name": "TypeScript",
+        "patterns": [
+          "*.ts",
+          "*.tsx"
+        ]
+      },
+      "languageId": "typescript"
+    },
+    {
+      "fileType": {
+        "name": "JavaScript",
+        "patterns": [
+          "*.js",
+          "*.jsx",
+          "*.mjs"
+        ]
+      },
+      "languageId": "javascript"
+    },
+    {
+      "fileType": {
+        "name": "Rust",
+        "patterns": [
+          "*.rs"
+        ]
+      },
+      "languageId": "rust"
+    },
+    {
+      "fileType": {
+        "patterns": [
+          "*.swift"
+        ]
+      },
+      "languageId": "swift"
+    }
+  ]
+}

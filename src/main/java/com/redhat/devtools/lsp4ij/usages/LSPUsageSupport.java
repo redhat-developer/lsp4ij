@@ -18,6 +18,7 @@ import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LSPRequestConstants;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import com.redhat.devtools.lsp4ij.client.features.FileUriSupport;
+import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
 import com.redhat.devtools.lsp4ij.features.AbstractLSPDocumentFeatureSupport;
 import com.redhat.devtools.lsp4ij.features.semanticTokens.viewProvider.LSPSemanticTokensFileViewProvider;
 import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
@@ -46,7 +47,8 @@ import java.util.function.BiFunction;
  */
 public class LSPUsageSupport extends AbstractLSPDocumentFeatureSupport<LSPUsageSupport.LSPUsageSupportParams, List<LSPUsagePsiElement>> {
 
-    public record LSPUsageSupportParams(@NotNull Position position) {}
+    public record LSPUsageSupportParams(@NotNull Position position) {
+    }
 
     public LSPUsageSupport(@NotNull PsiFile file) {
         super(file, false);
@@ -64,8 +66,8 @@ public class LSPUsageSupport extends AbstractLSPDocumentFeatureSupport<LSPUsageS
         var textDocumentIdentifier = new TextDocumentIdentifier();
         Project project = file.getProject();
         return getLanguageServers(file,
-                        f -> f.getUsageFeature().isEnabled(file),
-                        f -> f.getUsageFeature().isSupported(file))
+                f -> f.getUsageFeature().isEnabled(file),
+                f -> f.getUsageFeature().isSupported(file))
                 .thenComposeAsync(languageServers -> {
                     // Here languageServers is the list of language servers which matches the given file
                     // and which have usage (references, implementation, etc) capability
@@ -107,7 +109,8 @@ public class LSPUsageSupport extends AbstractLSPDocumentFeatureSupport<LSPUsageS
                         var clientFeature = ls.getClientFeatures();
 
                         // Collect declarations
-                        if (clientFeature.getDeclarationFeature().isDeclarationSupported(file)) {
+                        if (clientFeature.getDeclarationFeature().isEnabled(file)
+                                && clientFeature.getDeclarationFeature().isSupported(file)) {
                             updateTextDocumentUri(declarationParams.getTextDocument(), file, ls);
                             allFutures.add(
                                     // Update textDocument Uri with custom file Uri if needed
@@ -119,7 +122,9 @@ public class LSPUsageSupport extends AbstractLSPDocumentFeatureSupport<LSPUsageS
                         }
 
                         // Collect definitions
-                        if (collectDefinitions && clientFeature.getDefinitionFeature().isDefinitionSupported(file)) {
+                        if (collectDefinitions
+                                && clientFeature.getDefinitionFeature().isEnabled(file)
+                                && clientFeature.getDefinitionFeature().isSupported(file)) {
                             updateTextDocumentUri(definitionParams.getTextDocument(), file, ls);
                             allFutures.add(
                                     cancellationSupport.execute(ls
@@ -130,7 +135,9 @@ public class LSPUsageSupport extends AbstractLSPDocumentFeatureSupport<LSPUsageS
                         }
 
                         // Collect type definitions
-                        if (collectTypeDefinitions && clientFeature.getTypeDefinitionFeature().isTypeDefinitionSupported(file)) {
+                        if (collectTypeDefinitions
+                                && clientFeature.getTypeDefinitionFeature().isEnabled(file)
+                                && clientFeature.getTypeDefinitionFeature().isSupported(file)) {
                             updateTextDocumentUri(typeDefinitionParams.getTextDocument(), file, ls);
                             allFutures.add(
                                     cancellationSupport.execute(ls
@@ -141,7 +148,8 @@ public class LSPUsageSupport extends AbstractLSPDocumentFeatureSupport<LSPUsageS
                         }
 
                         // Collect references
-                        if (clientFeature.getReferencesFeature().isReferencesSupported(file)) {
+                        if (clientFeature.getReferencesFeature().isEnabled(file)
+                                && clientFeature.getReferencesFeature().isSupported(file)) {
                             updateTextDocumentUri(referenceParams.getTextDocument(), file, ls);
                             allFutures.add(
                                     cancellationSupport.execute(ls
@@ -152,7 +160,8 @@ public class LSPUsageSupport extends AbstractLSPDocumentFeatureSupport<LSPUsageS
                         }
 
                         // Collect implementations
-                        if (clientFeature.getImplementationFeature().isImplementationSupported(file)) {
+                        if (clientFeature.getImplementationFeature().isEnabled(file)
+                                && clientFeature.getImplementationFeature().isSupported(file)) {
                             updateTextDocumentUri(implementationParams.getTextDocument(), file, ls);
                             allFutures.add(
                                     cancellationSupport.execute(ls
@@ -198,7 +207,7 @@ public class LSPUsageSupport extends AbstractLSPDocumentFeatureSupport<LSPUsageS
     }
 
     private static List<LSPUsagePsiElement> createUsages(@Nullable List<? extends Location> locations,
-                                                         @Nullable FileUriSupport fileUriSupport,
+                                                         @NotNull LSPClientFeatures clientFeatures,
                                                          @NotNull LSPUsagePsiElement.UsageKind usageKind,
                                                          @NotNull Project project) {
         if (locations == null || locations.isEmpty()) {
@@ -206,22 +215,22 @@ public class LSPUsageSupport extends AbstractLSPDocumentFeatureSupport<LSPUsageS
         }
         return locations
                 .stream()
-                .map(location -> LSPUsagesManager.toPsiElement(location, fileUriSupport, usageKind, project))
+                .map(location -> LSPUsagesManager.toPsiElement(location, clientFeatures, usageKind, project))
                 .filter(Objects::nonNull)
                 .toList();
     }
 
     private static List<LSPUsagePsiElement> createUsages(@Nullable Either<List<? extends Location>, List<? extends LocationLink>> locations,
-                                                         @Nullable FileUriSupport fileUriSupport,
+                                                         @NotNull LSPClientFeatures clientFeatures,
                                                          @Nullable LSPUsagePsiElement.UsageKind usageKind,
                                                          @Nullable Project project) {
         if (locations == null) {
             return Collections.emptyList();
         }
         if (locations.isLeft()) {
-            return createUsages(locations.getLeft(), fileUriSupport, usageKind, project);
+            return createUsages(locations.getLeft(), clientFeatures, usageKind, project);
         }
-        return createUsagesFromLocationLinks(locations.getRight(), fileUriSupport, usageKind, project);
+        return createUsagesFromLocationLinks(locations.getRight(), clientFeatures, usageKind, project);
     }
 
     private static List<LSPUsagePsiElement> createUsagesFromLocationLinks(@Nullable List<? extends LocationLink> locations,
@@ -244,7 +253,6 @@ public class LSPUsageSupport extends AbstractLSPDocumentFeatureSupport<LSPUsageS
         context.setIncludeDeclaration(true);
         return new ReferenceParams(textDocument, position, context);
     }
-
 
 
 }

@@ -56,13 +56,13 @@ import org.slf4j.LoggerFactory;
 import java.util.*;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
 
 import static com.redhat.devtools.lsp4ij.features.completion.snippet.LspSnippetVariableConstants.*;
 import static com.redhat.devtools.lsp4ij.features.documentation.LSPDocumentationHelper.convertToHtml;
 import static com.redhat.devtools.lsp4ij.features.documentation.LSPDocumentationHelper.getValidMarkupContents;
+
 import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.isDoneNormally;
-import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.waitUntilDone;
+import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.awaitWithCheckCanceled;
 import static com.redhat.devtools.lsp4ij.internal.CompletionUtils.computePrefixStartFromInsertText;
 
 /**
@@ -88,7 +88,7 @@ public class LSPCompletionProposal extends LookupElement implements Pointer<LSPC
 
     private final Editor editor;
 
-    private CompletableFuture<CompletionItem> resolvedCompletionItemFuture;
+    private volatile CompletableFuture<CompletionItem> resolvedCompletionItemFuture;
 
     public LSPCompletionProposal(@NotNull CompletionItem item,
                                  @NotNull LSPCompletionFeature.LSPCompletionContext completionContext,
@@ -114,8 +114,10 @@ public class LSPCompletionProposal extends LookupElement implements Pointer<LSPC
             // Use client config to determine how the snippet should be transformed into a template
             boolean useTemplateForInvocationOnlySnippet = completionFeature.useTemplateForInvocationOnlySnippet(file);
 
-            // Get the indentation settings
-            LspSnippetIndentOptions indentOptions = CompletionProposalTools.createLspIndentOptions(snippetContent, file);
+            // AsIs preserves the server's indentation, including literal tab characters.
+            boolean adjustIndentation = item.getInsertTextMode() != InsertTextMode.AsIs;
+            LspSnippetIndentOptions indentOptions = adjustIndentation
+                    ? CompletionProposalTools.createLspIndentOptions(snippetContent, file) : null;
             // Load the insert text to build:
             // - an IJ Template instance which will take care of replacement of placeholders
             // - the insert text without placeholders
@@ -126,6 +128,10 @@ public class LSPCompletionProposal extends LookupElement implements Pointer<LSPC
                     indentOptions,
                     useTemplateForInvocationOnlySnippet
             );
+            if (!adjustIndentation) {
+                template.setToIndent(false);
+                template.setToReformat(false);
+            }
             // Update the TextEdit with the content snippet content without placeholders
             // ex : ${1:name} --> name
             updateInsertTextForTemplateProcessing(template.getTemplateText());
@@ -276,19 +282,23 @@ public class LSPCompletionProposal extends LookupElement implements Pointer<LSPC
         }
         // Here the IJ lookup item is selected.
         if (needToResolveCompletionDetail()) {
-            // The LSP completion item 'detail' is not filled, try to resolve it
-            // inside getExpensiveRenderer() which should not impact performance.
-            CompletionItem resolved = getResolvedCompletionItem();
-            if (resolved != null && resolved.getDetail() != null) {
-                item.setDetail(resolved.getDetail());
-
-                return new LookupElementRenderer<LookupElement>() {
-                    @Override
-                    public void renderElement(LookupElement element, LookupElementPresentation presentation) {
-                        LSPCompletionProposal.this.renderElement(presentation);
+            // The LSP completion item 'detail' is not filled, resolve it in the returned renderer.
+            // IntelliJ calls getExpensiveRenderer() on the EDT, possibly inside the write action of a typed
+            // character, and only the renderer runs in the background, in a read action that a pending
+            // write action cancels: waiting for the language server here would block the EDT on it.
+            return new LookupElementRenderer<LookupElement>() {
+                @Override
+                public void renderElement(LookupElement element, LookupElementPresentation presentation) {
+                    CompletionItem resolved = getResolvedCompletionItem();
+                    if (resolved != null && resolved.getDetail() != null) {
+                        item.setDetail(resolved.getDetail());
+                    } else if (item.getDetail() == null) {
+                        // The detail cannot be resolved, set empty string to avoid trying to resolve again the completion item
+                        item.setDetail("");
                     }
-                };
-            }
+                    LSPCompletionProposal.this.renderElement(presentation);
+                }
+            };
         }
         if (item.getDetail() == null) {
             // The detail cannot be resolved, set empty string to avoid trying to resolve again the completion item
@@ -442,14 +452,14 @@ public class LSPCompletionProposal extends LookupElement implements Pointer<LSPC
         Document document = editor.getDocument();
         switch (variableName) {
             case TM_FILENAME_BASE:
-                String fileName = LSPIJUtils.getFile(document).getNameWithoutExtension();
+                String fileName = LSPIJUtils.getFile(document, file.getProject()).getNameWithoutExtension();
                 return fileName != null ? fileName : ""; //$NON-NLS-1$
             case TM_FILENAME:
-                return LSPIJUtils.getFile(document).getName();
+                return LSPIJUtils.getFile(document, file.getProject()).getName();
             case TM_FILEPATH:
-                return LSPIJUtils.getFile(document).getPath();
+                return LSPIJUtils.getFile(document, file.getProject()).getPath();
             case TM_DIRECTORY:
-                return LSPIJUtils.getFile(document).getParent().getPath();
+                return LSPIJUtils.getFile(document, file.getProject()).getParent().getPath();
             case TM_LINE_INDEX:
                 int lineIndex = getTextEditRange().getStart().getLine();
                 return Integer.toString(lineIndex);
@@ -491,30 +501,35 @@ public class LSPCompletionProposal extends LookupElement implements Pointer<LSPC
      * @return the resolved completion item and null otherwise.
      */
     private CompletionItem getResolvedCompletionItem() {
+        var future = getResolvedCompletionItemFuture();
+        try {
+            awaitWithCheckCanceled(future);
+        } catch (ProcessCanceledException e) {
+            throw e;
+        } catch (CancellationException e) {
+            return null;
+        }
+
+        ProgressManager.checkCanceled();
+        if (isDoneNormally(future)) {
+            return future.getNow(null);
+        }
+        return null;
+    }
+
+    /**
+     * Returns the LSP 'completionItem/resolve' request of the completion item, sent on the first call.
+     * The EDT (apply) and background threads (expensive renderer, documentation) can both reach it.
+     *
+     * @return the LSP 'completionItem/resolve' request of the completion item.
+     */
+    private synchronized CompletableFuture<CompletionItem> getResolvedCompletionItemFuture() {
         if (resolvedCompletionItemFuture == null) {
             resolvedCompletionItemFuture = completionContext.getLanguageServer().getServer()
                     .getTextDocumentService()
                     .resolveCompletionItem(item);
         }
-        try {
-            // Wait until the future is finished and stop the wait if there are some ProcessCanceledException.
-            waitUntilDone(resolvedCompletionItemFuture, file);
-        } catch (
-                ProcessCanceledException e) {//Since 2024.2 ProcessCanceledException extends CancellationException so we can't use multicatch to keep backward compatibility
-            //TODO delete block when minimum required version is 2024.2
-            return null;
-        } catch (CancellationException e) {
-            return null;
-        } catch (ExecutionException e) {
-            LOGGER.error("Error while consuming LSP 'completionItem/resolve' request", e);
-            return null;
-        }
-
-        ProgressManager.checkCanceled();
-        if (isDoneNormally(resolvedCompletionItemFuture)) {
-            return resolvedCompletionItemFuture.getNow(null);
-        }
-        return null;
+        return resolvedCompletionItemFuture;
     }
 
     /**

@@ -29,9 +29,7 @@ import org.slf4j.LoggerFactory;
 import java.util.List;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
-
-import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.waitUntilDone;
+import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.awaitWithCheckCanceled;
 
 /**
  * LSP Go To Reference.
@@ -53,22 +51,17 @@ public class LSPGoToReferenceAction extends AbstractLSPGoToAction {
         var params = new LSPReferenceParams(new TextDocumentIdentifier(), LSPIJUtils.toPosition(offset, document), offset);
         CompletableFuture<List<LocationData>> referencesFuture = referenceSupport.getReferences(params);
         try {
-            waitUntilDone(referencesFuture, psiFile);
-        } catch (ProcessCanceledException ex) {
-            // cancel the LSP requests textDocument/references
-            referenceSupport.cancel();
-        } catch (CancellationException ex) {
-            // cancel the LSP requests textDocument/references
-            referenceSupport.cancel();
-        } catch (ExecutionException e) {
-            LOGGER.error("Error while consuming LSP 'textDocument/references' request", e);
+            awaitWithCheckCanceled(referencesFuture);
+        } catch (ProcessCanceledException e) {
+            throw e;
+        } catch (CancellationException ignore) {
         }
         return referencesFuture;
     }
 
     @Override
     protected boolean canSupportFeature(@NotNull LSPClientFeatures clientFeatures, @NotNull PsiFile file) {
-        return clientFeatures.getReferencesFeature().isReferencesSupported(file);
+        return clientFeatures.getReferencesFeature().isSupported(file);
     }
 
     @Override

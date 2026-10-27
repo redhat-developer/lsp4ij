@@ -10,15 +10,14 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.dap.runInTerminal.integrated;
 
-import com.intellij.ide.plugins.PluginManagerCore;
 import com.intellij.openapi.application.ApplicationManager;
-import com.intellij.openapi.extensions.PluginId;
 import com.intellij.openapi.util.SystemInfo;
 import com.intellij.terminal.JBTerminalWidget;
 import com.intellij.terminal.ui.TerminalWidget;
 import com.intellij.util.Alarm;
 import com.redhat.devtools.lsp4ij.dap.client.DAPClient;
 import com.redhat.devtools.lsp4ij.dap.runInTerminal.RunInTerminalService;
+import com.redhat.devtools.lsp4ij.internal.PluginUtils;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import org.eclipse.lsp4j.debug.RunInTerminalRequestArguments;
 import org.eclipse.lsp4j.debug.RunInTerminalResponse;
@@ -128,8 +127,7 @@ public class RunInIntegratedTerminalService implements RunInTerminalService {
      */
     @Override
     public boolean isApplicable() {
-        PluginId pluginId = PluginId.getId("org.jetbrains.plugins.terminal");
-        return PluginManagerCore.getPlugin(pluginId) != null;
+        return PluginUtils.isPluginInstalled("org.jetbrains.plugins.terminal");
     }
 
     /**
@@ -156,7 +154,16 @@ public class RunInIntegratedTerminalService implements RunInTerminalService {
                 shellWidget.executeCommand(command);
 
                 // Poll until the terminal process PID becomes available
+                // Fix: Create Alarm and ensure it's properly disposed when future completes or fails
                 Alarm alarm = new Alarm(Alarm.ThreadToUse.POOLED_THREAD, project);
+
+                // Ensure alarm is disposed when future completes (success or failure)
+                future.whenComplete((result, error) -> {
+                    if (alarm != null && !alarm.isDisposed()) {
+                        alarm.dispose();
+                    }
+                });
+
                 Runnable checkProcess = new Runnable() {
                     @Override
                     public void run() {
@@ -165,6 +172,7 @@ public class RunInIntegratedTerminalService implements RunInTerminalService {
                             RunInTerminalResponse resp = new RunInTerminalResponse();
                             resp.setProcessId((int) tty.getProcess().pid());
                             future.complete(resp);
+                            // Alarm will be disposed by whenComplete callback
                         } else if (!future.isDone()) {
                             alarm.addRequest(this, 100);
                         }
@@ -174,6 +182,7 @@ public class RunInIntegratedTerminalService implements RunInTerminalService {
 
             } catch (Exception e) {
                 future.completeExceptionally(e);
+                // Alarm will be disposed by whenComplete callback
             }
         });
 

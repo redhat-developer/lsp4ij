@@ -15,6 +15,8 @@ package com.redhat.devtools.lsp4ij.server.definition.launching;
 
 import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
+import com.redhat.devtools.lsp4ij.client.features.LSPWorkspaceFolderFeature;
+import com.redhat.devtools.lsp4ij.features.workspaceFolder.ConfigurableWorkspaceFolderStrategy;
 import com.redhat.devtools.lsp4ij.installation.ServerInstaller;
 import com.redhat.devtools.lsp4ij.server.definition.ClientConfigurableLanguageServerDefinition;
 import org.jetbrains.annotations.NotNull;
@@ -36,6 +38,9 @@ public class UserDefinedClientFeatures extends LSPClientFeatures {
         setBreadcrumbsFeature(new UserDefinedBreadcrumbsFeature());
         setEditorBehaviorFeature(new UserDefinedEditorBehaviorFeature(this));
         setFileUriSupport(new UserDefinedFileUriSupport(this));
+
+        // Use configurable workspace folder strategy for user-defined language servers
+        setWorkspaceFolderFeature(new UserDefinedWorkspaceFolderFeature());
     }
 
     public boolean isCaseSensitive(@NotNull PsiFile file) {

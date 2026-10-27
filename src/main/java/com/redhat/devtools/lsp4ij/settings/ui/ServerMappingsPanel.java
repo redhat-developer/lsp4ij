@@ -50,7 +50,7 @@ public class ServerMappingsPanel {
 
     private void createContent(@NotNull FormBuilder builder, boolean editable) {
         tabbedPane = new JBTabbedPane();
-        builder.addLabeledComponent(LanguageServerBundle.message("language.server.mappings.title"), tabbedPane, true);
+        builder.addLabeledComponentFillVertically(LanguageServerBundle.message("language.server.mappings.title"), tabbedPane);
 
         // Language mappings
         createLanguageMappingsContent(tabbedPane, editable);

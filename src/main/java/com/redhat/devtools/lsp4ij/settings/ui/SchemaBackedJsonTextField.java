@@ -52,8 +52,13 @@ public class SchemaBackedJsonTextField extends JsonTextField {
     public void resetJsonSchema() {
         setJsonFilename("lsp.server.settings.no.schema.json");
         if (index != null) {
-            var manager = LSPServerConfigurationJsonSchemaManager.getInstance(getProject());
-            manager.reset(index);
+            var project = getProject();
+            if (!project.isDisposed()) {
+                var manager = LSPServerConfigurationJsonSchemaManager.getInstance(project);
+                if (manager != null) {
+                    manager.reset(index);
+                }
+            }
         }
     }
 

@@ -30,15 +30,16 @@ import java.util.Objects;
 /**
  * Process stream connection provider used to start a language server with the
  * IntelliJ {@link OSProcessHandler} and {@link GeneralCommandLine}.
+ * Each provider owns at most one process. Create a new provider to restart a stopped connection.
  */
 public class OSProcessStreamConnectionProvider implements StreamConnectionProvider, ProcessDataProvider {
 
     private GeneralCommandLine commandLine;
-    private OSProcessHandler processHandler;
-    private InputStream inputStream;
+    private volatile OSProcessHandler processHandler;
+    private volatile InputStream inputStream;
     private final List<LanguageServerLogErrorHandler> handlers;
     private final List<Runnable> unexpectedServerStopHandlers;
-    private boolean stopped;
+    private volatile boolean stopped;
 
     public OSProcessStreamConnectionProvider() {
         this(null);
@@ -105,8 +106,18 @@ public class OSProcessStreamConnectionProvider implements StreamConnectionProvid
         unexpectedServerStopHandlers.add(handler);
     }
 
+    /**
+     * Starts the process for this connection. Serialized with {@link #stop()} so shutdown
+     * cannot miss a process whose creation is already in progress.
+     *
+     * @throws CannotStartProcessException if this provider already owns a process, has been
+     *                                    stopped, has no command line, or cannot create the process
+     */
     @Override
-    public void start() throws CannotStartProcessException {
+    public synchronized void start() throws CannotStartProcessException {
+        if (stopped || processHandler != null) {
+            throw new CannotStartProcessException("This connection provider has already been started or stopped");
+        }
         if (this.commandLine == null) {
             throw new CannotStartProcessException("Unable to start language server: " + this);
         }
@@ -167,8 +178,13 @@ public class OSProcessStreamConnectionProvider implements StreamConnectionProvid
         return processHandler.getProcessInput();
     }
 
+    /**
+     * Permanently stops this provider and requests termination of its process, if any.
+     * Waits for an in-progress {@link #start()} call, but does not wait for process exit.
+     * Repeated calls have no effect; restarting requires a new provider instance.
+     */
     @Override
-    public void stop() {
+    public synchronized void stop() {
         if (stopped) {
             return;
         }

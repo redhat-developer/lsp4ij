@@ -27,8 +27,10 @@ import com.redhat.devtools.lsp4ij.features.callHierarchy.LSPPrepareCallHierarchy
 import com.redhat.devtools.lsp4ij.features.codeAction.intention.LSPIntentionCodeActionSupport;
 import com.redhat.devtools.lsp4ij.features.codeLens.LSPCodeLensSupport;
 import com.redhat.devtools.lsp4ij.features.color.LSPColorSupport;
+import com.redhat.devtools.lsp4ij.features.color.LSPColorPresentationSupport;
 import com.redhat.devtools.lsp4ij.features.completion.LSPCompletionSupport;
 import com.redhat.devtools.lsp4ij.features.declaration.LSPDeclarationSupport;
+import com.redhat.devtools.lsp4ij.features.inlineCompletion.LSPInlineCompletionSupport;
 import com.redhat.devtools.lsp4ij.features.documentLink.LSPDocumentLinkSupport;
 import com.redhat.devtools.lsp4ij.features.documentSymbol.LSPDocumentSymbolSupport;
 import com.redhat.devtools.lsp4ij.features.documentation.LSPHoverSupport;
@@ -72,6 +74,7 @@ public class LSPFileSupport extends UserDataHolderBase implements Disposable {
     private final LSPCodeLensSupport codeLensSupport;
     private final LSPInlayHintsSupport inlayHintsSupport;
     private final LSPColorSupport colorSupport;
+    private final LSPColorPresentationSupport colorPresentationSupport;
     private final LSPFoldingRangeSupport foldingRangeSupport;
     private final LSPSelectionRangeSupport selectionRangeSupport;
     private final LSPFormattingSupport formattingSupport;
@@ -84,6 +87,7 @@ public class LSPFileSupport extends UserDataHolderBase implements Disposable {
     private final LSPPrepareRenameSupport prepareRenameSupport;
     private final LSPRenameSupport renameSupport;
     private final LSPCompletionSupport completionSupport;
+    private final LSPInlineCompletionSupport inlineCompletionSupport;
     private final LSPImplementationSupport implementationSupport;
     private final LSPReferenceSupport referenceSupport;
     private final LSPDefinitionSupport definitionSupport;
@@ -106,6 +110,7 @@ public class LSPFileSupport extends UserDataHolderBase implements Disposable {
         this.codeLensSupport = new LSPCodeLensSupport(file);
         this.inlayHintsSupport = new LSPInlayHintsSupport(file);
         this.colorSupport = new LSPColorSupport(file);
+        this.colorPresentationSupport = new LSPColorPresentationSupport(file);
         this.foldingRangeSupport = new LSPFoldingRangeSupport(file);
         this.selectionRangeSupport = new LSPSelectionRangeSupport(file);
         this.formattingSupport = new LSPFormattingSupport(file);
@@ -118,6 +123,7 @@ public class LSPFileSupport extends UserDataHolderBase implements Disposable {
         this.prepareRenameSupport = new LSPPrepareRenameSupport(file);
         this.renameSupport = new LSPRenameSupport(file);
         this.completionSupport = new LSPCompletionSupport(file);
+        this.inlineCompletionSupport = new LSPInlineCompletionSupport(file);
         this.implementationSupport = new LSPImplementationSupport(file);
         this.referenceSupport = new LSPReferenceSupport(file);
         this.definitionSupport = new LSPDefinitionSupport(file);
@@ -178,6 +184,7 @@ public class LSPFileSupport extends UserDataHolderBase implements Disposable {
         getCodeLensSupport().cancel();
         getInlayHintsSupport().cancel();
         getColorSupport().cancel();
+        getColorPresentationSupport().cancel();
         getFoldingRangeSupport().cancel();
         getSelectionRangeSupport().cancel();
         getFormattingSupport().cancel();
@@ -235,6 +242,15 @@ public class LSPFileSupport extends UserDataHolderBase implements Disposable {
      */
     public LSPColorSupport getColorSupport() {
         return colorSupport;
+    }
+
+    /**
+     * Returns the LSP color presentation support.
+     *
+     * @return the LSP color presentation support.
+     */
+    public LSPColorPresentationSupport getColorPresentationSupport() {
+        return colorPresentationSupport;
     }
 
     /**
@@ -343,6 +359,15 @@ public class LSPFileSupport extends UserDataHolderBase implements Disposable {
      */
     public LSPCompletionSupport getCompletionSupport() {
         return completionSupport;
+    }
+
+    /**
+     * Returns the LSP inline completion support.
+     *
+     * @return the LSP inline completion support.
+     */
+    public LSPInlineCompletionSupport getInlineCompletionSupport() {
+        return inlineCompletionSupport;
     }
 
     /**
@@ -502,11 +527,12 @@ public class LSPFileSupport extends UserDataHolderBase implements Disposable {
     }
 
     private Alarm getRefreshPsiFileAlarm() {
-        if (disposed) {
-            return null;
-        }
         if (refreshPsiFileAlarm == null) {
             synchronized (this) {
+                // Check disposed inside synchronized to prevent race condition
+                if (disposed) {
+                    return null;
+                }
                 if (refreshPsiFileAlarm == null) {
                     refreshPsiFileAlarm = new Alarm(Alarm.ThreadToUse.POOLED_THREAD, this);
                 }

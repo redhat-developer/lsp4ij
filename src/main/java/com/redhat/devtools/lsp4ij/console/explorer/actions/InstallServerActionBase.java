@@ -42,6 +42,9 @@ public abstract class InstallServerActionBase extends AnAction implements DumbAw
 
     @Override
     public void actionPerformed(@NotNull AnActionEvent anActionEvent) {
+        if (project.isDisposed()) {
+            return;
+        }
         LanguageServerManager.getInstance(project)
                 .install(serverDefinition, context);
     }

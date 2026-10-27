@@ -6,6 +6,65 @@
 
     <change-notes><![CDATA[
 
+    <h3>0.21.0</h3>
+    <ul>
+      <li><strong>Fixed LSP timeout deadlocks</strong> (#1648): replaced all <code>waitUntilDone</code> calls with <code>ProgressIndicatorUtils.awaitWithCheckCanceled</code> to cooperate with IntelliJ's ReadAction/WriteAction protocol</li>
+      <li>Fixed EDT freezes (#1604, #1620, #1629, #1637) and <code>Too many non-blocking read actions</code> (#1614)</li>
+      <li>Fixed IntelliJ 2026.2 compatibility (#1633): structure view dependency, Alarm Disposable, Disassembly View (#1636)</li>
+      <li>Fixed memory leaks (#1644) and NPE while unloading LSP4IJ (#1632)</li>
+      <li>Fixed on-type formatting running before <code>didChange</code> (#1624)</li>
+      <li>Fixed DAP output not displaying empty lines (#1651)</li>
+      <li>Fixed <code>toUri</code> with directory paths (#1623)</li>
+      <li>Fixed security issue: removed historical malware link from README (#1631)</li>
+      <li>Removed telemetry (#1640) and improved Disassembly View (#1645)</li>
+      <li>Added Candor, Language 1C (BSL), and BBj language server templates</li>
+    </ul>
+	See the full list of changes in the <a href="https://github.com/redhat-developer/lsp4ij/milestone/30?closed=1">changelog</a>.
+
+    <h3>0.20.1</h3>
+    <ul>
+      <li>Fix bug with invalid MCP view</li>
+    </ul>
+	See the full list of changes in the <a href="https://github.com/redhat-developer/lsp4ij/milestone/29?closed=1">changelog</a>.
+
+    <h3>0.20.0</h3>
+    <ul>
+      <li><strong>Fixed ReadAction/WriteAction deadlocks</strong> following <a href="https://blog.jetbrains.com/platform/2026/03/ui-freezes-and-the-dangers-of-non-cancellable-read-actions-in-background-threads/">JetBrains best practices</a> for non-cancellable read actions</li>
+      <li><strong>Adaptive LSP timeouts</strong>: dynamically adjust timeouts based on execution context (ReadAction, WriteAction, EDT.)</li>
+      <li>Added support for <code>textDocument/colorPresentation</code></li>
+      <li>Added support for <code>textDocument/inlineCompletion</code></li>
+      <li>Improved code action handling: show all available actions (not just first), better quickfix integration</li>
+      <li>Performance improvements: async loading of explorer/console, reduced unnecessary refreshes for colors/inlay hints</li>
+      <li>Fixed memory leak issues and improved cancellation handling</li>
+      <li>Enhanced <code>textDocument/documentLink</code> navigation for external libraries</li>
+      <li>Added Perl LSP & DAP as user-defined language servers</li>
+      <li>Fixed Remote Development (Gateway) diagnostics display</li>
+    </ul>
+    See the full list of changes in the <a href="https://github.com/redhat-developer/lsp4ij/milestone/28?closed=1">changelog</a>.
+
+    <h3>0.19.4</h3>
+    <ul>
+      <li>Added support for debugger <a href="https://github.com/redhat-developer/lsp4ij/blob/main/docs/dap/UserGuide.md#smart-step-into">Smart Step Into</a> action via DAP <code>StepInTargets</code></li>
+      <li>Added <a href="https://github.com/redhat-developer/lsp4ij/blob/main/docs/UserDefinedLanguageServer.md#workspace-folders-tab">Advanced Workspace folders</a> support</li>
+      <li>Added <a href="https://github.com/redhat-developer/lsp4ij/blob/main/docs/UserGuide.md#filters">filters</a> for LSP Structure View</li>
+      <li>Improved definition navigation: open references if definition result has the same range as clicked offset</li>
+      <li>Support for <strong>dynamic plugin unloading</strong> via disposable listeners and cleanup logic</li>
+      <li>Fixed text edits ordering to comply with LSP spec (same position edits)</li>
+      <li>Fixed various DAP issues including <code>AbstractMethodError</code> in Smart Step Into handler</li>
+      <li>Fixed <code>InlayHintsPassFactory</code> compatibility with IntelliJ 2026.2 EAP</li>
+      <li>Fixed definition/declaration request error reporting</li>
+      <li>Replaced deprecated internal API for IntelliJ 2026.2+ compatibility</li>
+    </ul>
+    See the full list of changes in the <a href="https://github.com/redhat-developer/lsp4ij/milestone/27?closed=1">changelog</a>.
+
+    <h3>0.19.3</h3>
+    <ul>
+      <li>Provide <a href="https://github.com/redhat-developer/lsp4ij/blob/main/docs/LSPApi.md#custom-launcher-builder">Custom launch Builder</a> API</li>
+      <li>Improve performance</li>
+      <li>Fixed several bugs and improved overall <strong>stability</strong> for LSP and DAP</li>
+    </ul>
+    See the full list of changes in the <a href="https://github.com/redhat-developer/lsp4ij/milestone/26?closed=1">changelog</a>.
+
     <h3>0.19.2</h3>
     <ul>
       <li>Improve performance</li>
@@ -222,7 +281,7 @@
     <h3>0.0.1</h3>
     <ul>
       <li>Initial release</li>
-    </ul>    
+    </ul>
     Learn more in the <a href="https://github.com/redhat-developer/lsp4ij/milestone/1?closed=1">changelog</a>.
 
   ]]>
@@ -246,13 +305,13 @@
         <li>by <code>developing an IntelliJ plugin</code> with LSP <code>extension points</code>:
             <ul>
                 <li>
-                    <a href="https://github.com/redhat-developer/lsp4ij/blob/main/docs/DeveloperGuide.md#declare-server-with-extension-point">
+                    <a href="https://github.com/redhat-developer/lsp4ij/blob/main/docs/DeveloperGuide.md#extension-point-declaration">
                         com.redhat.devtools.lsp4ij.server
                     </a>
                     extension point to define a language server.
                 </li>
                 <li>
-                    <a href="https://github.com/redhat-developer/lsp4ij/blob/main/docs/DeveloperGuide.md#declare-language-mapping-with-extension-point">
+                    <a href="https://github.com/redhat-developer/lsp4ij/blob/main/docs/DeveloperGuide.md#language-mapping">
                         com.redhat.devtools.lsp4ij.languageMapping
                     </a>
                     to associate an IntelliJ language with a language server definition.
@@ -303,8 +362,8 @@
     </description>
 
     <depends>com.intellij.modules.platform</depends>
+    <depends optional="true" config-file="plugin-structure-view.xml">intellij.structureView.plugin</depends>
     <depends optional="true" config-file="plugin-textmate.xml">org.jetbrains.plugins.textmate</depends>
-    <depends optional="true" config-file="plugin-telemetry.xml">com.redhat.devtools.intellij.telemetry</depends>
     <depends optional="true" config-file="plugin-json.xml">com.intellij.modules.json</depends>
     <depends optional="true" config-file="plugin-terminal.xml">org.jetbrains.plugins.terminal</depends>
     <!-- please see http://www.jetbrains.org/intellij/sdk/docs/basics/getting_started/build_number_ranges.html for description -->
@@ -316,7 +375,8 @@
         <!-- Installer task factory -->
         <extensionPoint
                 name="installerTaskFactory"
-                beanClass="com.redhat.devtools.lsp4ij.installation.definition.InstallerTaskFactoryPointBean">
+                beanClass="com.redhat.devtools.lsp4ij.installation.definition.InstallerTaskFactoryPointBean"
+                dynamic="true">
             <with attribute="factoryClass"
                   implements="com.redhat.devtools.lsp4ij.installation.definition.InstallerTaskFactory"/>
         </extensionPoint>
@@ -347,40 +407,55 @@
                 serviceImplementation="com.redhat.devtools.lsp4ij.installation.definition.ServerInstallerManager"/>
     </extensions>
 
+    <!-- =============================================== -->
+    <!-- LSP (Language Server Protocol) Support          -->
+    <!-- =============================================== -->
+
     <!-- LSP extension points -->
     <extensionPoints>
 
         <!-- Language server extension point -->
         <extensionPoint
                 name="server"
-                beanClass="com.redhat.devtools.lsp4ij.server.definition.extension.ServerExtensionPointBean">
+                beanClass="com.redhat.devtools.lsp4ij.server.definition.extension.ServerExtensionPointBean"
+                dynamic="true">
             <with attribute="factoryClass" implements="com.redhat.devtools.lsp4ij.LanguageServerFactory"/>
         </extensionPoint>
 
         <!-- Language server mappings extension point -->
         <extensionPoint
                 name="languageMapping"
-                beanClass="com.redhat.devtools.lsp4ij.server.definition.extension.LanguageMappingExtensionPointBean">
+                beanClass="com.redhat.devtools.lsp4ij.server.definition.extension.LanguageMappingExtensionPointBean"
+                dynamic="true">
             <with attribute="documentMatcher" implements="com.redhat.devtools.lsp4ij.DocumentMatcher"/>
         </extensionPoint>
         <extensionPoint
                 name="fileTypeMapping"
-                beanClass="com.redhat.devtools.lsp4ij.server.definition.extension.FileTypeMappingExtensionPointBean">
+                beanClass="com.redhat.devtools.lsp4ij.server.definition.extension.FileTypeMappingExtensionPointBean"
+                dynamic="true">
             <with attribute="documentMatcher" implements="com.redhat.devtools.lsp4ij.DocumentMatcher"/>
         </extensionPoint>
         <extensionPoint
                 name="fileNamePatternMapping"
-                beanClass="com.redhat.devtools.lsp4ij.server.definition.extension.FileNamePatternMappingExtensionPointBean">
+                beanClass="com.redhat.devtools.lsp4ij.server.definition.extension.FileNamePatternMappingExtensionPointBean"
+                dynamic="true">
             <with attribute="documentMatcher" implements="com.redhat.devtools.lsp4ij.DocumentMatcher"/>
         </extensionPoint>
 
         <!-- Semantic tokens colors provider extension point -->
         <extensionPoint
                 name="semanticTokensColorsProvider"
-                beanClass="com.redhat.devtools.lsp4ij.server.definition.extension.SemanticTokensColorsProviderExtensionPointBean">
+                beanClass="com.redhat.devtools.lsp4ij.server.definition.extension.SemanticTokensColorsProviderExtensionPointBean"
+                dynamic="true">
             <with attribute="class"
                   implements="com.redhat.devtools.lsp4ij.features.semanticTokens.SemanticTokensColorsProvider"/>
         </extensionPoint>
+
+        <!-- Workspace folder strategy extension point -->
+        <extensionPoint
+                name="workspaceFolderStrategy"
+                interface="com.redhat.devtools.lsp4ij.features.workspaceFolder.WorkspaceFolderStrategyProvider"
+                dynamic="true"/>
 
     </extensionPoints>
 
@@ -396,8 +471,6 @@
         <!-- LSP application services -->
         <applicationService
                 serviceImplementation="com.redhat.devtools.lsp4ij.client.indexing.ProjectIndexingDumbAndScanningStrategy"/>
-        <applicationService
-                serviceImplementation="com.redhat.devtools.lsp4ij.internal.telemetry.TelemetryManager"/>
         <applicationService
                 serviceImplementation="com.redhat.devtools.lsp4ij.LanguageServersRegistry"/>
         <applicationService
@@ -422,12 +495,10 @@
                 serviceImplementation="com.redhat.devtools.lsp4ij.usages.LSPUsagesManager"/>
         <projectService
                 serviceImplementation="com.redhat.devtools.lsp4ij.features.documentation.MarkdownConverter"/>
-
-        <!-- LSP textDocument/publishDiagnostics notification support -->
-        <externalAnnotator
-                id="LSPDiagnosticAnnotator"
-                language=""
-                implementationClass="com.redhat.devtools.lsp4ij.features.diagnostics.LSPDiagnosticAnnotator"/>
+        <projectService
+                serviceImplementation="com.redhat.devtools.lsp4ij.features.diagnostics.LSPDiagnosticsApplier"/>
+        <projectService
+                serviceImplementation="com.redhat.devtools.lsp4ij.features.documentLink.LSPDocumentLinkApplier"/>
         <localInspection id="LSPLocalInspectionTool"
                          language=""
                          enabledByDefault="true"
@@ -447,17 +518,26 @@
                 implementationClass="com.redhat.devtools.lsp4ij.features.completion.LSPCompletionContributor"
                 order="first, before wordCompletion"/>
 
+        <!-- LSP textDocument/inlineCompletion request support (LSP 3.18.0) -->
+        <inline.completion.provider
+                id="LSPInlineCompletionProvider"
+                implementation="com.redhat.devtools.lsp4ij.features.inlineCompletion.LSPInlineCompletionProvider"/>
+
         <!-- LSP textDocument/definition request support -->
         <gotoDeclarationHandler
                 id="LSPGotoDeclarationHandler"
                 implementation="com.redhat.devtools.lsp4ij.features.navigation.LSPGotoDeclarationHandler"
                 order="first"/>
 
-        <!-- LSP textDocument/documentLink request support -->
-        <externalAnnotator
-                id="LSPDocumentLinkAnnotator"
-                language=""
-                implementationClass="com.redhat.devtools.lsp4ij.features.documentLink.LSPDocumentLinkAnnotator"/>
+        <!-- LSP Diagnostics Pass (batch mode only, reactive via LSPDiagnosticsApplier in normal mode) -->
+        <highlightingPassFactory
+                id="LSPDiagnosticsPassFactory"
+                implementation="com.redhat.devtools.lsp4ij.features.diagnostics.LSPDiagnosticsPassFactory"/>
+
+        <!-- LSP Document Link Pass (with fallback to LSPDocumentLinkApplier when async) -->
+        <highlightingPassFactory
+                id="LSPDocumentLinkPassFactory"
+                implementation="com.redhat.devtools.lsp4ij.features.documentLink.LSPDocumentLinkPassFactory"/>
         <gotoDeclarationHandler
                 id="LSPDocumentLinkGotoDeclarationHandler"
                 implementation="com.redhat.devtools.lsp4ij.features.documentLink.LSPDocumentLinkGotoDeclarationHandler"/>
@@ -663,6 +743,11 @@
         <typeHierarchyProvider
                 language="textmate"
                 implementationClass="com.redhat.devtools.lsp4ij.features.typeHierarchy.LSPTypeHierarchyProvider"/>
+        <!-- Required for LSPPsiElement (Language.ANY), otherwise the JetBrains LSP client provider
+             (registered with language="") shadows the TEXT / textmate ones. -->
+        <typeHierarchyProvider
+                language=""
+                implementationClass="com.redhat.devtools.lsp4ij.features.typeHierarchy.LSPTypeHierarchyProvider"/>
 
         <!-- LSP textDocument/callHierarchy request support -->
         <callHierarchyProvider
@@ -670,6 +755,11 @@
                 implementationClass="com.redhat.devtools.lsp4ij.features.callHierarchy.LSPCallHierarchyProvider"/>
         <callHierarchyProvider
                 language="textmate"
+                implementationClass="com.redhat.devtools.lsp4ij.features.callHierarchy.LSPCallHierarchyProvider"/>
+        <!-- Required for LSPPsiElement (Language.ANY), otherwise the JetBrains LSP client provider
+             (registered with language="") shadows the TEXT / textmate ones. -->
+        <callHierarchyProvider
+                language=""
                 implementationClass="com.redhat.devtools.lsp4ij.features.callHierarchy.LSPCallHierarchyProvider"/>
 
         <!-- LSP Find Usages (LSP) support shows:
@@ -715,6 +805,16 @@
                 id="LSPRenameHandler"
                 implementation="com.redhat.devtools.lsp4ij.features.rename.LSPRenameHandler"
                 order="first"/>
+
+        <!-- LSP workspace/willRenameFiles for rename and move refactorings, sent before their write action -->
+        <renamePsiElementProcessor
+                implementation="com.redhat.devtools.lsp4ij.features.files.WillRenameFilesRenameProcessor"
+                order="last, after renamePsiFile"/>
+        <moveFileHandler
+                implementation="com.redhat.devtools.lsp4ij.features.files.WillRenameFilesMoveHandler"
+                order="last"/>
+        <refactoring.helper
+                implementation="com.redhat.devtools.lsp4ij.features.files.WillRenameFilesRefactoringHelper"/>
 
         <!-- Code Action support-->
         <intentionAction>
@@ -900,6 +1000,8 @@
                 class="com.redhat.devtools.lsp4ij.commands.editor.ShowReferencesAction"/>
         <action id="editor.action.triggerParameterHints"
                 class="com.redhat.devtools.lsp4ij.commands.editor.TriggerParameterHintsAction"/>
+        <action id="editor.action.goToLocations"
+                class="com.redhat.devtools.lsp4ij.commands.editor.GoToLocationsAction"/>
     </actions>
 
     <!-- LSP consoles -->
@@ -924,7 +1026,6 @@
                 factoryClass="com.redhat.devtools.lsp4ij.console.LSPConsoleToolWindowFactory"
                 canCloseContents="false"
                 icon="AllIcons.Webreferences.Server"/>
-
     </extensions>
 
     <!-- Semantic Tokens -->
@@ -999,6 +1100,9 @@
         <listener
                 topic="com.intellij.openapi.project.ProjectManagerListener"
                 class="com.redhat.devtools.lsp4ij.ConnectDocumentToLanguageServerSetupParticipant"/>
+        <listener
+                topic="com.intellij.openapi.fileEditor.FileDocumentManagerListener"
+                class="com.redhat.devtools.lsp4ij.LSPDocumentSaveListener"/>
         <listener topic="com.intellij.ide.AppLifecycleListener"
                   class="com.redhat.devtools.lsp4ij.client.indexing.ProjectIndexingAppLifecycleListener"/>
     </applicationListeners>
@@ -1008,16 +1112,26 @@
                   class="com.redhat.devtools.lsp4ij.features.completion.LSPCompletionContributor$LSPLookupManagerListener"/>
         <listener class="com.redhat.devtools.lsp4ij.client.indexing.ProjectIndexingOnlyDumbStrategy"
                   topic="com.intellij.openapi.project.DumbService$DumbModeListener"/>
+        <listener topic="com.intellij.refactoring.listeners.RefactoringEventListener"
+                  class="com.redhat.devtools.lsp4ij.features.files.WillRenameFilesPreparation$RefactoringListener"/>
     </projectListeners>
 
     <!-- DAP Support -->
+
+    <!-- DAP application listeners -->
+    <applicationListeners>
+        <listener
+                topic="com.intellij.openapi.project.ProjectManagerListener"
+                class="com.redhat.devtools.lsp4ij.dap.DAPProjectLifecycleListener"/>
+    </applicationListeners>
 
     <extensionPoints>
 
         <!-- Debug adapter server extension point -->
         <extensionPoint
                 name="debugAdapterServer"
-                beanClass="com.redhat.devtools.lsp4ij.dap.definitions.extension.DebugAdapterServerExtensionPointBean">
+                beanClass="com.redhat.devtools.lsp4ij.dap.definitions.extension.DebugAdapterServerExtensionPointBean"
+                dynamic="true">
             <with attribute="factoryClass"
                   implements="com.redhat.devtools.lsp4ij.dap.descriptors.DebugAdapterDescriptorFactory"/>
         </extensionPoint>
@@ -1095,6 +1209,12 @@
                 description="Show disassembly for this frame">
             <add-to-group group-id="DebuggingActionsGroup"/>
             <add-to-group group-id="XDebugger.Frames.Tree.Popup" anchor="last"/>
+        </action>
+        <action id="DAP.HexadecimalValues"
+                class="com.redhat.devtools.lsp4ij.dap.client.variables.DAPHexadecimalValuesAction"
+                text="Show Values as Hexadecimal"
+                description="Ask the DAP server for numbers in hexadecimal">
+            <add-to-group group-id="XDebugger.ValueGroup" anchor="last"/>
         </action>
     </actions>
 

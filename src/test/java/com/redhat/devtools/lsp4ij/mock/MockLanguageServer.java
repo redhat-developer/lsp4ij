@@ -48,11 +48,14 @@ public final class MockLanguageServer implements LanguageServer {
 	private final MockWorkspaceService workspaceService = new MockWorkspaceService(this::buildMaybeDelayedFuture);
 	private final InitializeResult initializeResult = new InitializeResult();
 	private volatile long delay = 0;
+	private volatile CompletableFuture<Void> initializeGate = CompletableFuture.completedFuture(null);
 	private volatile boolean started;
 
 	private final List<LanguageClient> remoteProxies = new ArrayList<>();
 
 	private final List<CompletableFuture<?>> inFlight = new CopyOnWriteArrayList<>();
+
+	private final List<String> notifications = new CopyOnWriteArrayList<>();
 
 	public static void reset() {
 		INSTANCE = new MockLanguageServer(MockLanguageServer::defaultServerCapabilities);
@@ -62,7 +65,7 @@ public final class MockLanguageServer implements LanguageServer {
 		INSTANCE = new MockLanguageServer(serverConfigurer);
 	}
 
-	private MockLanguageServer(final Supplier<ServerCapabilities> serverConfigurer) {
+	MockLanguageServer(final Supplier<ServerCapabilities> serverConfigurer) {
 		resetInitializeResult(serverConfigurer);
 	}
 
@@ -139,12 +142,42 @@ public final class MockLanguageServer implements LanguageServer {
 		capabilities.setTypeHierarchyProvider(new TypeHierarchyRegistrationOptions());
 		capabilities.setFoldingRangeProvider(new FoldingRangeProviderOptions());
 		capabilities.setDiagnosticProvider(new DiagnosticRegistrationOptions());
+		capabilities.setInlineCompletionProvider(true);
 		return capabilities;
 	}
 
 	@Override
 	public CompletableFuture<InitializeResult> initialize(InitializeParams params) {
-		return buildMaybeDelayedFuture(initializeResult);
+		notifications.add("initialize");
+		return initializeGate.thenCompose(ignored -> buildMaybeDelayedFuture(initializeResult));
+	}
+
+	@Override
+	public void initialized(InitializedParams params) {
+		notifications.add("initialized");
+	}
+
+	/**
+	 * @return the initialize request, the initialized notification, the workspace configuration and folder
+	 * notifications, the opened and changed documents and the hover requests this server received, in order
+	 */
+	public List<String> getNotifications() {
+		return notifications;
+	}
+
+	void record(String notification) {
+		notifications.add(notification);
+	}
+
+	/**
+	 * Holds the replies to initialize requests until the returned future is completed, which the caller must do.
+	 *
+	 * @return the future that releases the held and later initialize replies when completed.
+	 */
+	public CompletableFuture<Void> holdInitialize() {
+		CompletableFuture<Void> gate = new CompletableFuture<>();
+		initializeGate = gate;
+		return gate;
 	}
 
 	@Override
@@ -167,6 +200,10 @@ public final class MockLanguageServer implements LanguageServer {
 
 	public void setCompletionItem(CompletionItem completionItem) {
 		this.textDocumentService.setMockCompletionItem(completionItem);
+	}
+
+	public void setInlineCompletion(Either<List<InlineCompletionItem>, InlineCompletionList> inlineCompletion) {
+		this.textDocumentService.setMockInlineCompletion(inlineCompletion);
 	}
 
 	public void setSemanticTokens(SemanticTokens semanticTokens) {

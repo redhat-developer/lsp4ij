@@ -46,6 +46,7 @@ import org.eclipse.lsp4j.debug.InitializeRequestArgumentsPathFormat;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.Map;
@@ -105,11 +106,12 @@ public abstract class DebugAdapterDescriptor implements DebuggableFile {
     }
 
     protected @NotNull GeneralCommandLine createStartServerCommandLine(@Nullable String command) throws ExecutionException {
-        return createStartServerCommandLine(command, Collections.emptyMap(), false);
+        return createStartServerCommandLine(null, command, Collections.emptyMap(), false);
 
     }
 
-    protected @NotNull GeneralCommandLine createStartServerCommandLine(@Nullable String command,
+    protected @NotNull GeneralCommandLine createStartServerCommandLine(@Nullable String workingDirectory,
+                                                                       @Nullable String command,
                                                                        @NotNull Map<String, String> userEnvironmentVariables,
                                                                        boolean includeSystemEnvironmentVariables) throws ExecutionException {
         if (StringUtils.isBlank(command)) {
@@ -122,6 +124,12 @@ public abstract class DebugAdapterDescriptor implements DebuggableFile {
             command = command.replace($_PORT, String.valueOf(port));
         }
         GeneralCommandLine commandLine = createCommandLine(command, userEnvironmentVariables, includeSystemEnvironmentVariables);
+        if (StringUtils.isNotBlank(workingDirectory)) {
+            File workingDir = new File(workingDirectory);
+            if (workingDir.isDirectory()) {
+                commandLine = commandLine.withWorkingDirectory(workingDir.toPath());
+            }
+        }
         if (port != null) {
             commandLine.putUserData(DebugAdapterDescriptor.SERVER_PORT, port);
         }
@@ -169,11 +177,13 @@ public abstract class DebugAdapterDescriptor implements DebuggableFile {
         args.setAdapterID(adapterId);
         args.setPathFormat(InitializeRequestArgumentsPathFormat.PATH);
         args.setSupportsVariableType(true);
-        args.setSupportsVariablePaging(false);
+        // A large variable's indexed children are asked for a page at a time (DAPVariableChildren)
+        args.setSupportsVariablePaging(true);
         args.setLinesStartAt1(true);
         args.setColumnsStartAt1(true);
         args.setSupportsStartDebuggingRequest(true);
         args.setSupportsRunInTerminalRequest(true);
+        args.setSupportsInvalidatedEvent(true);
         return args;
     }
 

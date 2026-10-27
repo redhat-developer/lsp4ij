@@ -21,6 +21,7 @@ import com.intellij.notification.NotificationType;
 import com.intellij.notification.Notifications;
 import com.intellij.openapi.Disposable;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.util.Disposer;
 import com.intellij.ui.HyperlinkLabel;
 import com.intellij.ui.OnePixelSplitter;
 import com.intellij.util.ui.FormBuilder;
@@ -96,6 +97,7 @@ public class InstallerPanel implements Disposable {
             // Display on the right, console which shows traces of execution of installer
             TextConsoleBuilder consoleBuilder = TextConsoleBuilderFactory.getInstance().createBuilder(project);
             console = consoleBuilder.getConsole();
+            Disposer.register(this, console);
             OnePixelSplitter splitter = new OnePixelSplitter(false, 0.5f);
             splitter.setShowDividerControls(true);
             splitter.setHonorComponentsMinimumSize(true);
@@ -161,8 +163,6 @@ public class InstallerPanel implements Disposable {
 
     @Override
     public void dispose() {
-        if(console != null) {
-            console.dispose();
-        }
+        // Console is automatically disposed via Disposer.register
     }
 }

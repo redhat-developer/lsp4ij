@@ -49,7 +49,7 @@ repositories {
     }
 }
 
-val lsp: Configuration by configurations.creating
+val lsp = configurations.dependencyScope("lsp")
 
 // Dependencies are managed with Gradle version catalog - read more: https://docs.gradle.org/current/userguide/platforms.html#sub:version-catalog
 dependencies {
@@ -58,7 +58,9 @@ dependencies {
     intellijPlatform {
         // Disabling the installer dependency since IntelliJ 253 (2025.3.x) and potentially other
         // early access/snapshot versions may lack direct installer packages in the artifact repositories.
-        create(properties("platformType"), properties("platformVersion"), useInstaller = false)
+        create(properties("platformType"), properties("platformVersion")) {
+            useInstaller = false
+        }
 
         // Plugin Dependencies. Uses `platformBundledPlugins` property from the gradle.properties file for bundled IntelliJ Platform plugins.
         // starting from 2024.3, all json related code is know on its own plugin
@@ -117,7 +119,6 @@ dependencies {
 kotlin {
     jvmToolchain {
         languageVersion = JavaLanguageVersion.of(21)
-        vendor = JvmVendorSpec.JETBRAINS
     }
 }
 
@@ -127,10 +128,12 @@ tasks.withType<JavaCompile> {
     options.release.set(17)
 }
 
-// Set Kotlin JVM language level. While there's currently no Kotlin in this project, it is configured with the Kotlin plugin.
+// Set Kotlin JVM language level to match Java compatibility.
 tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile> {
     compilerOptions {
         jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
+        apiVersion.set(org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_1_9)
+        languageVersion.set(org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_1_9)
     }
 }
 
@@ -155,6 +158,9 @@ intellijPlatform {
             }
         }
 
+        // Change notes are maintained in plugin.xml, not rendered from CHANGELOG.md by the Changelog plugin
+        changeNotes = provider { null }
+
         ideaVersion {
             sinceBuild = properties("pluginSinceBuild")
             untilBuild = provider { null }
@@ -173,14 +179,14 @@ intellijPlatform {
     }
 
     pluginVerification {
-        failureLevel = listOf(INVALID_PLUGIN, COMPATIBILITY_PROBLEMS, MISSING_DEPENDENCIES)
+        // MISSING_DEPENDENCIES also fails for unavailable optional="true" dependencies; see https://youtrack.jetbrains.com/issue/MP-2974.
+        failureLevel = listOf(INVALID_PLUGIN, COMPATIBILITY_PROBLEMS)
         verificationReportsFormats = listOf(MARKDOWN, PLAIN)
         ides {
             select {
                 types = listOf(IntelliJPlatformType.IntellijIdea)
                 channels = listOf(ProductRelease.Channel.RELEASE) // Only stable releases
                 sinceBuild = "242" // From your minimum supported version
-                untilBuild = "261.*" // Up to current major version
             }
         }
     }
@@ -230,7 +236,6 @@ tasks.withType<Test> {
     environment("GRADLE_RELEASE_REPOSITORY","https://services.gradle.org/distributions")
     systemProperty("idea.log.leaked.projects.in.tests", "false")
     systemProperty( "idea.maven.test.mirror", "https://repo1.maven.org/maven2")
-    systemProperty( "com.redhat.devtools.intellij.telemetry.mode", "disabled")
 }
 
 // Configure Gradle Kover Plugin - read more: https://github.com/Kotlin/kotlinx-kover#configuration
@@ -262,8 +267,12 @@ tasks {
             jvmArgs("-XX:+AllowEnhancedClassRedefinition", "-XX:HotswapAgent=fatjar")
         }
 
-        //Use "debug" to send telemetry to dev source at segment.com
-        systemProperties["com.redhat.devtools.intellij.telemetry.mode"] = "debug" // "disabled"
+    }
+
+    publishPlugin {
+        // The IntelliJ Platform Gradle Plugin makes publishing run patchChangelog, which creates an empty CHANGELOG.md;
+        // change notes are maintained in plugin.xml
+        setDependsOn(dependsOn - "patchChangelog")
     }
 
     jacocoTestReport {

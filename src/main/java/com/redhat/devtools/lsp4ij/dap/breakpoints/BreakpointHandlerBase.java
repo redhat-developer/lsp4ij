@@ -20,14 +20,20 @@ import com.intellij.xdebugger.breakpoints.XBreakpoint;
 import com.intellij.xdebugger.breakpoints.XBreakpointHandler;
 import com.intellij.xdebugger.breakpoints.XBreakpointType;
 import com.intellij.xdebugger.breakpoints.XLineBreakpoint;
+import com.redhat.devtools.lsp4ij.dap.DAPBundle;
 import com.redhat.devtools.lsp4ij.dap.descriptors.DebugAdapterDescriptor;
 import org.eclipse.lsp4j.debug.Breakpoint;
 import org.eclipse.lsp4j.debug.Capabilities;
 import org.eclipse.lsp4j.debug.services.IDebugProtocolServer;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
+import java.util.Collections;
+import java.util.IdentityHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
 /**
@@ -37,6 +43,8 @@ import java.util.concurrent.CompletableFuture;
  */
 public abstract class BreakpointHandlerBase<B extends XBreakpoint<?>> extends XBreakpointHandler<B> implements Disposable {
 
+    private static final Logger LOGGER = LoggerFactory.getLogger(BreakpointHandlerBase.class);
+
     protected static final CompletableFuture<?>[] EMPTY_COMPLETABLE_FUTURES = new CompletableFuture[0];
     protected static final @NotNull Key<Integer> DAP_BREAKPOINT_ID = Key.create("dap.breakpoint.id");
 
@@ -45,6 +53,7 @@ public abstract class BreakpointHandlerBase<B extends XBreakpoint<?>> extends XB
     protected final @NotNull Project project;
     protected final List<IDebugProtocolServer> debugProtocolServers = ContainerUtil.createConcurrentList();
     protected final List<B> breakpoints = ContainerUtil.createConcurrentList();
+    private final Map<IDebugProtocolServer, Capabilities> capabilities = Collections.synchronizedMap(new IdentityHashMap<>());
 
     public BreakpointHandlerBase(@NotNull Class<? extends XBreakpointType<B, ?>> breakpointTypeClass,
                                  @NotNull XDebugSession debugSession,
@@ -59,13 +68,42 @@ public abstract class BreakpointHandlerBase<B extends XBreakpoint<?>> extends XB
     public CompletableFuture<@Nullable Void> initialize(@NotNull IDebugProtocolServer debugProtocolServer,
                                                         @NotNull Capabilities capabilities) {
         this.debugProtocolServers.add(debugProtocolServer);
+        this.capabilities.put(debugProtocolServer, capabilities);
         return sendBreakpoints(debugProtocolServer, null);
+    }
+
+    /**
+     * Returns the capabilities of the given initialized DAP server, and empty capabilities otherwise.
+     *
+     * @param debugProtocolServer the DAP server.
+     * @return the capabilities of the given initialized DAP server, and empty capabilities otherwise.
+     */
+    protected @NotNull Capabilities getCapabilities(@NotNull IDebugProtocolServer debugProtocolServer) {
+        var serverCapabilities = capabilities.get(debugProtocolServer);
+        return serverCapabilities != null ? serverCapabilities : new Capabilities();
     }
 
     @Override
     public void registerBreakpoint(@NotNull B breakpoint) {
-        if (!(breakpoint.isEnabled() &&
-                supportsBreakpoint(breakpoint))) {
+        if (!breakpoint.isEnabled()) {
+            return;
+        }
+
+        if (!supportsBreakpoint(breakpoint)) {
+            // Log why the breakpoint is not supported to help diagnose issues like #1433
+            var sourcePosition = breakpoint.getSourcePosition();
+            LOGGER.warn("Breakpoint not supported - enabled={}, sourcePosition={}, type={}",
+                       breakpoint.isEnabled(),
+                       sourcePosition,
+                       breakpoint.getType().getClass().getSimpleName());
+
+            // Mark the breakpoint as invalid so the user sees visual feedback
+            if (breakpoint instanceof XLineBreakpoint<?> lineBreakpoint) {
+                String message = sourcePosition == null
+                    ? DAPBundle.message("dap.breakpoints.location.not.available")
+                    : DAPBundle.message("dap.breakpoints.file.not.debuggable");
+                debugSession.setBreakpointInvalid(lineBreakpoint, message);
+            }
             return;
         }
 
@@ -81,19 +119,27 @@ public abstract class BreakpointHandlerBase<B extends XBreakpoint<?>> extends XB
             return;
         }
         breakpoints.remove(breakpoint);
-        sendBreakpoints(null,
-                breakpoints.isEmpty() ? new TemporaryBreakpoint(sourcePosition, false) : null);
+        // DAP replaces breakpoints per source, not per session. Include the removed
+        // source even when other files still have breakpoints, so its last breakpoint
+        // is cleared by an empty setBreakpoints request.
+        sendBreakpoints(null, new TemporaryBreakpoint(sourcePosition, false));
     }
 
     @Override
     public void dispose() {
         debugProtocolServers.clear();
+        capabilities.clear();
     }
 
     protected CompletableFuture<@Nullable Void> sendBreakpoints(@Nullable IDebugProtocolServer debugProtocolServer,
                                                                 @Nullable TemporaryBreakpoint temporaryBreakpoint) {
-        if (debugProtocolServers.isEmpty() || (breakpoints.isEmpty() && temporaryBreakpoint == null)) {
-            // DAP servers are not started or there are no breakpoints to send
+        if (breakpoints.isEmpty() && temporaryBreakpoint == null) {
+            // No breakpoints to send
+            return CompletableFuture.completedFuture(null);
+        }
+        if (debugProtocolServers.isEmpty()) {
+            // DAP server not yet initialized - breakpoints are stored and will be sent
+            // when initialize() is called (which calls sendBreakpoints with the server)
             return CompletableFuture.completedFuture(null);
         }
         return doSendBreakpoints(debugProtocolServer, temporaryBreakpoint);
@@ -129,7 +175,7 @@ public abstract class BreakpointHandlerBase<B extends XBreakpoint<?>> extends XB
      * @return the IntelliJ breakpoint from the DAP breakpoint id and null otherwise.
      */
     @Nullable
-    private B findBreakpointById(@Nullable Integer id) {
+    public B findBreakpointById(@Nullable Integer id) {
         if (id == null) {
             return null;
         }

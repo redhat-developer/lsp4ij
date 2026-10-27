@@ -41,10 +41,9 @@ import org.slf4j.LoggerFactory;
 import java.util.*;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
 
 import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.isDoneNormally;
-import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.waitUntilDone;
+import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.awaitWithCheckCanceled;
 
 /**
  * LSP completion contributor.
@@ -75,20 +74,14 @@ public class LSPCompletionContributor extends CompletionContributor {
                 offset,
                 autoPopup ? getCompletionChar(offset, document) : null,
                 autoPopup);
-        CompletableFuture<List<CompletionData>> future = LSPFileSupport.getSupport(psiFile)
-                .getCompletionSupport()
-                .getCompletions(params);
+        var completionSupport = LSPFileSupport.getSupport(psiFile)
+                .getCompletionSupport();
+        CompletableFuture<List<CompletionData>> future = completionSupport.getCompletions(params);
         try {
-            // Wait until the future is finished and stop the wait if there are some ProcessCanceledException.
-            waitUntilDone(future, psiFile);
-        } catch (
-                ProcessCanceledException ignore) {//Since 2024.2 ProcessCanceledException extends CancellationException so we can't use multicatch to keep backward compatibility
-            //TODO delete block when minimum required version is 2024.2
-            return;
-        } catch (CancellationException ignore) {
-            return;
-        } catch (ExecutionException e) {
-            LOGGER.error("Error while consuming LSP 'textDocument/completion' request", e);
+            awaitWithCheckCanceled(future);
+        } catch (ProcessCanceledException e) {
+            throw e;
+        } catch (CancellationException e) {
             return;
         }
 

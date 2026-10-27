@@ -30,19 +30,21 @@ You need to adjust this command to point to the location of the extracted Rust A
 
    ![Rust Analyzer template configuration](../images/user-defined-ls/rust-analyzer/RustAnalyzerTemplateConfiguration.png)
 
-6. **Click OK** to apply the changes. You should now have Rust language support enabled in your IDE, with the [Rust language server](https://pkg.Rust.dev/Rustlang.org/x/tools/Rustpls) integrated,
+6. **Click OK** to apply the changes. You should now have Rust language support enabled in your IDE, with the [Rust language server](https://rust-analyzer.github.io/) integrated,
    and you should see the language server in the [LSP console](../UserGuide.md#lsp-console):
 
    ![Rust Analyzer in LSP Console](../images/user-defined-ls/rust-analyzer/RustAnalyzerInLSPConsole.png)
  
 ## Syntax coloration
 
-Today LSP4IJ doesn't support `textDocument/semanticTokens` ([please vote at issue 238](https://github.com/redhat-developer/lsp4ij/issues/238)), the demo
-uses the [Rust TextMate grammar](https://github.com/microsoft/vscode/blob/main/extensions/rust/syntaxes/rust.tmLanguage.json)
-that you can configure in IntelliJ via the `Editor / TextMate Bundles` settings.
+LSP4IJ supports [`textDocument/semanticTokens`](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_semanticTokens).
+See [Semantic Tokens support](../UserGuide.md#semantic-tokens-support) for color settings and the Semantic Tokens Inspector.
+
+You can also add the [Rust TextMate grammar](https://github.com/microsoft/vscode/blob/main/extensions/rust/syntaxes/rust.tmLanguage.json)
+in IntelliJ via the `Editor / TextMate Bundles` settings:
 
 ![Rust TextMate Bundles](../images/user-defined-ls/rust-analyzer/RustTextMate.png)
 
-You need to clone https://github.com/microsoft/vscode and reference this folder
+Clone https://github.com/microsoft/vscode and reference this folder
 (which contains the [package.json](https://github.com/microsoft/vscode/tree/main/extensions/rust))
-to benefit from syntax coloration and language configuration (matching brackets, etc).
+for extra syntax coloration and language configuration (matching brackets, etc).

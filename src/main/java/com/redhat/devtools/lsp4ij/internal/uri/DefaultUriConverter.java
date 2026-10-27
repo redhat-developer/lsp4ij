@@ -50,6 +50,42 @@ class DefaultUriConverter implements UriConverter {
     }
 
     /**
+     * Converts an IntelliJ {@link VirtualFile} to an LSP-compliant {@link URI}.
+     *
+     * <p>
+     * Overrides the default implementation to avoid converting to {@link File}
+     * and calling {@link File#toURI()}, which triggers a blocking native
+     * filesystem call ({@code File.isDirectory()} → {@code GetFileAttributesEx0}
+     * on Windows) that can freeze the EDT for seconds.
+     * </p>
+     *
+     * <p>
+     * Instead, this uses {@link VirtualFile#getPath()} and
+     * {@link VirtualFile#isDirectory()}, both of which are in-memory operations.
+     * </p>
+     *
+     * @param file the IntelliJ virtual file
+     * @return the corresponding {@link URI}
+     * @see <a href="https://github.com/redhat-developer/lsp4ij/issues/1604">Issue #1604</a>
+     */
+    @Override
+    public @Nullable URI toUri(@NotNull VirtualFile file) {
+        try {
+            // VirtualFile.getPath() uses forward slashes on all platforms
+            String path = file.getPath();
+            if (!path.startsWith("/")) {
+                path = "/" + path;
+            }
+            if (file.isDirectory() && !path.endsWith("/")) {
+                path += "/";
+            }
+            return new URI("file", "", path, null);
+        } catch (URISyntaxException e) {
+            return toUri(VfsUtilCore.virtualToIoFile(file));
+        }
+    }
+
+    /**
      * Converts a Java {@link File} to an LSP-compliant {@link URI}.
      *
      * <p>
@@ -58,25 +94,25 @@ class DefaultUriConverter implements UriConverter {
      * </p>
      *
      * <p>
-     * This implementation explicitly builds the URI to avoid
-     * platform-specific issues, especially on Windows.
+     * This implementation builds the URI path from the file's absolute path
+     * string directly, avoiding {@link File#toURI()} which calls
+     * {@link File#isDirectory()} internally — a blocking native filesystem
+     * call that can freeze the EDT.
      * </p>
      *
      * @param file the Java file
      * @return the corresponding {@link URI}
+     * @see <a href="https://github.com/redhat-developer/lsp4ij/issues/1604">Issue #1604</a>
      */
     @Override
     public @Nullable URI toUri(@NotNull File file) {
         try {
-            // LSP-compliant file URI: file:///absolute/path
-            return new URI(
-                    "file",
-                    "", // no authority
-                    file.getAbsoluteFile().toURI().getPath(),
-                    null
-            );
+            String path = file.getAbsolutePath().replace('\\', '/');
+            if (!path.startsWith("/")) {
+                path = "/" + path;
+            }
+            return new URI("file", "", path, null);
         } catch (URISyntaxException e) {
-            // Fallback to the standard Java URI representation
             return file.getAbsoluteFile().toURI();
         }
     }

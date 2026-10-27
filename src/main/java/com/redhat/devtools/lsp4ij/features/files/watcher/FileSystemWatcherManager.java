@@ -10,6 +10,7 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.features.files.watcher;
 
+import com.intellij.openapi.Disposable;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.project.ProjectUtil;
 import com.redhat.devtools.lsp4ij.features.files.PathPatternMatcher;
@@ -30,10 +31,26 @@ import java.util.stream.Collectors;
 
 /**
  * LSP file system manager which matches a given URI by using LSP {@link FileSystemWatcher}.
+ * <p>
+ * The watchers with an explicit root outside the project also have that root watched and refreshed, since the VFS
+ * reports changes there only for the directories it has loaded, and refreshes them only when it synchronizes.
  */
-public class FileSystemWatcherManager {
+public class FileSystemWatcherManager implements Disposable {
 
     private static final int WatchKindAny = 7;
+
+    /**
+     * JAR/ZIP entry separator used in paths like "/path/to/lib.jar!/com/example/Class.class"
+     */
+    private static final String JAR_SEPARATOR = "!/";
+
+    /**
+     * Archive URI schemes that should be skipped to avoid ZipFileSystemProvider
+     * triggering toRealPath() which causes EDT freezes on Windows.
+     */
+    private static final Set<String> ARCHIVE_SCHEMES = Set.of(
+            "jar", "zip", "war", "ear"
+    );
 
     /**
      * Archive file extensions that should be skipped to avoid ZipFileSystemProvider
@@ -81,17 +98,24 @@ public class FileSystemWatcherManager {
 
     private final Map<String, List<FileSystemWatcher>> registry;
     private final @Nullable Path basePath;
+    private final @Nullable FileSystemWatchRoots externalRoots;
+    private boolean disposed;
 
     private Set<FileSystemWatcher> fileSystemWatchers;
 
     private Map<Integer, List<PathPatternMatcher>> pathPatternMatchers;
 
     public FileSystemWatcherManager(@NotNull Project project) {
-        this(getProjectBasePath(project));
+        this(getProjectBasePath(project), new FileSystemWatchRoots());
     }
 
     public FileSystemWatcherManager(@Nullable Path basePath) {
+        this(basePath, null);
+    }
+
+    FileSystemWatcherManager(@Nullable Path basePath, @Nullable FileSystemWatchRoots externalRoots) {
         this.basePath = basePath;
+        this.externalRoots = externalRoots;
         this.registry = new HashMap<>();
     }
 
@@ -194,7 +218,10 @@ public class FileSystemWatcherManager {
             return;
         }
         synchronized (registry) {
-            registry.put(id, watchers);
+            if (disposed) {
+                return;
+            }
+            registry.put(id, List.copyOf(watchers));
             reset();
         }
     }
@@ -211,13 +238,88 @@ public class FileSystemWatcherManager {
         }
     }
 
+    /**
+     * Unregister all the file system watchers, as when the language server that registered them stops.
+     */
+    public void clear() {
+        synchronized (registry) {
+            registry.clear();
+            reset();
+        }
+    }
+
+    /**
+     * Unregister all the file system watchers, and release the watched roots outside the project. Later
+     * registrations are ignored.
+     */
+    @Override
+    public void dispose() {
+        synchronized (registry) {
+            disposed = true;
+            clear();
+        }
+        if (externalRoots != null) {
+            externalRoots.dispose();
+        }
+    }
+
     private void reset() {
         this.fileSystemWatchers = registry
                 .values()
                 .stream()
                 .flatMap(List::stream)
-                .collect(Collectors.toSet());
+                .collect(Collectors.toUnmodifiableSet());
         pathPatternMatchers = null;
+        if (externalRoots != null) {
+            externalRoots.replace(externalRoots(fileSystemWatchers, basePath));
+        }
+    }
+
+    /**
+     * Returns the roots outside the project that the given watchers name explicitly: the base of a relative pattern,
+     * or the fixed prefix of an absolute glob. A pure glob such as {@code **}{@code /*.java}, which the project's VFS
+     * events already cover, names none, and neither does a root inside the project or a file system root.
+     */
+    static @NotNull Set<FileSystemWatchRoots.Root> externalRoots(@NotNull Collection<FileSystemWatcher> watchers,
+                                                                @Nullable Path projectPath) {
+        Set<FileSystemWatchRoots.Root> roots = new HashSet<>();
+        for (var watcher : watchers) {
+            var glob = watcher.getGlobPattern();
+            if (glob == null) {
+                continue;
+            }
+            String pattern = glob.isLeft() ? glob.getLeft() : glob.getRight().getPattern();
+            Path relativeBase = glob.isRight() ? getRelativeBasePath(glob.getRight().getBaseUri()) : projectPath;
+            if (StringUtils.isBlank(pattern) || glob.isRight() && relativeBase == null) {
+                continue;
+            }
+            try {
+                int firstGlob = findFirstGlobCharacter(pattern);
+                Path fixed = extractBasePath(pattern);
+                if (fixed == null && glob.isLeft()) {
+                    continue;
+                }
+                Path path = fixed == null ? relativeBase
+                        : fixed.isAbsolute() ? fixed : relativeBase != null ? relativeBase.resolve(fixed) : fixed;
+                if (firstGlob == -1 && path != null) {
+                    // A literal path names a file, whose directory is watched
+                    path = path.getParent();
+                }
+                if (path == null || !path.isAbsolute()) {
+                    continue;
+                }
+                path = path.normalize();
+                if (path.getParent() == null || projectPath != null && path.startsWith(projectPath)) {
+                    continue;
+                }
+                String suffix = firstGlob == -1 ? "" : pattern.substring(firstGlob);
+                boolean recursive = suffix.contains("**") || suffix.indexOf('/') >= 0 || suffix.indexOf('\\') >= 0;
+                roots.add(new FileSystemWatchRoots.Root(path, recursive));
+            } catch (IllegalArgumentException e) {
+                // An invalid path matches nothing either
+            }
+        }
+        return Set.copyOf(roots);
     }
 
     /**
@@ -256,11 +358,24 @@ public class FileSystemWatcherManager {
      * which calls toRealPath() -> FindFirstFile0 on Windows, causing EDT freezes.
      */
     private static boolean isArchiveFile(@NotNull URI uri) {
+        // First check: URI scheme (jar:, zip:, etc.)
+        String scheme = uri.getScheme();
+        if (scheme != null && ARCHIVE_SCHEMES.contains(scheme.toLowerCase())) {
+            return true;
+        }
+
+        // Second check: path contains JAR entry separator
         String path = uri.getPath();
         if (path == null) {
             return false;
         }
 
+        // Paths containing JAR_SEPARATOR are JAR/ZIP entry paths (e.g., /path/to/lib.jar!/com/example/Class.class)
+        if (path.contains(JAR_SEPARATOR)) {
+            return true;
+        }
+
+        // Third check: file extension
         // Extract the extension (including the dot)
         int lastDot = path.lastIndexOf('.');
         if (lastDot == -1 || lastDot == path.length() - 1) {

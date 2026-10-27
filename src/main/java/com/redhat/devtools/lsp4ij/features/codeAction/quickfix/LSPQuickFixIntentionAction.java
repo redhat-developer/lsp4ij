@@ -11,12 +11,15 @@
 package com.redhat.devtools.lsp4ij.features.codeAction.quickfix;
 
 import com.redhat.devtools.lsp4ij.features.codeAction.LSPLazyCodeActionIntentionAction;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * LSP quick fix.
  */
 public class LSPQuickFixIntentionAction extends LSPLazyCodeActionIntentionAction {
-    public LSPQuickFixIntentionAction(LSPLazyCodeActions lazyCodeActions, int index) {
+
+    public LSPQuickFixIntentionAction(@NotNull LSPLazyCodeActions lazyCodeActions,
+                                      int index) {
         super(index);
         super.setLazyCodeActions(lazyCodeActions);
     }

@@ -35,11 +35,12 @@ public class UserDefinedStreamConnectionProvider extends OSProcessStreamConnecti
     private final @NotNull Project project;
 
     public UserDefinedStreamConnectionProvider(@NotNull String commandLine,
+                                               @Nullable String workingDir,
                                                @NotNull Map<String, String> userEnvironmentVariables,
                                                boolean includeSystemEnvironmentVariables,
                                                @NotNull UserDefinedLanguageServerDefinition serverDefinition,
                                                @NotNull Project project) {
-        super(createCommandLine(commandLine, userEnvironmentVariables, includeSystemEnvironmentVariables));
+        super(createCommandLine(commandLine, workingDir, userEnvironmentVariables, includeSystemEnvironmentVariables));
         this.project = project;
         this.serverDefinition = serverDefinition;
     }

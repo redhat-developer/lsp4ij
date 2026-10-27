@@ -43,6 +43,21 @@ public class LSPIJUtils_toUriTest extends BasePlatformTestCase {
         }
     }
 
+    public void testToUriWithDirectory() {
+        // Verify that toUri for a directory VirtualFile produces a trailing slash,
+        // which is required for correct URI concatenation in LSP messages.
+        var baseDir = myFixture.getTempDirFixture().getFile("");
+        assertNotNull(baseDir);
+        assertTrue(baseDir.isDirectory());
+        URI dirUri = LSPIJUtils.toUri(baseDir);
+        assertTrue("Directory URI should end with /: " + dirUri, dirUri.getPath().endsWith("/"));
+
+        // Verify that a file URI does NOT have trailing slash
+        var file = myFixture.configureByText("test.txt", "hello");
+        URI fileUri = LSPIJUtils.toUri(file.getVirtualFile());
+        assertFalse("File URI should not end with /: " + fileUri, fileUri.getPath().endsWith("/"));
+    }
+
     public void testToUriWithUncPaths() {
         if (SystemInfo.isWindows) {
             // WSL UNC path with $ character

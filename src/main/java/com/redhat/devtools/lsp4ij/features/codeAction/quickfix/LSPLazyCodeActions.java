@@ -16,6 +16,7 @@ package com.redhat.devtools.lsp4ij.features.codeAction.quickfix;
 import com.intellij.codeInsight.intention.IntentionAction;
 import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.vfs.VirtualFile;
+import com.redhat.devtools.lsp4ij.LSPRequestConstants;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import com.redhat.devtools.lsp4ij.client.features.FileUriSupport;
 import com.redhat.devtools.lsp4ij.features.codeAction.CodeActionData;
@@ -27,16 +28,18 @@ import org.eclipse.lsp4j.*;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.jetbrains.annotations.TestOnly;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
 
 import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.isDoneNormally;
-import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.waitUntilDone;
+import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.awaitWithCheckCanceled;
 
 /**
  * This class returns 20 IJ {@link LSPLazyCodeActionIntentionAction} which does nothing. It loads the LSP code actions
@@ -46,12 +49,16 @@ import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.waitUntilDo
  */
 public class LSPLazyCodeActions implements LSPLazyCodeActionProvider {
 
+    private static final Logger LOGGER = LoggerFactory.getLogger(LSPLazyCodeActions.class);
+
     private static final int NB_LAZY_CODE_ACTIONS = 20;
 
     // The diagnostic
     private final List<Diagnostic> diagnostics;
 
-    // The virtual file
+    // The virtual file. Kept as is rather than resolved to a PsiFile: diagnostics are published on the LSP
+    // message thread, where a read action would wait for any pending write action, and a write action on the
+    // EDT may itself be waiting for a response queued behind that very message.
     private final VirtualFile file;
 
     // The language server which has reported the diagnostic
@@ -61,7 +68,8 @@ public class LSPLazyCodeActions implements LSPLazyCodeActionProvider {
     private final List<IntentionAction> codeActions;
 
     // LSP code actions request used to load code action for the diagnostic.
-    private CompletableFuture<List<CodeActionData>> lspCodeActionRequest = null;
+    private volatile CompletableFuture<List<CodeActionData>> lspCodeActionRequest = null;
+    private CancellationSupport cancellationSupport;
 
     public LSPLazyCodeActions(@NotNull List<Diagnostic> diagnostics,
                               @NotNull VirtualFile file,
@@ -95,25 +103,37 @@ public class LSPLazyCodeActions implements LSPLazyCodeActionProvider {
         return null;
     }
 
-    private List<CodeActionData> getOrLoadCodeActions() {
-        if (lspCodeActionRequest == null) {
-            // Create LSP textDocument/codeAction request
-            lspCodeActionRequest = loadCodeActionsFor(diagnostics);
-        }
-        // Get the response of the LSP textDocument/codeAction request.
-        List<CodeActionData> codeActions = null;
-        try {
-            waitUntilDone(lspCodeActionRequest);
-            if (isDoneNormally(lspCodeActionRequest)) {
-                codeActions = lspCodeActionRequest.getNow(null);
+    private @Nullable List<CodeActionData> getOrLoadCodeActions() {
+        CompletableFuture<List<CodeActionData>> future;
+        synchronized (this) {
+            future = lspCodeActionRequest;
+            if (future == null) {
+                // Create LSP textDocument/codeAction request. Highlighting passes run in parallel: without the lock,
+                // a second load cancels the first request before it is sent, and the stored request can be that
+                // cancelled one. cancel() clears a retired request; other failures are kept, so that availability
+                // checks do not each send a request to a failing server.
+                future = loadCodeActionsFor(diagnostics);
+                lspCodeActionRequest = future;
             }
-        } catch (ProcessCanceledException | ExecutionException e) {
-            // ProcessCanceledException occurs when user move the mouse, in this case the hover popup is closed
-            // but the lspCodeActionRequest is not cancelled here if user hover again the error.
-        } catch (CancellationException e) {
-            // Occur when code action is loading and a cancel has occurred, ignore the error.
         }
-        return codeActions;
+        // Wait for the LSP response, cooperating with IntelliJ's threading model.
+        // See https://github.com/redhat-developer/lsp4ij/issues/1648
+        try {
+            awaitWithCheckCanceled(future);
+        } catch (ProcessCanceledException e) {
+            throw e;
+        } catch (CancellationException e) {
+            return null;
+        }
+        if (future != lspCodeActionRequest) {
+            // cancel() retired this request while it was pending. A cancelled request completes without code
+            // actions, which says nothing about the available code actions, so report them as not loaded yet.
+            return null;
+        }
+        if (isDoneNormally(future)) {
+            return future.getNow(null);
+        }
+        return null;
     }
 
     /**
@@ -123,20 +143,25 @@ public class LSPLazyCodeActions implements LSPLazyCodeActionProvider {
      * @return list of Intellij {@link IntentionAction} which are used to create Intellij QuickFix.
      */
     private CompletableFuture<List<CodeActionData>> loadCodeActionsFor(@NotNull List<Diagnostic> diagnostics) {
-        return CompletableFutures
-                .computeAsyncCompose(cancelChecker -> languageServer
+        if (cancellationSupport != null) {
+            cancellationSupport.cancel();
+        }
+        // Each request keeps its own cancellation: the field can hold a newer one by the time the server is ready.
+        CancellationSupport requestCancellation = new CancellationSupport();
+        cancellationSupport = requestCancellation;
+        return languageServer
                         .getInitializedServer()
                         .thenCompose(ls -> {
-                            // Language server is initialized here
-                            cancelChecker.checkCanceled();
+                            if (requestCancellation.isCanceled()) {
+                                // cancel() retired this request while the server initialized: don't send it.
+                                return CompletableFuture.completedFuture(Collections.<CodeActionData>emptyList());
+                            }
 
                             // Collect code action for the given file by using the language server
                             CodeActionParams params = createCodeActionParams(diagnostics, file, languageServer.getClientFeatures());
-                            return ls.getTextDocumentService()
-                                    .codeAction(params)
+                            return requestCancellation.execute(ls.getTextDocumentService()
+                                    .codeAction(params), languageServer, LSPRequestConstants.TEXT_DOCUMENT_CODE_ACTION)
                                     .thenApply(codeActions -> {
-                                        // Code action are collected here
-                                        cancelChecker.checkCanceled();
                                         if (codeActions == null || codeActions.isEmpty()) {
                                             return Collections.emptyList();
                                         }
@@ -147,14 +172,14 @@ public class LSPLazyCodeActions implements LSPLazyCodeActionProvider {
                                                         CodeAction codeAction = ca.getRight();
                                                         return codeAction.getKind() == null ||
                                                                 codeAction.getKind().isEmpty() ||
-                                                                CodeActionKind.QuickFix.equals(codeAction.getKind());
+                                                                codeAction.getKind().startsWith(CodeActionKind.QuickFix);
                                                     }
                                                     return true;
                                                 })
                                                 .map(ca -> new CodeActionData(ca, languageServer))
                                                 .toList();
                                     });
-                        }));
+                        });
     }
 
     /**
@@ -194,7 +219,20 @@ public class LSPLazyCodeActions implements LSPLazyCodeActionProvider {
     /**
      * Cancel if needed the LSP request textDocument/codeAction
      */
-    public void cancel() {
-        CancellationSupport.cancel(lspCodeActionRequest);
+    public synchronized void cancel() {
+        if (cancellationSupport != null) {
+            cancellationSupport.cancel();
+        }
+        // The editor can keep the quick fixes that use these code actions, for example when the same diagnostics
+        // are published again, so the next use must send a new request.
+        lspCodeActionRequest = null;
+    }
+
+    /**
+     * Returns true if a textDocument/codeAction request has been created and not cancelled since.
+     */
+    @TestOnly
+    synchronized boolean hasRequest() {
+        return lspCodeActionRequest != null;
     }
 }

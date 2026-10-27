@@ -1,0 +1,62 @@
+{
+  "id": "perl-lsp-installer",
+  "name": "perl-lsp",
+  "executeOnStartServer": false,
+  "check": {
+    "exec": {
+      "name": "Trying current command",
+      "command": "${server.command}",
+      "timeout": 2000
+    }
+  },
+  "run": {
+    "download": {
+      "name": "Download perl-lsp",
+      "github": {
+        "owner": "EffortlessMetrics",
+        "repository": "perl-lsp",
+        "prerelease": false,
+        "asset": {
+          "windows": "perllsp-*-x86_64-pc-windows-msvc.zip",
+          "unix": {
+            "x86_64": "perllsp-*-x86_64-unknown-linux-gnu.tar.gz",
+            "arm64": "perllsp-*-aarch64-unknown-linux-gnu.tar.gz"
+          },
+          "mac": {
+            "x86_64": "perllsp-*-x86_64-apple-darwin.tar.gz",
+            "arm64": "perllsp-*-aarch64-apple-darwin.tar.gz"
+          }
+        }
+      },
+      "url": {
+        "windows": "https://github.com/EffortlessMetrics/perl-lsp/releases/download/v0.15.0/perllsp-0.15.0-x86_64-pc-windows-msvc.zip",
+        "unix": {
+          "x86_64": "https://github.com/EffortlessMetrics/perl-lsp/releases/download/v0.15.0/perllsp-0.15.0-x86_64-unknown-linux-gnu.tar.gz",
+          "arm64": "https://github.com/EffortlessMetrics/perl-lsp/releases/download/v0.15.0/perllsp-0.15.0-aarch64-unknown-linux-gnu.tar.gz"
+        },
+        "mac": {
+          "x86_64": "https://github.com/EffortlessMetrics/perl-lsp/releases/download/v0.15.0/perllsp-0.15.0-x86_64-apple-darwin.tar.gz",
+          "arm64": "https://github.com/EffortlessMetrics/perl-lsp/releases/download/v0.15.0/perllsp-0.15.0-aarch64-apple-darwin.tar.gz"
+        }
+      },
+      "output": {
+        "dir": "$USER_HOME$/.lsp4ij/lsp/perl-lsp",
+        "file": {
+          "name": {
+            "windows": "perllsp.exe",
+            "unix": "perllsp",
+            "mac": "perllsp"
+          },
+          "executable": true
+        }
+      },
+      "onSuccess": {
+        "configureServer": {
+          "name": "Configure Perl Language server command",
+          "command": "${output.dir}/${output.file.name} --stdio",
+          "update": true
+        }
+      }
+    }
+  }
+}

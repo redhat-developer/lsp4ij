@@ -17,33 +17,39 @@ import com.intellij.ide.structureView.StructureViewModel;
 import com.intellij.ide.structureView.StructureViewModelBase;
 import com.intellij.ide.structureView.StructureViewTreeElement;
 import com.intellij.ide.structureView.impl.common.PsiTreeElementBase;
+import com.intellij.ide.util.treeView.smartTree.Filter;
 import com.intellij.openapi.editor.Editor;
+import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
 import com.intellij.util.ArrayUtil;
 import com.redhat.devtools.lsp4ij.LSPFileSupport;
 import com.redhat.devtools.lsp4ij.client.indexing.ProjectIndexingManager;
-import com.redhat.devtools.lsp4ij.internal.PsiFileChangedException;
+import com.redhat.devtools.lsp4ij.features.documentSymbol.filter.*;
 import org.eclipse.lsp4j.DocumentSymbolParams;
 import org.eclipse.lsp4j.TextDocumentIdentifier;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.swing.*;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Objects;
 import java.util.concurrent.CancellationException;
-import java.util.concurrent.ExecutionException;
 import java.util.stream.Stream;
 
+import static com.redhat.devtools.lsp4ij.features.documentSymbol.LSPDocumentSymbolStructureViewFactory.isSymbolsSupportedByLanguageServer;
 import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.isDoneNormally;
-import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.waitUntilDone;
+import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.awaitWithCheckCanceled;
 
 /**
  * LSP document symbol structure view model.
  */
 public class LSPDocumentSymbolStructureViewModel extends StructureViewModelBase implements StructureViewModel.ElementInfoProvider {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(LSPDocumentSymbolStructureViewModel.class);
 
     public LSPDocumentSymbolStructureViewModel(@NotNull PsiFile psiFile, @Nullable Editor editor) {
         super(psiFile, editor, new LSPFileStructureViewElement(psiFile));
@@ -62,7 +68,74 @@ public class LSPDocumentSymbolStructureViewModel extends StructureViewModelBase 
     @Override
     protected Class @NotNull [] getSuitableClasses() {
         // Any PSI element
-        return new Class[] {PsiElement.class};
+        return new Class[]{PsiElement.class};
+    }
+
+    /**
+     * Finds the acceptable element in the structure view for a given PSI element.
+     * <p>
+     * This method is called by {@link #getCurrentEditorElement()} to determine which element
+     * should be selected in the Structure View based on the cursor position.
+     * Unlike the default implementation that walks up the PSI tree, this method performs
+     * a breadth-first search through the DocumentSymbol hierarchy to find the closest
+     * containing parent symbol.
+     * </p>
+     * <p>
+     * This enables "Always Select Opened Element" to work properly even when the cursor
+     * is positioned at an offset that doesn't correspond exactly to a DocumentSymbol
+     * (e.g., whitespace or text between symbols).
+     * </p>
+     *
+     * @param element the PSI element at the cursor position
+     * @return the DocumentSymbolData for the closest containing symbol, or null if none found
+     */
+    @Override
+    protected @Nullable Object findAcceptableElement(PsiElement element) {
+        if (element == null) {
+            return null;
+        }
+
+        // If this is already a DocumentSymbolData, return it directly
+        if (element instanceof DocumentSymbolData) {
+            return element;
+        }
+
+        // Find the closest containing DocumentSymbol using breadth-first search
+        // This ensures that even if the cursor is not exactly on a symbol boundary,
+        // the parent symbol that contains the cursor position will be selected
+        return LSPDocumentSymbolUtils.getDocumentSymbolData(element);
+    }
+
+    @Override
+    public Filter @NotNull [] getFilters() {
+        return new Filter[]{
+                new HideArraysFilter(),
+                new HideBooleansFilter(),
+                new HideClassesFilter(),
+                new HideConstantsFilter(),
+                new HideConstructorsFilter(),
+                new HideEnumMembersFilter(),
+                new HideEnumsFilter(),
+                new HideEventsFilter(),
+                new HideFieldsFilter(),
+                new HideFilesFilter(),
+                new HideFunctionsFilter(),
+                new HideInterfacesFilter(),
+                new HideKeysFilter(),
+                new HideMethodsFilter(),
+                new HideModulesFilter(),
+                new HideNamespacesFilter(),
+                new HideNullsFilter(),
+                new HideNumbersFilter(),
+                new HideObjectsFilter(),
+                new HideOperatorsFilter(),
+                new HidePackagesFilter(),
+                new HidePropertiesFilter(),
+                new HideStringsFilter(),
+                new HideStructsFilter(),
+                new HideTypeParametersFilter(),
+                new HideVariablesFilter()
+        };
     }
 
     @Override
@@ -93,9 +166,11 @@ public class LSPDocumentSymbolStructureViewModel extends StructureViewModelBase 
                 return Collections.emptyList();
             }
 
-            if (!LSPFileSupport.hasSupport(psiFile)) {
+            if (!LSPFileSupport.hasSupport(psiFile) || !isSymbolsSupportedByLanguageServer(psiFile)) {
                 // Don't force file support creation
-                // Ex: when file is closed, document symbol must return an empty list.
+                // Ex:
+                // 1. when file is closed, document symbol must return an empty list.
+                // 2. when language servers are stopped, document symbol must return an empty list.
                 return Collections.emptyList();
             }
 
@@ -104,17 +179,12 @@ public class LSPDocumentSymbolStructureViewModel extends StructureViewModelBase 
             LSPDocumentSymbolSupport documentSymbolSupport = fileSupport.getDocumentSymbolSupport();
             var params = new DocumentSymbolParams(new TextDocumentIdentifier());
             var documentSymbolFuture = documentSymbolSupport.getDocumentSymbols(params);
+
             try {
-                waitUntilDone(documentSymbolFuture, psiFile);
-            } catch (
-                    PsiFileChangedException e) { //Since 2024.2 ProcessCanceledException extends CancellationException so we can't use multicatch to keep backward compatibility
-                documentSymbolSupport.cancel();
+                awaitWithCheckCanceled(documentSymbolFuture);
+            } catch (ProcessCanceledException e) {
                 throw e;
-            } catch (CancellationException e) {
-                //documentSymbolSupport.cancel();
-                throw e;
-            } catch (ExecutionException e) {
-                return Collections.emptyList();
+            } catch (CancellationException ignore) {
             }
 
             if (isDoneNormally(documentSymbolFuture)) {
@@ -181,5 +251,4 @@ public class LSPDocumentSymbolStructureViewModel extends StructureViewModelBase 
     private static @Nullable StructureViewTreeElement getStructureViewTreeElement(DocumentSymbolData documentSymbol) {
         return documentSymbol.getClientFeatures().getDocumentSymbolFeature().getStructureViewTreeElement(documentSymbol);
     }
-
 }

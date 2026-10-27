@@ -18,8 +18,8 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.io.StringReader;
-import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Installer task registry.
@@ -34,14 +34,18 @@ public class InstallerTaskRegistry {
     private static final @NotNull String TASK_REF_JSON_PROPERTY = "ref";
 
 
-    private final @NotNull Map<String, InstallerTaskFactory> factories;
+    // Concurrent: EP listener callbacks mutate this on arbitrary threads, readers run on background tasks.
+    private final @NotNull Map<String, InstallerTaskFactory> factories = new ConcurrentHashMap<>();
 
     public InstallerTaskRegistry() {
-        factories = new HashMap<>();
     }
 
     public void registerFactory(String type, InstallerTaskFactory factory) {
         factories.put(type, factory);
+    }
+
+    public void unregisterFactory(String type) {
+        factories.remove(type);
     }
 
     public @NotNull ServerInstallerDescriptor loadInstaller(@NotNull String json) {

@@ -35,7 +35,7 @@ public class LSPTypeDefinitionSupport extends AbstractLSPDocumentFeatureSupport<
     private Integer previousOffset;
 
     public LSPTypeDefinitionSupport(@NotNull PsiFile file) {
-        super(file);
+        super(file, true, true);
     }
 
     public CompletableFuture<List<LocationData>> getTypeDefinitions(LSPTypeDefinitionParams params) {

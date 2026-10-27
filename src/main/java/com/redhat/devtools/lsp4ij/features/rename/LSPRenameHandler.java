@@ -75,15 +75,8 @@ public class LSPRenameHandler implements RenameHandler, TitledHandler {
         CompletableFuture<List<PrepareRenameResultData>> future =
                 prepareRenameSupport.getPrepareRenameResult(prepareRenameParams);
 
-        // As invoke method is invoked in the EDT Thread,
-        // com.redhat.devtools.lsp4ij.internal.CompletableFutures#waitUntilDone
-        // cannot be used to avoid freezing IJ, in this case the response Future
-        // is collected when the future is ready.
-
-        // Wait until the future is finished and stop waiting if there are some ProcessCanceledExceptions.
-        // The 'prepare rename' is stopped:
-        // - if user changes the editor content
-        // - if they cancel the Task
+        // Wait in a background task until the future completes.
+        // The task is cancellable: stops if the user cancels or the progress indicator is cancelled.
         waitUntilDoneAsync(future, LanguageServerBundle.message("lsp.refactor.rename.prepare.progress.title", psiFile.getVirtualFile().getName(), offset), psiFile);
 
         future.handle((prepareRenamesResult, error) -> {

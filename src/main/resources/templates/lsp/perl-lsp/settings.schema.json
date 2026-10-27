@@ -1,0 +1,344 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "LSP4IJ/perlsp/settings.schema.json",
+  "title": "LSP4IJ Perl LSP server settings JSON schema",
+  "description": "JSON schema for perlsp server settings.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "perl-lsp.serverPath": {
+      "type": "string",
+      "default": "",
+      "order": 10,
+      "description": "Absolute path to the perllsp binary. Leave empty to auto-download a release build.",
+      "markdownDescription": "Absolute path to the `perllsp` binary. Leave empty to auto-download a release build."
+    },
+    "perl-lsp.autoDownload": {
+      "type": "boolean",
+      "default": true,
+      "order": 20,
+      "description": "Automatically download the perllsp binary if it is not found locally. Disable this for internal deployments that set serverPath.",
+      "markdownDescription": "Automatically download the `perllsp` binary if it is not found locally. Disable this for internal deployments that set `serverPath`."
+    },
+    "perl-lsp.includePaths": {
+      "type": "array",
+      "default": [
+        "lib",
+        "local/lib/perl5"
+      ],
+      "items": {
+        "type": "string"
+      },
+      "order": 30,
+      "description": "Additional library paths (like use lib) to search for Perl modules. Set this if you see \"Can\u0027t locate Foo/Bar.pm\" style module lookup errors. Relative paths resolve from the workspace root.",
+      "markdownDescription": "Additional library paths (like `use lib`) to search for Perl modules. Set this if you see `Can\u0027t locate Foo/Bar.pm` style module lookup errors. Relative paths resolve from the workspace root."
+    },
+    "perl-lsp.enableDiagnostics": {
+      "type": "boolean",
+      "default": true,
+      "order": 40,
+      "description": "Enable real-time syntax diagnostics. When disabled, the server will not publish diagnostic errors and warnings.",
+      "markdownDescription": "Enable real-time syntax diagnostics. When disabled, the server will not publish diagnostic errors and warnings."
+    },
+    "perl-lsp.enableSemanticTokens": {
+      "type": "boolean",
+      "default": true,
+      "order": 50,
+      "description": "Enable semantic syntax highlighting. When disabled, the editor falls back to TextMate grammar coloring only.",
+      "markdownDescription": "Enable semantic syntax highlighting. When disabled, the editor falls back to TextMate grammar coloring only."
+    },
+    "perl-lsp.enableFormatting": {
+      "type": "boolean",
+      "default": true,
+      "order": 10,
+      "description": "Enable document formatting using perltidy. This requires perltidy to be installed on your system.",
+      "markdownDescription": "Enable document formatting using `perltidy`. This requires `perltidy` to be installed on your system."
+    },
+    "perl-lsp.formatOnSave": {
+      "type": "boolean",
+      "default": false,
+      "order": 20,
+      "description": "Format the document automatically on save. This requires perltidy to be installed.",
+      "markdownDescription": "Format the document automatically on save. This requires `perltidy` to be installed."
+    },
+    "perl-lsp.perltidyConfig": {
+      "type": "string",
+      "default": "",
+      "order": 30,
+      "description": "Path to your .perltidyrc configuration file. If omitted, perl-lsp searches the workspace and home directory.",
+      "markdownDescription": "Path to your `.perltidyrc` configuration file. If omitted, perl-lsp searches the workspace and home directory."
+    },
+    "perl-lsp.perlcritic.enabled": {
+      "type": "boolean",
+      "default": false,
+      "order": 40,
+      "description": "Enable external Perl::Critic diagnostics from the VS Code extension.",
+      "markdownDescription": "Enable external `perlcritic` diagnostics from the VS Code extension."
+    },
+    "perl-lsp.perlcritic.severity": {
+      "type": "number",
+      "enum": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "enumDescriptions": [
+        "Severity 1 - very permissive",
+        "Severity 2 - permissive",
+        "Severity 3 - balanced default",
+        "Severity 4 - strict",
+        "Severity 5 - very strict"
+      ],
+      "default": 3,
+      "order": 41,
+      "description": "Perl::Critic minimum severity (1 \u003d least severe/reports more, 5 \u003d most severe/reports less).",
+      "markdownDescription": "Perl::Critic minimum severity (`1` \u003d least severe/reports more, `5` \u003d most severe/reports less)."
+    },
+    "perl-lsp.perlcritic.profile": {
+      "type": "string",
+      "default": "",
+      "order": 42,
+      "description": "Optional path to a .perlcriticrc profile file used by the extension when synchronizing critic settings.",
+      "markdownDescription": "Optional path to a `.perlcriticrc` profile file used by the extension when synchronizing critic settings."
+    },
+    "perl-lsp.perlcritic.theme": {
+      "type": "string",
+      "default": "",
+      "order": 43,
+      "description": "Optional display theme label for PerlCritic settings. Reserved for editor-facing UI organization.",
+      "markdownDescription": "Optional display theme label for PerlCritic settings. Reserved for editor-facing UI organization."
+    },
+    "perl-lsp.enableRefactoring": {
+      "type": "boolean",
+      "default": true,
+      "order": 50,
+      "description": "Enable refactoring-related code actions (extract variable, extract method) when supported by the connected perllsp server.",
+      "markdownDescription": "Enable refactoring-related code actions (extract variable, extract method) when supported by the connected `perllsp` server."
+    },
+    "perl-lsp.enableTestIntegration": {
+      "type": "boolean",
+      "default": true,
+      "order": 60,
+      "description": "Enable Test::More and Test2 integration for the VS Code Test Explorer panel.",
+      "markdownDescription": "Enable `Test::More` and `Test2` integration for the VS Code Test Explorer panel."
+    },
+    "perl-lsp.autoPopulateNewFiles": {
+      "type": "boolean",
+      "default": true,
+      "order": 70,
+      "description": "Auto-populate new .pm files with a package declaration and new .t files with Test::More boilerplate.",
+      "markdownDescription": "Auto-populate new `.pm` files with a `package` declaration and new `.t` files with `Test::More` boilerplate."
+    },
+    "perl-lsp.aiCompletion.enabled": {
+      "type": "boolean",
+      "default": false,
+      "order": 10,
+      "description": "Enable AI-powered inline completions. Requires a running language server with AI support.",
+      "markdownDescription": "Enable AI-powered inline completions. Requires a running language server with AI support."
+    },
+    "perl-lsp.aiCompletion.streaming.enabled": {
+      "type": "boolean",
+      "default": true,
+      "order": 20,
+      "description": "Enable progressive streaming for AI completions so results appear as they are generated. Requires aiCompletion.enabled to be true.",
+      "markdownDescription": "Enable progressive streaming for AI completions so results appear as they are generated. Requires `aiCompletion.enabled` to be true."
+    },
+    "perl-lsp.channel": {
+      "type": "string",
+      "enum": [
+        "latest",
+        "stable",
+        "tag"
+      ],
+      "enumDescriptions": [
+        "Track the newest published release.",
+        "Stay on the latest stable release line.",
+        "Pin the extension to a specific release tag set in versionTag."
+      ],
+      "default": "latest",
+      "order": 10,
+      "description": "Release channel for the perllsp binary: latest for newest release, stable for latest stable line, tag for a pinned version.",
+      "markdownDescription": "Release channel for the `perllsp` binary: `latest` for newest release, `stable` for latest stable line, `tag` for a pinned version set in `versionTag`."
+    },
+    "perl-lsp.versionTag": {
+      "type": "string",
+      "default": "",
+      "order": 20,
+      "description": "Specific release tag (for example v0.12.1) to pin when channel is set to tag.",
+      "markdownDescription": "Specific release tag (for example `v0.12.1`) to pin when `channel` is set to `tag`."
+    },
+    "perl-lsp.downloadBaseUrl": {
+      "type": "string",
+      "default": "",
+      "order": 30,
+      "description": "Internal base URL hosting perllsp archives and SHA256SUMS, bypassing GitHub releases. Leave empty to use GitHub releases.",
+      "markdownDescription": "Internal base URL hosting perllsp archives and SHA256SUMS, bypassing GitHub releases. Example: `https://internal.example.com/perllsp/`. Leave empty to use GitHub releases."
+    },
+    "perl-lsp.linuxLibc": {
+      "type": "string",
+      "enum": [
+        "auto",
+        "gnu",
+        "glibc",
+        "musl"
+      ],
+      "enumDescriptions": [
+        "Detect Linux libc automatically.",
+        "Use the GNU/glibc Linux release asset.",
+        "Alias for gnu.",
+        "Use the musl Linux release asset."
+      ],
+      "default": "auto",
+      "order": 34,
+      "description": "Linux libc release asset selection. Keep auto unless you need to force GNU/glibc or musl.",
+      "markdownDescription": "Linux libc release asset selection for managed `perllsp` downloads. Keep `auto` unless you need to force `gnu`/`glibc` or `musl`."
+    },
+    "perl-lsp.updateCheckInterval": {
+      "type": "number",
+      "default": 24,
+      "minimum": 0,
+      "order": 35,
+      "description": "How often (in hours) to check for a new perllsp binary version in the background. Set to 0 to disable automatic update checks.",
+      "markdownDescription": "How often (in hours) to check for a new `perllsp` binary version in the background. Set to `0` to disable automatic update checks."
+    },
+    "perl-lsp.autoUpdate": {
+      "type": "boolean",
+      "default": false,
+      "order": 36,
+      "description": "Automatically download and install a new perllsp binary when an update is available, without prompting. When disabled, a notification is shown instead.",
+      "markdownDescription": "Automatically download and install a new `perllsp` binary when an update is available, without prompting. When disabled, a notification is shown instead."
+    },
+    "perl-lsp.featureProfile": {
+      "type": "string",
+      "enum": [
+        "auto",
+        "ga-lock",
+        "ga",
+        "prod",
+        "production",
+        "all"
+      ],
+      "enumDescriptions": [
+        "Choose the profile automatically based on the bundled binary.",
+        "Lock to the general-availability profile with conservative defaults.",
+        "Use the general-availability profile.",
+        "Use the production profile (alias for ga).",
+        "Use the production profile (alias for ga).",
+        "Enable every supported feature, including experimental ones."
+      ],
+      "default": "auto",
+      "order": 40,
+      "description": "Runtime LSP feature profile. auto follows the bundled binary build mode. Use ga or prod for production-safe features only. Use all to enable experimental features.",
+      "markdownDescription": "Runtime LSP feature profile. `auto` follows the bundled binary build mode. Use `ga` or `prod` for production-safe features only. Use `all` to enable experimental features."
+    },
+    "perl-lsp.disabledFeatures": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "lsp.completion",
+          "lsp.hover",
+          "lsp.definition",
+          "lsp.declaration",
+          "lsp.references",
+          "lsp.document_symbol",
+          "lsp.workspace_symbol",
+          "lsp.code_action",
+          "lsp.code_lens",
+          "lsp.rename",
+          "lsp.folding_range",
+          "lsp.selection_range",
+          "lsp.linked_editing_range",
+          "lsp.inlay_hint",
+          "lsp.semantic_tokens",
+          "lsp.call_hierarchy",
+          "lsp.type_hierarchy",
+          "lsp.pull_diagnostics",
+          "lsp.document_color",
+          "lsp.signature_help",
+          "lsp.document_highlight",
+          "lsp.formatting",
+          "lsp.range_formatting"
+        ]
+      },
+      "default": [],
+      "order": 50,
+      "description": "Feature IDs to disable at server startup. Use canonical lsp.* IDs such as lsp.semantic_tokens. Changes take effect after restarting the language server.",
+      "markdownDescription": "Feature IDs to disable at server startup. Use canonical `lsp.*` IDs such as `lsp.semantic_tokens`. Changes take effect after restarting the language server."
+    },
+    "perl-lsp.trace.server": {
+      "type": "string",
+      "enum": [
+        "off",
+        "messages",
+        "verbose"
+      ],
+      "enumDescriptions": [
+        "Disable protocol tracing.",
+        "Log request and response message summaries to the output channel.",
+        "Log full verbose protocol details including all message payloads."
+      ],
+      "default": "off",
+      "order": 60,
+      "description": "Traces the communication between VS Code and the perl-lsp language server. Set to messages or verbose to capture protocol traffic for debugging.",
+      "markdownDescription": "Traces the communication between VS Code and the perl-lsp language server. Set to `messages` or `verbose` to capture protocol traffic for debugging."
+    },
+    "perl-lsp.mcp.servers": {
+      "type": "array",
+      "order": 95,
+      "default": [],
+      "description": "Optional MCP stdio servers exposed to VS Code language models. Each entry supports label, command, args, cwd, env, version, and enabled.",
+      "markdownDescription": "Optional MCP stdio servers exposed to VS Code language models. Each entry supports `label`, `command`, `args`, `cwd`, `env`, `version`, and `enabled`.",
+      "items": {
+        "type": "object",
+        "required": [
+          "label",
+          "command"
+        ],
+        "properties": {
+          "label": {
+            "type": "string",
+            "description": "Display name shown in MCP server pickers."
+          },
+          "command": {
+            "type": "string",
+            "description": "Executable used to start the MCP server."
+          },
+          "args": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Command-line arguments passed to the server."
+          },
+          "cwd": {
+            "type": "string",
+            "description": "Optional working directory used when launching the server."
+          },
+          "env": {
+            "type": "object",
+            "description": "Optional environment variable overrides (set a key to null to unset).",
+            "additionalProperties": {
+              "type": [
+                "string",
+                "number",
+                "null"
+              ]
+            }
+          },
+          "version": {
+            "type": "string",
+            "description": "Optional MCP server version used by VS Code for refresh prompts."
+          },
+          "enabled": {
+            "type": "boolean",
+            "default": true,
+            "description": "Set to false to keep a server config without publishing it."
+          }
+        }
+      }
+    }
+  }
+}

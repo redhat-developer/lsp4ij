@@ -30,7 +30,7 @@ public abstract class AbstractDocumentMatcher implements DocumentMatcher {
             super(indicator -> {
                         return AbstractDocumentMatcher.this.match(file, project);
                     }, "Match with " + AbstractDocumentMatcher.this.getClass().getName(),
-                    project, null, AbstractDocumentMatcher.class, file.getUrl());
+                    project, null, AbstractDocumentMatcher.this, file.getUrl(), project);
             init();
         }
     }

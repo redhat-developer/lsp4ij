@@ -16,7 +16,6 @@ import com.intellij.xdebugger.frame.presentation.XValuePresentation;
 import com.redhat.devtools.lsp4ij.dap.client.DAPClient;
 import com.redhat.devtools.lsp4ij.dap.client.DAPStackFrame;
 import org.eclipse.lsp4j.debug.Variable;
-import org.eclipse.lsp4j.debug.VariablesArguments;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -34,6 +33,8 @@ public class DAPValue extends XNamedValue {
     private final @Nullable Integer parentVariablesReference;
     @Nullable
     private final Icon icon;
+    // The variable with the value of a lazy variable, once the user asked for it
+    private volatile @Nullable Variable resolved;
 
     public DAPValue(@NotNull DAPStackFrame stackFrame,
                     @NotNull Variable variable,
@@ -47,9 +48,30 @@ public class DAPValue extends XNamedValue {
 
     @Override
     public void computePresentation(@NotNull XValueNode node, @NotNull XValuePlace place) {
-        XValuePresentation presentation = getPresentation();
-        boolean hasChildren = variable.getVariablesReference() > 0;
-        node.setPresentation(icon, presentation, hasChildren);
+        var server = getClient().getDebugProtocolServer();
+        if (resolved == null && server != null && DAPLazyValueEvaluator.isLazy(variable)) {
+            // Getting the value may run code: get it when the user asks for it
+            node.setPresentation(icon, getPresentation(variable), false);
+            var format = getClient().getValueFormat();
+            node.setFullValueEvaluator(new DAPLazyValueEvaluator(server, variable.getVariablesReference(), format, value -> {
+                resolved = value;
+                node.setPresentation(icon, getPresentation(value), value.getVariablesReference() > 0);
+            }));
+            return;
+        }
+        Variable shown = getShownVariable();
+        node.setPresentation(icon, getPresentation(shown), shown.getVariablesReference() > 0);
+    }
+
+    /**
+     * Returns the variable which this value shows: the variable with the value of a lazy variable once the user asked
+     * for it, and the variable itself otherwise.
+     *
+     * @return the variable which this value shows.
+     */
+    @NotNull Variable getShownVariable() {
+        Variable value = resolved;
+        return value != null ? value : variable;
     }
 
     @Override
@@ -59,17 +81,12 @@ public class DAPValue extends XNamedValue {
             return;
         }
 
-        int parentVariablesReference = variable.getVariablesReference();
-        VariablesArguments varArgs = new VariablesArguments();
-        varArgs.setVariablesReference(parentVariablesReference);
-        server.variables(varArgs)
-                .thenAccept(variablesResponse -> {
-                    XValueChildrenList list = new XValueChildrenList();
-                    for (Variable variable : variablesResponse.getVariables()) {
-                        list.add(variable.getName(), new DAPValue(stackFrame, variable, parentVariablesReference));
-                    }
-                    node.addChildren(list, true);
-                });
+        Variable shown = getShownVariable();
+        int parentVariablesReference = shown.getVariablesReference();
+        // a large variable, such as a large array, is read a page at a time
+        new DAPVariableChildren(server, shown, getClient().getValueFormat(),
+                child -> new DAPValue(stackFrame, child, parentVariablesReference))
+                .load(node);
     }
 
     @Nullable
@@ -83,8 +100,8 @@ public class DAPValue extends XNamedValue {
     }
 
     @NotNull
-    private XValuePresentation getPresentation() {
-        return getClient().getServerDescriptor().getVariableSupport().getValuePresentation(variable);
+    private XValuePresentation getPresentation(@NotNull Variable shown) {
+        return getClient().getServerDescriptor().getVariableSupport().getValuePresentation(shown);
     }
 
 

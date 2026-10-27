@@ -112,18 +112,21 @@ public class LSPBreadcrumbsRefreshListener implements ProjectActivity, LanguageS
                 file.putUserData(NEEDS_RESTART, false);
 
                 // Refresh breadcrumb when LSP Symbols are available.
-                LSPFileSupport fileSupport = LSPFileSupport.getSupport(file);
-                LSPDocumentSymbolSupport documentSymbolSupport = fileSupport.getDocumentSymbolSupport();
-                var params = new DocumentSymbolParams(new TextDocumentIdentifier());
-                var documentSymbolFuture = documentSymbolSupport.getDocumentSymbols(params);
-                documentSymbolFuture
-                        .thenApply(symbols -> {
-                            // We must force the modification stamp to increment or sticky lines won't be recomputed
-                            file.clearCaches();
-                            ApplicationManager.getApplication().invokeLater(() -> fileSupport.restartDaemonCodeAnalyzerWithDebounce());
-                            return symbols;
-                        });
-
+                // Language server matching involves slow operations (file type detection, index queries)
+                // that must not run on the EDT.
+                ApplicationManager.getApplication().executeOnPooledThread(() -> {
+                    LSPFileSupport fileSupport = LSPFileSupport.getSupport(file);
+                    LSPDocumentSymbolSupport documentSymbolSupport = fileSupport.getDocumentSymbolSupport();
+                    var params = new DocumentSymbolParams(new TextDocumentIdentifier());
+                    var documentSymbolFuture = documentSymbolSupport.getDocumentSymbols(params);
+                    documentSymbolFuture
+                            .thenApply(symbols -> {
+                                // We must force the modification stamp to increment or sticky lines won't be recomputed
+                                file.clearCaches();
+                                ApplicationManager.getApplication().invokeLater(() -> fileSupport.restartDaemonCodeAnalyzerWithDebounce());
+                                return symbols;
+                            });
+                });
             }
         }
     }
