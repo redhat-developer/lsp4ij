@@ -36,6 +36,41 @@ The `Configuration` tab to specify the working directory and the file you want t
 
   ![DAP Configuration Type/Configuration](./images/DAP_config_type_configuration.png)
 
+
+
+
+### IntelliJ macro expansion
+
+You can use [built-in IntelliJ macros](https://www.jetbrains.com/help/idea/built-in-macros.html) in DAP configuration parameters. This allows you to reference project and file paths without hardcoding absolute paths.
+
+For example, you can use `$PROJECT_DIR$` to reference the root of the project:
+
+```json
+{
+  "program": "$PROJECT_DIR$/src/main.js"
+}
+```
+
+You can also use `$FilePath$` to reference the path of the currently selected editor file:
+
+```json
+{
+  "program": "$FilePath$"
+}
+```
+
+Here are some useful standard built-in macros that you can use:
+
+- `$WORKSPACE_DIR$`: The path to the workspace where the current project belongs. The workspace is the root of the open file hierarchy and can include multiple projects.
+- `$PROJECT_DIR$`: The root of the project.
+- `$USER_HOME$`: The user's home directory.
+- `$FilePath$`: The path of the currently selected editor file.
+
+Macro expansion is applied to string values in DAP parameters, including values nested inside objects and arrays.
+
+
+
+
 ## Breakpoints
 
 ### Adding breakpoint

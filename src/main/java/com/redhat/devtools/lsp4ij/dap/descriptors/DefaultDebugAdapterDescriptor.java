@@ -16,6 +16,9 @@ import com.intellij.execution.configurations.GeneralCommandLine;
 import com.intellij.execution.configurations.RunConfigurationOptions;
 import com.intellij.execution.process.ProcessHandler;
 import com.intellij.execution.runners.ExecutionEnvironment;
+import com.intellij.openapi.actionSystem.CommonDataKeys;
+import com.intellij.openapi.actionSystem.DataContext;
+import com.intellij.openapi.fileEditor.FileEditorManager;
 import com.intellij.openapi.fileTypes.FileType;
 import com.intellij.openapi.fileTypes.FileTypeManager;
 import com.intellij.openapi.project.Project;
@@ -46,16 +49,18 @@ public class DefaultDebugAdapterDescriptor extends DebugAdapterDescriptor {
 
     private final @NotNull String id;
 
-    public DefaultDebugAdapterDescriptor(@NotNull RunConfigurationOptions options,
-                                         @NotNull ExecutionEnvironment environment,
-                                         @NotNull DebugAdapterServerDefinition serverDefinition) {
+    public DefaultDebugAdapterDescriptor(
+            @NotNull RunConfigurationOptions options,
+            @NotNull ExecutionEnvironment environment,
+            @NotNull DebugAdapterServerDefinition serverDefinition) {
         super(options, environment, serverDefinition);
         this.id = serverDefinition.getId();
     }
 
-    public DefaultDebugAdapterDescriptor(@NotNull RunConfigurationOptions options,
-                                         @NotNull ExecutionEnvironment environment,
-                                         @NotNull String runConfigurationName) {
+    public DefaultDebugAdapterDescriptor(
+            @NotNull RunConfigurationOptions options,
+            @NotNull ExecutionEnvironment environment,
+            @NotNull String runConfigurationName) {
         super(options, environment, null);
         this.id = runConfigurationName;
     }
@@ -71,39 +76,52 @@ public class DefaultDebugAdapterDescriptor extends DebugAdapterDescriptor {
     public ProcessHandler startServer() throws ExecutionException {
         GeneralCommandLine commandLine = createStartServerCommandLine(options);
         if (commandLine == null) {
-            throw new ExecutionException("Cannot starts the server, the command must be specified!");
+            throw new ExecutionException(
+                    "Cannot starts the server, the command must be specified!");
         }
         return startServer(commandLine);
     }
 
     @Nullable
-    protected GeneralCommandLine createStartServerCommandLine(@NotNull RunConfigurationOptions options) throws ExecutionException {
+    protected GeneralCommandLine createStartServerCommandLine(
+            @NotNull RunConfigurationOptions options) throws ExecutionException {
         if (options instanceof DAPRunConfigurationOptions dapOptions) {
             String workingDirectory = dapOptions.getWorkingDirectory();
             String command = dapOptions.getCommand();
+
             if (StringUtils.isBlank(command)) {
                 var server = dapOptions.getDebugAdapterServer();
                 if (server instanceof CommandLineUpdater userDefinedServer) {
                     command = userDefinedServer.getCommandLine();
                 }
             }
+
             // Environment variables
             Map<String, String> userEnvironmentVariables = new HashMap<>();
             boolean includeSystemEnvironmentVariables = true;
             var envData = getEnvData();
+
             if (envData != null) {
                 userEnvironmentVariables.putAll(envData.getEnvs());
                 includeSystemEnvironmentVariables = envData.isPassParentEnvs();
             }
 
-            String resolvedCommandLine = resolveCommandLine(command, environment.getProject());
-            return createStartServerCommandLine(workingDirectory, resolvedCommandLine, userEnvironmentVariables, includeSystemEnvironmentVariables);
+            String resolvedCommandLine =
+                    resolveCommandLine(command, environment.getProject());
+
+            return createStartServerCommandLine(
+                    workingDirectory,
+                    resolvedCommandLine,
+                    userEnvironmentVariables,
+                    includeSystemEnvironmentVariables);
         }
+
         return null;
     }
 
     protected @Nullable EnvironmentVariablesData getEnvData() {
-        if (environment.getRunProfile() instanceof EnvironmentVariablesDataConfigurable runConfiguration) {
+        if (environment.getRunProfile()
+                instanceof EnvironmentVariablesDataConfigurable runConfiguration) {
             return runConfiguration.getEnvData();
         }
         return null;
@@ -113,19 +131,40 @@ public class DefaultDebugAdapterDescriptor extends DebugAdapterDescriptor {
         if (options instanceof FileOptionConfigurable dapOptions) {
             String file = dapOptions.getFile();
             int index = file != null ? file.lastIndexOf('.') : -1;
+
             if (index != -1) {
                 String fileExtension = file.substring(index + 1);
-                return FileTypeManager.getInstance().getFileTypeByExtension(fileExtension);
+                return FileTypeManager.getInstance()
+                        .getFileTypeByExtension(fileExtension);
             }
         }
+
         return null;
     }
 
     @NotNull
     public Map<String, Object> getDapParameters() {
         if (options instanceof DAPRunConfigurationOptions dapOptions) {
-            return LaunchUtils.getDapParameters(dapOptions);
+            Project project = environment.getProject();
+
+            DataContext dataContext = environment.getDataContext();
+
+            VirtualFile selectedFile = dataContext != null
+                    ? CommonDataKeys.VIRTUAL_FILE.getData(dataContext)
+                    : null;
+
+            if (selectedFile == null) {
+                VirtualFile[] selectedFiles =
+                        FileEditorManager.getInstance(project).getSelectedFiles();
+
+                selectedFile =
+                        selectedFiles.length > 0 ? selectedFiles[0] : null;
+            }
+
+            return LaunchUtils.getDapParameters(
+                    dapOptions, project, selectedFile);
         }
+
         return Collections.emptyMap();
     }
 
@@ -150,25 +189,31 @@ public class DefaultDebugAdapterDescriptor extends DebugAdapterDescriptor {
     @Nullable
     public String getServerName() {
         String serverName = null;
+
         if (options instanceof DAPRunConfigurationOptions dapOptions) {
             serverName = dapOptions.getServerName();
         }
+
         if (StringUtils.isBlank(serverName)) {
             return super.getServerName();
         }
+
         return serverName;
     }
 
     @Override
-    public boolean isDebuggableFile(@NotNull VirtualFile file, @NotNull Project project) {
-        if (getServerDefinition() != null &&
-                super.isDebuggableFile(file, project)) {
+    public boolean isDebuggableFile(
+            @NotNull VirtualFile file,
+            @NotNull Project project) {
+        if (getServerDefinition() != null
+                && super.isDebuggableFile(file, project)) {
             return true;
         }
+
         if (options instanceof DAPRunConfigurationOptions dapOptions) {
             return dapOptions.isDebuggableFile(file, project);
         }
+
         return false;
     }
 }
-
