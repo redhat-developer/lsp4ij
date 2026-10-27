@@ -11,19 +11,12 @@
 package com.redhat.devtools.lsp4ij.dap.breakpoints;
 
 import com.intellij.icons.AllIcons;
-import com.intellij.openapi.application.ApplicationManager;
-import com.intellij.openapi.application.ModalityState;
 import com.intellij.openapi.project.Project;
-import com.intellij.openapi.util.Comparing;
 import com.intellij.xdebugger.XDebugSession;
 import com.intellij.xdebugger.XDebugSessionListener;
-import com.intellij.xdebugger.XDebuggerManager;
 import com.intellij.xdebugger.XExpression;
 import com.intellij.xdebugger.breakpoints.SuspendPolicy;
 import com.intellij.xdebugger.breakpoints.XBreakpoint;
-import com.intellij.xdebugger.impl.XDebugSessionImpl;
-import com.intellij.xdebugger.impl.breakpoints.XBreakpointBase;
-import com.intellij.xdebugger.impl.breakpoints.XBreakpointManagerImpl;
 import com.redhat.devtools.lsp4ij.dap.descriptors.DebugAdapterDescriptor;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import org.eclipse.lsp4j.debug.Breakpoint;
@@ -234,42 +227,5 @@ public class DAPFunctionBreakpointHandler extends BreakpointHandlerBase<XBreakpo
     protected void setBreakpointInvalid(@NotNull XBreakpoint<DAPFunctionBreakpointProperties> ijBreakpoint,
                                         @Nullable String message) {
         updateBreakpointPresentation(ijBreakpoint, AllIcons.Debugger.Db_invalid_breakpoint, message);
-    }
-
-    /**
-     * Shows the given breakpoint with the given icon and error message in the session, as
-     * {@link XDebugSession#updateBreakpointPresentation} shows a line breakpoint: IntelliJ 2024.2 takes only line
-     * breakpoints there, so the presentation which the session keeps for each of its breakpoints is set here.
-     */
-    private void updateBreakpointPresentation(@NotNull XBreakpoint<?> ijBreakpoint,
-                                              @Nullable Icon icon,
-                                              @Nullable String errorMessage) {
-        if (!(debugSession instanceof XDebugSessionImpl session)) {
-            return;
-        }
-        var presentation = session.getBreakpointPresentation(ijBreakpoint);
-        if (presentation == null) {
-            // The breakpoint is no longer registered in the session
-            return;
-        }
-        if (Comparing.equal(presentation.getIcon(), icon) && Comparing.strEqual(presentation.getErrorMessage(), errorMessage)) {
-            return;
-        }
-        presentation.setIcon(icon);
-        presentation.setErrorMessage(errorMessage);
-        // The breakpoint keeps its icon until it is computed again with the presentation
-        clearIcon(ijBreakpoint);
-        if (XDebuggerManager.getInstance(project).getBreakpointManager() instanceof XBreakpointManagerImpl breakpointManager) {
-            ApplicationManager.getApplication().invokeLater(
-                    () -> breakpointManager.fireBreakpointPresentationUpdated(ijBreakpoint, session),
-                    ModalityState.any(),
-                    project.getDisposed());
-        }
-    }
-
-    private static void clearIcon(@NotNull XBreakpoint<?> ijBreakpoint) {
-        if (ijBreakpoint instanceof XBreakpointBase<?, ?, ?> breakpointBase) {
-            breakpointBase.clearIcon();
-        }
     }
 }

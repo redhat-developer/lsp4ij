@@ -123,6 +123,31 @@ names the function breakpoint where the program stopped (`hitBreakpointIds` of i
 at it as at a line breakpoint. A DAP function breakpoint has no log message, so one whose `Suspend` option is unchecked
 stops, and LSP4IJ logs and resumes the program.
 
+### Data breakpoints
+
+When the DAP server supports
+[data breakpoints](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_SetDataBreakpoints)
+(`supportsDataBreakpoints`), a breakpoint can stop the program when a value changes rather than at a line. While the
+program is stopped, right-click a variable in the `Variables` or `Watches` view and choose `Break on Value Change`.
+LSP4IJ asks the DAP server which data the variable is
+([dataBreakpointInfo](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_DataBreakpointInfo)),
+by the variable's name and its container. When the DAP server can't watch it, the debug tool window shows the reason
+which the DAP server gives, and no breakpoint is added. Otherwise a `DAP Data Breakpoint` is added, named as the DAP
+server describes the data, such as `Counter.count`; it stops at writes when the DAP server offers them, and at the
+first access type which it offers otherwise.
+
+A data breakpoint has the `Condition`, `Suspend` and logging options of a line breakpoint, and a `Hit condition`, which
+the DAP server reads; the hit condition can be changed in the `Breakpoints` dialog. The enabled data breakpoints are
+sent to the DAP server which named their data, all of them again whenever one is added, changed or removed, and the
+dialog shows each as verified or not, as the DAP server answers. When the DAP server names the data breakpoint where the
+program stopped (`hitBreakpointIds` of its `stopped` event), the program stops at it, and the `description` of the
+`stopped` event, which says what changed, such as `Counter.count changed from 0 to 2`, is shown where it stopped.
+
+The DAP server says whether the data of a data breakpoint stays the same in a later debug session (`canPersist`). When
+it doesn't, as for most DAP servers, the data breakpoint is removed when its debug session ends, so that it is neither
+saved with the project nor sent to a later debug session. When it does, the data breakpoint is kept, and sent to the
+later debug sessions of the same DAP server.
+
 ### Exception breakpoint
 
 Some DAP servers support exception breakpoints. If so, you must first run the configuration process, 

@@ -1152,6 +1152,8 @@
                 implementation="com.redhat.devtools.lsp4ij.dap.breakpoints.DAPBreakpointType"/>
         <xdebugger.breakpointType
                 implementation="com.redhat.devtools.lsp4ij.dap.breakpoints.DAPFunctionBreakpointType"/>
+        <xdebugger.breakpointType
+                implementation="com.redhat.devtools.lsp4ij.dap.breakpoints.DAPDataBreakpointType"/>
         <completion.contributor id="DAPCompletionProcessor"
                                 language="any"
                                 implementationClass="com.redhat.devtools.lsp4ij.dap.completion.DAPCompletionProcessor"/>
@@ -1216,6 +1218,12 @@
                 class="com.redhat.devtools.lsp4ij.dap.client.variables.DAPHexadecimalValuesAction"
                 text="Show Values as Hexadecimal"
                 description="Ask the DAP server for numbers in hexadecimal">
+            <add-to-group group-id="XDebugger.ValueGroup" anchor="last"/>
+        </action>
+        <action id="DAP.BreakOnValueChange"
+                class="com.redhat.devtools.lsp4ij.dap.client.variables.DAPBreakOnValueChangeAction"
+                text="Break on Value Change"
+                description="Stop the program when the DAP server sees this value change">
             <add-to-group group-id="XDebugger.ValueGroup" anchor="last"/>
         </action>
     </actions>

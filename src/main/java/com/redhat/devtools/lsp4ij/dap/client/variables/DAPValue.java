@@ -142,6 +142,10 @@ public class DAPValue extends XNamedValue {
         return stackFrame.getClient();
     }
 
+    public @NotNull DAPStackFrame getStackFrame() {
+        return stackFrame;
+    }
+
     public @Nullable Integer getParentVariablesReference() {
         return parentVariablesReference;
     }

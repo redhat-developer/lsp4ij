@@ -33,6 +33,7 @@ import com.redhat.devtools.lsp4ij.console.explorer.TracingMessageConsumer;
 import com.redhat.devtools.lsp4ij.dap.DAPDebugProcess;
 import com.redhat.devtools.lsp4ij.dap.DebugMode;
 import com.redhat.devtools.lsp4ij.dap.TransportStreams;
+import com.redhat.devtools.lsp4ij.dap.breakpoints.DAPDataBreakpointHandler;
 import com.redhat.devtools.lsp4ij.dap.client.variables.DAPValueFormat;
 import com.redhat.devtools.lsp4ij.dap.descriptors.DebugAdapterDescriptor;
 import com.redhat.devtools.lsp4ij.dap.disassembly.DisassemblyFile;
@@ -235,6 +236,16 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
                                 .initialize(getDebugProtocolServer(), getCapabilities());
                     })
                     .thenCompose(v -> {
+                        // client sends a setDataBreakpoints request
+                        // if supportsDataBreakpoints returns true
+                        monitor.checkCanceled();
+                        monitor.setFraction(57d / 100d);
+                        monitor.setText2("Sending data breakpoints");
+                        return debugProcess
+                                .getDataBreakpointHandler()
+                                .initialize(getDebugProtocolServer(), getCapabilities());
+                    })
+                    .thenCompose(v -> {
                         // client sends a setExceptionBreakpoints request
                         // if one or more exceptionBreakpointFilters have been defined
                         // (or if supportsConfigurationDoneRequest is not true)
@@ -357,10 +368,12 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
             var breakpoint = args.getBreakpoint();
             if (breakpoint != null) {
                 // breakpoint with a given id changed (ex: verified changed)
-                // update the Intellij Breakpoint, a line or a function breakpoint, with those information.
+                // update the Intellij Breakpoint, a line, a function or a data breakpoint, with those information.
                 debugProcess.getBreakpointHandler()
                         .updateBreakpoint(breakpoint, null);
                 debugProcess.getFunctionBreakpointHandler()
+                        .updateBreakpoint(breakpoint, null);
+                debugProcess.getDataBreakpointHandler()
                         .updateBreakpoint(breakpoint, null);
             }
         }
@@ -405,7 +418,7 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
     /**
      * Suspends the session where the given thread stopped. When a breakpoint stopped it, the session is told which
      * one; otherwise, the session is suspended at the top frame, and an exception which stopped the thread is shown
-     * there.
+     * there. What a data breakpoint saw change, as the stopped event describes it, is shown where the program stopped.
      *
      * @param server        the debug adapter.
      * @param args          the stopped event.
@@ -428,11 +441,16 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
         if (breakpoint != null) {
             breakpointReached(getSession(), server, breakpoint, context, topFrame.getId(), stoppedThread.getId())
                     .exceptionally(this::reportBreakpointFailure);
+            if (breakpoint.getSuspendPolicy() != SuspendPolicy.NONE) {
+                showDataBreakpointHint(getProject(), context, args, DAPClient::showInformationHint);
+            }
             return;
         }
         getSession().positionReached(context);
         if (StoppedEventArgumentsReason.EXCEPTION.equals(args.getReason())) {
             showExceptionHint(getProject(), context, server, getCapabilities(), args, DAPClient::showErrorHint);
+        } else {
+            showDataBreakpointHint(getProject(), context, args, DAPClient::showInformationHint);
         }
     }
 
@@ -520,7 +538,40 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
                                                                @NotNull IDebugProtocolServer server,
                                                                @NotNull Capabilities capabilities,
                                                                @NotNull StoppedEventArguments args,
-                                                               @NotNull ErrorHintDisplay display) {
+                                                               @NotNull HintDisplay display) {
+        return showStopHint(project, context, () -> getExceptionHint(server, capabilities, args), display);
+    }
+
+    /**
+     * Shows the hint of a data breakpoint stop where the program stopped, in an editor of the top frame's file, with
+     * the stopped event's description of what changed, such as {@code Counter.count changed from 0 to 2}. A stop of
+     * another reason, or with no description, shows nothing.
+     *
+     * @param project the project.
+     * @param context the suspend context of the stop.
+     * @param args    the stopped event.
+     * @param display shows the text of the hint in the editor, at the offset where the program stopped.
+     * @return the future, completed once the display of the hint is scheduled, if there is one.
+     */
+    static CompletableFuture<@Nullable Void> showDataBreakpointHint(@NotNull Project project,
+                                                                    @NotNull XSuspendContext context,
+                                                                    @NotNull StoppedEventArguments args,
+                                                                    @NotNull HintDisplay display) {
+        String description = args.getDescription();
+        if (!StoppedEventArgumentsReason.DATA_BREAKPOINT.equals(args.getReason()) || StringUtils.isBlank(description)) {
+            return CompletableFuture.completedFuture(null);
+        }
+        return showStopHint(project, context, () -> CompletableFuture.completedFuture(description), display);
+    }
+
+    /**
+     * Shows a hint where the program stopped, in an editor of the top frame's file, with the text which the given
+     * supplier computes. When no editor shows the file, the text is not computed.
+     */
+    private static CompletableFuture<@Nullable Void> showStopHint(@NotNull Project project,
+                                                                  @NotNull XSuspendContext context,
+                                                                  @NotNull Supplier<CompletableFuture<String>> hintText,
+                                                                  @NotNull HintDisplay display) {
         var stack = context.getActiveExecutionStack();
         var topFrame = stack != null ? stack.getTopFrame() : null;
         var position = topFrame != null ? topFrame.getSourcePosition() : null;
@@ -537,17 +588,17 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
         // has occurred before computing the error hint position.
         // TODO: remove this timer by detecting that scroll editor is finished
         // to display the error hint
-        return getExceptionHint(server, capabilities, args)
+        return hintText.get()
                 .thenAccept(hint -> AppExecutorUtil.getAppScheduledExecutorService().schedule(
                         () -> ApplicationManager.getApplication().invokeLater(() -> display.show(editor, hint, offset)),
                         1, TimeUnit.SECONDS));
     }
 
     /**
-     * Shows the text of an error hint in an editor, at an offset.
+     * Shows the text of a hint in an editor, at an offset.
      */
     @FunctionalInterface
-    interface ErrorHintDisplay {
+    interface HintDisplay {
         void show(@NotNull Editor editor, @NotNull String text, int offset);
     }
 
@@ -700,7 +751,31 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
             // The editor was closed between the stop and the hint
             return;
         }
-        JComponent label = HintUtil.createErrorLabel(hintText);
+        doShowHint(editor, HintUtil.createErrorLabel(hintText), offset);
+    }
+
+    static void showInformationHint(@NotNull Editor editor, @NotNull String text, int offset) {
+        if (ApplicationManager.getApplication().isUnitTestMode()) {
+            return;
+        }
+        String html = toHintHtml(text);
+        if (ApplicationManager.getApplication().isDispatchThread()) {
+            doShowInformationHint(editor, html, offset);
+        } else {
+            ApplicationManager.getApplication()
+                    .invokeLater(() -> doShowInformationHint(editor, html, offset));
+        }
+    }
+
+    private static void doShowInformationHint(@NotNull Editor editor, @NotNull String hintText, int offset) {
+        if (editor.isDisposed()) {
+            // The editor was closed between the stop and the hint
+            return;
+        }
+        doShowHint(editor, HintUtil.createInformationLabel(hintText), offset);
+    }
+
+    private static void doShowHint(@NotNull Editor editor, @NotNull JComponent label, int offset) {
         LightweightHint hint = new LightweightHint(label);
         final VisualPosition pos1 = editor.offsetToVisualPosition(offset);
         final Point p = getHintPosition(hint, editor, pos1, HintManager.DEFAULT);
@@ -1175,6 +1250,24 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
 
     public boolean canDisassemble() {
         return Boolean.TRUE.equals(getCapabilities().getSupportsDisassembleRequest());
+    }
+
+    /**
+     * Returns true if the debug adapter supports data breakpoints and false otherwise.
+     *
+     * @return true if the debug adapter supports data breakpoints and false otherwise.
+     */
+    public boolean isSupportsDataBreakpoints() {
+        return DAPDataBreakpointHandler.isSupportsDataBreakpoints(getCapabilities());
+    }
+
+    /**
+     * Returns the handler of the data breakpoints of the debug session.
+     *
+     * @return the handler of the data breakpoints of the debug session.
+     */
+    public @NotNull DAPDataBreakpointHandler getDataBreakpointHandler() {
+        return debugProcess.getDataBreakpointHandler();
     }
 
     @NotNull
