@@ -107,6 +107,22 @@ the DAP server writes to the console without stopping the program; the expressio
 A DAP server which doesn't support logpoints stops at it: LSP4IJ then evaluates the expression in the stopped frame,
 logs it, and resumes the program. A breakpoint which suspends logs its expression when it stops.
 
+### Function breakpoints
+
+When the DAP server supports
+[function breakpoints](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_SetFunctionBreakpoints)
+(`supportsFunctionBreakpoints`), a breakpoint can be set on a function by its name rather than on a line. In the
+`Breakpoints` dialog (`Run | View Breakpoints...`), click `+`, choose `DAP Function Breakpoint`, and enter the name of
+the function as the DAP server names it, such as `main` or `Point.move`.
+
+A function breakpoint has the `Condition`, `Suspend` and logging options of a line breakpoint, and a `Hit condition`,
+which the DAP server reads, such as `3` or `>= 3`; its name and hit condition can be changed in the dialog. The enabled
+function breakpoints are sent to the DAP server when the debug session starts, and all of them again whenever one is
+added, changed or removed. The dialog shows each as verified or not, as the DAP server answers. When the DAP server
+names the function breakpoint where the program stopped (`hitBreakpointIds` of its `stopped` event), the program stops
+at it as at a line breakpoint. A DAP function breakpoint has no log message, so one whose `Suspend` option is unchecked
+stops, and LSP4IJ logs and resumes the program.
+
 ### Exception breakpoint
 
 Some DAP servers support exception breakpoints. If so, you must first run the configuration process, 

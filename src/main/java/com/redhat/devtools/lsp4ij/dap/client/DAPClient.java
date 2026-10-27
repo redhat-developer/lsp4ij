@@ -225,6 +225,16 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
                                 .initialize(getDebugProtocolServer(), getCapabilities());
                     })
                     .thenCompose(v -> {
+                        // client sends a setFunctionBreakpoints request
+                        // if supportsFunctionBreakpoints returns true
+                        monitor.checkCanceled();
+                        monitor.setFraction(55d / 100d);
+                        monitor.setText2("Sending function breakpoints");
+                        return debugProcess
+                                .getFunctionBreakpointHandler()
+                                .initialize(getDebugProtocolServer(), getCapabilities());
+                    })
+                    .thenCompose(v -> {
                         // client sends a setExceptionBreakpoints request
                         // if one or more exceptionBreakpointFilters have been defined
                         // (or if supportsConfigurationDoneRequest is not true)
@@ -347,8 +357,10 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
             var breakpoint = args.getBreakpoint();
             if (breakpoint != null) {
                 // breakpoint with a given id changed (ex: verified changed)
-                // update the Intellij Breakpoint with those information.
+                // update the Intellij Breakpoint, a line or a function breakpoint, with those information.
                 debugProcess.getBreakpointHandler()
+                        .updateBreakpoint(breakpoint, null);
+                debugProcess.getFunctionBreakpointHandler()
                         .updateBreakpoint(breakpoint, null);
             }
         }
@@ -412,7 +424,7 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
         StackFrame topFrame = frames[0];
         DAPSuspendContext context = getSuspendContext(threads, stoppedThread, frames);
         var breakpointHandler = debugProcess.getBreakpointHandler();
-        XBreakpoint<?> breakpoint = getStopBreakpoint(args, breakpointHandler::findBreakpointById, () -> breakpointHandler.findBreakpoint(topFrame));
+        XBreakpoint<?> breakpoint = getStopBreakpoint(args, debugProcess::findBreakpointById, () -> breakpointHandler.findBreakpoint(topFrame));
         if (breakpoint != null) {
             breakpointReached(getSession(), server, breakpoint, context, topFrame.getId(), stoppedThread.getId())
                     .exceptionally(this::reportBreakpointFailure);
