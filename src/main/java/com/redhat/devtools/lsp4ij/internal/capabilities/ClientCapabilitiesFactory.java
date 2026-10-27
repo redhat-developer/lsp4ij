@@ -150,6 +150,9 @@ public class ClientCapabilitiesFactory {
         // Inlay Hint support
         textDocumentClientCapabilities.setInlayHint(new InlayHintCapabilities(Boolean.TRUE));
 
+        // Inline Value support, for the inline values of a DAP debug session
+        textDocumentClientCapabilities.setInlineValue(new InlineValueCapabilities(Boolean.TRUE));
+
         // Color support
         textDocumentClientCapabilities.setColorProvider(new ColorProviderCapabilities(Boolean.TRUE));
 

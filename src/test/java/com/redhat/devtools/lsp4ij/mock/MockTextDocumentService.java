@@ -72,6 +72,8 @@ public class MockTextDocumentService implements TextDocumentService {
     private List<DocumentSymbol> documentSymbols;
     private SemanticTokens mockSemanticTokens;
     private List<FoldingRange> foldingRanges;
+    private List<InlineValue> mockInlineValues;
+    private final List<InlineValueParams> inlineValueRequests = new CopyOnWriteArrayList<>();
     public int codeActionRequests = 0;
     public volatile CodeActionParams lastCodeActionParams;
     private Function<CompletionItem, CompletableFuture<CompletionItem>> resolveCompletionItemProcessor;
@@ -532,6 +534,20 @@ public class MockTextDocumentService implements TextDocumentService {
     @Override
     public CompletableFuture<List<FoldingRange>> foldingRange(FoldingRangeRequestParams params) {
         return CompletableFuture.completedFuture(this.foldingRanges);
+    }
+
+    public void setMockInlineValues(List<InlineValue> inlineValues) {
+        this.mockInlineValues = inlineValues;
+    }
+
+    public List<InlineValueParams> getInlineValueRequests() {
+        return inlineValueRequests;
+    }
+
+    @Override
+    public CompletableFuture<List<InlineValue>> inlineValue(InlineValueParams params) {
+        inlineValueRequests.add(params);
+        return CompletableFuture.completedFuture(this.mockInlineValues);
     }
 
 }

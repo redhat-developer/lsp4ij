@@ -17,6 +17,7 @@ import com.intellij.openapi.vfs.LocalFileSystem;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.ui.ColoredTextContainer;
 import com.intellij.ui.SimpleTextAttributes;
+import com.intellij.util.concurrency.AppExecutorUtil;
 import com.intellij.xdebugger.XDebuggerBundle;
 import com.intellij.xdebugger.XDebuggerUtil;
 import com.intellij.xdebugger.XSourcePosition;
@@ -39,6 +40,7 @@ import org.jetbrains.annotations.Nullable;
 import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static com.redhat.devtools.lsp4ij.dap.DAPIJUtils.getValidFilePath;
@@ -146,13 +148,15 @@ public class DAPStackFrame extends XStackFrame {
         }
 
         var context = new DebugVariableContext(this);
-        CompletableFuture<DebugVariableContext> future = new CompletableFuture<>();
-        ApplicationManager.getApplication().executeOnPooledThread(() ->
-                ApplicationManager.getApplication().runReadAction(() -> {
-                    context.configureContext();
-                    future.complete(context);
-                }));
-        variablesContext = future;
+        Executor executor = AppExecutorUtil.getAppExecutorService();
+        // The providers first load, without a read action, what may take time, such as the inline values that a
+        // language server answers, then configure the context in a read action, which waits for nothing
+        variablesContext = CompletableFuture.supplyAsync(context::loadContext, executor)
+                .thenCompose(loaded -> loaded)
+                .thenApplyAsync(unused -> {
+                    ApplicationManager.getApplication().runReadAction(context::configureContext);
+                    return context;
+                }, executor);
         return variablesContext;
     }
 
@@ -176,6 +180,7 @@ public class DAPStackFrame extends XStackFrame {
                         return;
                     }
                     AtomicInteger remaining = new AtomicInteger(scopeArray.length);
+                    Scope expanded = getAutoExpandedScope(scopeArray);
                     for (Scope scope : scopeArray) {
                         int parentVariablesReference = scope.getVariablesReference();
                         XValueChildrenList children = new XValueChildrenList();
@@ -186,11 +191,27 @@ public class DAPStackFrame extends XStackFrame {
                                 .thenAccept(variablesResponse -> {
                                     children.addBottomGroup(new DAPValueGroup(this, scope.getName(),
                                             Arrays.asList(variablesResponse.getVariables()),
-                                            parentVariablesReference));
+                                            parentVariablesReference,
+                                            scope == expanded));
                                     node.addChildren(children, remaining.decrementAndGet() == 0);
                                 });
                     }
                 });
+    }
+
+    /**
+     * Returns the scope whose group is expanded when the frame's variables are shown: the one which the DAP server
+     * presents as the frame's local variables ('locals'), or else the first one. The debugger computes the values of
+     * an expanded group's variables, and their inline values in the editor.
+     *
+     * @param scopes the scopes of the frame, in the order of the DAP server.
+     * @return the scope whose group is expanded, or null if there is none.
+     */
+    static @Nullable Scope getAutoExpandedScope(@NotNull Scope[] scopes) {
+        return Arrays.stream(scopes)
+                .filter(scope -> ScopePresentationHint.LOCALS.equals(scope.getPresentationHint()))
+                .findFirst()
+                .orElse(scopes.length > 0 ? scopes[0] : null);
     }
 
     public @NotNull DAPClient getClient() {
@@ -199,6 +220,15 @@ public class DAPStackFrame extends XStackFrame {
 
     public int getFrameId() {
         return stackFrame.getId();
+    }
+
+    /**
+     * Returns the stack frame which the DAP server sent.
+     *
+     * @return the stack frame which the DAP server sent.
+     */
+    public @NotNull StackFrame getStackFrame() {
+        return stackFrame;
     }
 
     public @Nullable String getInstructionPointerReference() {

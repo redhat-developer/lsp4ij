@@ -64,7 +64,7 @@ Current state of [Language Features]( https://microsoft.github.io/language-serve
  * ✅ [textDocument/selectionRange](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_selectionRange)  (see [implementation details](#selection-range))
  * ✅ [textDocument/documentSymbol](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_documentSymbol) (see [implementation details](#document-symbol))
  * ✅ [textDocument/semanticTokens (experimental)](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_semanticTokens) (see [implementation details](#semantic-tokens))
- * ❌ [textDocument/inlineValue](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_inlineValue).
+ * ✅ [textDocument/inlineValue](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_inlineValue) (see [implementation details](#inline-value)).
  * ❌ [workspace/inlineValue/refresh](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_inlineValue_refresh).
  * ❌ [textDocument/moniker](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_moniker).
  * ❌ [textDocument/pullDiagnostics](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_pullDiagnostics).
@@ -320,6 +320,22 @@ LSP4IJ registers [LSPInlayHintProvider](https://github.com/redhat-developer/lsp4
 Here is an example with the [Qute language server](https://github.com/redhat-developer/quarkus-ls/tree/master/qute.ls) showing the parameter's Java type as inlay hint:
 
 ![textDocument/inlayHint](./images/lsp-support/textDocument_inlayHint.png)
+
+### Inline Value
+
+[textDocument/inlineValue](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_inlineValue) is implemented with
+[LSPDebugVariablePositionProvider](https://github.com/redhat-developer/lsp4ij/blob/main/src/main/java/com/redhat/devtools/lsp4ij/dap/client/variables/providers/LSPDebugVariablePositionProvider.java),
+which places the values that a [DAP](./dap/DAPSupport.md) debug session shows inline in the editor, while the program is stopped
+(see [user guide](./dap/UserGuide.md#inline-value)).
+
+When the program stops, the language servers of the stopped file which support it (`inlineValueProvider`) are asked for the
+inline values from the start of the file to the end of the stopped line, with the DAP stack frame id and the stopped location
+as `context`. Each variable lookup (`InlineValueVariableLookup`) gives its variable a position: since IntelliJ shows one value
+per variable, the value is shown at the last line, before or on the stopped line, where the language server names the variable.
+The `InlineValueText` and `InlineValueEvaluatableExpression` inline values are ignored.
+
+The language servers are waited for 2 seconds at most; a variable which they don't name is placed with the syntax
+highlighting of the editor, as without a language server. `workspace/inlineValue/refresh` is not supported.
 
 ### Document Color
 

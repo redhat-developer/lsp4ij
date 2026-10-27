@@ -19,6 +19,7 @@ import com.intellij.xdebugger.evaluation.ExpressionInfo;
 import com.intellij.xdebugger.frame.presentation.*;
 import com.redhat.devtools.lsp4ij.dap.client.variables.providers.DebugVariablePositionProvider;
 import com.redhat.devtools.lsp4ij.dap.client.variables.providers.HighlighterDebugVariablePositionProvider;
+import com.redhat.devtools.lsp4ij.dap.client.variables.providers.LSPDebugVariablePositionProvider;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import org.eclipse.lsp4j.debug.Variable;
 import org.jetbrains.annotations.NotNull;
@@ -26,7 +27,7 @@ import org.jetbrains.annotations.Nullable;
 
 import javax.swing.*;
 import java.util.Collection;
-import java.util.Collections;
+import java.util.List;
 
 /**
  * Debug Adapter Protocol (DAP) variable support.
@@ -148,8 +149,18 @@ public class DebugAdapterVariableSupport {
         this.serverDescriptor = serverDescriptor;
     }
 
+    /**
+     * Returns the providers of the positions of the variables, whose values are shown inline. The first provider which
+     * gives a variable a position wins.
+     * <p>
+     * By default, the positions which the language servers of the file give with 'textDocument/inlineValue' win, and
+     * a variable which they don't name gets the position which the editor highlighter finds.
+     * </p>
+     *
+     * @return the providers of the positions of the variables.
+     */
     public @NotNull Collection<DebugVariablePositionProvider> getDebugVariablePositionProvider() {
-        return Collections.singletonList(new HighlighterDebugVariablePositionProvider());
+        return List.of(new LSPDebugVariablePositionProvider(), new HighlighterDebugVariablePositionProvider());
     }
 
     @NotNull
