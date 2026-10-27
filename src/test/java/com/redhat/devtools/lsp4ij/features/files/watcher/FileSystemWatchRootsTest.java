@@ -172,6 +172,9 @@ public class FileSystemWatchRootsTest extends BasePlatformTestCase {
     public void testARefreshAfterAChangeDoesNotJoinAPassThatStartedBeforeIt() throws Exception {
         Path watched = Files.createDirectories(directory.resolve("external"));
         roots.replace(Set.of(new FileSystemWatchRoots.Root(watched, true)));
+        // A periodic pass running at the first refresh() below would make it return the pass queued after it, which
+        // the second refresh() rightly shares, since it starts after the change: only the test's passes run
+        roots.stopPeriodicRefresh();
         refresh();
         var running = roots.refresh();
         Path source = watched.resolve("data.txt");
