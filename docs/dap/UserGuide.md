@@ -165,6 +165,20 @@ Here's a demo with [Python Debugpy](./user-defined-dap/python-debugpy.md) which 
 
 This happens because `Caught Exceptions` is selected.
 
+## Reset Frame
+
+When the DAP server supports the
+[RestartFrame](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_RestartFrame) request
+(`supportsRestartFrame`), **Reset Frame** restarts the execution of a stack frame while the program is stopped. It is
+available in the context menu of the `Frames` view, with the icon shown when hovering a frame, and in the
+`Run | Debugging Actions` menu, for each frame that the DAP server doesn't mark as one that can't be restarted
+(`canRestart` set to `false`).
+
+The program runs until the DAP server sends a
+[stopped](https://microsoft.github.io/debug-adapter-protocol//specification.html#Events_Stopped) event with the reason
+`restart`, which stops it in the restarted frame. When the DAP server can't restart the frame, the console shows why,
+and the program stays stopped where it was.
+
 ## Inline value
 
 The values of the variables are displayed inline, but this is not perfect because a DAP server generally cannot handle variable positions (only their values). 

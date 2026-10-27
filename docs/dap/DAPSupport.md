@@ -50,7 +50,7 @@ Current state of [Requests](https://microsoft.github.io/debug-adapter-protocol//
 * ✅ [Pause](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_Pause).
 * ❌ [ReadMemory](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_ReadMemory).
 * ❌ [Restart](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_Restart).
-* ❌ [RestartFrame](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_RestartFrame).
+* ✅ [RestartFrame](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_RestartFrame), with the `supportsRestartFrame` capability and the `canRestart` property of a stack frame (see [user guide](./UserGuide.md#reset-frame)).
 * ❌ [ReverseContinue](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_ReverseContinue).
 * ✅ [Scopes](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_Scopes).
 * ✅ [SetBreakpoints](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_SetBreakpoints) (see [user guide](./UserGuide.md#adding-breakpoint)).
