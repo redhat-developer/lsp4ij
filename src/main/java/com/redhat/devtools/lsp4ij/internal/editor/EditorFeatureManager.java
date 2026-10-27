@@ -15,6 +15,7 @@ import com.intellij.openapi.Disposable;
 import com.intellij.openapi.application.ModalityState;
 import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.editor.Editor;
+import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiFile;
@@ -27,11 +28,13 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.Supplier;
 
 /**
  * Editor feature manager used to refresh IntelliJ visible feature of editors from a given project:
@@ -73,6 +76,78 @@ public class EditorFeatureManager implements Disposable {
 
     public static EditorFeatureManager getInstance(@NotNull Project project) {
         return project.getService(EditorFeatureManager.class);
+    }
+
+    private record EditorPresentation(PsiFile file, Editor editor, List<Runnable> updates) {
+    }
+
+    /**
+     * Refreshes a connection's editors in one coalesced read action. Submitting one action per
+     * document can overflow the platform submission tracker during workspace refresh bursts.
+     * The file supplier is evaluated when the pass executes, so coalescing retains current files.
+     * Cache invalidation and UI updates reuse the same feature handlers as single-file refreshes.
+     *
+     * @param owner         the connection lifetime; separate owners never coalesce with each other
+     * @param files         the current files connected to that owner
+     * @param featureType   the editor feature to refresh, clearing its cached LSP data
+     * @param cancelChecker cancellation for owners retired without going through Disposer
+     */
+    public void refreshEditorFeatures(@NotNull Disposable owner,
+                                      @NotNull Supplier<? extends Iterable<VirtualFile>> files,
+                                      @NotNull EditorFeatureType featureType,
+                                      @NotNull CancelChecker cancelChecker) {
+        if (project.isDisposed() || cancelChecker.isCanceled()) {
+            return;
+        }
+        ReadAction.nonBlocking((Callable<List<EditorPresentation>>) () -> {
+                    var presentations = new ArrayList<EditorPresentation>();
+                    for (var file : files.get()) {
+                        ProgressManager.checkCanceled();
+                        cancelChecker.checkCanceled();
+                        if (!file.isValid()) {
+                            continue;
+                        }
+                        var editors = LSPIJUtils.editorsForFile(file, project);
+                        if (editors.length == 0) {
+                            continue;
+                        }
+                        var psiFile = LSPIJUtils.getPsiFile(file, project);
+                        if (psiFile == null) {
+                            continue;
+                        }
+                        for (var editor : editors) {
+                            if (!editor.isDisposed()) {
+                                var updates = new ArrayList<Runnable>();
+                                collectUiRunnables(psiFile, editor, featureType, updates);
+                                presentations.add(new EditorPresentation(psiFile, editor, updates));
+                            }
+                        }
+                    }
+                    return presentations;
+                })
+                .expireWith(owner)
+                .expireWith(project)
+                .expireWhen(cancelChecker::isCanceled)
+                .coalesceBy(this, owner, featureType)
+                .finishOnUiThread(ModalityState.any(), presentations -> {
+                    var clearedFiles = new HashSet<PsiFile>();
+                    for (var presentation : presentations) {
+                        if (!presentation.file().isValid()) {
+                            continue;
+                        }
+                        if (clearedFiles.add(presentation.file())) {
+                            clearLSPCache(presentation.file(), featureType);
+                        }
+                        if (presentation.editor().isDisposed()) {
+                            continue;
+                        }
+                        clearEditorCache(presentation.editor(), project, featureType);
+                        LSPFileSupport.getSupport(presentation.file()).restartDaemonCodeAnalyzerWithDebounce();
+                        if (!cancelChecker.isCanceled()) {
+                            presentation.updates().forEach(Runnable::run);
+                        }
+                    }
+                }).submit(AppExecutorUtil.getAppExecutorService());
     }
 
     /**

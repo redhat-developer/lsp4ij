@@ -18,8 +18,8 @@ Current state of [Text Document Synchronization](https://microsoft.github.io/lan
  * ✅ [textDocument/didChange](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_didChange).
  * ✅ [textDocument/didClose](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_didClose).
  * ✅ [textDocument/didSave](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_didSave).
- * ❌ [textDocument/willSave](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_willSave).
- * ❌ [textDocument/willSaveWaitUntil](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_willSaveWaitUntil).
+ * ✅ [textDocument/willSave](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_willSave) (see [implementation details](#will-save))
+ * ✅ [textDocument/willSaveWaitUntil](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_willSaveWaitUntil) (see [implementation details](#will-save))
  
 Notebooks are not supported.
  
@@ -93,7 +93,10 @@ Current state of [Workspace Features]( https://microsoft.github.io/language-serv
  * ✅ [workspace/didRenameFiles](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_didRenameFiles).
  * ✅ [workspace/willDeleteFiles](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_willDeleteFiles).
  * ✅ [workspace/didDeleteFiles](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_didDeleteFiles).
- * ❌ [workspace/diagnostic](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_diagnostic).
+ * ✅ [workspace/textDocumentContent](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.18/specification/#workspace_textDocumentContent) (LSP 3.18, see [implementation details](#text-document-content))
+ * ✅ [workspace/textDocumentContent/refresh](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.18/specification/#workspace_textDocumentContentRefresh) (LSP 3.18, see [implementation details](#text-document-content))
+ * ✅ [workspace/diagnostic](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_diagnostic) (see [implementation details](#workspace-diagnostics))
+
  
 ## Window Features
 
@@ -114,6 +117,23 @@ Current state of [Window Features]( https://microsoft.github.io/language-server-
 Here a sample with [Eclipse JDT Language Server](https://github.com/eclipse-jdtls/eclipse.jdt.ls):
 
 ![$/progress](./images/lsp-support/progress.png)
+
+### Will Save
+
+When a document is saved, [textDocument/willSave](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_willSave)
+and [textDocument/willSaveWaitUntil](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_willSaveWaitUntil)
+are sent before it is written, to each language server that has the document open and asks for them
+(`willSave` and `willSaveWaitUntil` in its `TextDocumentSyncOptions`):
+
+ * The changes not yet sent to the server are sent first, so that it has the text that is saved.
+ * The reason of `willSave` is always `Manual`, since IntelliJ does not say why a document is saved.
+ * The save waits for the edits of `willSaveWaitUntil` for at most 1.5 seconds. The documents saved together, as by
+   `Save All` or on switching to another application, share that time: a document that finds it used up still gets
+   `willSave`, but not `willSaveWaitUntil`.
+ * The edits that arrive in time are applied to the document, in a command of their own so that `Undo` reverts them
+   alone, and are saved with it. The server receives their `didChange` before the `didSave`.
+ * The edits that arrive later are dropped, as LSP allows. After three such timeouts, `willSaveWaitUntil` is no longer
+   sent for that document.
 
 ### Go to Definition
 
@@ -476,6 +496,34 @@ with debounce and refresh the LSP diagnostics  `externalAnnotator`.
 
 It doesn't support the related documents.
 
+### Workspace Diagnostics
+
+Workspace diagnostics start automatically when a server advertises
+`diagnosticProvider.workspaceDiagnostics`, including dynamic registrations.
+LSP4IJ consumes full, unchanged and streamed partial reports, retains result IDs,
+and reissues completed requests with a short delay. Outdated requests rejected
+with `ContentModified` are retried after the same delay. A diagnostic refresh cancels
+and restarts the workspace pull; stopping the server cancels outstanding work.
+Unregistering a provider clears its diagnostics from open and closed files while
+retaining other providers, including an active document pull provider with the same
+identifier. Replacing a document cache restarts only providers with affected cached
+results or pending matches. Other workspace requests continue, filtering reports
+for the replaced cache until their next pull. Asynchronous document matching does not block refresh,
+unregistration or shutdown; late matches cannot publish after cancellation. A failed matcher
+rejects only that file report, allowing remaining reports and pulls to continue.
+Workspace reports honor server file mappings and synchronous/asynchronous
+DocumentMatchers before updating diagnostics; filtering never starts a server
+or connects a document. Unchanged reports reuse successful matching for retained
+results until that file's content or path, server definitions or mappings change, or a
+diagnostic refresh is requested. Full reports always run matching. A change
+during asynchronous matching allows one recheck before publication. A file
+that keeps changing is left for the next pull, allowing other queued reports
+to proceed without publishing stale matches. Match entries are discarded
+together with their result IDs.
+Workspace reports update closed-file diagnostics. For open files handled by the
+same document diagnostic provider, a fresh workspace report triggers a document
+pull so current editor diagnostics take precedence over slower workspace results.
+
 ### Code Action
 
 Here is an example featuring the [Clojure LSP](./user-defined-ls/clojure-lsp.md), which offers code actions:
@@ -817,3 +865,23 @@ After setting the cursor position in a file, you can view the Type Hierarchy usi
 Here is an example with the [MicroProfile language server](https://github.com/eclipse/lsp4mp/tree/master/microprofile.ls) collecting JAX-RS endpoints:
 
 ![workspace/symbol](./images/lsp-support/workspace_symbol.gif)
+
+### Text Document Content
+
+[workspace/textDocumentContent](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.18/specification/#workspace_textDocumentContent)
+lets a language server provide documents that are not files on disk, such as library sources, decompiled classes or
+generated code, under the URI schemes it lists in its `workspace.textDocumentContent` capability, or registers
+dynamically with `client/registerCapability`.
+
+ * When a navigation result points to a URI with one of those schemes, its text is fetched with
+   `workspace/textDocumentContent` before IntelliJ navigates there, and it opens in a read-only editor. The results
+   that can point there are locations, such as a definition or a reference, workspace symbols, call and type hierarchy
+   items, and document links. `file` URIs are never fetched.
+ * [window/showDocument](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#window_showDocument)
+   opens such a URI the same way.
+ * The document keeps the server's URI. It is opened on the server with `textDocument/didOpen` under that URI, so the
+   language features work in its editor.
+ * On [workspace/textDocumentContent/refresh](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.18/specification/#workspace_textDocumentContentRefresh),
+   the text is fetched again and the open editor shows it, without the document becoming modified.
+ * The documents are closed when the language server stops, or when it unregisters their scheme. A request for their
+   text times out after 10 seconds.

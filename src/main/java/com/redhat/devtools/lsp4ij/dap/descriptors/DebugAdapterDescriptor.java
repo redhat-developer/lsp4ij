@@ -24,6 +24,9 @@ import com.intellij.openapi.util.Key;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.util.net.NetUtils;
 import com.intellij.xdebugger.XDebugSession;
+import com.intellij.xdebugger.XSourcePosition;
+import com.intellij.xdebugger.breakpoints.XBreakpoint;
+import com.intellij.xdebugger.breakpoints.XLineBreakpoint;
 import com.intellij.xdebugger.evaluation.XDebuggerEditorsProvider;
 import com.redhat.devtools.lsp4ij.dap.DAPDebugProcess;
 import com.redhat.devtools.lsp4ij.dap.DAPDebuggerEditorsProvider;
@@ -65,8 +68,8 @@ public abstract class DebugAdapterDescriptor implements DebuggableFile {
     private @NotNull DebugAdapterVariableSupport variableSupport;
 
     public DebugAdapterDescriptor(@NotNull RunConfigurationOptions options,
-                                  @NotNull ExecutionEnvironment environment,
-                                  @Nullable DebugAdapterServerDefinition serverDefinition) {
+                                   @NotNull ExecutionEnvironment environment,
+                                   @Nullable DebugAdapterServerDefinition serverDefinition) {
         this.options = options;
         this.environment = environment;
         this.serverDefinition = serverDefinition;
@@ -107,7 +110,6 @@ public abstract class DebugAdapterDescriptor implements DebuggableFile {
 
     protected @NotNull GeneralCommandLine createStartServerCommandLine(@Nullable String command) throws ExecutionException {
         return createStartServerCommandLine(null, command, Collections.emptyMap(), false);
-
     }
 
     protected @NotNull GeneralCommandLine createStartServerCommandLine(@Nullable String workingDirectory,
@@ -117,12 +119,15 @@ public abstract class DebugAdapterDescriptor implements DebuggableFile {
         if (StringUtils.isBlank(command)) {
             throw new ExecutionException("DAP server command must be specified.");
         }
+
         Integer port = null;
         int portIndex = command.indexOf($_PORT);
         if (portIndex != -1) {
             port = getAvailablePort();
             command = command.replace($_PORT, String.valueOf(port));
         }
+
+        // Validate the working directory before creating the command line.
         String effectiveWorkingDirectory = null;
         if (StringUtils.isNotBlank(workingDirectory)) {
             File workingDir = new File(workingDirectory);
@@ -130,8 +135,11 @@ public abstract class DebugAdapterDescriptor implements DebuggableFile {
                 effectiveWorkingDirectory = workingDirectory;
             }
         }
+
+        // Pass the working directory early so environment customizers can use it.
         GeneralCommandLine commandLine = createCommandLine(command, effectiveWorkingDirectory,
                 userEnvironmentVariables, includeSystemEnvironmentVariables);
+
         if (port != null) {
             commandLine.putUserData(DebugAdapterDescriptor.SERVER_PORT, port);
         }
@@ -156,7 +164,6 @@ public abstract class DebugAdapterDescriptor implements DebuggableFile {
         return new DAPClient(debugProcess, dapParameters, isDebug, debugMode, serverTrace, parentClient);
     }
 
-
     /**
      * Returns the port used by the DAP server and null otherwise.
      *
@@ -179,11 +186,13 @@ public abstract class DebugAdapterDescriptor implements DebuggableFile {
         args.setAdapterID(adapterId);
         args.setPathFormat(InitializeRequestArgumentsPathFormat.PATH);
         args.setSupportsVariableType(true);
-        args.setSupportsVariablePaging(false);
+        // A large variable's indexed children are asked for a page at a time (DAPVariableChildren)
+        args.setSupportsVariablePaging(true);
         args.setLinesStartAt1(true);
         args.setColumnsStartAt1(true);
         args.setSupportsStartDebuggingRequest(true);
         args.setSupportsRunInTerminalRequest(true);
+        args.setSupportsInvalidatedEvent(true);
         return args;
     }
 
@@ -287,6 +296,24 @@ public abstract class DebugAdapterDescriptor implements DebuggableFile {
     @Override
     public boolean isDebuggableFile(@NotNull VirtualFile file, @NotNull Project project) {
         return serverDefinition != null && serverDefinition.isDebuggableFile(file, project);
+    }
+
+    /**
+     * Returns whether the given breakpoint is a line breakpoint on a file that is debuggable by this
+     * DAP server (see {@link #isDebuggableFile}). This is the shared predicate used both to accept a
+     * native line breakpoint (in the DAP breakpoint handler) and to decide whether to forward it
+     * during a DAP session (in {@code DAPForwardedLineBreakpointHandler}). It intentionally does not
+     * look at the breakpoint's type, so each caller keeps control of its own DAP-type handling.
+     */
+    public boolean isDebuggableLineBreakpoint(@NotNull XBreakpoint<?> breakpoint, @NotNull Project project) {
+        if (!(breakpoint instanceof XLineBreakpoint<?> lineBreakpoint)) {
+            return false;
+        }
+        XSourcePosition sourcePosition = lineBreakpoint.getSourcePosition();
+        if (sourcePosition == null) {
+            return false;
+        }
+        return isDebuggableFile(sourcePosition.getFile(), project);
     }
 
     public @NotNull DAPBreakpointHandlerBase<?> createBreakpointHandler(@NotNull XDebugSession session, Project project) {

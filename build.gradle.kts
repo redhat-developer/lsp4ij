@@ -49,7 +49,7 @@ repositories {
     }
 }
 
-val lsp: Configuration by configurations.creating
+val lsp = configurations.dependencyScope("lsp")
 
 // Dependencies are managed with Gradle version catalog - read more: https://docs.gradle.org/current/userguide/platforms.html#sub:version-catalog
 dependencies {
@@ -58,7 +58,9 @@ dependencies {
     intellijPlatform {
         // Disabling the installer dependency since IntelliJ 253 (2025.3.x) and potentially other
         // early access/snapshot versions may lack direct installer packages in the artifact repositories.
-        create(properties("platformType"), properties("platformVersion"), useInstaller = false)
+        create(properties("platformType"), properties("platformVersion")) {
+            useInstaller = false
+        }
 
         // Plugin Dependencies. Uses `platformBundledPlugins` property from the gradle.properties file for bundled IntelliJ Platform plugins.
         // starting from 2024.3, all json related code is know on its own plugin
@@ -155,6 +157,9 @@ intellijPlatform {
                     .let(::markdownToHTML)
             }
         }
+
+        // Change notes are maintained in plugin.xml, not rendered from CHANGELOG.md by the Changelog plugin
+        changeNotes = provider { null }
 
         ideaVersion {
             sinceBuild = properties("pluginSinceBuild")
@@ -262,6 +267,12 @@ tasks {
             jvmArgs("-XX:+AllowEnhancedClassRedefinition", "-XX:HotswapAgent=fatjar")
         }
 
+    }
+
+    publishPlugin {
+        // The IntelliJ Platform Gradle Plugin makes publishing run patchChangelog, which creates an empty CHANGELOG.md;
+        // change notes are maintained in plugin.xml
+        setDependsOn(dependsOn - "patchChangelog")
     }
 
     jacocoTestReport {

@@ -18,20 +18,30 @@ import com.intellij.codeInsight.inline.completion.elements.InlineCompletionGrayT
 import com.intellij.codeInsight.inline.completion.elements.InlineCompletionSkipTextElement
 import com.intellij.codeInsight.inline.completion.suggestion.InlineCompletionSuggestion
 import com.intellij.codeInsight.inline.completion.suggestion.InlineCompletionVariant
+import com.intellij.codeInsight.lookup.LookupManager
+import com.intellij.openapi.application.EDT
 import com.intellij.openapi.application.readAction
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.progress.ProcessCanceledException
+import com.intellij.openapi.progress.util.ProgressIndicatorUtils
 import com.redhat.devtools.lsp4ij.LSPFileSupport
 import com.redhat.devtools.lsp4ij.LSPIJUtils
 import com.redhat.devtools.lsp4ij.LanguageServiceAccessor
-import com.intellij.openapi.progress.util.ProgressIndicatorUtils
+import com.redhat.devtools.lsp4ij.client.features.LSPCompletionProposal
 import com.redhat.devtools.lsp4ij.internal.CompletableFutures.isDoneNormally
-import kotlinx.coroutines.flow.asFlow
-import org.eclipse.lsp4j.TextDocumentIdentifier
 import java.util.concurrent.CancellationException
 import java.util.concurrent.ExecutionException
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.asFlow
+import kotlinx.coroutines.withContext
+import org.eclipse.lsp4j.InlineCompletionContext
+import org.eclipse.lsp4j.InlineCompletionTriggerKind
+import org.eclipse.lsp4j.InsertTextFormat
+import org.eclipse.lsp4j.Range
+import org.eclipse.lsp4j.SelectedCompletionInfo
+import org.eclipse.lsp4j.TextDocumentIdentifier
 
 /**
  * LSP Inline Completion Provider that integrates with IntelliJ's inline completion API
@@ -79,13 +89,12 @@ class LSPInlineCompletionProvider : DebouncedInlineCompletionProvider() {
         // Create LSP params (must be done in read action)
         val document = request.document
         val offset = request.endOffset
-        val (position, textDocument) = readAction {
-            val pos = LSPIJUtils.toPosition(offset, document)
-            val doc = TextDocumentIdentifier(LSPIJUtils.toUri(file).toString())
-            Pair(pos, doc)
+        // Lookup selection is UI state. Capture it together with the document position
+        // on EDT before starting the asynchronous server request. createParams has no side
+        // effects, so a cancelled read is simply repeated.
+        val params = withContext(Dispatchers.EDT) {
+            readAction { createParams(request) }
         }
-
-        val params = LSPInlineCompletionParams(textDocument, position, offset)
 
         // Get inline completions from language servers via LSPFileSupport
         val support = LSPFileSupport.getSupport(file).inlineCompletionSupport
@@ -124,7 +133,9 @@ class LSPInlineCompletionProvider : DebouncedInlineCompletionProvider() {
                     else -> null
                 }
 
-                if (insertText.isNullOrBlank()) {
+                val selected = params.context.selectedCompletionInfo
+                if (insertText.isNullOrBlank() ||
+                    (selected != null && (item.range != selected.range || !insertText.startsWith(selected.text)))) {
                     null
                 } else {
                     // Build elements list considering the range
@@ -198,6 +209,51 @@ class LSPInlineCompletionProvider : DebouncedInlineCompletionProvider() {
         // Accept typing events and direct calls
         // The real check for language server support happens in getSuggestionDebounced
         return event is InlineCompletionEvent.DocumentChange ||
-                event is InlineCompletionEvent.DirectCall
+                event is InlineCompletionEvent.DirectCall ||
+                event is InlineCompletionEvent.LookupChange
+    }
+
+    override fun restartOn(event: InlineCompletionEvent): Boolean {
+        // The platform otherwise retains the current session at the same caret position.
+        // A different lookup item or explicit invocation needs fresh server alternatives.
+        return event is InlineCompletionEvent.DirectCall || event is InlineCompletionEvent.LookupChange
+    }
+
+    /** Capture the native invocation kind and the replacement represented by the popup selection. */
+    internal fun createParams(request: InlineCompletionRequest): LSPInlineCompletionParams {
+        val document = request.document
+        val position = LSPIJUtils.toPosition(request.endOffset, document)
+        val textDocument = TextDocumentIdentifier(LSPIJUtils.toUri(request.file).toString())
+        val kind = if (request.event is InlineCompletionEvent.DirectCall) {
+            InlineCompletionTriggerKind.Invoked
+        } else {
+            InlineCompletionTriggerKind.Automatic
+        }
+        val context = InlineCompletionContext(kind)
+        val lookup = LookupManager.getActiveLookup(request.editor)
+        val selected = request.lookupElement ?: lookup?.currentItem
+        if (selected != null && lookup != null) {
+            // Completion ranking wraps LSP proposals in lookup decorators. The platform
+            // accessor unwraps them so insertion text/ranges and snippet format survive.
+            val proposal = selected.`as`(LSPCompletionProposal::class.java)
+            val item = proposal?.item
+            // A snippet can resolve editor variables and live placeholders on insertion.
+            // Do not describe its source notation as literal selected completion text.
+            if (item?.insertTextFormat != InsertTextFormat.Snippet) {
+                val edit = item?.textEdit
+                val text = when {
+                    edit?.isLeft == true -> edit.left.newText
+                    edit?.isRight == true -> edit.right.newText
+                    else -> item?.insertText ?: selected.lookupString
+                }
+                val range = proposal?.textEditRange ?: Range(
+                    LSPIJUtils.toPosition(lookup.lookupStart, document), position
+                )
+                context.selectedCompletionInfo = SelectedCompletionInfo(range, text)
+            }
+        }
+        return LSPInlineCompletionParams(textDocument, position, request.endOffset).apply {
+            this.context = context
+        }
     }
 }

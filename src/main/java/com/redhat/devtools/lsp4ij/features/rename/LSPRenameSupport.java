@@ -13,6 +13,7 @@ package com.redhat.devtools.lsp4ij.features.rename;
 import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.LSPRequestConstants;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
+import com.redhat.devtools.lsp4ij.WorkspaceEditSnapshot;
 import com.redhat.devtools.lsp4ij.features.AbstractLSPDocumentFeatureSupport;
 import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
 import com.redhat.devtools.lsp4ij.internal.CompletableFutures;
@@ -37,7 +38,7 @@ public class LSPRenameSupport extends AbstractLSPDocumentFeatureSupport<LSPRenam
     private LSPRenameParams previousParams;
 
     public LSPRenameSupport(@NotNull PsiFile file) {
-        super(file);
+        super(file, true, true);
     }
 
     public CompletableFuture<List<WorkspaceEditData>> getRename(@NotNull LSPRenameParams params) {
@@ -73,13 +74,16 @@ public class LSPRenameSupport extends AbstractLSPDocumentFeatureSupport<LSPRenam
                                                                            @NotNull CancellationSupport cancellationSupport) {
         // Update textDocument Uri with custom file Uri if needed
         updateTextDocumentUri(params.getTextDocument(), file, languageServer);
+        // Capture before dispatch, not when the response arrives: typing during the request
+        // must invalidate edits for every affected document, including other open files.
+        var snapshot = WorkspaceEditSnapshot.capture(languageServer);
         return cancellationSupport.execute(languageServer
                                 .getTextDocumentService()
                                 .rename(params), languageServer, LSPRequestConstants.TEXT_DOCUMENT_RENAME,
                         false /* if rename throws an error, the error must not be displayed as notification but as hint in the editor  */)
                 .thenApplyAsync(workspaceEdit -> {
                     if (isValidWorkspaceEdit(workspaceEdit)) {
-                        return List.of(new WorkspaceEditData(workspaceEdit, languageServer));
+                        return List.of(new WorkspaceEditData(workspaceEdit, languageServer, snapshot));
                     }
                     return Collections.emptyList();
                 });

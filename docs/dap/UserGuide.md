@@ -34,7 +34,44 @@ The `Mappings` tab to specify the files which can be debugged to allow adding/re
 
 The `Configuration` tab to specify the working directory and the file you want to run/debug:
 
+The working directory specified in the DAP configuration is applied before environment customization. This allows environment customizers to access the configured working directory when preparing environment variables for the debug adapter.
+
   ![DAP Configuration Type/Configuration](./images/DAP_config_type_configuration.png)
+
+
+
+
+### IntelliJ macro expansion
+
+You can use [built-in IntelliJ macros](https://www.jetbrains.com/help/idea/built-in-macros.html) in DAP configuration parameters. This allows you to reference project and file paths without hardcoding absolute paths.
+
+For example, you can use `$PROJECT_DIR$` to reference the root of the project:
+
+```json
+{
+  "program": "$PROJECT_DIR$/src/main.js"
+}
+```
+
+You can also use `$FilePath$` to reference the path of the currently selected editor file:
+
+```json
+{
+  "program": "$FilePath$"
+}
+```
+
+Here are some useful standard built-in macros that you can use:
+
+- `$WORKSPACE_DIR$`: The path to the workspace where the current project belongs. The workspace is the root of the open file hierarchy and can include multiple projects.
+- `$PROJECT_DIR$`: The root of the project.
+- `$USER_HOME$`: The user's home directory.
+- `$FilePath$`: The path of the currently selected editor file.
+
+Macro expansion is applied to string values in DAP parameters, including values nested inside objects and arrays.
+
+
+
 
 ## Breakpoints
 
@@ -63,6 +100,15 @@ Conditional breakpoints are also supported. Here is an example of a conditional 
 
 ![DAP Conditional Breakpoint](./images/DAP_conditional_breakpoint.png)
 
+### Logpoint
+
+A breakpoint whose `Suspend` option is unchecked logs instead of stopping. Its `"Breakpoint hit" message` and
+`Evaluate and log` expression are sent to the DAP server as a
+[logpoint](https://microsoft.github.io/debug-adapter-protocol//specification.html#Types_SourceBreakpoint), whose message
+the DAP server writes to the console without stopping the program; the expression is evaluated by the DAP server.
+A DAP server which doesn't support logpoints stops at it: LSP4IJ then evaluates the expression in the stopped frame,
+logs it, and resumes the program. A breakpoint which suspends logs its expression when it stops.
+
 ### Exception breakpoint
 
 Some DAP servers support exception breakpoints. If so, you must first run the configuration process, 
@@ -75,6 +121,12 @@ The first time, the selected exception breakpoints
 are based on the default configuration provided by the DAP server.
 
 You can then select or deselect the exception breakpoints you want to use.
+
+An exception breakpoint which the DAP server allows to be conditional (`supportsCondition`) can be given a condition
+in the `Condition` column, such as the exception types to stop at; until then, the column shows what the DAP server
+says the condition means. The condition is sent with the
+[exception filter options](https://microsoft.github.io/debug-adapter-protocol//specification.html#Types_ExceptionFilterOptions)
+when the DAP server supports them (`supportsExceptionFilterOptions`), and kept with the selected exception breakpoints.
 
 Take a sample JavaScript file containing an error:
 
@@ -115,6 +167,20 @@ Here's a demo with [Python Debugpy](./user-defined-dap/python-debugpy.md) which 
 
 This happens because `Caught Exceptions` is selected.
 
+## Reset Frame
+
+When the DAP server supports the
+[RestartFrame](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_RestartFrame) request
+(`supportsRestartFrame`), **Reset Frame** restarts the execution of a stack frame while the program is stopped. It is
+available in the context menu of the `Frames` view, with the icon shown when hovering a frame, and in the
+`Run | Debugging Actions` menu, for each frame that the DAP server doesn't mark as one that can't be restarted
+(`canRestart` set to `false`).
+
+The program runs until the DAP server sends a
+[stopped](https://microsoft.github.io/debug-adapter-protocol//specification.html#Events_Stopped) event with the reason
+`restart`, which stops it in the restarted frame. When the DAP server can't restart the frame, the console shows why,
+and the program stays stopped where it was.
+
 ## Inline value
 
 The values of the variables are displayed inline, but this is not perfect because a DAP server generally cannot handle variable positions (only their values). 
@@ -141,6 +207,29 @@ completion should be available in the expression editor by consuming the
 
 ![Completion](images/DAP_debugging_completion.png)
 
+## Hexadecimal values
+
+When the DAP server supports value formatting (`supportsValueFormattingOptions`), the context menu of the Variables and
+Watches views has `Show Values as Hexadecimal`, which asks the DAP server for numbers in hexadecimal
+([ValueFormat](https://microsoft.github.io/debug-adapter-protocol//specification.html#Types_ValueFormat)) in the
+variables, evaluations and set values of the debug session, and shows the values again.
+
+## Large variables
+
+A variable with more than 100 indexed children, such as a large array, whose
+[Variable](https://microsoft.github.io/debug-adapter-protocol//specification.html#Types_Variable) says how many it has
+(`indexedVariables`), shows its first 100 and a `...` node with how many more there are. Opening the node asks the
+DAP server for the next 100 ([`variables`](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_Variables)
+with `filter` `indexed`, `start` and `count`), so a large variable is read a page at a time. Its named children, when
+it says it has any (`namedVariables`), are asked for first.
+
+## Lazy variables
+
+A variable which the DAP server marks as lazy
+([presentationHint.lazy](https://microsoft.github.io/debug-adapter-protocol//specification.html#Types_VariablePresentationHint)),
+such as a property computed by a getter, is shown with a `Show value` link instead of its value, since getting the value
+may run code. Clicking the link asks the DAP server for the value, which then replaces the link and can be expanded.
+
 ## Set value
 
 If debug adapter [supports setting a variable to a value](https://microsoft.github.io/debug-adapter-protocol//specification.html#Types_Capabilities),
@@ -154,6 +243,22 @@ You should edit the variable:
 
 the edit apply will consume the
 [SetVariable request](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_SetVariable):
+
+## Loaded sources and modules
+
+When the DAP server reports the sources it has loaded (`supportsLoadedSourcesRequest`), the debug tab gets a
+`Loaded Sources` tab the first time it reports any. It lists each source with its path, as the
+[loadedSources](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_LoadedSources) request
+gives them at the first stop, and as the
+[loadedSource](https://microsoft.github.io/debug-adapter-protocol//specification.html#Events_LoadedSource) event adds,
+changes and removes them. Double-clicking a source, or Enter, opens it: a source with a path in its file, and one with
+a `sourceReference` in the text that the DAP server gives for it, read-only.
+
+When the DAP server reports its modules (`supportsModulesRequest`), a `Modules` tab lists each module's name, version
+and path, and whether it is user code, as the
+[modules](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_Modules) request gives them at
+the first stop and the [module](https://microsoft.github.io/debug-adapter-protocol//specification.html#Events_Module) event
+updates them.
 
 ## Run In Terminal
 

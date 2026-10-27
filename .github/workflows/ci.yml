@@ -24,11 +24,11 @@ jobs:
 
       # Check out current repository
       - name: Fetch Sources
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       # Set up Java environment for the next steps
       - name: Setup Java
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v6
         with:
           distribution: 'temurin'
           java-version: 21
@@ -36,7 +36,7 @@ jobs:
 
       # Setup Gradle
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@v5
 
       # Run tests
       - name: Run Tests
@@ -45,13 +45,13 @@ jobs:
       # Collect Tests Result
       - name: Collect Tests Result
         if: ${{ success() || failure()}}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: tests-result-${{runner.os}}
           path: ${{ github.workspace }}/build/reports/tests
 
       - name: Upload coverage reports to Codecov
-        uses: codecov/codecov-action@v4.0.1
+        uses: codecov/codecov-action@v7.1.1
         if: runner.os == 'Linux'
         with:
           token: ${{ secrets.CODECOV_TOKEN }}

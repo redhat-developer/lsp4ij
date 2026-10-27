@@ -806,6 +806,16 @@
                 implementation="com.redhat.devtools.lsp4ij.features.rename.LSPRenameHandler"
                 order="first"/>
 
+        <!-- LSP workspace/willRenameFiles for rename and move refactorings, sent before their write action -->
+        <renamePsiElementProcessor
+                implementation="com.redhat.devtools.lsp4ij.features.files.WillRenameFilesRenameProcessor"
+                order="last, after renamePsiFile"/>
+        <moveFileHandler
+                implementation="com.redhat.devtools.lsp4ij.features.files.WillRenameFilesMoveHandler"
+                order="last"/>
+        <refactoring.helper
+                implementation="com.redhat.devtools.lsp4ij.features.files.WillRenameFilesRefactoringHelper"/>
+
         <!-- Code Action support-->
         <intentionAction>
             <bundleName>messages.LanguageServerBundle</bundleName>
@@ -1090,6 +1100,9 @@
         <listener
                 topic="com.intellij.openapi.project.ProjectManagerListener"
                 class="com.redhat.devtools.lsp4ij.ConnectDocumentToLanguageServerSetupParticipant"/>
+        <listener
+                topic="com.intellij.openapi.fileEditor.FileDocumentManagerListener"
+                class="com.redhat.devtools.lsp4ij.LSPDocumentSaveListener"/>
         <listener topic="com.intellij.ide.AppLifecycleListener"
                   class="com.redhat.devtools.lsp4ij.client.indexing.ProjectIndexingAppLifecycleListener"/>
     </applicationListeners>
@@ -1099,6 +1112,8 @@
                   class="com.redhat.devtools.lsp4ij.features.completion.LSPCompletionContributor$LSPLookupManagerListener"/>
         <listener class="com.redhat.devtools.lsp4ij.client.indexing.ProjectIndexingOnlyDumbStrategy"
                   topic="com.intellij.openapi.project.DumbService$DumbModeListener"/>
+        <listener topic="com.intellij.refactoring.listeners.RefactoringEventListener"
+                  class="com.redhat.devtools.lsp4ij.features.files.WillRenameFilesPreparation$RefactoringListener"/>
     </projectListeners>
 
     <!-- DAP Support -->
@@ -1194,6 +1209,12 @@
                 description="Show disassembly for this frame">
             <add-to-group group-id="DebuggingActionsGroup"/>
             <add-to-group group-id="XDebugger.Frames.Tree.Popup" anchor="last"/>
+        </action>
+        <action id="DAP.HexadecimalValues"
+                class="com.redhat.devtools.lsp4ij.dap.client.variables.DAPHexadecimalValuesAction"
+                text="Show Values as Hexadecimal"
+                description="Ask the DAP server for numbers in hexadecimal">
+            <add-to-group group-id="XDebugger.ValueGroup" anchor="last"/>
         </action>
     </actions>
 

@@ -52,6 +52,10 @@ public class ClientCapabilitiesFactory {
         // Support for 'workspace/configuration'
         workspaceClientCapabilities.setConfiguration(Boolean.TRUE);
 
+        // Support for 'workspace/textDocumentContent' (LSP 3.18): documents the server provides under its own URI
+        // schemes, which it can also register dynamically
+        workspaceClientCapabilities.setTextDocumentContent(new TextDocumentContentCapabilities(Boolean.TRUE));
+
         // Support for 'workspace/symbol'
         var symbolCapabilities = new SymbolCapabilities();
         workspaceClientCapabilities.setSymbol(symbolCapabilities);
@@ -162,6 +166,7 @@ public class ClientCapabilitiesFactory {
         completionItemCapabilities.setDeprecatedSupport(Boolean.TRUE);
         completionItemCapabilities.setLabelDetailsSupport(Boolean.TRUE);
         CompletionCapabilities completionCapabilities = new CompletionCapabilities(completionItemCapabilities);
+        completionCapabilities.setInsertTextMode(InsertTextMode.AdjustIndentation);
         completionCapabilities.setCompletionList(new CompletionListCapabilities(List.of("editRange")));
         completionCapabilities.setDynamicRegistration(Boolean.TRUE);
         textDocumentClientCapabilities.setCompletion(completionCapabilities);
@@ -177,6 +182,7 @@ public class ClientCapabilitiesFactory {
         ParameterInformationCapabilities parameterInformationCapabilities = new ParameterInformationCapabilities();
         parameterInformationCapabilities.setLabelOffsetSupport(Boolean.TRUE);
         signatureInformationCapabilities.setParameterInformation(parameterInformationCapabilities);
+        signatureInformationCapabilities.setActiveParameterSupport(Boolean.TRUE);
         signatureHelpCapabilities.setSignatureInformation(signatureInformationCapabilities);
         textDocumentClientCapabilities.setSignatureHelp(signatureHelpCapabilities);
 

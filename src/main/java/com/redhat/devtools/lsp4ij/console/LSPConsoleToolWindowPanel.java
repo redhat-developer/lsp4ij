@@ -629,13 +629,25 @@ public class LSPConsoleToolWindowPanel extends SimpleToolWindowPanel implements 
 
         @Override
         public void dispose() {
+            var project = getProject();
             for (LanguageServerSettingsListener settingsChangeListener : settingsChangeListeners) {
-                ProjectLanguageServerSettings.getInstance(getProject()).removeSettingsListener(settingsChangeListener);
-                GlobalLanguageServerSettings.getInstance().removeSettingsListener(settingsChangeListener);
+                if (!project.isDisposed()) {
+                    var projectSettings = ProjectLanguageServerSettings.getInstance(project);
+                    if (projectSettings != null) {
+                        projectSettings.removeSettingsListener(settingsChangeListener);
+                    }
+                }
+                var globalSettings = GlobalLanguageServerSettings.getInstance();
+                if (globalSettings != null) {
+                    globalSettings.removeSettingsListener(settingsChangeListener);
+                }
             }
             settingsChangeListeners.clear();
-            for (var serverDefinitionListener : serverDefinitionListeners) {
-                LanguageServersRegistry.getInstance().removeLanguageServerDefinitionListener(serverDefinitionListener);
+            var registry = LanguageServersRegistry.getInstance();
+            if (registry != null) {
+                for (var serverDefinitionListener : serverDefinitionListeners) {
+                    registry.removeLanguageServerDefinitionListener(serverDefinitionListener);
+                }
             }
             serverDefinitionListeners.clear();
             super.dispose();

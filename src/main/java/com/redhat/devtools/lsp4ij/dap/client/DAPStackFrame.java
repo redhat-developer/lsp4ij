@@ -181,6 +181,7 @@ public class DAPStackFrame extends XStackFrame {
                         XValueChildrenList children = new XValueChildrenList();
                         VariablesArguments variablesArgs = new VariablesArguments();
                         variablesArgs.setVariablesReference(parentVariablesReference);
+                        variablesArgs.setFormat(client.getValueFormat());
                         server.variables(variablesArgs)
                                 .thenAccept(variablesResponse -> {
                                     children.addBottomGroup(new DAPValueGroup(this, scope.getName(),
@@ -202,6 +203,29 @@ public class DAPStackFrame extends XStackFrame {
 
     public @Nullable String getInstructionPointerReference() {
         return stackFrame.getInstructionPointerReference();
+    }
+
+    /**
+     * Returns true if the debug adapter can restart this frame with the 'restartFrame' request and false otherwise.
+     *
+     * @return true if the debug adapter can restart this frame and false otherwise.
+     */
+    public boolean canRestart() {
+        return canRestart(client.getCapabilities(), stackFrame);
+    }
+
+    /**
+     * Returns true if the debug adapter supports the 'restartFrame' request (supportsRestartFrame) and the frame
+     * doesn't say that it can't be restarted (canRestart), and false otherwise.
+     *
+     * @param capabilities the debug adapter capabilities.
+     * @param stackFrame   the DAP stack frame.
+     * @return true if the debug adapter can restart the frame and false otherwise.
+     */
+    static boolean canRestart(@NotNull Capabilities capabilities, @NotNull StackFrame stackFrame) {
+        // A frame which doesn't say whether it can be restarted can be, when the debug adapter supports 'restartFrame'
+        return Boolean.TRUE.equals(capabilities.getSupportsRestartFrame())
+                && !Boolean.FALSE.equals(stackFrame.getCanRestart());
     }
 
     @Override

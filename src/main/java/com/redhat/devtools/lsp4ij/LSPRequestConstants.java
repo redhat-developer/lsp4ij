@@ -21,6 +21,7 @@ public class LSPRequestConstants {
     public static final String WORKSPACE_WILL_DELETE_FILES = "workspace/willDeleteFiles";
     public static final String WORKSPACE_WILL_RENAME_FILES = "workspace/willRenameFiles";
     public static final String WORKSPACE_SYMBOL = "workspace/symbol";
+    public static final String WORKSPACE_TEXT_DOCUMENT_CONTENT = "workspace/textDocumentContent";
 
     // textDocument/* LSP requests
 

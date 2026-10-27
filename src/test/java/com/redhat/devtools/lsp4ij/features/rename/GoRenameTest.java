@@ -53,7 +53,7 @@ public class GoRenameTest extends LSPRenameFixtureTestCase {
                               "documentChanges": [
                                 {
                                   "textDocument": {
-                                    "version": 5,
+                                    "version": 1,
                                     "uri": "%s"
                                   },
                                   "edits": [
@@ -102,7 +102,7 @@ public class GoRenameTest extends LSPRenameFixtureTestCase {
                               "documentChanges": [
                                 {
                                   "textDocument": {
-                                    "version": 5,
+                                    "version": 1,
                                     "uri": "%s"
                                   },
                                   "edits": [

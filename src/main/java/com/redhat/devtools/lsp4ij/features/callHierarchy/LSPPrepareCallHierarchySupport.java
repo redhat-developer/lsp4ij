@@ -38,7 +38,7 @@ public class LSPPrepareCallHierarchySupport extends AbstractLSPDocumentFeatureSu
     private Integer previousOffset;
 
     public LSPPrepareCallHierarchySupport(@NotNull PsiFile file) {
-        super(file);
+        super(file, true, true);
     }
 
     public CompletableFuture<List<CallHierarchyItemData>> getPrepareCallHierarchies(LSPCallHierarchyPrepareParams params) {

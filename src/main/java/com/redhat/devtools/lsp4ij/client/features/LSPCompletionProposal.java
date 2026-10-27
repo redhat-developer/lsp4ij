@@ -114,8 +114,10 @@ public class LSPCompletionProposal extends LookupElement implements Pointer<LSPC
             // Use client config to determine how the snippet should be transformed into a template
             boolean useTemplateForInvocationOnlySnippet = completionFeature.useTemplateForInvocationOnlySnippet(file);
 
-            // Get the indentation settings
-            LspSnippetIndentOptions indentOptions = CompletionProposalTools.createLspIndentOptions(snippetContent, file);
+            // AsIs preserves the server's indentation, including literal tab characters.
+            boolean adjustIndentation = item.getInsertTextMode() != InsertTextMode.AsIs;
+            LspSnippetIndentOptions indentOptions = adjustIndentation
+                    ? CompletionProposalTools.createLspIndentOptions(snippetContent, file) : null;
             // Load the insert text to build:
             // - an IJ Template instance which will take care of replacement of placeholders
             // - the insert text without placeholders
@@ -126,6 +128,10 @@ public class LSPCompletionProposal extends LookupElement implements Pointer<LSPC
                     indentOptions,
                     useTemplateForInvocationOnlySnippet
             );
+            if (!adjustIndentation) {
+                template.setToIndent(false);
+                template.setToReformat(false);
+            }
             // Update the TextEdit with the content snippet content without placeholders
             // ex : ${1:name} --> name
             updateInsertTextForTemplateProcessing(template.getTemplateText());

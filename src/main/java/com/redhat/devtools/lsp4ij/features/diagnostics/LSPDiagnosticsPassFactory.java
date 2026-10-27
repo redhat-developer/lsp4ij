@@ -44,6 +44,8 @@ public class LSPDiagnosticsPassFactory implements MainHighlightingPassFactory,
                 -1
         );
         LSPDiagnosticsApplier.GROUP_ID = passId;
+        // Show the diagnostics that were published before this registration.
+        LSPDiagnosticsApplier.getInstance(project).applyPendingRefreshes();
     }
 
     @Nullable

@@ -11,6 +11,7 @@
 package com.redhat.devtools.lsp4ij.mock;
 
 import com.intellij.openapi.project.Project;
+import com.redhat.devtools.lsp4ij.client.LanguageClientImpl;
 import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
 import com.redhat.devtools.lsp4ij.server.StreamConnectionProvider;
 import com.redhat.devtools.lsp4ij.server.definition.ClientConfigurableLanguageServerDefinition;
@@ -30,6 +31,8 @@ public class MockLanguageServerDefinition extends LanguageServerDefinition imple
     private final boolean clientConfigurable;
     private final ClientConfigurationSettings clientConfigurationSettings = new ClientConfigurationSettings();
     private final @NotNull MockLanguageServer server;
+
+    private static volatile @Nullable LanguageClientImpl lastLanguageClient;
 
     public MockLanguageServerDefinition(boolean clientConfigurable, boolean useServerSingleton) {
         this(SERVER_ID, clientConfigurable, useServerSingleton);
@@ -64,5 +67,20 @@ public class MockLanguageServerDefinition extends LanguageServerDefinition imple
 
     public @NotNull MockLanguageServer getServer() {
         return server;
+    }
+
+    @Override
+    public @NotNull LanguageClientImpl createLanguageClient(@NotNull Project project) {
+        var client = super.createLanguageClient(project);
+        lastLanguageClient = client;
+        return client;
+    }
+
+    /**
+     * @return the language client created last, which a test can use while its server initializes, before
+     * the wrapper has it
+     */
+    public static @Nullable LanguageClientImpl getLastLanguageClient() {
+        return lastLanguageClient;
     }
 }

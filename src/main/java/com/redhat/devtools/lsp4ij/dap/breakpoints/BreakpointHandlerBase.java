@@ -20,6 +20,7 @@ import com.intellij.xdebugger.breakpoints.XBreakpoint;
 import com.intellij.xdebugger.breakpoints.XBreakpointHandler;
 import com.intellij.xdebugger.breakpoints.XBreakpointType;
 import com.intellij.xdebugger.breakpoints.XLineBreakpoint;
+import com.redhat.devtools.lsp4ij.dap.DAPBundle;
 import com.redhat.devtools.lsp4ij.dap.descriptors.DebugAdapterDescriptor;
 import org.eclipse.lsp4j.debug.Breakpoint;
 import org.eclipse.lsp4j.debug.Capabilities;
@@ -29,7 +30,10 @@ import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.Collections;
+import java.util.IdentityHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
 /**
@@ -49,6 +53,10 @@ public abstract class BreakpointHandlerBase<B extends XBreakpoint<?>> extends XB
     protected final @NotNull Project project;
     protected final List<IDebugProtocolServer> debugProtocolServers = ContainerUtil.createConcurrentList();
     protected final List<B> breakpoints = ContainerUtil.createConcurrentList();
+    private final Map<IDebugProtocolServer, Capabilities> capabilities = Collections.synchronizedMap(new IdentityHashMap<>());
+    // The temporary breakpoint, as of "Run to Cursor", from when it is registered until it is unregistered: each
+    // 'setBreakpoints' request for its source keeps it, as when the user adds a breakpoint to the source meanwhile
+    private @Nullable XSourcePosition registeredTemporaryBreakpoint;
 
     public BreakpointHandlerBase(@NotNull Class<? extends XBreakpointType<B, ?>> breakpointTypeClass,
                                  @NotNull XDebugSession debugSession,
@@ -63,7 +71,19 @@ public abstract class BreakpointHandlerBase<B extends XBreakpoint<?>> extends XB
     public CompletableFuture<@Nullable Void> initialize(@NotNull IDebugProtocolServer debugProtocolServer,
                                                         @NotNull Capabilities capabilities) {
         this.debugProtocolServers.add(debugProtocolServer);
+        this.capabilities.put(debugProtocolServer, capabilities);
         return sendBreakpoints(debugProtocolServer, null);
+    }
+
+    /**
+     * Returns the capabilities of the given initialized DAP server, and empty capabilities otherwise.
+     *
+     * @param debugProtocolServer the DAP server.
+     * @return the capabilities of the given initialized DAP server, and empty capabilities otherwise.
+     */
+    protected @NotNull Capabilities getCapabilities(@NotNull IDebugProtocolServer debugProtocolServer) {
+        var serverCapabilities = capabilities.get(debugProtocolServer);
+        return serverCapabilities != null ? serverCapabilities : new Capabilities();
     }
 
     @Override
@@ -83,40 +103,49 @@ public abstract class BreakpointHandlerBase<B extends XBreakpoint<?>> extends XB
             // Mark the breakpoint as invalid so the user sees visual feedback
             if (breakpoint instanceof XLineBreakpoint<?> lineBreakpoint) {
                 String message = sourcePosition == null
-                    ? "Breakpoint location not available"
-                    : "File not debuggable with current debug adapter";
+                    ? DAPBundle.message("dap.breakpoints.location.not.available")
+                    : DAPBundle.message("dap.breakpoints.file.not.debuggable");
                 debugSession.setBreakpointInvalid(lineBreakpoint, message);
             }
             return;
         }
 
         breakpoints.add(breakpoint);
+        onBreakpointsChanged(breakpoint);
         sendBreakpoints(null, null);
     }
 
     @Override
     public void unregisterBreakpoint(@NotNull B breakpoint,
                                      boolean temporary) {
-        var sourcePosition = breakpoint.getSourcePosition();
-        if (!supportsBreakpoint(breakpoint) || sourcePosition == null) {
+        // Remove the breakpoint by identity, without checking supportsBreakpoint(): IntelliJ unregisters
+        // a changed breakpoint with its new location, which may not be supported anymore (ex: its file
+        // was moved out of the mapped files). Checking it kept the breakpoint, which was then sent again
+        // at its new location, while its old source was never cleared in the debug adapter.
+        if (!breakpoints.remove(breakpoint)) {
+            // Not registered (ex: not supported when it was registered)
             return;
         }
-        breakpoints.remove(breakpoint);
+        onBreakpointsChanged(breakpoint);
         // DAP replaces breakpoints per source, not per session. Include the removed
         // source even when other files still have breakpoints, so its last breakpoint
         // is cleared by an empty setBreakpoints request.
-        sendBreakpoints(null, new TemporaryBreakpoint(sourcePosition, false));
+        var sourcePosition = breakpoint.getSourcePosition();
+        sendBreakpoints(null, sourcePosition != null ? new TemporaryBreakpoint(sourcePosition, false) : null);
     }
 
     @Override
     public void dispose() {
         debugProtocolServers.clear();
+        capabilities.clear();
     }
 
-    protected CompletableFuture<@Nullable Void> sendBreakpoints(@Nullable IDebugProtocolServer debugProtocolServer,
-                                                                @Nullable TemporaryBreakpoint temporaryBreakpoint) {
-        if (breakpoints.isEmpty() && temporaryBreakpoint == null) {
-            // No breakpoints to send
+    // Sends take turns, so the debug adapter gets them in the order in which they read the breakpoints: a request
+    // which still has the temporary breakpoint cannot follow the one which removes it
+    protected synchronized CompletableFuture<@Nullable Void> sendBreakpoints(@Nullable IDebugProtocolServer debugProtocolServer,
+                                                                             @Nullable TemporaryBreakpoint temporaryBreakpoint) {
+        if (breakpoints.isEmpty() && temporaryBreakpoint == null && registeredTemporaryBreakpoint == null && !hasSentBreakpoints()) {
+            // No breakpoints to send, and none to clear
             return CompletableFuture.completedFuture(null);
         }
         if (debugProtocolServers.isEmpty()) {
@@ -125,6 +154,15 @@ public abstract class BreakpointHandlerBase<B extends XBreakpoint<?>> extends XB
             return CompletableFuture.completedFuture(null);
         }
         return doSendBreakpoints(debugProtocolServer, temporaryBreakpoint);
+    }
+
+    /**
+     * Returns true if breakpoints sent to the debug adapter may still have to be cleared, and false otherwise.
+     *
+     * @return true if breakpoints sent to the debug adapter may still have to be cleared, and false otherwise.
+     */
+    protected boolean hasSentBreakpoints() {
+        return false;
     }
 
     /**
@@ -157,7 +195,7 @@ public abstract class BreakpointHandlerBase<B extends XBreakpoint<?>> extends XB
      * @return the IntelliJ breakpoint from the DAP breakpoint id and null otherwise.
      */
     @Nullable
-    private B findBreakpointById(@Nullable Integer id) {
+    public B findBreakpointById(@Nullable Integer id) {
         if (id == null) {
             return null;
         }
@@ -171,26 +209,49 @@ public abstract class BreakpointHandlerBase<B extends XBreakpoint<?>> extends XB
     }
 
     /**
-     * Register the given source position as temporary breakpoint.
+     * Register the given source position as temporary breakpoint. It stays in the 'setBreakpoints' requests for its
+     * source until it is unregistered. One is kept at a time: unregister the one registered before first.
      *
      * @param sourcePosition the temporary breakpoint.
      * @return the completable future.
      */
-    public CompletableFuture<@Nullable Void> registerTemporaryBreakpoint(@NotNull XSourcePosition sourcePosition) {
-        return sendBreakpoints(null, new TemporaryBreakpoint(sourcePosition, true));
+    public synchronized CompletableFuture<@Nullable Void> registerTemporaryBreakpoint(@NotNull XSourcePosition sourcePosition) {
+        registeredTemporaryBreakpoint = sourcePosition;
+        return sendBreakpoints(null, null);
     }
 
     /**
      * Un-register the given source position as temporary breakpoint.
      *
-     * @param sourcePosition the temporary breakpoint.
+     * @param sourcePosition the temporary breakpoint, as given to {@link #registerTemporaryBreakpoint(XSourcePosition)}.
      * @return the completable future.
      */
-    public CompletableFuture<@Nullable Void> unregisterTemporaryBreakpoint(@NotNull XSourcePosition sourcePosition) {
+    public synchronized CompletableFuture<@Nullable Void> unregisterTemporaryBreakpoint(@NotNull XSourcePosition sourcePosition) {
+        if (registeredTemporaryBreakpoint == sourcePosition) {
+            registeredTemporaryBreakpoint = null;
+        }
         return sendBreakpoints(null, new TemporaryBreakpoint(sourcePosition, false));
     }
 
+    /**
+     * Returns the registered temporary breakpoint, and null if there is none.
+     *
+     * @return the registered temporary breakpoint, and null if there is none.
+     */
+    protected synchronized @Nullable XSourcePosition getRegisteredTemporaryBreakpoint() {
+        return registeredTemporaryBreakpoint;
+    }
+
     protected abstract boolean supportsBreakpoint(B breakpoint);
+
+    /**
+     * Called when the given breakpoint has been added to or removed from the registered breakpoints,
+     * before the breakpoints are sent to the debug adapter.
+     *
+     * @param breakpoint the added or removed breakpoint.
+     */
+    protected void onBreakpointsChanged(@NotNull B breakpoint) {
+    }
 
     protected abstract @NotNull CompletableFuture<@Nullable Void> doSendBreakpoints(@Nullable IDebugProtocolServer debugProtocolServer,
                                                                            @Nullable TemporaryBreakpoint temporaryBreakpoint);
