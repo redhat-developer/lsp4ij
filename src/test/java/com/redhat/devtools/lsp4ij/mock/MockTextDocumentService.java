@@ -384,6 +384,8 @@ public class MockTextDocumentService implements TextDocumentService {
         this.mockCodeActions = new ArrayList<>();
         this.mockResolvedCodeAction = new CodeAction();
         this.diagnosticRequests.clear();
+        this.mockInlineValues = null;
+        this.inlineValueRequests.clear();
         this.renameProcessor = null;
         this.prepareRenameProcessor = null;
         this.documentSymbols = Collections.emptyList();
