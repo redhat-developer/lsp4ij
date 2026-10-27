@@ -41,6 +41,7 @@ import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import com.redhat.devtools.lsp4ij.settings.ServerTrace;
 import org.eclipse.lsp4j.debug.*;
+import org.eclipse.lsp4j.debug.Module;
 import org.eclipse.lsp4j.debug.launch.DSPLauncher;
 import org.eclipse.lsp4j.debug.services.IDebugProtocolClient;
 import org.eclipse.lsp4j.debug.services.IDebugProtocolServer;
@@ -67,6 +68,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.function.UnaryOperator;
@@ -118,6 +120,9 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
     private @NotNull
     final List<DAPClient> childrenClient;
     private boolean sentTerminateRequest;
+    // Whether the loaded sources and modules were asked for. They are asked for at the first stop, and then follow the
+    // 'loadedSource' and 'module' events: asking at each stop would get all of them again at each step.
+    private final AtomicBoolean loadedSourcesAndModulesAsked = new AtomicBoolean();
 
     public DAPClient(@NotNull DAPDebugProcess debugProcess,
                      @NotNull Map<String, Object> dapParameters,
@@ -357,6 +362,9 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
         Integer threadId = args.getThreadId();
         if (server == null || threadId == null) {
             return;
+        }
+        if (loadedSourcesAndModulesAsked.compareAndSet(false, true)) {
+            refreshLoadedSourcesAndModules(server);
         }
         getThreads(true).thenAcceptAsync(threads -> {
             var stoppedThread = Arrays.stream(threads)
@@ -919,6 +927,72 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
     @Override
     public void thread(ThreadEventArguments args) {
         debugProcess.refreshThread(args);
+    }
+
+    // Loaded sources and modules
+
+    @Override
+    public void loadedSource(LoadedSourceEventArguments args) {
+        debugProcess.updateLoadedSource(this, args);
+    }
+
+    @Override
+    public void module(ModuleEventArguments args) {
+        debugProcess.updateModule(this, args);
+    }
+
+    /**
+     * Shows the sources and modules which the DAP server reports, if it reports them, as the program first stopped.
+     *
+     * @param server the debug adapter.
+     */
+    private void refreshLoadedSourcesAndModules(@NotNull IDebugProtocolServer server) {
+        getLoadedSources(server, getCapabilities()).thenAccept(sources -> {
+            if (sources != null) {
+                debugProcess.refreshLoadedSources(this, sources);
+            }
+        });
+        getModules(server, getCapabilities()).thenAccept(modules -> {
+            if (modules != null) {
+                debugProcess.refreshModules(this, modules);
+            }
+        });
+    }
+
+    /**
+     * Returns the sources which the DAP server reports as loaded, or null when it doesn't report them
+     * (supportsLoadedSourcesRequest) or the request fails.
+     *
+     * @param server       the debug adapter.
+     * @param capabilities the debug adapter's capabilities.
+     * @return the loaded sources, or null.
+     */
+    static CompletableFuture<Source @Nullable []> getLoadedSources(@NotNull IDebugProtocolServer server,
+                                                                   @NotNull Capabilities capabilities) {
+        if (!Boolean.TRUE.equals(capabilities.getSupportsLoadedSourcesRequest())) {
+            return CompletableFuture.completedFuture(null);
+        }
+        return server.loadedSources(new LoadedSourcesArguments())
+                .thenApply(response -> response != null && response.getSources() != null ? response.getSources() : new Source[0])
+                .exceptionally(error -> null);
+    }
+
+    /**
+     * Returns the modules which the DAP server reports, or null when it doesn't report them (supportsModulesRequest) or
+     * the request fails.
+     *
+     * @param server       the debug adapter.
+     * @param capabilities the debug adapter's capabilities.
+     * @return the modules, or null.
+     */
+    static CompletableFuture<Module @Nullable []> getModules(@NotNull IDebugProtocolServer server,
+                                                             @NotNull Capabilities capabilities) {
+        if (!Boolean.TRUE.equals(capabilities.getSupportsModulesRequest())) {
+            return CompletableFuture.completedFuture(null);
+        }
+        return server.modules(new ModulesArguments())
+                .thenApply(response -> response != null && response.getModules() != null ? response.getModules() : new Module[0])
+                .exceptionally(error -> null);
     }
 
     public CompletableFuture<org.eclipse.lsp4j.debug.Thread[]> getThreads(boolean refreshThreads) {

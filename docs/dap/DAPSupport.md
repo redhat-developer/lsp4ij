@@ -13,9 +13,9 @@ Current state of [Events](https://microsoft.github.io/debug-adapter-protocol//sp
 * ❌ [Exited](https://microsoft.github.io/debug-adapter-protocol//specification.html#Events_Exited).
 * ✅ [Initialized](https://microsoft.github.io/debug-adapter-protocol//specification.html#Events_Initialized).
 * ✅ [Invalidated](https://microsoft.github.io/debug-adapter-protocol//specification.html#Events_Invalidated).
-* ❌ [LoadedSource](https://microsoft.github.io/debug-adapter-protocol//specification.html#Events_LoadedSource).
+* ✅ [LoadedSource](https://microsoft.github.io/debug-adapter-protocol//specification.html#Events_LoadedSource).
 * ❌ [Memory](https://microsoft.github.io/debug-adapter-protocol//specification.html#Events_Memory).
-* ❌ [Module](https://microsoft.github.io/debug-adapter-protocol//specification.html#Events_Module).
+* ✅ [Module](https://microsoft.github.io/debug-adapter-protocol//specification.html#Events_Module).
 * ✅ [Output](https://microsoft.github.io/debug-adapter-protocol//specification.html#Events_Output).
 * ❌ [Process](https://microsoft.github.io/debug-adapter-protocol//specification.html#Events_Process).
 * ❌ [ProgressEnd](https://microsoft.github.io/debug-adapter-protocol//specification.html#Events_ProgressEnd).
@@ -43,9 +43,9 @@ Current state of [Requests](https://microsoft.github.io/debug-adapter-protocol//
 * ❌ [GotoTargets](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_GotoTargets).
 * ✅ [Initialize](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_Initialize).
 * ✅ [Launch](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_Launch). 
-* ❌ [LoadedSources](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_LoadedSources). 
+* ✅ [LoadedSources](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_LoadedSources).
 * ❌ [Locations](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_Locations).
-* ❌ [Modules](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_Modules).
+* ✅ [Modules](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_Modules).
 * ✅ [Next](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_Next).
 * ✅ [Pause](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_Pause).
 * ❌ [ReadMemory](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_ReadMemory).
