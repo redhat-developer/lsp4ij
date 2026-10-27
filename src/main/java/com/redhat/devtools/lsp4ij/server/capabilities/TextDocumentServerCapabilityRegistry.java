@@ -27,8 +27,8 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.net.URI;
-import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Predicate;
 
 /**
@@ -51,7 +51,7 @@ public abstract class TextDocumentServerCapabilityRegistry<T extends TextDocumen
     public TextDocumentServerCapabilityRegistry(@NotNull LSPClientFeatures clientFeatures,
                                                 @Nullable EditorFeatureType editorFeatureType) {
         this.clientFeatures = clientFeatures;
-        this.dynamicCapabilities = new ArrayList<>();
+        this.dynamicCapabilities = new CopyOnWriteArrayList<>();
         this.editorFeatureType = editorFeatureType;
     }
 

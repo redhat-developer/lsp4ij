@@ -177,11 +177,13 @@ public abstract class DebugAdapterDescriptor implements DebuggableFile {
         args.setAdapterID(adapterId);
         args.setPathFormat(InitializeRequestArgumentsPathFormat.PATH);
         args.setSupportsVariableType(true);
-        args.setSupportsVariablePaging(false);
+        // A large variable's indexed children are asked for a page at a time (DAPVariableChildren)
+        args.setSupportsVariablePaging(true);
         args.setLinesStartAt1(true);
         args.setColumnsStartAt1(true);
         args.setSupportsStartDebuggingRequest(true);
         args.setSupportsRunInTerminalRequest(true);
+        args.setSupportsInvalidatedEvent(true);
         return args;
     }
 

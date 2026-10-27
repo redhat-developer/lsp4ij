@@ -43,6 +43,7 @@ import com.redhat.devtools.lsp4ij.dap.client.DAPClient;
 import com.redhat.devtools.lsp4ij.dap.client.DAPStackFrame;
 import com.redhat.devtools.lsp4ij.dap.client.DAPSuspendContext;
 import com.redhat.devtools.lsp4ij.dap.client.files.DAPFileRegistry;
+import com.redhat.devtools.lsp4ij.dap.client.variables.DAPValueFormat;
 import com.redhat.devtools.lsp4ij.dap.configurations.DAPCommandLineState;
 import com.redhat.devtools.lsp4ij.dap.descriptors.DebugAdapterDescriptor;
 import com.redhat.devtools.lsp4ij.dap.disassembly.DAPAlternativeSourceHandler;
@@ -97,6 +98,7 @@ public class DAPDebugProcess extends XDebugProcess implements Disposable {
     private Status status;
     private Supplier<TransportStreams> streamsSupplier;
     private DAPClient parentClient;
+    private final @NotNull DAPValueFormat valueFormat = new DAPValueFormat();
 
     public DAPDebugProcess(@NotNull DAPCommandLineState dapState,
                            @NotNull XDebugSession session,
@@ -325,6 +327,18 @@ public class DAPDebugProcess extends XDebugProcess implements Disposable {
     }
 
     @Override
+    public void startPausing() {
+        DAPClient client = parentClient;
+        if (client != null) {
+            client.pause()
+                    .exceptionally(error -> {
+                        print("Pausing failed: " + error.getMessage(), ConsoleViewContentType.ERROR_OUTPUT);
+                        return null;
+                    });
+        }
+    }
+
+    @Override
     public @Nullable XSmartStepIntoHandler<DAPStepIntoVariant> getSmartStepIntoHandler() {
         if (smartStepIntoHandler == null) {
             smartStepIntoHandler = new DAPSmartStepIntoHandler(getSession());
@@ -500,6 +514,26 @@ public class DAPDebugProcess extends XDebugProcess implements Disposable {
     @Override
     public @Nullable DAPAlternativeSourceHandler getAlternativeSourceHandler() {
         return alternativeSourceHandler;
+    }
+
+    /**
+     * Returns the format in which the clients of this debug session ask for values.
+     *
+     * @return the format in which the clients of this debug session ask for values.
+     */
+    public @NotNull DAPValueFormat getValueFormat() {
+        return valueFormat;
+    }
+
+    /**
+     * Returns true if the DAP server of this debug session, or that of a child session, formats values, and false
+     * otherwise.
+     *
+     * @return true if the DAP server of this debug session, or that of a child session, formats values, and false
+     * otherwise.
+     */
+    public boolean isSupportsValueFormattingOptions() {
+        return parentClient != null && parentClient.isSupportsValueFormattingOptionsInSessions();
     }
 
     public @Nullable DisassemblyFile getDisassemblyFile() {

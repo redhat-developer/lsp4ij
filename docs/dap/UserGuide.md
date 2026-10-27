@@ -63,6 +63,15 @@ Conditional breakpoints are also supported. Here is an example of a conditional 
 
 ![DAP Conditional Breakpoint](./images/DAP_conditional_breakpoint.png)
 
+### Logpoint
+
+A breakpoint whose `Suspend` option is unchecked logs instead of stopping. Its `"Breakpoint hit" message` and
+`Evaluate and log` expression are sent to the DAP server as a
+[logpoint](https://microsoft.github.io/debug-adapter-protocol//specification.html#Types_SourceBreakpoint), whose message
+the DAP server writes to the console without stopping the program; the expression is evaluated by the DAP server.
+A DAP server which doesn't support logpoints stops at it: LSP4IJ then evaluates the expression in the stopped frame,
+logs it, and resumes the program. A breakpoint which suspends logs its expression when it stops.
+
 ### Exception breakpoint
 
 Some DAP servers support exception breakpoints. If so, you must first run the configuration process, 
@@ -75,6 +84,12 @@ The first time, the selected exception breakpoints
 are based on the default configuration provided by the DAP server.
 
 You can then select or deselect the exception breakpoints you want to use.
+
+An exception breakpoint which the DAP server allows to be conditional (`supportsCondition`) can be given a condition
+in the `Condition` column, such as the exception types to stop at; until then, the column shows what the DAP server
+says the condition means. The condition is sent with the
+[exception filter options](https://microsoft.github.io/debug-adapter-protocol//specification.html#Types_ExceptionFilterOptions)
+when the DAP server supports them (`supportsExceptionFilterOptions`), and kept with the selected exception breakpoints.
 
 Take a sample JavaScript file containing an error:
 
@@ -140,6 +155,29 @@ completion should be available in the expression editor by consuming the
 [Completion request](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_Completions):
 
 ![Completion](images/DAP_debugging_completion.png)
+
+## Hexadecimal values
+
+When the DAP server supports value formatting (`supportsValueFormattingOptions`), the context menu of the Variables and
+Watches views has `Show Values as Hexadecimal`, which asks the DAP server for numbers in hexadecimal
+([ValueFormat](https://microsoft.github.io/debug-adapter-protocol//specification.html#Types_ValueFormat)) in the
+variables, evaluations and set values of the debug session, and shows the values again.
+
+## Large variables
+
+A variable with more than 100 indexed children, such as a large array, whose
+[Variable](https://microsoft.github.io/debug-adapter-protocol//specification.html#Types_Variable) says how many it has
+(`indexedVariables`), shows its first 100 and a `...` node with how many more there are. Opening the node asks the
+DAP server for the next 100 ([`variables`](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_Variables)
+with `filter` `indexed`, `start` and `count`), so a large variable is read a page at a time. Its named children, when
+it says it has any (`namedVariables`), are asked for first.
+
+## Lazy variables
+
+A variable which the DAP server marks as lazy
+([presentationHint.lazy](https://microsoft.github.io/debug-adapter-protocol//specification.html#Types_VariablePresentationHint)),
+such as a property computed by a getter, is shown with a `Show value` link instead of its value, since getting the value
+may run code. Clicking the link asks the DAP server for the value, which then replaces the link and can be expanded.
 
 ## Set value
 
