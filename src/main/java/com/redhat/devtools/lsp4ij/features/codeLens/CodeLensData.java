@@ -54,21 +54,22 @@ public class CodeLensData {
             return resolveCodeLensFuture;
         }
         // Use a CancellationSupport to catch errors like ResponseErrorException
-        // and ignore theme
+        // and ignore them
         CancellationSupport cancellationSupport = new CancellationSupport();
+        // Chain the side-effects into the returned future so that callers waiting
+        // via allOf() are guaranteed the codeLens field is updated before they read it.
         resolveCodeLensFuture = cancellationSupport.execute(languageServer
                         .getTextDocumentService()
                         .resolveCodeLens(codeLens),
                 languageServer,
-                LSPRequestConstants.CODE_LENS_RESOLVE);
-        resolveCodeLensFuture
-                .thenAccept(cl -> {
-                    // mark codelens as resolved
+                LSPRequestConstants.CODE_LENS_RESOLVE)
+                .thenApply(cl -> {
                     if (cl != null) {
                         codeLens = cl;
                         toResolve = false;
                         result.decrementResolve();
                     }
+                    return cl;
                 });
         return resolveCodeLensFuture;
     }
