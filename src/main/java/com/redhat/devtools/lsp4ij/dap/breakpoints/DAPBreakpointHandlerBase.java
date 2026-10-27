@@ -254,26 +254,32 @@ public abstract class DAPBreakpointHandlerBase<B extends XBreakpoint<?>> extends
                     if (breakpoints == null) {
                         return;
                     }
-                    // A later request for this source replaced this one: its breakpoints may have changed or moved
-                    // to another source since, so this response must not override the state of the later one
-                    if (sentSources.get(arguments.getSource()) != token) {
-                        return;
-                    }
-                    for (int i = 0; i < breakpoints.length; i++) {
-                        Breakpoint breakpointResponse = breakpoints[i];
-                        B ijBreakpoint;
-                        if (breakpoints.length == ijBreakpoints.size()) {
-                            // The response has a breakpoint per source breakpoint, in the same order: when two are on
-                            // the same line, such as a breakpoint and the temporary breakpoint, each keeps its own id
-                            ijBreakpoint = ijBreakpoints.get(i);
-                        } else {
-                            ijBreakpoint = findBreakpoint(breakpointResponse, arguments, i);
+                    // The token of a source is replaced while sending the breakpoints, which holds this lock: checking
+                    // it and applying the response under the same lock keeps an older response from writing after
+                    // a newer one
+                    synchronized (this) {
+                        // A later request for this source replaced this one: its breakpoints may have changed or moved
+                        // to another source since, so this response must not override the state of the later one
+                        if (sentSources.get(arguments.getSource()) != token) {
+                            return;
                         }
-                        // A native breakpoint shadowed since the request was sent is not sent anymore:
-                        // a late response must not give it back the DAP id it had
-                        if (ijBreakpoint != null && !shadowedBreakpoints.contains(ijBreakpoint)) {
-                            ijBreakpoint.putUserData(DAP_BREAKPOINT_ID, breakpointResponse.getId());
-                            updateBreakpoint(breakpointResponse, ijBreakpoint);
+                        for (int i = 0; i < breakpoints.length; i++) {
+                            Breakpoint breakpointResponse = breakpoints[i];
+                            B ijBreakpoint;
+                            if (breakpoints.length == ijBreakpoints.size()) {
+                                // The response has a breakpoint per source breakpoint, in the same order: when two
+                                // are on the same line, such as a breakpoint and the temporary breakpoint, each keeps
+                                // its own id
+                                ijBreakpoint = ijBreakpoints.get(i);
+                            } else {
+                                ijBreakpoint = findBreakpoint(breakpointResponse, arguments, i);
+                            }
+                            // A native breakpoint shadowed since the request was sent is not sent anymore:
+                            // a late response must not give it back the DAP id it had
+                            if (ijBreakpoint != null && !shadowedBreakpoints.contains(ijBreakpoint)) {
+                                ijBreakpoint.putUserData(DAP_BREAKPOINT_ID, breakpointResponse.getId());
+                                updateBreakpoint(breakpointResponse, ijBreakpoint);
+                            }
                         }
                     }
                 });
