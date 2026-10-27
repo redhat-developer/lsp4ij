@@ -13,6 +13,7 @@ package com.redhat.devtools.lsp4ij;
 import com.intellij.notification.Notification;
 import com.intellij.notification.Notifications;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.util.Disposer;
 import com.intellij.testFramework.UsefulTestCase;
 import com.intellij.testFramework.fixtures.IdeaProjectTestFixture;
 import com.intellij.testFramework.fixtures.IdeaTestFixtureFactory;
@@ -47,6 +48,19 @@ public class LanguageServerWrapperDisposeWhileStartingTest extends UsefulTestCas
         await(serverDefinition.creating);
         // The wrapper is disposed, as when its server definition is removed, while the connection is being created
         wrapper.dispose();
+        serverDefinition.proceed.countDown();
+
+        assertTrue("the connection should be closed", serverDefinition.stopped.await(10, TimeUnit.SECONDS));
+    }
+
+    public void testAStopWhileTheConnectionIsCreatedClosesIt() throws Exception {
+        var wrapper = new LanguageServerWrapper(myFixture.getProject(), serverDefinition);
+        Disposer.register(getTestRootDisposable(), wrapper);
+
+        wrapper.start();
+        await(serverDefinition.creating);
+        // The language server is stopped, not disposed, while the connection is being created
+        wrapper.stop();
         serverDefinition.proceed.countDown();
 
         assertTrue("the connection should be closed", serverDefinition.stopped.await(10, TimeUnit.SECONDS));
