@@ -611,6 +611,32 @@ public class WorkspaceDiagnosticManagerTest {
     }
 
     @Test
+    public void shutdownCancelsPendingPullAtOnceWhileTheExecutorIsBusy() throws Exception {
+        var h = harness();
+        h.manager.updateProviders(Set.of("lua"));
+        var request = h.next();
+        // A task still running on the executor, such as a report consumer, must not delay the cancellation: a server
+        // stop closes the connection once it is answered, and a later cancellation never reaches the server
+        var running = new CountDownLatch(1);
+        var release = new CountDownLatch(1);
+        h.executor.execute(() -> {
+            running.countDown();
+            try {
+                release.await(5, TimeUnit.SECONDS);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        });
+        assertTrue(running.await(5, TimeUnit.SECONDS));
+        try {
+            h.manager.dispose();
+            assertTrue(request.future.isCancelled());
+        } finally {
+            release.countDown();
+        }
+    }
+
+    @Test
     public void shutdownCancelsPendingPullWithoutRearming() throws Exception {
         var h = harness();
         h.manager.updateProviders(Set.of("lua"));

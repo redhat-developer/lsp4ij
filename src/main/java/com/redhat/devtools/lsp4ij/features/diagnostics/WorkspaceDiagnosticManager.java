@@ -45,6 +45,8 @@ public final class WorkspaceDiagnosticManager implements Disposable {
     private final Consumer<String> clearProvider;
     private final BiConsumer<String, String> clearFile;
     private final Map<String, Provider> providers = new HashMap<>();
+    // The requests not answered yet, which dispose() cancels at once, outside the executor
+    private final Set<CompletableFuture<WorkspaceDiagnosticReport>> pendingRequests = ConcurrentHashMap.newKeySet();
     private volatile boolean disposed;
 
     /**
@@ -210,8 +212,11 @@ public final class WorkspaceDiagnosticManager implements Disposable {
         params.setIdentifier(provider.identifier);
         params.setPartialResultToken(token);
         try {
-            provider.request = server.diagnostic(params);
-            provider.request.whenComplete((report, error) -> execute(() -> {
+            var request = server.diagnostic(params);
+            provider.request = request;
+            pendingRequests.add(request);
+            request.whenComplete((report, error) -> pendingRequests.remove(request));
+            request.whenComplete((report, error) -> execute(() -> {
                 if (!Objects.equals(provider.token, token)) {
                     return; // a refreshed/unregistered request completed late
                 }
@@ -425,6 +430,9 @@ public final class WorkspaceDiagnosticManager implements Disposable {
             return;
         }
         disposed = true;
+        // Cancel the requests now, which sends their $/cancelRequest at once: a stop closes the connection once the
+        // server has answered shutdown, which may be before the executor gets to the task below
+        pendingRequests.forEach(request -> request.cancel(true));
         // Do not wait for a report consumer/read action while stopping a server.
         executor.execute(() -> {
             providers.values().forEach(this::cancel);
