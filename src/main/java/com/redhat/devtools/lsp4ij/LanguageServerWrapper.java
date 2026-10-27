@@ -478,6 +478,17 @@ public class LanguageServerWrapper implements Disposable {
                             this.currentProcessCommandLines = data.getCommands();
                         }
 
+                        synchronized (this) {
+                            if (isDisposed() || currentInitializingContext != initializingContext) {
+                                // The language server was stopped or disposed while the connection was created, or
+                                // before this start: that stop could not close the connection, which did not exist
+                                // yet, and nothing else will, so close it here
+                                provider.stop();
+                                startFuture.cancel(false);
+                                return;
+                            }
+                        }
+
                         // Throws the CannotStartProcessException exception if process is not alive.
                         // This use case comes for instance when the start process command fails (not a valid start command)
                         provider.ensureIsAlive();

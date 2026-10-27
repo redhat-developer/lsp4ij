@@ -51,8 +51,10 @@ public class MockConnectionProvider implements StreamConnectionProvider {
 		this.server = server;
 	}
 	
+	// start() and stop() take turns: a stop while the language server starts can come from two threads, the start's and
+	// the stop's
 	@Override
-	public void start() throws CannotStartProcessException {
+	public synchronized void start() throws CannotStartProcessException {
 		Pipe serverOutputToClientInput = openPipe();
 		Pipe clientOutputToServerInput = openPipe();
 		errorStream = new ByteArrayInputStream("Error output on console".getBytes(StandardCharsets.UTF_8));
@@ -93,7 +95,7 @@ public class MockConnectionProvider implements StreamConnectionProvider {
 	}
 
 	@Override
-	public void stop() {
+	public synchronized void stop() {
 		streams.forEach(t -> {
 			try {
 				t.close();
