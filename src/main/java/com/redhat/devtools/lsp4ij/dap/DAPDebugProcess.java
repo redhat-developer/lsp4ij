@@ -108,6 +108,9 @@ public class DAPDebugProcess extends XDebugProcess implements Disposable {
      * loaded sources or modules.
      */
     private volatile @Nullable RunnerLayoutUi layoutUi;
+    // Whether the DAP server reported loaded sources, or modules, which may be before the layout of the debug tab exists
+    private volatile boolean loadedSourcesReported;
+    private volatile boolean modulesReported;
     private final AtomicBoolean loadedSourcesShown = new AtomicBoolean();
     private final AtomicBoolean modulesShown = new AtomicBoolean();
 
@@ -502,8 +505,15 @@ public class DAPDebugProcess extends XDebugProcess implements Disposable {
 
             @Override
             public void registerAdditionalContent(@NotNull RunnerLayoutUi ui) {
-                // The "Loaded Sources" and "Modules" panels are added once the DAP server reports any
+                // The "Loaded Sources" and "Modules" panels are added once the DAP server reports any, and those it
+                // reported before this layout existed, as when the client connected first, are added now
                 layoutUi = ui;
+                if (loadedSourcesReported) {
+                    showLoadedSources();
+                }
+                if (modulesReported) {
+                    showModules();
+                }
 
                 // Register "Exception Breakpoints" panel
                 registerBreakpointsPanel(ui);
@@ -561,8 +571,8 @@ public class DAPDebugProcess extends XDebugProcess implements Disposable {
      */
     public void refreshLoadedSources(@NotNull DAPClient client, @NotNull Source[] sources) {
         loadedSourcesClient = client;
-        showContent(loadedSourcesShown, LoadedSourcesPanel.ID, loadedSourcesPanel,
-                DAPBundle.message("dap.panels.loaded.sources"), loadedSourcesPanel.getDefaultFocusedComponent());
+        loadedSourcesReported = true;
+        showLoadedSources();
         loadedSourcesPanel.refresh(sources);
     }
 
@@ -574,8 +584,8 @@ public class DAPDebugProcess extends XDebugProcess implements Disposable {
      */
     public void updateLoadedSource(@NotNull DAPClient client, @NotNull LoadedSourceEventArguments args) {
         loadedSourcesClient = client;
-        showContent(loadedSourcesShown, LoadedSourcesPanel.ID, loadedSourcesPanel,
-                DAPBundle.message("dap.panels.loaded.sources"), loadedSourcesPanel.getDefaultFocusedComponent());
+        loadedSourcesReported = true;
+        showLoadedSources();
         loadedSourcesPanel.update(args);
     }
 
@@ -585,8 +595,8 @@ public class DAPDebugProcess extends XDebugProcess implements Disposable {
      * @param modules the modules.
      */
     public void refreshModules(@NotNull Module[] modules) {
-        showContent(modulesShown, ModulesPanel.ID, modulesPanel,
-                DAPBundle.message("dap.panels.modules"), modulesPanel.getDefaultFocusedComponent());
+        modulesReported = true;
+        showModules();
         modulesPanel.refresh(modules);
     }
 
@@ -596,8 +606,8 @@ public class DAPDebugProcess extends XDebugProcess implements Disposable {
      * @param args the 'module' event.
      */
     public void updateModule(@NotNull ModuleEventArguments args) {
-        showContent(modulesShown, ModulesPanel.ID, modulesPanel,
-                DAPBundle.message("dap.panels.modules"), modulesPanel.getDefaultFocusedComponent());
+        modulesReported = true;
+        showModules();
         modulesPanel.update(args);
     }
 
@@ -615,6 +625,20 @@ public class DAPDebugProcess extends XDebugProcess implements Disposable {
         return modulesPanel;
     }
 
+    private void showLoadedSources() {
+        showContent(loadedSourcesShown, LoadedSourcesPanel.ID, loadedSourcesPanel,
+                DAPBundle.message("dap.panels.loaded.sources"), loadedSourcesPanel.getDefaultFocusedComponent());
+    }
+
+    private void showModules() {
+        showContent(modulesShown, ModulesPanel.ID, modulesPanel,
+                DAPBundle.message("dap.panels.modules"), modulesPanel.getDefaultFocusedComponent());
+    }
+
+    /**
+     * Adds the given panel to the debug tab, once: when the layout of the debug tab does not exist yet, it is added
+     * when the layout is created.
+     */
     private void showContent(@NotNull AtomicBoolean shown,
                              @NotNull String id,
                              @NotNull JComponent panel,
