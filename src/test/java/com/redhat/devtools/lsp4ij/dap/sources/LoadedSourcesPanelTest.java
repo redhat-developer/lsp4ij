@@ -59,6 +59,14 @@ public class LoadedSourcesPanelTest extends BasePlatformTestCase {
         assertEquals("a.x", LoadedSourcesPanel.name(source("/work/a.x", null)));
     }
 
+    public void testTheNameOfASourceIsTheLastSegmentOfItsPathWhateverItsForm() {
+        // the path is the DAP server's: a URL, or a path of another file system, is not parsed as a local path
+        assertEquals("a.js", LoadedSourcesPanel.name(source("http://host/scripts/a.js", null)));
+        assertEquals("b.x", LoadedSourcesPanel.name(source("C:\\work\\b.x", null)));
+        assertEquals("http://host/", LoadedSourcesPanel.name(source("http://host/", null)));
+        assertEquals("eval", LoadedSourcesPanel.name(source("eval", null)));
+    }
+
     public void testASourceWithoutAPathOrASourceReferenceIsTheOneWithItsName() {
         var panel = new LoadedSourcesPanel<String>((session, source) -> opened.add(source));
         panel.refresh(SESSION, new Source[]{named("eval 1"), named("eval 2")});

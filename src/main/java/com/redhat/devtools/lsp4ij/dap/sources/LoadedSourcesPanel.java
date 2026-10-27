@@ -29,7 +29,6 @@ import javax.swing.*;
 import java.awt.event.KeyAdapter;
 import java.awt.event.KeyEvent;
 import java.awt.event.MouseEvent;
-import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -183,9 +182,11 @@ public class LoadedSourcesPanel<S> extends BorderLayoutPanel implements Disposab
         if (source.getName() != null) {
             return source.getName();
         }
-        if (source.getPath() != null) {
-            Path name = Path.of(source.getPath()).getFileName();
-            return name != null ? name.toString() : source.getPath();
+        String path = source.getPath();
+        if (path != null) {
+            // The path is the DAP server's, such as a URL, which may not be a valid path of this file system
+            String name = path.substring(Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\')) + 1);
+            return !name.isEmpty() ? name : path;
         }
         return "";
     }
