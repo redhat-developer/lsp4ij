@@ -15,7 +15,6 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * The temporary breakpoint that "Run to Cursor" sets before it resumes the program. It stays until the program next
@@ -26,7 +25,10 @@ import java.util.concurrent.atomic.AtomicReference;
 public class RunToCursorBreakpoint {
 
     private final @NotNull BreakpointHandlerBase<?> breakpointHandler;
-    private final AtomicReference<@Nullable XSourcePosition> position = new AtomicReference<>();
+    // The position of the temporary breakpoint, or null when none is set. set(), stopped() and ended() take turns, and
+    // each sends its 'setBreakpoints' requests before it returns, so the debug adapter gets them in the order of the
+    // calls: a stop while the breakpoint is being set removes it once it is set.
+    private @Nullable XSourcePosition position;
 
     public RunToCursorBreakpoint(@NotNull BreakpointHandlerBase<?> breakpointHandler) {
         this.breakpointHandler = breakpointHandler;
@@ -38,8 +40,9 @@ public class RunToCursorBreakpoint {
      * @param sourcePosition the position to run to.
      * @return the completable future of the 'setBreakpoints' requests which set it.
      */
-    public CompletableFuture<@Nullable Void> set(@NotNull XSourcePosition sourcePosition) {
-        XSourcePosition previous = position.getAndSet(sourcePosition);
+    public synchronized CompletableFuture<@Nullable Void> set(@NotNull XSourcePosition sourcePosition) {
+        XSourcePosition previous = position;
+        position = sourcePosition;
         if (previous != null) {
             breakpointHandler.unregisterTemporaryBreakpoint(previous);
         }
@@ -49,8 +52,9 @@ public class RunToCursorBreakpoint {
     /**
      * Removes the temporary breakpoint, if one is set, since the program stopped.
      */
-    public void stopped() {
-        XSourcePosition set = position.getAndSet(null);
+    public synchronized void stopped() {
+        XSourcePosition set = position;
+        position = null;
         if (set != null) {
             breakpointHandler.unregisterTemporaryBreakpoint(set);
         }
@@ -59,7 +63,7 @@ public class RunToCursorBreakpoint {
     /**
      * Forgets the temporary breakpoint, since the session ended: there is no debug adapter to remove it from.
      */
-    public void ended() {
-        position.set(null);
+    public synchronized void ended() {
+        position = null;
     }
 }
