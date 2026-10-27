@@ -94,7 +94,8 @@ final class FileSystemWatchRoots implements Disposable {
     }
 
     private synchronized CompletableFuture<Void> periodicRefresh(boolean fully) {
-        if (disposed || roots.isEmpty()) {
+        // Without a timer, as once a test stopped it, a periodic refresh still running starts no pass
+        if (disposed || roots.isEmpty() || timer == null) {
             return CompletableFuture.completedFuture(null);
         }
         if (!refresh.isDone()) {
@@ -251,6 +252,17 @@ final class FileSystemWatchRoots implements Disposable {
     @TestOnly
     synchronized int watchRequestCount() {
         return requests.size();
+    }
+
+    /**
+     * Stops the periodic refreshes, so that only the refreshes a test asks for run.
+     */
+    @TestOnly
+    synchronized void stopPeriodicRefresh() {
+        if (timer != null) {
+            timer.cancel(false);
+            timer = null;
+        }
     }
 
     private void releaseWatches() {
