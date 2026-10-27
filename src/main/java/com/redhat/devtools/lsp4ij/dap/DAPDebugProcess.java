@@ -39,6 +39,7 @@ import com.intellij.xdebugger.stepping.XSmartStepIntoHandler;
 import com.intellij.xdebugger.ui.XDebugTabLayouter;
 import com.redhat.devtools.lsp4ij.dap.breakpoints.DAPBreakpointHandlerBase;
 import com.redhat.devtools.lsp4ij.dap.breakpoints.DAPExceptionBreakpointsPanel;
+import com.redhat.devtools.lsp4ij.dap.breakpoints.RunToCursorBreakpoint;
 import com.redhat.devtools.lsp4ij.dap.client.DAPClient;
 import com.redhat.devtools.lsp4ij.dap.client.DAPStackFrame;
 import com.redhat.devtools.lsp4ij.dap.client.DAPSuspendContext;
@@ -82,6 +83,8 @@ public class DAPDebugProcess extends XDebugProcess implements Disposable {
     private final @NotNull ExecutionResult executionResult;
     private final @NotNull XDebuggerEditorsProvider editorsProvider;
     private final @NotNull DAPBreakpointHandlerBase<?> breakpointHandler;
+
+    private final @NotNull RunToCursorBreakpoint runToCursorBreakpoint;
     private final @NotNull DebugAdapterDescriptor serverDescriptor;
     private final @NotNull DAPServerReadyTracker serverReadyFuture;
     private final ThreadsPanel threadsPanel;
@@ -112,6 +115,7 @@ public class DAPDebugProcess extends XDebugProcess implements Disposable {
         this.serverDescriptor = dapState.getServerDescriptor();
         this.editorsProvider = serverDescriptor.createDebuggerEditorsProvider(dapState.getFileType(), this);
         this.breakpointHandler = serverDescriptor.createBreakpointHandler(session, project);
+        this.runToCursorBreakpoint = new RunToCursorBreakpoint(breakpointHandler);
         this.disassemblyBreakpointHandler = serverDescriptor.createDisassemblyBreakpointHandler(session, project);
         this.alternativeSourceHandler = new DAPAlternativeSourceHandler(this);
         this.threadsPanel = new ThreadsPanel(this);
@@ -268,6 +272,7 @@ public class DAPDebugProcess extends XDebugProcess implements Disposable {
 
     @Override
     public void stop() {
+        runToCursorBreakpoint.ended();
         if (status != Status.STOPPED && status != Status.STOPPING) {
             ApplicationManager.getApplication()
                     .executeOnPooledThread(() -> {
@@ -353,24 +358,12 @@ public class DAPDebugProcess extends XDebugProcess implements Disposable {
 
     @Override
     public void resume(@Nullable XSuspendContext context) {
-        resume(context, null);
-    }
-
-    private void resume(@Nullable XSuspendContext context,
-                        @Nullable XSourcePosition runToCursorPosition) {
         if (context instanceof DAPSuspendContext dapContext) {
             Integer threadId = dapContext.getThreadId();
             if (threadId != null) {
-                // Continue...
+                // Continue... the temporary breakpoint of "Run to Cursor" stays until the program next stops
                 DAPClient client = dapContext.getClient();
-                var result = client.continue_(threadId);
-                if (runToCursorPosition != null) {
-                    // "Run to Cursor" has been used, remove her temporary breakpoint
-                    // after the 'continue' DAP request.
-                    result
-                            .thenRun(() -> getBreakpointHandler()
-                                    .unregisterTemporaryBreakpoint(runToCursorPosition));
-                }
+                client.continue_(threadId);
             }
         }
     }
@@ -406,6 +399,15 @@ public class DAPDebugProcess extends XDebugProcess implements Disposable {
         return breakpointHandler;
     }
 
+    /**
+     * Returns the temporary breakpoint of "Run to Cursor", which the program removes when it next stops.
+     *
+     * @return the temporary breakpoint of "Run to Cursor".
+     */
+    public @NotNull RunToCursorBreakpoint getRunToCursorBreakpoint() {
+        return runToCursorBreakpoint;
+    }
+
     public @NotNull DisassemblyBreakpointHandlerBase<?> getDisassemblyBreakpointHandler() {
         return disassemblyBreakpointHandler;
     }
@@ -426,10 +428,10 @@ public class DAPDebugProcess extends XDebugProcess implements Disposable {
     @Override
     public void runToPosition(@NotNull XSourcePosition position,
                               @Nullable XSuspendContext context) {
-        getBreakpointHandler()
-                .registerTemporaryBreakpoint(position)// Send a temporary breakpoint with the proper position to the DAP server
+        runToCursorBreakpoint
+                .set(position)// Send a temporary breakpoint with the proper position to the DAP server
                 .thenApply(unused -> {
-                    resume(context, position); // and resume the debugger
+                    resume(context); // and resume the debugger
                     return null;
                 });
     }
