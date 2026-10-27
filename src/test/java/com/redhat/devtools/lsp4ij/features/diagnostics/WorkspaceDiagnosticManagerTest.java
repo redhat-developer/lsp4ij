@@ -637,6 +637,22 @@ public class WorkspaceDiagnosticManagerTest {
     }
 
     @Test
+    public void shutdownWhileAPullIsSentCancelsItAtOnce() throws Exception {
+        var h = harness();
+        h.afterRequest = () -> {
+            // dispose() runs after the request is sent, before the manager keeps it; dropping the cleanup which
+            // dispose() queued, as a connection closed before it ran would, leaves the request to the manager alone
+            h.manager.dispose();
+            h.executor.shutdownNow();
+            Thread.interrupted();
+        };
+        h.manager.updateProviders(Set.of("lua"));
+        var request = h.next();
+        assertTrue(h.executor.awaitTermination(5, TimeUnit.SECONDS));
+        assertTrue(request.future.isCancelled());
+    }
+
+    @Test
     public void shutdownCancelsPendingPullWithoutRearming() throws Exception {
         var h = harness();
         h.manager.updateProviders(Set.of("lua"));
@@ -839,6 +855,7 @@ public class WorkspaceDiagnosticManagerTest {
         volatile boolean refuseCancellation;
         volatile boolean failNextProviderClear;
         volatile Runnable beforeApply = () -> {};
+        volatile Runnable afterRequest = () -> {};
         volatile java.util.function.Function<String, CompletableFuture<Boolean>> matcher = uri -> CompletableFuture.completedFuture(true);
         final List<String> clearedProviders = new CopyOnWriteArrayList<>();
         final List<String> clearedFiles = new CopyOnWriteArrayList<>();
@@ -861,6 +878,7 @@ public class WorkspaceDiagnosticManagerTest {
         @Override public CompletableFuture<WorkspaceDiagnosticReport> diagnostic(WorkspaceDiagnosticParams params) {
             var future = new Future(refuseCancellation);
             requests.add(new Request(params, future));
+            afterRequest.run();
             return future;
         }
         @Override public void didChangeConfiguration(DidChangeConfigurationParams params) { }

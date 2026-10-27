@@ -215,6 +215,10 @@ public final class WorkspaceDiagnosticManager implements Disposable {
             var request = server.diagnostic(params);
             provider.request = request;
             pendingRequests.add(request);
+            if (disposed) {
+                // dispose() ran while the request was sent, before it was added, so it did not cancel it
+                request.cancel(true);
+            }
             request.whenComplete((report, error) -> pendingRequests.remove(request));
             request.whenComplete((report, error) -> execute(() -> {
                 if (!Objects.equals(provider.token, token)) {
