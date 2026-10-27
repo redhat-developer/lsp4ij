@@ -36,7 +36,11 @@ import org.jetbrains.annotations.Nullable;
 
 import javax.swing.*;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.IdentityHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 
@@ -48,6 +52,10 @@ import java.util.concurrent.CompletionException;
  * the DAP server, so each change sends all of them, and the removal of the last one sends none.
  */
 public class DAPFunctionBreakpointHandler extends BreakpointHandlerBase<XBreakpoint<DAPFunctionBreakpointProperties>> {
+
+    // The number of the last 'setFunctionBreakpoints' request sent to each DAP server: the answer to an older one, which
+    // can come after the answer to a newer one, is out of date
+    private final Map<IDebugProtocolServer, Long> lastRequests = Collections.synchronizedMap(new IdentityHashMap<>());
 
     public DAPFunctionBreakpointHandler(@NotNull XDebugSession debugSession,
                                         @NotNull DebugAdapterDescriptor debugAdapterDescriptor,
@@ -94,7 +102,8 @@ public class DAPFunctionBreakpointHandler extends BreakpointHandlerBase<XBreakpo
         final var setFunctionBreakpointsFutures = new ArrayList<CompletableFuture<Void>>();
         for (var server : servers) {
             if (isSupportsFunctionBreakpoints(getCapabilities(server))) {
-                setFunctionBreakpointsFutures.add(setFunctionBreakpoints(server, arguments, ijBreakpoints));
+                long request = lastRequests.merge(server, 1L, Long::sum);
+                setFunctionBreakpointsFutures.add(setFunctionBreakpoints(server, arguments, ijBreakpoints, request));
             }
         }
         return CompletableFuture.allOf(setFunctionBreakpointsFutures.toArray(EMPTY_COMPLETABLE_FUTURES));
@@ -103,17 +112,24 @@ public class DAPFunctionBreakpointHandler extends BreakpointHandlerBase<XBreakpo
     /**
      * Sends the 'setFunctionBreakpoints' request, and gives each IJ breakpoint the id and the status of its DAP
      * breakpoint. When the request fails, each IJ breakpoint is shown invalid with the error, and the session goes on.
+     * The answer is ignored once a newer request has been sent to the DAP server.
      *
      * @param debugProtocolServer the DAP server.
      * @param arguments           the 'setFunctionBreakpoints' arguments.
      * @param ijBreakpoints       the IJ breakpoint of each function breakpoint of the arguments, in the same order.
+     * @param request             the number of the request.
      * @return the future.
      */
     private CompletableFuture<Void> setFunctionBreakpoints(@NotNull IDebugProtocolServer debugProtocolServer,
                                                            @NotNull SetFunctionBreakpointsArguments arguments,
-                                                           @NotNull List<XBreakpoint<DAPFunctionBreakpointProperties>> ijBreakpoints) {
+                                                           @NotNull List<XBreakpoint<DAPFunctionBreakpointProperties>> ijBreakpoints,
+                                                           long request) {
         return debugProtocolServer.setFunctionBreakpoints(arguments)
                 .handle((response, error) -> {
+                    if (!Objects.equals(lastRequests.get(debugProtocolServer), request)) {
+                        // A newer request replaced these breakpoints: its answer gives their ids and status
+                        return null;
+                    }
                     if (error != null) {
                         Throwable cause = error instanceof CompletionException && error.getCause() != null ? error.getCause() : error;
                         String message = cause.getMessage();

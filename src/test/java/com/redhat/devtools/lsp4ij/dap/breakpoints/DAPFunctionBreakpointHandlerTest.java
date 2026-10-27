@@ -148,6 +148,30 @@ public class DAPFunctionBreakpointHandlerTest extends HeavyPlatformTestCase {
         }
     }
 
+    public void testTheAnswerToAnOlderRequestChangesNothing() throws Exception {
+        var twice = breakpoint("twice");
+        var move = breakpoint("Point.move");
+        var handler = handler();
+        var answers = new ArrayList<CompletableFuture<SetFunctionBreakpointsResponse>>();
+        try {
+            handler.registerBreakpoint(twice);
+            handler.registerBreakpoint(move);
+            handler.initialize(pendingServer(answers), supported());
+            handler.unregisterBreakpoint(twice, false);
+            assertEquals(List.of(List.of("twice", "Point.move"), List.of("Point.move")), names());
+
+            // the debug adapter answers the newer request first, then the older one, whose answer is out of date
+            answers.get(1).complete(response(answer(22, true, null)));
+            answers.get(0).complete(response(answer(11, true, null), answer(12, false, "an old answer")));
+
+            assertEquals(List.of("verified Point.move"), shown);
+            assertSame(move, handler.findBreakpointById(22));
+            assertNull(handler.findBreakpointById(12));
+        } finally {
+            handler.dispose();
+        }
+    }
+
     public void testEachChangeSendsAllTheBreakpoints() throws Exception {
         var twice = breakpoint("twice");
         var move = breakpoint("Point.move");
@@ -272,6 +296,35 @@ public class DAPFunctionBreakpointHandlerTest extends HeavyPlatformTestCase {
                 shown.add("invalid " + ijBreakpoint.getProperties().getName() + ": " + message);
             }
         };
+    }
+
+    private static SetFunctionBreakpointsResponse response(Breakpoint... breakpoints) {
+        var response = new SetFunctionBreakpointsResponse();
+        response.setBreakpoints(breakpoints);
+        return response;
+    }
+
+    /**
+     * Returns a DAP server which answers each request when the test completes its answer, in the given list.
+     */
+    private IDebugProtocolServer pendingServer(List<CompletableFuture<SetFunctionBreakpointsResponse>> answers) {
+        return (IDebugProtocolServer) Proxy.newProxyInstance(IDebugProtocolServer.class.getClassLoader(), new Class[]{IDebugProtocolServer.class}, (p, m, a) -> {
+            switch (m.getName()) {
+                case "setFunctionBreakpoints" -> {
+                    requests.add((SetFunctionBreakpointsArguments) a[0]);
+                    var answer = new CompletableFuture<SetFunctionBreakpointsResponse>();
+                    answers.add(answer);
+                    return answer;
+                }
+                case "equals" -> {
+                    return p == a[0];
+                }
+                case "hashCode" -> {
+                    return System.identityHashCode(p);
+                }
+                default -> throw new AssertionError(m.getName());
+            }
+        });
     }
 
     private IDebugProtocolServer server(Function<SetFunctionBreakpointsArguments, Breakpoint[]> answers) {
