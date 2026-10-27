@@ -20,6 +20,7 @@ import com.intellij.xdebugger.breakpoints.XBreakpoint;
 import com.intellij.xdebugger.breakpoints.XBreakpointHandler;
 import com.intellij.xdebugger.breakpoints.XBreakpointType;
 import com.intellij.xdebugger.breakpoints.XLineBreakpoint;
+import com.redhat.devtools.lsp4ij.dap.DAPBundle;
 import com.redhat.devtools.lsp4ij.dap.descriptors.DebugAdapterDescriptor;
 import org.eclipse.lsp4j.debug.Breakpoint;
 import org.eclipse.lsp4j.debug.Capabilities;
@@ -83,8 +84,8 @@ public abstract class BreakpointHandlerBase<B extends XBreakpoint<?>> extends XB
             // Mark the breakpoint as invalid so the user sees visual feedback
             if (breakpoint instanceof XLineBreakpoint<?> lineBreakpoint) {
                 String message = sourcePosition == null
-                    ? "Breakpoint location not available"
-                    : "File not debuggable with current debug adapter";
+                    ? DAPBundle.message("dap.breakpoints.location.not.available")
+                    : DAPBundle.message("dap.breakpoints.file.not.debuggable");
                 debugSession.setBreakpointInvalid(lineBreakpoint, message);
             }
             return;
