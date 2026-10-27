@@ -41,16 +41,21 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 
 /**
  * "Run to Cursor" keeps its temporary breakpoint until the program next stops, and the session's end forgets it.
  */
 public class RunToCursorBreakpointTest extends HeavyPlatformTestCase {
 
-    private final List<SetBreakpointsArguments> requests = new ArrayList<>();
+    private final List<SetBreakpointsArguments> requests = Collections.synchronizedList(new ArrayList<>());
+    // Runs before the debug adapter receives each 'setBreakpoints' request
+    private volatile Runnable beforeRequest = () -> {};
 
     public void testTheBreakpointStaysUntilTheProgramStops() throws Exception {
         var dir = Files.createTempDirectory("dap-run-to-cursor-");
@@ -106,6 +111,60 @@ public class RunToCursorBreakpointTest extends HeavyPlatformTestCase {
         }
     }
 
+    public void testAStopWhileTheBreakpointIsBeingSetRemovesItOnceItIsSet() throws Exception {
+        var dir = Files.createTempDirectory("dap-run-to-cursor-");
+        var path = dir.resolve("a.lua");
+        var handler = handler();
+        try {
+            var position = position(path, 2);
+            handler.initialize(server(), new Capabilities()).join();
+            var runToCursor = new RunToCursorBreakpoint(handler);
+            var sending = new CountDownLatch(1);
+            var sent = new CountDownLatch(1);
+            beforeRequest = () -> {
+                // the request which sets the breakpoint is slow to go out
+                beforeRequest = () -> {};
+                sending.countDown();
+                await(sent);
+            };
+
+            var set = new Thread(() -> runToCursor.set(position));
+            set.start();
+            await(sending);
+            var stop = new Thread(runToCursor::stopped);
+            stop.start();
+            awaitBlockedOrDone(stop);
+            sent.countDown();
+            set.join(30_000);
+            stop.join(30_000);
+
+            // the stop removes the breakpoint after it is set, rather than before, which would leave it set
+            assertEquals(List.of(List.of(3), List.of()), lines(path));
+        } finally {
+            handler.dispose();
+            FileUtil.delete(dir.toFile());
+        }
+    }
+
+    private static void await(CountDownLatch latch) {
+        try {
+            assertTrue(latch.await(30, TimeUnit.SECONDS));
+        } catch (InterruptedException e) {
+            throw new AssertionError(e);
+        }
+    }
+
+    /**
+     * Waits until the thread waits for a lock, or is done.
+     */
+    private static void awaitBlockedOrDone(Thread thread) throws InterruptedException {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(30);
+        while (thread.getState() != Thread.State.BLOCKED && thread.getState() != Thread.State.TERMINATED) {
+            assertTrue(System.nanoTime() < deadline);
+            Thread.sleep(10);
+        }
+    }
+
     private DAPBreakpointHandlerBase<XLineBreakpoint<DAPBreakpointProperties>> handler() throws Exception {
         var type = Arrays.stream(ConfigurationType.CONFIGURATION_TYPE_EP.getExtensions())
                 .filter(t -> t.getId().equals("DAPConfiguration")).findFirst().orElseThrow();
@@ -145,6 +204,7 @@ public class RunToCursorBreakpointTest extends HeavyPlatformTestCase {
     private IDebugProtocolServer server() {
         return (IDebugProtocolServer) Proxy.newProxyInstance(IDebugProtocolServer.class.getClassLoader(), new Class[]{IDebugProtocolServer.class}, (p, m, a) -> {
             if (m.getName().equals("setBreakpoints")) {
+                beforeRequest.run();
                 requests.add((SetBreakpointsArguments) a[0]);
                 var response = new SetBreakpointsResponse();
                 response.setBreakpoints(new Breakpoint[0]);
