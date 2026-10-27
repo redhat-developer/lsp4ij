@@ -32,6 +32,11 @@ import com.intellij.xdebugger.XDebugProcess;
 import com.intellij.xdebugger.XDebugSession;
 import com.intellij.xdebugger.XSourcePosition;
 import com.intellij.xdebugger.breakpoints.XBreakpointHandler;
+import com.intellij.xdebugger.breakpoints.XBreakpointType;
+import com.intellij.xdebugger.breakpoints.XLineBreakpoint;
+import com.intellij.xdebugger.breakpoints.XLineBreakpointType;
+import com.redhat.devtools.lsp4ij.dap.breakpoints.DAPBreakpointTypeBase;
+import com.redhat.devtools.lsp4ij.dap.breakpoints.DAPForwardedLineBreakpointHandler;
 import com.intellij.xdebugger.evaluation.XDebuggerEditorsProvider;
 import com.intellij.xdebugger.frame.XStackFrame;
 import com.intellij.xdebugger.frame.XSuspendContext;
@@ -92,6 +97,9 @@ public class DAPDebugProcess extends XDebugProcess implements Disposable {
 
     // Disassembly
     private final @NotNull DisassemblyBreakpointHandlerBase<?> disassemblyBreakpointHandler;
+
+    // Native line breakpoints (JS, Python, …) forwarded to the DAP server on mapped files
+    private final @NotNull java.util.List<XBreakpointHandler<?>> forwardedBreakpointHandlers;
     private final @NotNull DAPAlternativeSourceHandler alternativeSourceHandler;
     private final long sessionId;
 
@@ -119,6 +127,7 @@ public class DAPDebugProcess extends XDebugProcess implements Disposable {
         this.serverDescriptor = dapState.getServerDescriptor();
         this.editorsProvider = serverDescriptor.createDebuggerEditorsProvider(dapState.getFileType(), this);
         this.breakpointHandler = serverDescriptor.createBreakpointHandler(session, project);
+        this.forwardedBreakpointHandlers = createForwardedBreakpointHandlers(breakpointHandler, serverDescriptor, project);
         this.runToCursorBreakpoint = new RunToCursorBreakpoint(breakpointHandler);
         this.disassemblyBreakpointHandler = serverDescriptor.createDisassemblyBreakpointHandler(session, project);
         this.alternativeSourceHandler = new DAPAlternativeSourceHandler(this);
@@ -402,7 +411,12 @@ public class DAPDebugProcess extends XDebugProcess implements Disposable {
 
     @Override
     public XBreakpointHandler<?> @NotNull [] getBreakpointHandlers() {
-        return new XBreakpointHandler[]{breakpointHandler, disassemblyBreakpointHandler};
+        java.util.List<XBreakpointHandler<?>> handlers = new java.util.ArrayList<>();
+        handlers.add(breakpointHandler);
+        handlers.add(disassemblyBreakpointHandler);
+        // Forward native line breakpoints (JS, Python, …) on DAP-mapped files while this session runs.
+        handlers.addAll(forwardedBreakpointHandlers);
+        return handlers.toArray(new XBreakpointHandler[0]);
     }
 
     public @NotNull DAPBreakpointHandlerBase<?> getBreakpointHandler() {
@@ -420,6 +434,36 @@ public class DAPDebugProcess extends XDebugProcess implements Disposable {
 
     public @NotNull DisassemblyBreakpointHandlerBase<?> getDisassemblyBreakpointHandler() {
         return disassemblyBreakpointHandler;
+    }
+
+    /**
+     * Build one {@link DAPForwardedLineBreakpointHandler} per registered NATIVE line-breakpoint type
+     * (every {@link XLineBreakpointType} that is not our own DAP type), so that while this DAP
+     * session runs, native breakpoints on files mapped to the DAP server are forwarded via
+     * {@code setBreakpoints}. Nothing here is language-specific — it is driven purely by the DAP
+     * server's file mappings ({@link DebugAdapterDescriptor#isDebuggableFile}).
+     */
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private static @NotNull java.util.List<XBreakpointHandler<?>> createForwardedBreakpointHandlers(@NotNull DAPBreakpointHandlerBase<?> sharedHandler,
+                                                                                                  @NotNull DebugAdapterDescriptor descriptor,
+                                                                                                  @NotNull com.intellij.openapi.project.Project project) {
+        java.util.List<XBreakpointHandler<?>> result = new java.util.ArrayList<>();
+        try {
+            for (XBreakpointType type : XBreakpointType.EXTENSION_POINT_NAME.getExtensionList()) {
+                if (!(type instanceof XLineBreakpointType<?>)) {
+                    continue; // only line breakpoints
+                }
+                if (type instanceof DAPBreakpointTypeBase<?>) {
+                    continue; // our own DAP breakpoint type is already handled by the DAP handler
+                }
+                Class<? extends XBreakpointType<XLineBreakpoint<?>, ?>> typeClass =
+                        (Class<? extends XBreakpointType<XLineBreakpoint<?>, ?>>) type.getClass();
+                result.add(new DAPForwardedLineBreakpointHandler(typeClass, sharedHandler, descriptor, project));
+            }
+        } catch (Exception e) {
+            // Never let breakpoint forwarding break the debug session; fall back to DAP-only breakpoints.
+        }
+        return result;
     }
 
     @NotNull

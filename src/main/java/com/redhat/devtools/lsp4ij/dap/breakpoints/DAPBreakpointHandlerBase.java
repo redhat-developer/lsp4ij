@@ -18,6 +18,8 @@ import com.intellij.xdebugger.XSourcePosition;
 import com.intellij.xdebugger.breakpoints.SuspendPolicy;
 import com.intellij.xdebugger.breakpoints.XBreakpoint;
 import com.intellij.xdebugger.breakpoints.XBreakpointType;
+import com.intellij.xdebugger.breakpoints.XLineBreakpoint;
+import com.redhat.devtools.lsp4ij.dap.DAPBundle;
 import com.redhat.devtools.lsp4ij.dap.descriptors.DebugAdapterDescriptor;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import org.eclipse.lsp4j.debug.*;
@@ -28,6 +30,7 @@ import org.jetbrains.annotations.Nullable;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 
 import static com.redhat.devtools.lsp4ij.dap.DAPIJUtils.*;
@@ -38,7 +41,12 @@ import static com.redhat.devtools.lsp4ij.dap.DAPIJUtils.*;
 public abstract class DAPBreakpointHandlerBase<B extends XBreakpoint<?>> extends BreakpointHandlerBase<B> {
 
     private static final SourceBreakpoint[] EMPTY_SOURCE_BREAKPOINTS = new SourceBreakpoint[0];
+
     private final @NotNull DAPExceptionBreakpointsPanel exceptionBreakpointsPanel;
+    private final Set<B> shadowedBreakpoints = ConcurrentHashMap.newKeySet();
+    // The sources which have breakpoints in the debug adapter, with a token of their latest 'setBreakpoints' request.
+    // A cleared source stays until its clear succeeded, so that a failed clear is sent again.
+    private final Map<Source, Object> sentSources = new ConcurrentHashMap<>();
 
     public DAPBreakpointHandlerBase(@NotNull Class<? extends XBreakpointType<B, ?>> breakpointTypeClass,
                                     @NotNull XDebugSession debugSession,
@@ -148,9 +156,10 @@ public abstract class DAPBreakpointHandlerBase<B extends XBreakpoint<?>> extends
         Map<Source, List<SourceBreakpoint>> targetBreakpoints = new HashMap<>();
         // The IJ breakpoint of each source breakpoint, in the same order, and null for the temporary breakpoint
         Map<Source, List<@Nullable B>> targetIJBreakpoints = new HashMap<>();
+        Set<LineLocation> dapBreakpointLines = getDAPBreakpointLines();
         for (B breakpoint : breakpoints) {
             var sourcePosition = breakpoint.getSourcePosition();
-            if (sourcePosition != null) {
+            if (sourcePosition != null && !isShadowed(breakpoint, dapBreakpointLines)) {
                 addSourceBreakpoint(sourcePosition, breakpoint.getConditionExpression(), getLogMessage(breakpoint), targetBreakpoints);
                 targetIJBreakpoints.computeIfAbsent(toDAPSource(sourcePosition), s -> new ArrayList<>()).add(breakpoint);
             }
@@ -178,6 +187,12 @@ public abstract class DAPBreakpointHandlerBase<B extends XBreakpoint<?>> extends
             }
         }
 
+        // Also send the sources which had breakpoints and have none anymore, so that they are cleared even when
+        // the removed breakpoint doesn't know its old source (ex: its file was moved or renamed)
+        for (Source source : sentSources.keySet()) {
+            targetBreakpoints.computeIfAbsent(source, s -> new ArrayList<>());
+        }
+
         final var setBreakpointsFutures = new ArrayList<CompletableFuture<Void>>();
         for (Iterator<Map.Entry<Source, List<SourceBreakpoint>>> iterator = targetBreakpoints.entrySet()
                 .iterator(); iterator.hasNext(); ) {
@@ -189,22 +204,30 @@ public abstract class DAPBreakpointHandlerBase<B extends XBreakpoint<?>> extends
             // Call 'setBreakpoints' DAP request for each Source keys.
             final var arguments = createSetBreakpointsArguments(source, sourceBreakpoints);
             List<@Nullable B> ijBreakpoints = targetIJBreakpoints.getOrDefault(source, List.of());
+            // A later request for this source replaces the token, so that the response of an earlier request
+            // is not applied anymore, and the response of an earlier clear cannot stop tracking it
+            final var token = new Object();
+            sentSources.put(source, token);
+            final var sourceFutures = new ArrayList<CompletableFuture<Void>>();
             if (debugProtocolServer != null) {
                 // Call 'setBreakpoints' DAP request for each Source keys
                 // and the given debug protocol server
-                setBreakpointsFutures.add(setBreakpoints(debugProtocolServer, arguments, ijBreakpoints));
+                sourceFutures.add(setBreakpoints(debugProtocolServer, arguments, ijBreakpoints, token));
             } else {
                 // Call 'setBreakpoints' DAP request for each Source keys
                 // for each registered debug protocol server
                 for (var server : debugProtocolServers) {
-                    setBreakpointsFutures.add(setBreakpoints(server, arguments, ijBreakpoints));
+                    sourceFutures.add(setBreakpoints(server, arguments, ijBreakpoints, token));
                 }
             }
+            setBreakpointsFutures.addAll(sourceFutures);
 
-            // Once we told adapter there are no breakpoints for a source file, we can stop
-            // tracking that file
             if (sourceBreakpoints.isEmpty()) {
                 iterator.remove();
+                // Once the adapter accepted that there are no breakpoints for a source file, we can stop
+                // tracking that file
+                CompletableFuture.allOf(sourceFutures.toArray(EMPTY_COMPLETABLE_FUTURES))
+                        .thenRun(() -> sentSources.remove(source, token));
             }
         }
         return CompletableFuture.allOf(setBreakpointsFutures.toArray(EMPTY_COMPLETABLE_FUTURES));
@@ -217,11 +240,13 @@ public abstract class DAPBreakpointHandlerBase<B extends XBreakpoint<?>> extends
      * @param arguments           the 'setBreakpoints' arguments.
      * @param ijBreakpoints       the IJ breakpoint of each source breakpoint of the arguments, in the same order, and
      *                            null for the temporary breakpoint.
+     * @param token               the token of the request in {@link #sentSources}.
      * @return the future.
      */
     private CompletableFuture<Void> setBreakpoints(@NotNull IDebugProtocolServer debugProtocolServer,
                                                    @NotNull SetBreakpointsArguments arguments,
-                                                   @NotNull List<@Nullable B> ijBreakpoints) {
+                                                   @NotNull List<@Nullable B> ijBreakpoints,
+                                                   @NotNull Object token) {
         CompletableFuture<SetBreakpointsResponse> future = debugProtocolServer.setBreakpoints(arguments);
         return future
                 .thenAccept(response -> {
@@ -229,22 +254,140 @@ public abstract class DAPBreakpointHandlerBase<B extends XBreakpoint<?>> extends
                     if (breakpoints == null) {
                         return;
                     }
-                    for (int i = 0; i < breakpoints.length; i++) {
-                        Breakpoint breakpointResponse = breakpoints[i];
-                        B ijBreakpoint;
-                        if (breakpoints.length == ijBreakpoints.size()) {
-                            // The response has a breakpoint per source breakpoint, in the same order: when two are on
-                            // the same line, such as a breakpoint and the temporary breakpoint, each keeps its own id
-                            ijBreakpoint = ijBreakpoints.get(i);
-                        } else {
-                            ijBreakpoint = findBreakpoint(breakpointResponse, arguments, i);
+                    // The token of a source is replaced while sending the breakpoints, which holds this lock: checking
+                    // it and applying the response under the same lock keeps an older response from writing after
+                    // a newer one
+                    synchronized (this) {
+                        // A later request for this source replaced this one: its breakpoints may have changed or moved
+                        // to another source since, so this response must not override the state of the later one
+                        if (sentSources.get(arguments.getSource()) != token) {
+                            return;
                         }
-                        if (ijBreakpoint != null) {
-                            ijBreakpoint.putUserData(DAP_BREAKPOINT_ID, breakpointResponse.getId());
-                            updateBreakpoint(breakpointResponse, ijBreakpoint);
+                        for (int i = 0; i < breakpoints.length; i++) {
+                            Breakpoint breakpointResponse = breakpoints[i];
+                            B ijBreakpoint;
+                            if (breakpoints.length == ijBreakpoints.size()) {
+                                // The response has a breakpoint per source breakpoint, in the same order: when two
+                                // are on the same line, such as a breakpoint and the temporary breakpoint, each keeps
+                                // its own id
+                                ijBreakpoint = ijBreakpoints.get(i);
+                            } else {
+                                ijBreakpoint = findBreakpoint(breakpointResponse, arguments, i);
+                            }
+                            // A native breakpoint shadowed since the request was sent is not sent anymore:
+                            // a late response must not give it back the DAP id it had
+                            if (ijBreakpoint != null && !shadowedBreakpoints.contains(ijBreakpoint)) {
+                                ijBreakpoint.putUserData(DAP_BREAKPOINT_ID, breakpointResponse.getId());
+                                updateBreakpoint(breakpointResponse, ijBreakpoint);
+                            }
                         }
                     }
                 });
+    }
+
+    /**
+     * A forwarded native line breakpoint and a DAP breakpoint can be on the same line. Only the DAP
+     * breakpoint is sent: two breakpoints at one location with different settings (condition, log,
+     * suspend policy) cannot be merged without silently dropping one of them, and the DAP protocol
+     * leaves it to each debug adapter how it handles duplicates. The native breakpoint is shown as
+     * inactive for this debug session only, with the icon IntelliJ uses for a breakpoint which is
+     * inactive because of another breakpoint; it stays enabled and keeps working with the language's
+     * own debugger.
+     */
+    @Override
+    protected void onBreakpointsChanged(@NotNull B breakpoint) {
+        // Check all breakpoints, not only the changed line: when a breakpoint moves to another line,
+        // IntelliJ unregisters it with its new position, so the old line is not known anymore.
+        Set<LineLocation> dapBreakpointLines = getDAPBreakpointLines();
+        for (B candidate : breakpoints) {
+            updateShadowedPresentation(candidate, isShadowed(candidate, dapBreakpointLines));
+        }
+        if (!breakpoints.contains(breakpoint)) {
+            updateShadowedPresentation(breakpoint, false);
+        }
+    }
+
+    private void updateShadowedPresentation(@NotNull B breakpoint, boolean shadowed) {
+        if (!(breakpoint instanceof XLineBreakpoint<?> lineBreakpoint)) {
+            return;
+        }
+        if (shadowed) {
+            if (shadowedBreakpoints.add(breakpoint)) {
+                // The breakpoint is not sent anymore: forget the DAP id it had before
+                breakpoint.putUserData(DAP_BREAKPOINT_ID, null);
+                // Not an error: the inactive dependent icon instead of the invalid one
+                debugSession.updateBreakpointPresentation(lineBreakpoint,
+                        lineBreakpoint.getType().getInactiveDependentIcon(), DAPBundle.message("dap.breakpoints.shadowed"));
+            }
+        } else if (shadowedBreakpoints.remove(breakpoint)) {
+            // Reset the presentation; the response of the debug adapter updates it when the breakpoint is sent
+            debugSession.updateBreakpointPresentation(lineBreakpoint, null, null);
+        }
+    }
+
+    /**
+     * Returns true if the given breakpoint is a native line breakpoint with a DAP breakpoint on the same line.
+     *
+     * @param breakpoint the breakpoint.
+     * @return true if the given breakpoint is a native line breakpoint with a DAP breakpoint on the same line.
+     */
+    boolean isShadowed(@NotNull B breakpoint) {
+        return isShadowed(breakpoint, getDAPBreakpointLines());
+    }
+
+    /**
+     * Returns true if the given breakpoint is a native line breakpoint on one of the given DAP breakpoint lines.
+     * <p>
+     * The DAP breakpoint lines are collected once by the caller (see {@link #getDAPBreakpointLines()}), so that
+     * checking all breakpoints stays linear instead of scanning all breakpoints for each of them.
+     *
+     * @param breakpoint         the breakpoint.
+     * @param dapBreakpointLines the lines of the DAP breakpoints.
+     * @return true if the given breakpoint is a native line breakpoint on one of the given DAP breakpoint lines.
+     */
+    private static boolean isShadowed(@NotNull XBreakpoint<?> breakpoint,
+                                      @NotNull Set<LineLocation> dapBreakpointLines) {
+        if (breakpoint.getType() instanceof DAPBreakpointTypeBase<?> || dapBreakpointLines.isEmpty()) {
+            return false;
+        }
+        XSourcePosition position = breakpoint.getSourcePosition();
+        return position != null && dapBreakpointLines.contains(new LineLocation(position.getFile(), position.getLine()));
+    }
+
+    /**
+     * Returns the file and line of each DAP breakpoint.
+     *
+     * @return the file and line of each DAP breakpoint.
+     */
+    private @NotNull Set<LineLocation> getDAPBreakpointLines() {
+        Set<LineLocation> lines = new HashSet<>();
+        for (B breakpoint : breakpoints) {
+            if (breakpoint.getType() instanceof DAPBreakpointTypeBase<?>) {
+                XSourcePosition position = breakpoint.getSourcePosition();
+                if (position != null) {
+                    lines.add(new LineLocation(position.getFile(), position.getLine()));
+                }
+            }
+        }
+        return lines;
+    }
+
+    /**
+     * A line (0-based) of a file.
+     */
+    private record LineLocation(@NotNull VirtualFile file, int line) {
+    }
+
+    @Override
+    protected boolean hasSentBreakpoints() {
+        return !sentSources.isEmpty();
+    }
+
+    @Override
+    public void dispose() {
+        super.dispose();
+        shadowedBreakpoints.clear();
+        sentSources.clear();
     }
 
     private @Nullable B findBreakpoint(@NotNull Breakpoint breakpointResponse,
@@ -263,7 +406,13 @@ public abstract class DAPBreakpointHandlerBase<B extends XBreakpoint<?>> extends
     }
 
     private <B extends XBreakpoint<?>> boolean supportsBreakpointType(B breakpoint) {
-        return breakpoint.getType() instanceof DAPBreakpointTypeBase<?>;
+        // A DAP breakpoint is always supported. A language's NATIVE line breakpoint is supported when
+        // its file is mapped to this DAP server, so that while a DAP session runs it can be forwarded
+        // (by DAPForwardedLineBreakpointHandler) while keeping its native type for other sessions.
+        if (breakpoint.getType() instanceof DAPBreakpointTypeBase<?>) {
+            return true;
+        }
+        return debugAdapterDescriptor.isDebuggableLineBreakpoint(breakpoint, project);
     }
 
     /**
@@ -294,9 +443,11 @@ public abstract class DAPBreakpointHandlerBase<B extends XBreakpoint<?>> extends
         if (filePath == null) {
             return null;
         }
+        Set<LineLocation> dapBreakpointLines = getDAPBreakpointLines();
         for (B breakpoint : breakpoints) {
             XSourcePosition breakpointPosition = breakpoint.getSourcePosition();
-            if (breakpointPosition == null) {
+            if (breakpointPosition == null || isShadowed(breakpoint, dapBreakpointLines)) {
+                // A shadowed breakpoint is not sent: the DAP breakpoint on the same line is the one reached
                 continue;
             }
             VirtualFile fileInBreakpoint = breakpointPosition.getFile();

@@ -24,6 +24,9 @@ import com.intellij.openapi.util.Key;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.util.net.NetUtils;
 import com.intellij.xdebugger.XDebugSession;
+import com.intellij.xdebugger.XSourcePosition;
+import com.intellij.xdebugger.breakpoints.XBreakpoint;
+import com.intellij.xdebugger.breakpoints.XLineBreakpoint;
 import com.intellij.xdebugger.evaluation.XDebuggerEditorsProvider;
 import com.redhat.devtools.lsp4ij.dap.DAPDebugProcess;
 import com.redhat.devtools.lsp4ij.dap.DAPDebuggerEditorsProvider;
@@ -287,6 +290,24 @@ public abstract class DebugAdapterDescriptor implements DebuggableFile {
     @Override
     public boolean isDebuggableFile(@NotNull VirtualFile file, @NotNull Project project) {
         return serverDefinition != null && serverDefinition.isDebuggableFile(file, project);
+    }
+
+    /**
+     * Returns whether the given breakpoint is a line breakpoint on a file that is debuggable by this
+     * DAP server (see {@link #isDebuggableFile}). This is the shared predicate used both to accept a
+     * native line breakpoint (in the DAP breakpoint handler) and to decide whether to forward it
+     * during a DAP session (in {@code DAPForwardedLineBreakpointHandler}). It intentionally does not
+     * look at the breakpoint's type, so each caller keeps control of its own DAP-type handling.
+     */
+    public boolean isDebuggableLineBreakpoint(@NotNull XBreakpoint<?> breakpoint, @NotNull Project project) {
+        if (!(breakpoint instanceof XLineBreakpoint<?> lineBreakpoint)) {
+            return false;
+        }
+        XSourcePosition sourcePosition = lineBreakpoint.getSourcePosition();
+        if (sourcePosition == null) {
+            return false;
+        }
+        return isDebuggableFile(sourcePosition.getFile(), project);
     }
 
     public @NotNull DAPBreakpointHandlerBase<?> createBreakpointHandler(@NotNull XDebugSession session, Project project) {
