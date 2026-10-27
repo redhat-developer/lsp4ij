@@ -29,6 +29,7 @@ import java.util.concurrent.CompletableFuture;
 public class DAPMovedFileBreakpointTest extends HeavyPlatformTestCase {
 
     private final List<SetBreakpointsArguments> requests = new ArrayList<>();
+    private boolean failClears;
     private Path dir;
     private DAPBreakpointHandlerBase<?> sharedHandler;
     private DAPForwardedLineBreakpointHandler forwardedHandler;
@@ -78,6 +79,43 @@ public class DAPMovedFileBreakpointTest extends HeavyPlatformTestCase {
         Map<String, Integer> sent = sentBreakpoints();
         assertEquals(Integer.valueOf(0), sent.get("a.lua"));
         assertEquals(Integer.valueOf(1), sent.get("b.lua"));
+    }
+
+    public void testFailedClearIsSentAgain() throws Exception {
+        var file = file("a.lua");
+        var breakpoint = forwardedBreakpoint(file);
+
+        // The debug adapter fails to clear the breakpoints of the renamed file
+        failClears = true;
+        WriteAction.runAndWait(() -> file.rename(this, "a.txt"));
+        forwardedHandler.unregisterBreakpoint(breakpoint, false);
+        forwardedHandler.registerBreakpoint(breakpoint);
+        assertEquals(Integer.valueOf(0), sentBreakpoints().get("a.lua"));
+        assertTrue(sharedHandler.hasSentBreakpoints());
+
+        // The next update sends the clear again
+        failClears = false;
+        requests.clear();
+        var other = lineBreakpoint(file("c.lua"));
+        forwardedHandler.registerBreakpoint(other);
+        Map<String, Integer> sent = sentBreakpoints();
+        assertEquals(Integer.valueOf(0), sent.get("a.lua"));
+        assertEquals(Integer.valueOf(1), sent.get("c.lua"));
+
+        // Once cleared, the file is not sent anymore
+        requests.clear();
+        forwardedHandler.unregisterBreakpoint(other, false);
+        sent = sentBreakpoints();
+        assertFalse(sent.containsKey("a.lua"));
+        assertEquals(Integer.valueOf(0), sent.get("c.lua"));
+        assertFalse(sharedHandler.hasSentBreakpoints());
+    }
+
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private XLineBreakpoint<?> lineBreakpoint(VirtualFile file) {
+        var nativeType = XBreakpointType.EXTENSION_POINT_NAME.findExtension(DAPShadowedBreakpointTest.NativeLineBreakpointType.class);
+        return WriteAction.compute(() -> XDebuggerManager.getInstance(getProject()).getBreakpointManager()
+                .addLineBreakpoint((XLineBreakpointType) nativeType, file.getUrl(), 0, null));
     }
 
     @SuppressWarnings({"unchecked", "rawtypes"})
@@ -151,7 +189,11 @@ public class DAPMovedFileBreakpointTest extends HeavyPlatformTestCase {
     private IDebugProtocolServer server() {
         return (IDebugProtocolServer) Proxy.newProxyInstance(IDebugProtocolServer.class.getClassLoader(), new Class[]{IDebugProtocolServer.class}, (p, m, a) -> {
             if (m.getName().equals("setBreakpoints")) {
-                requests.add((SetBreakpointsArguments) a[0]);
+                var arguments = (SetBreakpointsArguments) a[0];
+                requests.add(arguments);
+                if (failClears && arguments.getBreakpoints().length == 0) {
+                    return CompletableFuture.failedFuture(new IllegalStateException("setBreakpoints failed"));
+                }
                 var response = new SetBreakpointsResponse();
                 response.setBreakpoints(new Breakpoint[0]);
                 return CompletableFuture.completedFuture(response);

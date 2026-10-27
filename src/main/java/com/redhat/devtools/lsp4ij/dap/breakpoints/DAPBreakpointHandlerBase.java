@@ -44,8 +44,9 @@ public abstract class DAPBreakpointHandlerBase<B extends XBreakpoint<?>> extends
 
     private final @NotNull DAPExceptionBreakpointsPanel exceptionBreakpointsPanel;
     private final Set<B> shadowedBreakpoints = ConcurrentHashMap.newKeySet();
-    // The sources which have breakpoints in the debug adapter
-    private final Set<Source> sentSources = ConcurrentHashMap.newKeySet();
+    // The sources which have breakpoints in the debug adapter, with a token of their latest 'setBreakpoints' request.
+    // A cleared source stays until its clear succeeded, so that a failed clear is sent again.
+    private final Map<Source, Object> sentSources = new ConcurrentHashMap<>();
 
     public DAPBreakpointHandlerBase(@NotNull Class<? extends XBreakpointType<B, ?>> breakpointTypeClass,
                                     @NotNull XDebugSession debugSession,
@@ -188,7 +189,7 @@ public abstract class DAPBreakpointHandlerBase<B extends XBreakpoint<?>> extends
 
         // Also send the sources which had breakpoints and have none anymore, so that they are cleared even when
         // the removed breakpoint doesn't know its old source (ex: its file was moved or renamed)
-        for (Source source : sentSources) {
+        for (Source source : sentSources.keySet()) {
             targetBreakpoints.computeIfAbsent(source, s -> new ArrayList<>());
         }
 
@@ -203,25 +204,30 @@ public abstract class DAPBreakpointHandlerBase<B extends XBreakpoint<?>> extends
             // Call 'setBreakpoints' DAP request for each Source keys.
             final var arguments = createSetBreakpointsArguments(source, sourceBreakpoints);
             List<@Nullable B> ijBreakpoints = targetIJBreakpoints.getOrDefault(source, List.of());
+            final var sourceFutures = new ArrayList<CompletableFuture<Void>>();
             if (debugProtocolServer != null) {
                 // Call 'setBreakpoints' DAP request for each Source keys
                 // and the given debug protocol server
-                setBreakpointsFutures.add(setBreakpoints(debugProtocolServer, arguments, ijBreakpoints));
+                sourceFutures.add(setBreakpoints(debugProtocolServer, arguments, ijBreakpoints));
             } else {
                 // Call 'setBreakpoints' DAP request for each Source keys
                 // for each registered debug protocol server
                 for (var server : debugProtocolServers) {
-                    setBreakpointsFutures.add(setBreakpoints(server, arguments, ijBreakpoints));
+                    sourceFutures.add(setBreakpoints(server, arguments, ijBreakpoints));
                 }
             }
+            setBreakpointsFutures.addAll(sourceFutures);
 
-            // Once we told adapter there are no breakpoints for a source file, we can stop
-            // tracking that file
+            // A later request for this source replaces the token, so that the response of an earlier clear
+            // cannot stop tracking it
+            final var token = new Object();
+            sentSources.put(source, token);
             if (sourceBreakpoints.isEmpty()) {
                 iterator.remove();
-                sentSources.remove(source);
-            } else {
-                sentSources.add(source);
+                // Once the adapter accepted that there are no breakpoints for a source file, we can stop
+                // tracking that file
+                CompletableFuture.allOf(sourceFutures.toArray(EMPTY_COMPLETABLE_FUTURES))
+                        .thenRun(() -> sentSources.remove(source, token));
             }
         }
         return CompletableFuture.allOf(setBreakpointsFutures.toArray(EMPTY_COMPLETABLE_FUTURES));
