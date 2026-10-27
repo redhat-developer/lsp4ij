@@ -47,6 +47,7 @@ import com.intellij.xdebugger.frame.XSuspendContext;
 import com.intellij.xdebugger.stepping.XSmartStepIntoHandler;
 import com.intellij.xdebugger.ui.XDebugTabLayouter;
 import com.redhat.devtools.lsp4ij.dap.breakpoints.DAPBreakpointHandlerBase;
+import com.redhat.devtools.lsp4ij.dap.breakpoints.DAPDataBreakpointHandler;
 import com.redhat.devtools.lsp4ij.dap.breakpoints.DAPExceptionBreakpointsPanel;
 import com.redhat.devtools.lsp4ij.dap.breakpoints.DAPFunctionBreakpointHandler;
 import com.redhat.devtools.lsp4ij.dap.breakpoints.RunToCursorBreakpoint;
@@ -103,6 +104,7 @@ public class DAPDebugProcess extends XDebugProcess implements Disposable {
     private final @NotNull XDebuggerEditorsProvider editorsProvider;
     private final @NotNull DAPBreakpointHandlerBase<?> breakpointHandler;
     private final @NotNull DAPFunctionBreakpointHandler functionBreakpointHandler;
+    private final @NotNull DAPDataBreakpointHandler dataBreakpointHandler;
 
     private final @NotNull RunToCursorBreakpoint runToCursorBreakpoint;
     private final @NotNull DebugAdapterDescriptor serverDescriptor;
@@ -156,6 +158,7 @@ public class DAPDebugProcess extends XDebugProcess implements Disposable {
         this.breakpointHandler = serverDescriptor.createBreakpointHandler(session, project);
         this.forwardedBreakpointHandlers = createForwardedBreakpointHandlers(breakpointHandler, serverDescriptor, project);
         this.functionBreakpointHandler = serverDescriptor.createFunctionBreakpointHandler(session, project);
+        this.dataBreakpointHandler = serverDescriptor.createDataBreakpointHandler(session, project);
         this.runToCursorBreakpoint = new RunToCursorBreakpoint(breakpointHandler);
         this.disassemblyBreakpointHandler = serverDescriptor.createDisassemblyBreakpointHandler(session, project);
         this.alternativeSourceHandler = new DAPAlternativeSourceHandler(this);
@@ -444,6 +447,7 @@ public class DAPDebugProcess extends XDebugProcess implements Disposable {
         java.util.List<XBreakpointHandler<?>> handlers = new java.util.ArrayList<>();
         handlers.add(breakpointHandler);
         handlers.add(functionBreakpointHandler);
+        handlers.add(dataBreakpointHandler);
         handlers.add(disassemblyBreakpointHandler);
         // Forward native line breakpoints (JS, Python, …) on DAP-mapped files while this session runs.
         handlers.addAll(forwardedBreakpointHandlers);
@@ -464,15 +468,27 @@ public class DAPDebugProcess extends XDebugProcess implements Disposable {
     }
 
     /**
-     * Returns the IntelliJ breakpoint, a line or a function breakpoint, of the given DAP breakpoint id, and null
-     * otherwise.
+     * Returns the handler of the data breakpoints, which it sends with 'setDataBreakpoints'.
+     *
+     * @return the handler of the data breakpoints.
+     */
+    public @NotNull DAPDataBreakpointHandler getDataBreakpointHandler() {
+        return dataBreakpointHandler;
+    }
+
+    /**
+     * Returns the IntelliJ breakpoint, a line, a function or a data breakpoint, of the given DAP breakpoint id, and
+     * null otherwise.
      *
      * @param id the DAP breakpoint id.
      * @return the IntelliJ breakpoint of the given DAP breakpoint id, and null otherwise.
      */
     public @Nullable XBreakpoint<?> findBreakpointById(@Nullable Integer id) {
         XBreakpoint<?> breakpoint = breakpointHandler.findBreakpointById(id);
-        return breakpoint != null ? breakpoint : functionBreakpointHandler.findBreakpointById(id);
+        if (breakpoint == null) {
+            breakpoint = functionBreakpointHandler.findBreakpointById(id);
+        }
+        return breakpoint != null ? breakpoint : dataBreakpointHandler.findBreakpointById(id);
     }
 
     /**
@@ -798,6 +814,7 @@ public class DAPDebugProcess extends XDebugProcess implements Disposable {
         }
         breakpointHandler.dispose();
         functionBreakpointHandler.dispose();
+        dataBreakpointHandler.dispose();
         disassemblyBreakpointHandler.dispose();
         getAlternativeSourceHandler().dispose();
         var disassemblyFile = getDisassemblyFile();
