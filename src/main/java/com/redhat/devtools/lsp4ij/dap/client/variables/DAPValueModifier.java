@@ -55,7 +55,8 @@ public class DAPValueModifier extends XValueModifier {
 
     @Override
     public @Nullable String getInitialValueEditorText() {
-        return value.getVariable().getValue();
+        // The value shown, rather than the placeholder of a lazy variable whose value the user asked for
+        return value.getShownVariable().getValue();
     }
 
 }
