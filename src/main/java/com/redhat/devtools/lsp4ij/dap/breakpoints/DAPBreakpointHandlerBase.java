@@ -44,6 +44,8 @@ public abstract class DAPBreakpointHandlerBase<B extends XBreakpoint<?>> extends
 
     private final @NotNull DAPExceptionBreakpointsPanel exceptionBreakpointsPanel;
     private final Set<B> shadowedBreakpoints = ConcurrentHashMap.newKeySet();
+    // The sources which have breakpoints in the debug adapter
+    private final Set<Source> sentSources = ConcurrentHashMap.newKeySet();
 
     public DAPBreakpointHandlerBase(@NotNull Class<? extends XBreakpointType<B, ?>> breakpointTypeClass,
                                     @NotNull XDebugSession debugSession,
@@ -153,9 +155,10 @@ public abstract class DAPBreakpointHandlerBase<B extends XBreakpoint<?>> extends
         Map<Source, List<SourceBreakpoint>> targetBreakpoints = new HashMap<>();
         // The IJ breakpoint of each source breakpoint, in the same order, and null for the temporary breakpoint
         Map<Source, List<@Nullable B>> targetIJBreakpoints = new HashMap<>();
+        Set<LineLocation> dapBreakpointLines = getDAPBreakpointLines();
         for (B breakpoint : breakpoints) {
             var sourcePosition = breakpoint.getSourcePosition();
-            if (sourcePosition != null && !isShadowed(breakpoint)) {
+            if (sourcePosition != null && !isShadowed(breakpoint, dapBreakpointLines)) {
                 addSourceBreakpoint(sourcePosition, breakpoint.getConditionExpression(), getLogMessage(breakpoint), targetBreakpoints);
                 targetIJBreakpoints.computeIfAbsent(toDAPSource(sourcePosition), s -> new ArrayList<>()).add(breakpoint);
             }
@@ -174,6 +177,12 @@ public abstract class DAPBreakpointHandlerBase<B extends XBreakpoint<?>> extends
                 targetBreakpoints
                         .computeIfAbsent(source, s -> new ArrayList<>());
             }
+        }
+
+        // Also send the sources which had breakpoints and have none anymore, so that they are cleared even when
+        // the removed breakpoint doesn't know its old source (ex: its file was moved or renamed)
+        for (Source source : sentSources) {
+            targetBreakpoints.computeIfAbsent(source, s -> new ArrayList<>());
         }
 
         final var setBreakpointsFutures = new ArrayList<CompletableFuture<Void>>();
@@ -203,6 +212,9 @@ public abstract class DAPBreakpointHandlerBase<B extends XBreakpoint<?>> extends
             // tracking that file
             if (sourceBreakpoints.isEmpty()) {
                 iterator.remove();
+                sentSources.remove(source);
+            } else {
+                sentSources.add(source);
             }
         }
         return CompletableFuture.allOf(setBreakpointsFutures.toArray(EMPTY_COMPLETABLE_FUTURES));
@@ -258,8 +270,9 @@ public abstract class DAPBreakpointHandlerBase<B extends XBreakpoint<?>> extends
     protected void onBreakpointsChanged(@NotNull B breakpoint) {
         // Check all breakpoints, not only the changed line: when a breakpoint moves to another line,
         // IntelliJ unregisters it with its new position, so the old line is not known anymore.
+        Set<LineLocation> dapBreakpointLines = getDAPBreakpointLines();
         for (B candidate : breakpoints) {
-            updateShadowedPresentation(candidate, isShadowed(candidate));
+            updateShadowedPresentation(candidate, isShadowed(candidate, dapBreakpointLines));
         }
         if (!breakpoints.contains(breakpoint)) {
             updateShadowedPresentation(breakpoint, false);
@@ -291,30 +304,62 @@ public abstract class DAPBreakpointHandlerBase<B extends XBreakpoint<?>> extends
      * @return true if the given breakpoint is a native line breakpoint with a DAP breakpoint on the same line.
      */
     boolean isShadowed(@NotNull B breakpoint) {
-        if (breakpoint.getType() instanceof DAPBreakpointTypeBase<?>) {
+        return isShadowed(breakpoint, getDAPBreakpointLines());
+    }
+
+    /**
+     * Returns true if the given breakpoint is a native line breakpoint on one of the given DAP breakpoint lines.
+     * <p>
+     * The DAP breakpoint lines are collected once by the caller (see {@link #getDAPBreakpointLines()}), so that
+     * checking all breakpoints stays linear instead of scanning all breakpoints for each of them.
+     *
+     * @param breakpoint         the breakpoint.
+     * @param dapBreakpointLines the lines of the DAP breakpoints.
+     * @return true if the given breakpoint is a native line breakpoint on one of the given DAP breakpoint lines.
+     */
+    private static boolean isShadowed(@NotNull XBreakpoint<?> breakpoint,
+                                      @NotNull Set<LineLocation> dapBreakpointLines) {
+        if (breakpoint.getType() instanceof DAPBreakpointTypeBase<?> || dapBreakpointLines.isEmpty()) {
             return false;
         }
         XSourcePosition position = breakpoint.getSourcePosition();
-        if (position == null) {
-            return false;
-        }
-        for (B other : breakpoints) {
-            if (other.getType() instanceof DAPBreakpointTypeBase<?>) {
-                XSourcePosition otherPosition = other.getSourcePosition();
-                if (otherPosition != null
-                        && otherPosition.getLine() == position.getLine()
-                        && otherPosition.getFile().equals(position.getFile())) {
-                    return true;
+        return position != null && dapBreakpointLines.contains(new LineLocation(position.getFile(), position.getLine()));
+    }
+
+    /**
+     * Returns the file and line of each DAP breakpoint.
+     *
+     * @return the file and line of each DAP breakpoint.
+     */
+    private @NotNull Set<LineLocation> getDAPBreakpointLines() {
+        Set<LineLocation> lines = new HashSet<>();
+        for (B breakpoint : breakpoints) {
+            if (breakpoint.getType() instanceof DAPBreakpointTypeBase<?>) {
+                XSourcePosition position = breakpoint.getSourcePosition();
+                if (position != null) {
+                    lines.add(new LineLocation(position.getFile(), position.getLine()));
                 }
             }
         }
-        return false;
+        return lines;
+    }
+
+    /**
+     * A line (0-based) of a file.
+     */
+    private record LineLocation(@NotNull VirtualFile file, int line) {
+    }
+
+    @Override
+    protected boolean hasSentBreakpoints() {
+        return !sentSources.isEmpty();
     }
 
     @Override
     public void dispose() {
         super.dispose();
         shadowedBreakpoints.clear();
+        sentSources.clear();
     }
 
     private @Nullable B findBreakpoint(@NotNull Breakpoint breakpointResponse,
@@ -370,9 +415,10 @@ public abstract class DAPBreakpointHandlerBase<B extends XBreakpoint<?>> extends
         if (filePath == null) {
             return null;
         }
+        Set<LineLocation> dapBreakpointLines = getDAPBreakpointLines();
         for (B breakpoint : breakpoints) {
             XSourcePosition breakpointPosition = breakpoint.getSourcePosition();
-            if (breakpointPosition == null || isShadowed(breakpoint)) {
+            if (breakpointPosition == null || isShadowed(breakpoint, dapBreakpointLines)) {
                 // A shadowed breakpoint is not sent: the DAP breakpoint on the same line is the one reached
                 continue;
             }

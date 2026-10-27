@@ -115,16 +115,20 @@ public abstract class BreakpointHandlerBase<B extends XBreakpoint<?>> extends XB
     @Override
     public void unregisterBreakpoint(@NotNull B breakpoint,
                                      boolean temporary) {
-        var sourcePosition = breakpoint.getSourcePosition();
-        if (!supportsBreakpoint(breakpoint) || sourcePosition == null) {
+        // Remove the breakpoint by identity, without checking supportsBreakpoint(): IntelliJ unregisters
+        // a changed breakpoint with its new location, which may not be supported anymore (ex: its file
+        // was moved out of the mapped files). Checking it kept the breakpoint, which was then sent again
+        // at its new location, while its old source was never cleared in the debug adapter.
+        if (!breakpoints.remove(breakpoint)) {
+            // Not registered (ex: not supported when it was registered)
             return;
         }
-        breakpoints.remove(breakpoint);
         onBreakpointsChanged(breakpoint);
         // DAP replaces breakpoints per source, not per session. Include the removed
         // source even when other files still have breakpoints, so its last breakpoint
         // is cleared by an empty setBreakpoints request.
-        sendBreakpoints(null, new TemporaryBreakpoint(sourcePosition, false));
+        var sourcePosition = breakpoint.getSourcePosition();
+        sendBreakpoints(null, sourcePosition != null ? new TemporaryBreakpoint(sourcePosition, false) : null);
     }
 
     @Override
@@ -135,8 +139,8 @@ public abstract class BreakpointHandlerBase<B extends XBreakpoint<?>> extends XB
 
     protected CompletableFuture<@Nullable Void> sendBreakpoints(@Nullable IDebugProtocolServer debugProtocolServer,
                                                                 @Nullable TemporaryBreakpoint temporaryBreakpoint) {
-        if (breakpoints.isEmpty() && temporaryBreakpoint == null) {
-            // No breakpoints to send
+        if (breakpoints.isEmpty() && temporaryBreakpoint == null && !hasSentBreakpoints()) {
+            // No breakpoints to send, and none to clear
             return CompletableFuture.completedFuture(null);
         }
         if (debugProtocolServers.isEmpty()) {
@@ -145,6 +149,15 @@ public abstract class BreakpointHandlerBase<B extends XBreakpoint<?>> extends XB
             return CompletableFuture.completedFuture(null);
         }
         return doSendBreakpoints(debugProtocolServer, temporaryBreakpoint);
+    }
+
+    /**
+     * Returns true if breakpoints sent to the debug adapter may still have to be cleared, and false otherwise.
+     *
+     * @return true if breakpoints sent to the debug adapter may still have to be cleared, and false otherwise.
+     */
+    protected boolean hasSentBreakpoints() {
+        return false;
     }
 
     /**
