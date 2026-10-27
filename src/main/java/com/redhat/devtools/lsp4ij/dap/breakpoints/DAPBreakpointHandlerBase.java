@@ -164,6 +164,13 @@ public abstract class DAPBreakpointHandlerBase<B extends XBreakpoint<?>> extends
             }
         }
 
+        // The registered temporary breakpoint, as of "Run to Cursor", stays in each request for its source
+        XSourcePosition registered = getRegisteredTemporaryBreakpoint();
+        if (registered != null) {
+            addSourceBreakpoint(registered, null, null, targetBreakpoints);
+            targetIJBreakpoints.computeIfAbsent(toDAPSource(registered), s -> new ArrayList<>()).add(null);
+        }
+
         if (temporaryBreakpoint != null) {
             if (temporaryBreakpoint.add()) {
                 addSourceBreakpoint(temporaryBreakpoint.sourcePosition(), null, null, targetBreakpoints);

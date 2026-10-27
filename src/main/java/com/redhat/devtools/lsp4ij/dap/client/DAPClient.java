@@ -351,6 +351,8 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
 
     @Override
     public void stopped(StoppedEventArguments args) {
+        // "Run to Cursor" ends at this stop, at its temporary breakpoint or anywhere else
+        debugProcess.getRunToCursorBreakpoint().stopped();
         var server = getDebugProtocolServer();
         Integer threadId = args.getThreadId();
         if (server == null || threadId == null) {
