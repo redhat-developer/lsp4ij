@@ -19,12 +19,15 @@ import com.intellij.execution.ui.layout.PlaceInGrid;
 import com.intellij.icons.AllIcons;
 import com.intellij.openapi.Disposable;
 import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.fileEditor.OpenFileDescriptor;
 import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.progress.ProgressIndicator;
 import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.progress.Task;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.NlsContexts;
+import com.intellij.openapi.vfs.LocalFileSystem;
+import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.ui.AppUIUtil;
 import com.intellij.ui.content.Content;
 import com.intellij.util.ui.FormBuilder;
@@ -45,12 +48,15 @@ import com.redhat.devtools.lsp4ij.dap.client.DAPDropFrameHandler;
 import com.redhat.devtools.lsp4ij.dap.client.DAPStackFrame;
 import com.redhat.devtools.lsp4ij.dap.client.DAPSuspendContext;
 import com.redhat.devtools.lsp4ij.dap.client.files.DAPFileRegistry;
+import com.redhat.devtools.lsp4ij.dap.client.files.DAPSourceReferencePosition;
 import com.redhat.devtools.lsp4ij.dap.client.variables.DAPValueFormat;
 import com.redhat.devtools.lsp4ij.dap.configurations.DAPCommandLineState;
 import com.redhat.devtools.lsp4ij.dap.descriptors.DebugAdapterDescriptor;
 import com.redhat.devtools.lsp4ij.dap.disassembly.DAPAlternativeSourceHandler;
 import com.redhat.devtools.lsp4ij.dap.disassembly.DisassemblyFile;
 import com.redhat.devtools.lsp4ij.dap.disassembly.breakpoints.DisassemblyBreakpointHandlerBase;
+import com.redhat.devtools.lsp4ij.dap.sources.LoadedSourcesPanel;
+import com.redhat.devtools.lsp4ij.dap.sources.ModulesPanel;
 import com.redhat.devtools.lsp4ij.dap.stepping.DAPSmartStepIntoHandler;
 import com.redhat.devtools.lsp4ij.dap.stepping.DAPStepIntoVariant;
 import com.redhat.devtools.lsp4ij.dap.threads.ThreadsPanel;
@@ -60,6 +66,10 @@ import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.awaitWithCh
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import com.redhat.devtools.lsp4ij.settings.ServerTrace;
 import com.redhat.devtools.lsp4ij.settings.ui.InstallerPanel;
+import org.eclipse.lsp4j.debug.LoadedSourceEventArguments;
+import org.eclipse.lsp4j.debug.Module;
+import org.eclipse.lsp4j.debug.ModuleEventArguments;
+import org.eclipse.lsp4j.debug.Source;
 import org.eclipse.lsp4j.debug.SteppingGranularity;
 import org.eclipse.lsp4j.debug.Thread;
 import org.eclipse.lsp4j.debug.ThreadEventArguments;
@@ -73,6 +83,7 @@ import java.util.HashMap;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Supplier;
 
 /**
@@ -89,6 +100,19 @@ public class DAPDebugProcess extends XDebugProcess implements Disposable {
     private final @NotNull DebugAdapterDescriptor serverDescriptor;
     private final @NotNull DAPServerReadyTracker serverReadyFuture;
     private final ThreadsPanel threadsPanel;
+    private final @NotNull LoadedSourcesPanel loadedSourcesPanel;
+    private final @NotNull ModulesPanel modulesPanel;
+
+    /**
+     * The layout of the debug tab, which the Loaded Sources and Modules tabs are added to once the DAP server reports
+     * loaded sources or modules.
+     */
+    private volatile @Nullable RunnerLayoutUi layoutUi;
+    private final AtomicBoolean loadedSourcesShown = new AtomicBoolean();
+    private final AtomicBoolean modulesShown = new AtomicBoolean();
+
+    /** The client whose DAP server reported the loaded sources shown, which gives the text of a source reference. */
+    private volatile @Nullable DAPClient loadedSourcesClient;
 
     // Disassembly
     private final @NotNull DisassemblyBreakpointHandlerBase<?> disassemblyBreakpointHandler;
@@ -124,6 +148,8 @@ public class DAPDebugProcess extends XDebugProcess implements Disposable {
         this.alternativeSourceHandler = new DAPAlternativeSourceHandler(this);
         this.threadsPanel = new ThreadsPanel(this);
         this.dropFrameHandler = new DAPDropFrameHandler(this);
+        this.loadedSourcesPanel = new LoadedSourcesPanel(this::openLoadedSource);
+        this.modulesPanel = new ModulesPanel();
         this.status = Status.NONE;
 
         // At this step, the DAP server process is launched (but we don't know if the process is started correctly)
@@ -476,6 +502,9 @@ public class DAPDebugProcess extends XDebugProcess implements Disposable {
 
             @Override
             public void registerAdditionalContent(@NotNull RunnerLayoutUi ui) {
+                // The "Loaded Sources" and "Modules" panels are added once the DAP server reports any
+                layoutUi = ui;
+
                 // Register "Exception Breakpoints" panel
                 registerBreakpointsPanel(ui);
 
@@ -521,6 +550,109 @@ public class DAPDebugProcess extends XDebugProcess implements Disposable {
 
     public void refreshThread(ThreadEventArguments args) {
         threadsPanel.refreshThread(args);
+    }
+
+    /**
+     * Shows the sources which the DAP server of the given client reports as loaded, in the "Loaded Sources" tab, which
+     * is added the first time.
+     *
+     * @param client  the client whose DAP server reports the sources.
+     * @param sources the loaded sources.
+     */
+    public void refreshLoadedSources(@NotNull DAPClient client, @NotNull Source[] sources) {
+        loadedSourcesClient = client;
+        showContent(loadedSourcesShown, LoadedSourcesPanel.ID, loadedSourcesPanel,
+                DAPBundle.message("dap.panels.loaded.sources"), loadedSourcesPanel.getDefaultFocusedComponent());
+        loadedSourcesPanel.refresh(sources);
+    }
+
+    /**
+     * Updates the "Loaded Sources" tab, which is added the first time, with a 'loadedSource' event.
+     *
+     * @param client the client whose DAP server sent the event.
+     * @param args   the 'loadedSource' event.
+     */
+    public void updateLoadedSource(@NotNull DAPClient client, @NotNull LoadedSourceEventArguments args) {
+        loadedSourcesClient = client;
+        showContent(loadedSourcesShown, LoadedSourcesPanel.ID, loadedSourcesPanel,
+                DAPBundle.message("dap.panels.loaded.sources"), loadedSourcesPanel.getDefaultFocusedComponent());
+        loadedSourcesPanel.update(args);
+    }
+
+    /**
+     * Shows the modules which the DAP server reports, in the "Modules" tab, which is added the first time.
+     *
+     * @param modules the modules.
+     */
+    public void refreshModules(@NotNull Module[] modules) {
+        showContent(modulesShown, ModulesPanel.ID, modulesPanel,
+                DAPBundle.message("dap.panels.modules"), modulesPanel.getDefaultFocusedComponent());
+        modulesPanel.refresh(modules);
+    }
+
+    /**
+     * Updates the "Modules" tab, which is added the first time, with a 'module' event.
+     *
+     * @param args the 'module' event.
+     */
+    public void updateModule(@NotNull ModuleEventArguments args) {
+        showContent(modulesShown, ModulesPanel.ID, modulesPanel,
+                DAPBundle.message("dap.panels.modules"), modulesPanel.getDefaultFocusedComponent());
+        modulesPanel.update(args);
+    }
+
+    /**
+     * @return the "Loaded Sources" panel.
+     */
+    public @NotNull LoadedSourcesPanel getLoadedSourcesPanel() {
+        return loadedSourcesPanel;
+    }
+
+    /**
+     * @return the "Modules" panel.
+     */
+    public @NotNull ModulesPanel getModulesPanel() {
+        return modulesPanel;
+    }
+
+    private void showContent(@NotNull AtomicBoolean shown,
+                             @NotNull String id,
+                             @NotNull JComponent panel,
+                             @NotNull String title,
+                             @NotNull JComponent focused) {
+        RunnerLayoutUi ui = layoutUi;
+        if (ui == null || !shown.compareAndSet(false, true)) {
+            return;
+        }
+        ApplicationManager.getApplication().invokeLater(() -> {
+            final Content content = ui.createContent(id, panel, title, null, focused);
+            content.setCloseable(false);
+            ui.addContent(content, 0, PlaceInGrid.left, false);
+        });
+    }
+
+    /**
+     * Opens a loaded source: one with a source reference in the text its DAP server gives for it, another in its file.
+     *
+     * @param source the source to open.
+     */
+    private void openLoadedSource(@NotNull Source source) {
+        DAPClient client = loadedSourcesClient;
+        int sourceReference = source.getSourceReference() != null ? source.getSourceReference() : 0;
+        if (sourceReference > 0 && client != null) {
+            var file = DAPFileRegistry.getInstance().getOrCreateDAPFile(getConfigName(), LoadedSourcesPanel.name(source), getProject());
+            new DAPSourceReferencePosition(file, sourceReference, 0, client).createNavigatable(getProject()).navigate(true);
+            return;
+        }
+        String path = source.getPath();
+        if (path != null) {
+            ApplicationManager.getApplication().executeOnPooledThread(() -> {
+                VirtualFile file = LocalFileSystem.getInstance().refreshAndFindFileByPath(path);
+                if (file != null) {
+                    ApplicationManager.getApplication().invokeLater(() -> new OpenFileDescriptor(getProject(), file).navigate(true));
+                }
+            });
+        }
     }
 
     @Override

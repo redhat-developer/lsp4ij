@@ -242,6 +242,22 @@ You should edit the variable:
 the edit apply will consume the
 [SetVariable request](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_SetVariable):
 
+## Loaded sources and modules
+
+When the DAP server reports the sources it has loaded (`supportsLoadedSourcesRequest`), the debug tab gets a
+`Loaded Sources` tab the first time the program stops. It lists each source with its path, as the
+[loadedSources](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_LoadedSources) request
+gives them at each stop, and as the
+[loadedSource](https://microsoft.github.io/debug-adapter-protocol//specification.html#Events_LoadedSource) event adds,
+changes and removes them. Double-clicking a source, or Enter, opens it: a source with a path in its file, and one with
+a `sourceReference` in the text that the DAP server gives for it, read-only.
+
+When the DAP server reports its modules (`supportsModulesRequest`), a `Modules` tab lists each module's name, version
+and path, and whether it is user code, as the
+[modules](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_Modules) request gives them at
+each stop and the [module](https://microsoft.github.io/debug-adapter-protocol//specification.html#Events_Module) event
+updates them.
+
 ## Run In Terminal
 
 If the DAP server supports the [Run In Terminal](https://microsoft.github.io/debug-adapter-protocol/specification.html#Reverse_Requests_RunInTerminal) request, **LSP4IJ** can handle it automatically.  

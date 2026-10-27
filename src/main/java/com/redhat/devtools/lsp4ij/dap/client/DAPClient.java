@@ -41,6 +41,7 @@ import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import com.redhat.devtools.lsp4ij.settings.ServerTrace;
 import org.eclipse.lsp4j.debug.*;
+import org.eclipse.lsp4j.debug.Module;
 import org.eclipse.lsp4j.debug.launch.DSPLauncher;
 import org.eclipse.lsp4j.debug.services.IDebugProtocolClient;
 import org.eclipse.lsp4j.debug.services.IDebugProtocolServer;
@@ -358,6 +359,7 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
         if (server == null || threadId == null) {
             return;
         }
+        refreshLoadedSourcesAndModules(server);
         getThreads(true).thenAcceptAsync(threads -> {
             var stoppedThread = Arrays.stream(threads)
                     .filter(thread -> threadId.equals(thread.getId()))
@@ -919,6 +921,72 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
     @Override
     public void thread(ThreadEventArguments args) {
         debugProcess.refreshThread(args);
+    }
+
+    // Loaded sources and modules
+
+    @Override
+    public void loadedSource(LoadedSourceEventArguments args) {
+        debugProcess.updateLoadedSource(this, args);
+    }
+
+    @Override
+    public void module(ModuleEventArguments args) {
+        debugProcess.updateModule(args);
+    }
+
+    /**
+     * Shows the sources and modules which the DAP server reports, if it reports them, as the program stopped.
+     *
+     * @param server the debug adapter.
+     */
+    private void refreshLoadedSourcesAndModules(@NotNull IDebugProtocolServer server) {
+        getLoadedSources(server, getCapabilities()).thenAccept(sources -> {
+            if (sources != null) {
+                debugProcess.refreshLoadedSources(this, sources);
+            }
+        });
+        getModules(server, getCapabilities()).thenAccept(modules -> {
+            if (modules != null) {
+                debugProcess.refreshModules(modules);
+            }
+        });
+    }
+
+    /**
+     * Returns the sources which the DAP server reports as loaded, or null when it doesn't report them
+     * (supportsLoadedSourcesRequest) or the request fails.
+     *
+     * @param server       the debug adapter.
+     * @param capabilities the debug adapter's capabilities.
+     * @return the loaded sources, or null.
+     */
+    static CompletableFuture<Source @Nullable []> getLoadedSources(@NotNull IDebugProtocolServer server,
+                                                                   @NotNull Capabilities capabilities) {
+        if (!Boolean.TRUE.equals(capabilities.getSupportsLoadedSourcesRequest())) {
+            return CompletableFuture.completedFuture(null);
+        }
+        return server.loadedSources(new LoadedSourcesArguments())
+                .thenApply(response -> response != null && response.getSources() != null ? response.getSources() : new Source[0])
+                .exceptionally(error -> null);
+    }
+
+    /**
+     * Returns the modules which the DAP server reports, or null when it doesn't report them (supportsModulesRequest) or
+     * the request fails.
+     *
+     * @param server       the debug adapter.
+     * @param capabilities the debug adapter's capabilities.
+     * @return the modules, or null.
+     */
+    static CompletableFuture<Module @Nullable []> getModules(@NotNull IDebugProtocolServer server,
+                                                             @NotNull Capabilities capabilities) {
+        if (!Boolean.TRUE.equals(capabilities.getSupportsModulesRequest())) {
+            return CompletableFuture.completedFuture(null);
+        }
+        return server.modules(new ModulesArguments())
+                .thenApply(response -> response != null && response.getModules() != null ? response.getModules() : new Module[0])
+                .exceptionally(error -> null);
     }
 
     public CompletableFuture<org.eclipse.lsp4j.debug.Thread[]> getThreads(boolean refreshThreads) {
