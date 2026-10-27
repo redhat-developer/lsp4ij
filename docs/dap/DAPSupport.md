@@ -57,7 +57,7 @@ Current state of [Requests](https://microsoft.github.io/debug-adapter-protocol//
 * ❌ [SetDataBreakpoints](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_SetDataBreakpoints).
 * ✅ [SetExceptionBreakpoints](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_SetExceptionBreakpoints) (see [user guide](./UserGuide.md#exception-breakpoint))
 * ❌ [SetExpression](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_SetExpression).
-* ❌ [SetFunctionBreakpoints](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_SetFunctionBreakpoints).
+* ✅ [SetFunctionBreakpoints](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_SetFunctionBreakpoints), with the `supportsFunctionBreakpoints` capability and the [FunctionBreakpoint](https://microsoft.github.io/debug-adapter-protocol//specification.html#Types_FunctionBreakpoint) type (see [user guide](./UserGuide.md#function-breakpoints)).
 * ✅ [SetInstructionBreakpoints](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_SetInstructionBreakpoints) (see [user guide](./UserGuide.md#disassemble)).
 * ✅ [SetVariable](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_SetVariable).
 * ✅ [Source](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_Source).
