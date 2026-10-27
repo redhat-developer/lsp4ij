@@ -611,6 +611,48 @@ public class WorkspaceDiagnosticManagerTest {
     }
 
     @Test
+    public void shutdownCancelsPendingPullAtOnceWhileTheExecutorIsBusy() throws Exception {
+        var h = harness();
+        h.manager.updateProviders(Set.of("lua"));
+        var request = h.next();
+        // A task still running on the executor, such as a report consumer, must not delay the cancellation: a server
+        // stop closes the connection once it is answered, and a later cancellation never reaches the server
+        var running = new CountDownLatch(1);
+        var release = new CountDownLatch(1);
+        h.executor.execute(() -> {
+            running.countDown();
+            try {
+                release.await(5, TimeUnit.SECONDS);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        });
+        assertTrue(running.await(5, TimeUnit.SECONDS));
+        try {
+            h.manager.dispose();
+            assertTrue(request.future.isCancelled());
+        } finally {
+            release.countDown();
+        }
+    }
+
+    @Test
+    public void shutdownWhileAPullIsSentCancelsItAtOnce() throws Exception {
+        var h = harness();
+        h.afterRequest = () -> {
+            // dispose() runs after the request is sent, before the manager keeps it; dropping the cleanup which
+            // dispose() queued, as a connection closed before it ran would, leaves the request to the manager alone
+            h.manager.dispose();
+            h.executor.shutdownNow();
+            Thread.interrupted();
+        };
+        h.manager.updateProviders(Set.of("lua"));
+        var request = h.next();
+        assertTrue(h.executor.awaitTermination(5, TimeUnit.SECONDS));
+        assertTrue(request.future.isCancelled());
+    }
+
+    @Test
     public void shutdownCancelsPendingPullWithoutRearming() throws Exception {
         var h = harness();
         h.manager.updateProviders(Set.of("lua"));
@@ -813,6 +855,7 @@ public class WorkspaceDiagnosticManagerTest {
         volatile boolean refuseCancellation;
         volatile boolean failNextProviderClear;
         volatile Runnable beforeApply = () -> {};
+        volatile Runnable afterRequest = () -> {};
         volatile java.util.function.Function<String, CompletableFuture<Boolean>> matcher = uri -> CompletableFuture.completedFuture(true);
         final List<String> clearedProviders = new CopyOnWriteArrayList<>();
         final List<String> clearedFiles = new CopyOnWriteArrayList<>();
@@ -835,6 +878,7 @@ public class WorkspaceDiagnosticManagerTest {
         @Override public CompletableFuture<WorkspaceDiagnosticReport> diagnostic(WorkspaceDiagnosticParams params) {
             var future = new Future(refuseCancellation);
             requests.add(new Request(params, future));
+            afterRequest.run();
             return future;
         }
         @Override public void didChangeConfiguration(DidChangeConfigurationParams params) { }
