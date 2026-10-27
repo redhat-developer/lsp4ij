@@ -36,7 +36,7 @@ public class LSPReferenceSupport extends AbstractLSPDocumentFeatureSupport<LSPRe
     private Integer previousOffset;
 
     public LSPReferenceSupport(@NotNull PsiFile file) {
-        super(file);
+        super(file, true, true);
     }
 
     public CompletableFuture<List<LocationData>> getReferences(LSPReferenceParams params) {

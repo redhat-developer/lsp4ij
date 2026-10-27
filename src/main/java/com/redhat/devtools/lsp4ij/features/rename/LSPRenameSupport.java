@@ -38,7 +38,7 @@ public class LSPRenameSupport extends AbstractLSPDocumentFeatureSupport<LSPRenam
     private LSPRenameParams previousParams;
 
     public LSPRenameSupport(@NotNull PsiFile file) {
-        super(file);
+        super(file, true, true);
     }
 
     public CompletableFuture<List<WorkspaceEditData>> getRename(@NotNull LSPRenameParams params) {
