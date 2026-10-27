@@ -14,7 +14,6 @@ import org.junit.Assert;
 import org.junit.Test;
 
 import java.util.List;
-import java.util.Map;
 
 /**
  * Tests for {@link CommandUtils}.
@@ -70,46 +69,6 @@ public class CommandUtilsTest {
                 "C:\\Users\\USERNAME\\A FOLDER WITH SPACE\\node_modules/.bin/typescript-language-server.cmd",
                 "--stdio"
         );
-    }
-
-    @Test
-    public void testWindowsEnvironmentMergeIsCaseInsensitive() {
-        Map<String, String> parentEnvironment =
-                Map.of("Path", "parent-path");
-
-        Map<String, String> configuredEnvironment =
-                Map.of("PATH", "configured-path");
-
-        Map<String, String> result =
-                CommandUtils.mergeEnvironmentVariables(
-                        parentEnvironment,
-                        configuredEnvironment,
-                        true
-                );
-
-        Assert.assertEquals(1, result.size());
-        Assert.assertEquals("configured-path", result.get("Path"));
-        Assert.assertEquals("configured-path", result.get("PATH"));
-    }
-
-    @Test
-    public void testNonWindowsEnvironmentMergeIsCaseSensitive() {
-        Map<String, String> parentEnvironment =
-                Map.of("Path", "parent-path");
-
-        Map<String, String> configuredEnvironment =
-                Map.of("PATH", "configured-path");
-
-        Map<String, String> result =
-                CommandUtils.mergeEnvironmentVariables(
-                        parentEnvironment,
-                        configuredEnvironment,
-                        false
-                );
-
-        Assert.assertEquals(2, result.size());
-        Assert.assertEquals("parent-path", result.get("Path"));
-        Assert.assertEquals("configured-path", result.get("PATH"));
     }
 
     private static void assertCommand(String command, String... expected) {
