@@ -68,6 +68,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.function.UnaryOperator;
@@ -119,6 +120,9 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
     private @NotNull
     final List<DAPClient> childrenClient;
     private boolean sentTerminateRequest;
+    // Whether the loaded sources and modules were asked for. They are asked for at the first stop, and then follow the
+    // 'loadedSource' and 'module' events: asking at each stop would get all of them again at each step.
+    private final AtomicBoolean loadedSourcesAndModulesAsked = new AtomicBoolean();
 
     public DAPClient(@NotNull DAPDebugProcess debugProcess,
                      @NotNull Map<String, Object> dapParameters,
@@ -359,7 +363,9 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
         if (server == null || threadId == null) {
             return;
         }
-        refreshLoadedSourcesAndModules(server);
+        if (loadedSourcesAndModulesAsked.compareAndSet(false, true)) {
+            refreshLoadedSourcesAndModules(server);
+        }
         getThreads(true).thenAcceptAsync(threads -> {
             var stoppedThread = Arrays.stream(threads)
                     .filter(thread -> threadId.equals(thread.getId()))
@@ -936,7 +942,7 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
     }
 
     /**
-     * Shows the sources and modules which the DAP server reports, if it reports them, as the program stopped.
+     * Shows the sources and modules which the DAP server reports, if it reports them, as the program first stopped.
      *
      * @param server the debug adapter.
      */
