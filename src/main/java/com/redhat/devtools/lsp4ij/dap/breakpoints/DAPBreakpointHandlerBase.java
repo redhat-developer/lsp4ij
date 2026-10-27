@@ -249,7 +249,9 @@ public abstract class DAPBreakpointHandlerBase<B extends XBreakpoint<?>> extends
                         } else {
                             ijBreakpoint = findBreakpoint(breakpointResponse, arguments, i);
                         }
-                        if (ijBreakpoint != null) {
+                        // A native breakpoint shadowed since the request was sent is not sent anymore:
+                        // a late response must not give it back the DAP id it had
+                        if (ijBreakpoint != null && !shadowedBreakpoints.contains(ijBreakpoint)) {
                             ijBreakpoint.putUserData(DAP_BREAKPOINT_ID, breakpointResponse.getId());
                             updateBreakpoint(breakpointResponse, ijBreakpoint);
                         }
