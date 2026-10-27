@@ -592,7 +592,7 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
         return null;
     }
 
-    private static @NotNull Throwable getCause(@NotNull Throwable error) {
+    static @NotNull Throwable getCause(@NotNull Throwable error) {
         return error instanceof CompletionException && error.getCause() != null ? error.getCause() : error;
     }
 

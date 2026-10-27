@@ -41,6 +41,7 @@ import com.redhat.devtools.lsp4ij.dap.breakpoints.DAPBreakpointHandlerBase;
 import com.redhat.devtools.lsp4ij.dap.breakpoints.DAPExceptionBreakpointsPanel;
 import com.redhat.devtools.lsp4ij.dap.breakpoints.RunToCursorBreakpoint;
 import com.redhat.devtools.lsp4ij.dap.client.DAPClient;
+import com.redhat.devtools.lsp4ij.dap.client.DAPDropFrameHandler;
 import com.redhat.devtools.lsp4ij.dap.client.DAPStackFrame;
 import com.redhat.devtools.lsp4ij.dap.client.DAPSuspendContext;
 import com.redhat.devtools.lsp4ij.dap.client.files.DAPFileRegistry;
@@ -97,6 +98,9 @@ public class DAPDebugProcess extends XDebugProcess implements Disposable {
     // Smart Step Into
     private DAPSmartStepIntoHandler smartStepIntoHandler;
 
+    // Reset Frame
+    private final @NotNull DAPDropFrameHandler dropFrameHandler;
+
     private @Nullable CompletableFuture<Void> connectToServerFuture;
     private Status status;
     private Supplier<TransportStreams> streamsSupplier;
@@ -119,6 +123,7 @@ public class DAPDebugProcess extends XDebugProcess implements Disposable {
         this.disassemblyBreakpointHandler = serverDescriptor.createDisassemblyBreakpointHandler(session, project);
         this.alternativeSourceHandler = new DAPAlternativeSourceHandler(this);
         this.threadsPanel = new ThreadsPanel(this);
+        this.dropFrameHandler = new DAPDropFrameHandler(this);
         this.status = Status.NONE;
 
         // At this step, the DAP server process is launched (but we don't know if the process is started correctly)
@@ -349,6 +354,11 @@ public class DAPDebugProcess extends XDebugProcess implements Disposable {
             smartStepIntoHandler = new DAPSmartStepIntoHandler(getSession());
         }
         return smartStepIntoHandler;
+    }
+
+    @Override
+    public @NotNull DAPDropFrameHandler getDropFrameHandler() {
+        return dropFrameHandler;
     }
 
     private @Nullable SteppingGranularity getSteppingGranularity(@NotNull DAPClient client) {
