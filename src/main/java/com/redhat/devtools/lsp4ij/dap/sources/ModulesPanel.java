@@ -34,13 +34,27 @@ import java.util.Objects;
  * (<a href="https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_Modules">modules</a>
  * and the <a href="https://microsoft.github.io/debug-adapter-protocol//specification.html#Events_Module">module</a>
  * event): each one's name, version and path, and whether it is user code, in the order the DAP server gives them.
+ * Each DAP session of the debug session, such as a child session started with 'startDebugging', keeps its own
+ * modules, since a module id is valid only in its session.
+ *
+ * @param <S> the DAP session which reports the modules.
  */
-public class ModulesPanel extends BorderLayoutPanel implements Disposable {
+public class ModulesPanel<S> extends BorderLayoutPanel implements Disposable {
 
     public static final @NotNull String ID = "dap-modules-panel";
 
-    private final ListTableModel<Module> model;
-    private final TableView<Module> table;
+    /**
+     * A module, and the DAP session which reported it.
+     *
+     * @param session the DAP session which reported the module.
+     * @param module  the module.
+     * @param <S>     the DAP session.
+     */
+    public record SessionModule<S>(@NotNull S session, @NotNull Module module) {
+    }
+
+    private final ListTableModel<SessionModule<S>> model;
+    private final TableView<SessionModule<S>> table;
 
     public ModulesPanel() {
         this.model = new ListTableModel<>(new NameColumnInfo(), new VersionColumnInfo(), new PathColumnInfo(), new UserCodeColumnInfo());
@@ -57,37 +71,53 @@ public class ModulesPanel extends BorderLayoutPanel implements Disposable {
     }
 
     /**
-     * Shows the given modules in place of those shown.
+     * Shows the given modules of a DAP session in place of those it reported before, where the first of those was.
+     * The modules of the other DAP sessions stay.
      *
-     * @param modules the modules which the DAP server reports.
+     * @param session the DAP session.
+     * @param modules the modules which the DAP session reports.
      */
-    public void refresh(@NotNull Module[] modules) {
-        List<Module> shown = List.of(modules);
-        ApplicationManager.getApplication().invokeLater(() -> model.setItems(new ArrayList<>(shown)));
+    public void refresh(@NotNull S session, @NotNull Module[] modules) {
+        List<Module> reported = List.of(modules);
+        ApplicationManager.getApplication().invokeLater(() -> {
+            List<SessionModule<S>> updated = new ArrayList<>();
+            int at = -1;
+            for (SessionModule<S> shown : model.getItems()) {
+                if (shown.session() != session) {
+                    updated.add(shown);
+                } else if (at < 0) {
+                    at = updated.size();
+                }
+            }
+            updated.addAll(at >= 0 ? at : updated.size(),
+                    reported.stream().map(module -> new SessionModule<>(session, module)).toList());
+            model.setItems(updated);
+        });
     }
 
     /**
-     * Updates the shown modules with a 'module' event: a new module is added at the end, a changed one replaces the
-     * one with its id, and a removed one is removed.
+     * Updates the shown modules of a DAP session with its 'module' event: a new module is added at the end, a changed
+     * one replaces the one with its id, and a removed one is removed.
      *
-     * @param args the 'module' event.
+     * @param session the DAP session.
+     * @param args    the 'module' event.
      */
-    public void update(@NotNull ModuleEventArguments args) {
+    public void update(@NotNull S session, @NotNull ModuleEventArguments args) {
         Module module = args.getModule();
         if (module == null) {
             return;
         }
         ApplicationManager.getApplication().invokeLater(() -> {
-            List<Module> updated = new ArrayList<>(model.getItems());
-            int index = indexOf(updated, module);
+            List<SessionModule<S>> updated = new ArrayList<>(model.getItems());
+            int index = indexOf(updated, session, module);
             if (ModuleEventArgumentsReason.REMOVED.equals(args.getReason())) {
                 if (index >= 0) {
                     updated.remove(index);
                 }
             } else if (index >= 0) {
-                updated.set(index, module);
+                updated.set(index, new SessionModule<>(session, module));
             } else {
-                updated.add(module);
+                updated.add(new SessionModule<>(session, module));
             }
             model.setItems(updated);
         });
@@ -97,59 +127,60 @@ public class ModulesPanel extends BorderLayoutPanel implements Disposable {
      * @return the shown modules, in order.
      */
     public @NotNull List<Module> getModules() {
-        return List.copyOf(model.getItems());
+        return model.getItems().stream().map(SessionModule::module).toList();
     }
 
-    private static int indexOf(@NotNull List<Module> modules, @NotNull Module module) {
+    private static <S> int indexOf(@NotNull List<SessionModule<S>> modules, @NotNull S session, @NotNull Module module) {
         for (int i = 0; i < modules.size(); i++) {
-            if (Objects.equals(modules.get(i).getId(), module.getId())) {
+            SessionModule<S> shown = modules.get(i);
+            if (shown.session() == session && Objects.equals(shown.module().getId(), module.getId())) {
                 return i;
             }
         }
         return -1;
     }
 
-    private static class NameColumnInfo extends ColumnInfo<Module, String> {
+    private static class NameColumnInfo extends ColumnInfo<SessionModule<?>, String> {
         NameColumnInfo() {
             super(DAPBundle.message("dap.panels.modules.name"));
         }
 
         @Override
-        public @Nullable String valueOf(Module module) {
-            return module.getName();
+        public @Nullable String valueOf(SessionModule<?> shown) {
+            return shown.module().getName();
         }
     }
 
-    private static class VersionColumnInfo extends ColumnInfo<Module, String> {
+    private static class VersionColumnInfo extends ColumnInfo<SessionModule<?>, String> {
         VersionColumnInfo() {
             super(DAPBundle.message("dap.panels.modules.version"));
         }
 
         @Override
-        public @Nullable String valueOf(Module module) {
-            return module.getVersion();
+        public @Nullable String valueOf(SessionModule<?> shown) {
+            return shown.module().getVersion();
         }
     }
 
-    private static class PathColumnInfo extends ColumnInfo<Module, String> {
+    private static class PathColumnInfo extends ColumnInfo<SessionModule<?>, String> {
         PathColumnInfo() {
             super(DAPBundle.message("dap.panels.modules.path"));
         }
 
         @Override
-        public @Nullable String valueOf(Module module) {
-            return module.getPath();
+        public @Nullable String valueOf(SessionModule<?> shown) {
+            return shown.module().getPath();
         }
     }
 
-    private static class UserCodeColumnInfo extends ColumnInfo<Module, String> {
+    private static class UserCodeColumnInfo extends ColumnInfo<SessionModule<?>, String> {
         UserCodeColumnInfo() {
             super(DAPBundle.message("dap.panels.modules.user.code"));
         }
 
         @Override
-        public @Nullable String valueOf(Module module) {
-            Boolean userCode = module.getIsUserCode();
+        public @Nullable String valueOf(SessionModule<?> shown) {
+            Boolean userCode = shown.module().getIsUserCode();
             if (userCode == null) {
                 return null;
             }

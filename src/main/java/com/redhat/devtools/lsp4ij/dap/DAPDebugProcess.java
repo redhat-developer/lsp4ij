@@ -100,8 +100,8 @@ public class DAPDebugProcess extends XDebugProcess implements Disposable {
     private final @NotNull DebugAdapterDescriptor serverDescriptor;
     private final @NotNull DAPServerReadyTracker serverReadyFuture;
     private final ThreadsPanel threadsPanel;
-    private final @NotNull LoadedSourcesPanel loadedSourcesPanel;
-    private final @NotNull ModulesPanel modulesPanel;
+    private final @NotNull LoadedSourcesPanel<DAPClient> loadedSourcesPanel;
+    private final @NotNull ModulesPanel<DAPClient> modulesPanel;
 
     /**
      * The layout of the debug tab, which the Loaded Sources and Modules tabs are added to once the DAP server reports
@@ -113,9 +113,6 @@ public class DAPDebugProcess extends XDebugProcess implements Disposable {
     private volatile boolean modulesReported;
     private final AtomicBoolean loadedSourcesShown = new AtomicBoolean();
     private final AtomicBoolean modulesShown = new AtomicBoolean();
-
-    /** The client whose DAP server reported the loaded sources shown, which gives the text of a source reference. */
-    private volatile @Nullable DAPClient loadedSourcesClient;
 
     // Disassembly
     private final @NotNull DisassemblyBreakpointHandlerBase<?> disassemblyBreakpointHandler;
@@ -151,8 +148,8 @@ public class DAPDebugProcess extends XDebugProcess implements Disposable {
         this.alternativeSourceHandler = new DAPAlternativeSourceHandler(this);
         this.threadsPanel = new ThreadsPanel(this);
         this.dropFrameHandler = new DAPDropFrameHandler(this);
-        this.loadedSourcesPanel = new LoadedSourcesPanel(this::openLoadedSource);
-        this.modulesPanel = new ModulesPanel();
+        this.loadedSourcesPanel = new LoadedSourcesPanel<>(this::openLoadedSource);
+        this.modulesPanel = new ModulesPanel<>();
         this.status = Status.NONE;
 
         // At this step, the DAP server process is launched (but we don't know if the process is started correctly)
@@ -570,10 +567,9 @@ public class DAPDebugProcess extends XDebugProcess implements Disposable {
      * @param sources the loaded sources.
      */
     public void refreshLoadedSources(@NotNull DAPClient client, @NotNull Source[] sources) {
-        loadedSourcesClient = client;
         loadedSourcesReported = true;
         showLoadedSources();
-        loadedSourcesPanel.refresh(sources);
+        loadedSourcesPanel.refresh(client, sources);
     }
 
     /**
@@ -583,45 +579,47 @@ public class DAPDebugProcess extends XDebugProcess implements Disposable {
      * @param args   the 'loadedSource' event.
      */
     public void updateLoadedSource(@NotNull DAPClient client, @NotNull LoadedSourceEventArguments args) {
-        loadedSourcesClient = client;
         loadedSourcesReported = true;
         showLoadedSources();
-        loadedSourcesPanel.update(args);
+        loadedSourcesPanel.update(client, args);
     }
 
     /**
-     * Shows the modules which the DAP server reports, in the "Modules" tab, which is added the first time.
+     * Shows the modules which the DAP server of the given client reports, in the "Modules" tab, which is added the
+     * first time.
      *
+     * @param client  the client whose DAP server reports the modules.
      * @param modules the modules.
      */
-    public void refreshModules(@NotNull Module[] modules) {
+    public void refreshModules(@NotNull DAPClient client, @NotNull Module[] modules) {
         modulesReported = true;
         showModules();
-        modulesPanel.refresh(modules);
+        modulesPanel.refresh(client, modules);
     }
 
     /**
      * Updates the "Modules" tab, which is added the first time, with a 'module' event.
      *
-     * @param args the 'module' event.
+     * @param client the client whose DAP server sent the event.
+     * @param args   the 'module' event.
      */
-    public void updateModule(@NotNull ModuleEventArguments args) {
+    public void updateModule(@NotNull DAPClient client, @NotNull ModuleEventArguments args) {
         modulesReported = true;
         showModules();
-        modulesPanel.update(args);
+        modulesPanel.update(client, args);
     }
 
     /**
      * @return the "Loaded Sources" panel.
      */
-    public @NotNull LoadedSourcesPanel getLoadedSourcesPanel() {
+    public @NotNull LoadedSourcesPanel<DAPClient> getLoadedSourcesPanel() {
         return loadedSourcesPanel;
     }
 
     /**
      * @return the "Modules" panel.
      */
-    public @NotNull ModulesPanel getModulesPanel() {
+    public @NotNull ModulesPanel<DAPClient> getModulesPanel() {
         return modulesPanel;
     }
 
@@ -658,12 +656,12 @@ public class DAPDebugProcess extends XDebugProcess implements Disposable {
     /**
      * Opens a loaded source: one with a source reference in the text its DAP server gives for it, another in its file.
      *
+     * @param client the client whose DAP server reported the source.
      * @param source the source to open.
      */
-    private void openLoadedSource(@NotNull Source source) {
-        DAPClient client = loadedSourcesClient;
+    private void openLoadedSource(@NotNull DAPClient client, @NotNull Source source) {
         int sourceReference = source.getSourceReference() != null ? source.getSourceReference() : 0;
-        if (sourceReference > 0 && client != null) {
+        if (sourceReference > 0) {
             var file = DAPFileRegistry.getInstance().getOrCreateDAPFile(getConfigName(), LoadedSourcesPanel.name(source), getProject());
             new DAPSourceReferencePosition(file, sourceReference, 0, client).createNavigatable(getProject()).navigate(true);
             return;

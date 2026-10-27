@@ -34,27 +34,41 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
-import java.util.function.Consumer;
+import java.util.function.BiConsumer;
 
 /**
  * Loaded Sources panel, which shows the sources that the DAP server reports as loaded
  * (<a href="https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_LoadedSources">loadedSources</a>
  * and the <a href="https://microsoft.github.io/debug-adapter-protocol//specification.html#Events_LoadedSource">loadedSource</a>
- * event): each one's name and path, in path order. Double-clicking a source, or Enter, opens it.
+ * event): each one's name and path, in path order. Double-clicking a source, or Enter, opens it. Each DAP session of
+ * the debug session, such as a child session started with 'startDebugging', keeps its own sources.
+ *
+ * @param <S> the DAP session which reports the sources.
  */
-public class LoadedSourcesPanel extends BorderLayoutPanel implements Disposable {
+public class LoadedSourcesPanel<S> extends BorderLayoutPanel implements Disposable {
 
     public static final @NotNull String ID = "dap-loaded-sources-panel";
 
-    private static final Comparator<Source> ORDER = Comparator.comparing(LoadedSourcesPanel::key);
-
-    private final ListTableModel<Source> model;
-    private final TableView<Source> table;
+    private static final Comparator<SessionSource<?>> ORDER = Comparator.comparing(shown -> key(shown.source()));
 
     /**
-     * @param opener opens a source of the panel, by its path or its source reference.
+     * A loaded source, and the DAP session which reported it: a source reference is valid only in its session.
+     *
+     * @param session the DAP session which reported the source.
+     * @param source  the source.
+     * @param <S>     the DAP session.
      */
-    public LoadedSourcesPanel(@NotNull Consumer<Source> opener) {
+    public record SessionSource<S>(@NotNull S session, @NotNull Source source) {
+    }
+
+    private final ListTableModel<SessionSource<S>> model;
+    private final TableView<SessionSource<S>> table;
+
+    /**
+     * @param opener opens a source of the panel, by its path or its source reference, in the DAP session which
+     *               reported it.
+     */
+    public LoadedSourcesPanel(@NotNull BiConsumer<S, Source> opener) {
         this.model = new ListTableModel<>(new NameColumnInfo(), new PathColumnInfo());
         this.table = new TableView<>(model);
         new DoubleClickListener() {
@@ -83,32 +97,40 @@ public class LoadedSourcesPanel extends BorderLayoutPanel implements Disposable 
     }
 
     /**
-     * Shows the given sources in place of those shown.
+     * Shows the given sources of a DAP session in place of those it reported before. The sources of the other DAP
+     * sessions stay.
      *
-     * @param sources the sources which the DAP server reports as loaded.
+     * @param session the DAP session.
+     * @param sources the sources which the DAP session reports as loaded.
      */
-    public void refresh(@NotNull Source[] sources) {
-        List<Source> sorted = new ArrayList<>(List.of(sources));
-        sorted.sort(ORDER);
-        ApplicationManager.getApplication().invokeLater(() -> model.setItems(sorted));
+    public void refresh(@NotNull S session, @NotNull Source[] sources) {
+        List<Source> reported = List.of(sources);
+        ApplicationManager.getApplication().invokeLater(() -> {
+            List<SessionSource<S>> updated = new ArrayList<>(model.getItems());
+            updated.removeIf(shown -> shown.session() == session);
+            reported.forEach(source -> updated.add(new SessionSource<>(session, source)));
+            updated.sort(ORDER);
+            model.setItems(updated);
+        });
     }
 
     /**
-     * Updates the shown sources with a 'loadedSource' event: a new source is added, a changed one replaces the one with
-     * its path or source reference, and a removed one is removed.
+     * Updates the shown sources of a DAP session with its 'loadedSource' event: a new source is added, a changed one
+     * replaces the same source, and a removed one is removed.
      *
-     * @param args the 'loadedSource' event.
+     * @param session the DAP session.
+     * @param args    the 'loadedSource' event.
      */
-    public void update(@NotNull LoadedSourceEventArguments args) {
+    public void update(@NotNull S session, @NotNull LoadedSourceEventArguments args) {
         Source source = args.getSource();
         if (source == null) {
             return;
         }
         ApplicationManager.getApplication().invokeLater(() -> {
-            List<Source> updated = new ArrayList<>(model.getItems());
-            updated.removeIf(shown -> sameSource(shown, source));
+            List<SessionSource<S>> updated = new ArrayList<>(model.getItems());
+            updated.removeIf(shown -> shown.session() == session && sameSource(shown.source(), source));
             if (!LoadedSourceEventArgumentsReason.REMOVED.equals(args.getReason())) {
-                updated.add(source);
+                updated.add(new SessionSource<>(session, source));
                 updated.sort(ORDER);
             }
             model.setItems(updated);
@@ -119,27 +141,35 @@ public class LoadedSourcesPanel extends BorderLayoutPanel implements Disposable 
      * @return the shown sources, in order.
      */
     public @NotNull List<Source> getSources() {
-        return List.copyOf(model.getItems());
+        return model.getItems().stream().map(SessionSource::source).toList();
     }
 
-    private boolean open(@NotNull Consumer<Source> opener) {
-        Source selected = table.getSelectedObject();
+    private boolean open(@NotNull BiConsumer<S, Source> opener) {
+        SessionSource<S> selected = table.getSelectedObject();
         if (selected == null) {
             return false;
         }
-        opener.accept(selected);
+        opener.accept(selected.session(), selected.source());
         return true;
     }
 
     /**
-     * @return true if the two describe the same source: the same path, or, without a path, the same source reference.
+     * @return true if the two describe the same source: the same path, or, without a path, the same source reference,
+     * or, without either, the same name.
      */
     static boolean sameSource(@NotNull Source a, @NotNull Source b) {
         if (a.getPath() != null || b.getPath() != null) {
             return Objects.equals(a.getPath(), b.getPath());
         }
-        return a.getSourceReference() != null && a.getSourceReference() > 0
-                && Objects.equals(a.getSourceReference(), b.getSourceReference());
+        if (hasSourceReference(a) || hasSourceReference(b)) {
+            return Objects.equals(a.getSourceReference(), b.getSourceReference());
+        }
+        // The name is all that tells apart two sources without a path or a source reference
+        return a.getName() != null && a.getName().equals(b.getName());
+    }
+
+    private static boolean hasSourceReference(@NotNull Source source) {
+        return source.getSourceReference() != null && source.getSourceReference() > 0;
     }
 
     private static @NotNull String key(@NotNull Source source) {
@@ -160,24 +190,25 @@ public class LoadedSourcesPanel extends BorderLayoutPanel implements Disposable 
         return "";
     }
 
-    private static class NameColumnInfo extends ColumnInfo<Source, String> {
+    private static class NameColumnInfo extends ColumnInfo<SessionSource<?>, String> {
         NameColumnInfo() {
             super(DAPBundle.message("dap.panels.loaded.sources.name"));
         }
 
         @Override
-        public @Nullable String valueOf(Source source) {
-            return name(source);
+        public @Nullable String valueOf(SessionSource<?> shown) {
+            return name(shown.source());
         }
     }
 
-    private static class PathColumnInfo extends ColumnInfo<Source, String> {
+    private static class PathColumnInfo extends ColumnInfo<SessionSource<?>, String> {
         PathColumnInfo() {
             super(DAPBundle.message("dap.panels.loaded.sources.path"));
         }
 
         @Override
-        public @Nullable String valueOf(Source source) {
+        public @Nullable String valueOf(SessionSource<?> shown) {
+            Source source = shown.source();
             return source.getPath() != null ? source.getPath() : source.getOrigin();
         }
     }

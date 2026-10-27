@@ -932,7 +932,7 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
 
     @Override
     public void module(ModuleEventArguments args) {
-        debugProcess.updateModule(args);
+        debugProcess.updateModule(this, args);
     }
 
     /**
@@ -948,7 +948,7 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
         });
         getModules(server, getCapabilities()).thenAccept(modules -> {
             if (modules != null) {
-                debugProcess.refreshModules(modules);
+                debugProcess.refreshModules(this, modules);
             }
         });
     }
