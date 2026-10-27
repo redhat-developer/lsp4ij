@@ -111,6 +111,31 @@ public class RunToCursorBreakpointTest extends HeavyPlatformTestCase {
         }
     }
 
+    public void testABreakpointAddedOrRemovedBeforeTheProgramStopsKeepsIt() throws Exception {
+        var dir = Files.createTempDirectory("dap-run-to-cursor-");
+        var path = dir.resolve("a.lua");
+        var handler = handler();
+        try {
+            var breakpoint = breakpoint(path, 0);
+            handler.initialize(server(), new Capabilities()).join();
+            var runToCursor = new RunToCursorBreakpoint(handler);
+            runToCursor.set(position(path, 2)).join();
+            requests.clear();
+
+            // the user adds a breakpoint to the file, then removes it: each request for the file keeps the temporary one
+            handler.registerBreakpoint(breakpoint);
+            handler.unregisterBreakpoint(breakpoint, false);
+            assertEquals(List.of(List.of(1, 3), List.of(3)), lines(path));
+            requests.clear();
+
+            runToCursor.stopped();
+            assertEquals(List.of(List.of()), lines(path));
+        } finally {
+            handler.dispose();
+            FileUtil.delete(dir.toFile());
+        }
+    }
+
     public void testAStopWhileTheBreakpointIsBeingSetRemovesItOnceItIsSet() throws Exception {
         var dir = Files.createTempDirectory("dap-run-to-cursor-");
         var path = dir.resolve("a.lua");

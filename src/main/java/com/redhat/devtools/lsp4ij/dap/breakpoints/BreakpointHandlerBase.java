@@ -54,6 +54,9 @@ public abstract class BreakpointHandlerBase<B extends XBreakpoint<?>> extends XB
     protected final List<IDebugProtocolServer> debugProtocolServers = ContainerUtil.createConcurrentList();
     protected final List<B> breakpoints = ContainerUtil.createConcurrentList();
     private final Map<IDebugProtocolServer, Capabilities> capabilities = Collections.synchronizedMap(new IdentityHashMap<>());
+    // The temporary breakpoint, as of "Run to Cursor", from when it is registered until it is unregistered: each
+    // 'setBreakpoints' request for its source keeps it, as when the user adds a breakpoint to the source meanwhile
+    private @Nullable XSourcePosition registeredTemporaryBreakpoint;
 
     public BreakpointHandlerBase(@NotNull Class<? extends XBreakpointType<B, ?>> breakpointTypeClass,
                                  @NotNull XDebugSession debugSession,
@@ -131,9 +134,11 @@ public abstract class BreakpointHandlerBase<B extends XBreakpoint<?>> extends XB
         capabilities.clear();
     }
 
-    protected CompletableFuture<@Nullable Void> sendBreakpoints(@Nullable IDebugProtocolServer debugProtocolServer,
-                                                                @Nullable TemporaryBreakpoint temporaryBreakpoint) {
-        if (breakpoints.isEmpty() && temporaryBreakpoint == null) {
+    // Sends take turns, so the debug adapter gets them in the order in which they read the breakpoints: a request
+    // which still has the temporary breakpoint cannot follow the one which removes it
+    protected synchronized CompletableFuture<@Nullable Void> sendBreakpoints(@Nullable IDebugProtocolServer debugProtocolServer,
+                                                                             @Nullable TemporaryBreakpoint temporaryBreakpoint) {
+        if (breakpoints.isEmpty() && temporaryBreakpoint == null && registeredTemporaryBreakpoint == null) {
             // No breakpoints to send
             return CompletableFuture.completedFuture(null);
         }
@@ -189,23 +194,37 @@ public abstract class BreakpointHandlerBase<B extends XBreakpoint<?>> extends XB
     }
 
     /**
-     * Register the given source position as temporary breakpoint.
+     * Register the given source position as temporary breakpoint. It stays in the 'setBreakpoints' requests for its
+     * source until it is unregistered. One is kept at a time: unregister the one registered before first.
      *
      * @param sourcePosition the temporary breakpoint.
      * @return the completable future.
      */
-    public CompletableFuture<@Nullable Void> registerTemporaryBreakpoint(@NotNull XSourcePosition sourcePosition) {
-        return sendBreakpoints(null, new TemporaryBreakpoint(sourcePosition, true));
+    public synchronized CompletableFuture<@Nullable Void> registerTemporaryBreakpoint(@NotNull XSourcePosition sourcePosition) {
+        registeredTemporaryBreakpoint = sourcePosition;
+        return sendBreakpoints(null, null);
     }
 
     /**
      * Un-register the given source position as temporary breakpoint.
      *
-     * @param sourcePosition the temporary breakpoint.
+     * @param sourcePosition the temporary breakpoint, as given to {@link #registerTemporaryBreakpoint(XSourcePosition)}.
      * @return the completable future.
      */
-    public CompletableFuture<@Nullable Void> unregisterTemporaryBreakpoint(@NotNull XSourcePosition sourcePosition) {
+    public synchronized CompletableFuture<@Nullable Void> unregisterTemporaryBreakpoint(@NotNull XSourcePosition sourcePosition) {
+        if (registeredTemporaryBreakpoint == sourcePosition) {
+            registeredTemporaryBreakpoint = null;
+        }
         return sendBreakpoints(null, new TemporaryBreakpoint(sourcePosition, false));
+    }
+
+    /**
+     * Returns the registered temporary breakpoint, and null if there is none.
+     *
+     * @return the registered temporary breakpoint, and null if there is none.
+     */
+    protected synchronized @Nullable XSourcePosition getRegisteredTemporaryBreakpoint() {
+        return registeredTemporaryBreakpoint;
     }
 
     protected abstract boolean supportsBreakpoint(B breakpoint);
