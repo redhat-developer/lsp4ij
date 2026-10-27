@@ -161,6 +161,98 @@ public class DAPShadowedBreakpointTest extends HeavyPlatformTestCase {
         }
     }
 
+    /**
+     * A 'setBreakpoints' response which arrives after the native breakpoint became shadowed doesn't give it back its
+     * DAP id, nor a verified or invalid presentation: a breakpoint event with that id must not reach it.
+     */
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    public void testLateResponseIsNotAppliedToAShadowedBreakpoint() throws Exception {
+        var nativeType = new NativeLineBreakpointType();
+        XBreakpointType.EXTENSION_POINT_NAME.getPoint().registerExtension(nativeType, getTestRootDisposable());
+
+        var presentations = new ArrayList<String>();
+        var session = (XDebugSession) Proxy.newProxyInstance(XDebugSession.class.getClassLoader(), new Class[]{XDebugSession.class}, (p, m, a) -> {
+            String target = a != null && a.length > 0 && a[0] instanceof XLineBreakpoint<?> b
+                    ? (b.getType() instanceof DAPBreakpointType ? "dap " : "native ") : "";
+            switch (m.getName()) {
+                case "setBreakpointInvalid" -> presentations.add(target + "invalid:" + a[1]);
+                case "setBreakpointVerified" -> presentations.add(target + "verified");
+                case "updateBreakpointPresentation" -> presentations.add(target + presentation(a));
+                default -> {
+                }
+            }
+            return null;
+        });
+        var handler = (BreakpointHandlerBase) handler(session);
+        var requests = new ArrayList<SetBreakpointsArguments>();
+        var responses = new ArrayList<CompletableFuture<SetBreakpointsResponse>>();
+        // A debug adapter which answers only when the test completes the response
+        var server = (IDebugProtocolServer) Proxy.newProxyInstance(IDebugProtocolServer.class.getClassLoader(), new Class[]{IDebugProtocolServer.class}, (p, m, a) -> {
+            if (m.getName().equals("setBreakpoints")) {
+                requests.add((SetBreakpointsArguments) a[0]);
+                var response = new CompletableFuture<SetBreakpointsResponse>();
+                responses.add(response);
+                return response;
+            }
+            if (m.getName().equals("equals")) return p == a[0];
+            if (m.getName().equals("hashCode")) return System.identityHashCode(p);
+            throw new AssertionError(m.getName());
+        });
+
+        var dir = Files.createTempDirectory("dap-breakpoints-");
+        var path = dir.resolve("a.lua");
+        try {
+            var file = file(path);
+            XLineBreakpoint<?> nativeBreakpoint = WriteAction.compute(() -> XDebuggerManager.getInstance(getProject()).getBreakpointManager()
+                    .addLineBreakpoint((XLineBreakpointType) nativeType, file.getUrl(), 0, null));
+            XLineBreakpoint<?> dapBreakpoint = WriteAction.compute(() -> XDebuggerManager.getInstance(getProject()).getBreakpointManager()
+                    .addLineBreakpoint(new DAPBreakpointType(), file.getUrl(), 0, new DAPBreakpointProperties()));
+
+            // The native breakpoint is sent, and the debug adapter doesn't answer yet
+            handler.registerBreakpoint(nativeBreakpoint);
+            handler.initialize(server, new Capabilities());
+            assertEquals(1, requests.size());
+
+            // A DAP breakpoint on the same line shadows the native breakpoint while its request is pending
+            handler.registerBreakpoint(dapBreakpoint);
+            assertEquals(2, requests.size());
+            assertEquals(List.of("native inactive:" + DAPBundle.message("dap.breakpoints.shadowed")), presentations);
+            presentations.clear();
+
+            // The late response for the native breakpoint arrives: it is ignored
+            responses.get(0).complete(response(1, 1));
+            assertNull(nativeBreakpoint.getUserData(BreakpointHandlerBase.DAP_BREAKPOINT_ID));
+            assertTrue(presentations.isEmpty());
+
+            // The response for the DAP breakpoint gives it its id
+            responses.get(1).complete(response(2, 1));
+            assertEquals(Integer.valueOf(2), dapBreakpoint.getUserData(BreakpointHandlerBase.DAP_BREAKPOINT_ID));
+            assertEquals(List.of("dap verified"), presentations);
+            presentations.clear();
+
+            // A breakpoint event with the id of the late response doesn't reach the shadowed native breakpoint
+            var changed = new Breakpoint();
+            changed.setId(1);
+            changed.setVerified(true);
+            handler.updateBreakpoint(changed, null);
+            assertTrue(presentations.isEmpty());
+        } finally {
+            handler.dispose();
+            com.intellij.openapi.util.io.FileUtil.delete(dir.toFile());
+        }
+    }
+
+    /** Returns a 'setBreakpoints' response with one verified breakpoint with the given id, at the given line. */
+    private static SetBreakpointsResponse response(int id, int line) {
+        var breakpoint = new Breakpoint();
+        breakpoint.setId(id);
+        breakpoint.setVerified(true);
+        breakpoint.setLine(line);
+        var response = new SetBreakpointsResponse();
+        response.setBreakpoints(new Breakpoint[]{breakpoint});
+        return response;
+    }
+
     /** Describes an 'updateBreakpointPresentation' call: a reset (no icon) or the inactive dependent icon. */
     private static String presentation(Object[] args) {
         if (args[1] == null) {
