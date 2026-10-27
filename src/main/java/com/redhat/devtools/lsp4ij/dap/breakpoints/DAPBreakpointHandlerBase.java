@@ -204,24 +204,24 @@ public abstract class DAPBreakpointHandlerBase<B extends XBreakpoint<?>> extends
             // Call 'setBreakpoints' DAP request for each Source keys.
             final var arguments = createSetBreakpointsArguments(source, sourceBreakpoints);
             List<@Nullable B> ijBreakpoints = targetIJBreakpoints.getOrDefault(source, List.of());
+            // A later request for this source replaces the token, so that the response of an earlier request
+            // is not applied anymore, and the response of an earlier clear cannot stop tracking it
+            final var token = new Object();
+            sentSources.put(source, token);
             final var sourceFutures = new ArrayList<CompletableFuture<Void>>();
             if (debugProtocolServer != null) {
                 // Call 'setBreakpoints' DAP request for each Source keys
                 // and the given debug protocol server
-                sourceFutures.add(setBreakpoints(debugProtocolServer, arguments, ijBreakpoints));
+                sourceFutures.add(setBreakpoints(debugProtocolServer, arguments, ijBreakpoints, token));
             } else {
                 // Call 'setBreakpoints' DAP request for each Source keys
                 // for each registered debug protocol server
                 for (var server : debugProtocolServers) {
-                    sourceFutures.add(setBreakpoints(server, arguments, ijBreakpoints));
+                    sourceFutures.add(setBreakpoints(server, arguments, ijBreakpoints, token));
                 }
             }
             setBreakpointsFutures.addAll(sourceFutures);
 
-            // A later request for this source replaces the token, so that the response of an earlier clear
-            // cannot stop tracking it
-            final var token = new Object();
-            sentSources.put(source, token);
             if (sourceBreakpoints.isEmpty()) {
                 iterator.remove();
                 // Once the adapter accepted that there are no breakpoints for a source file, we can stop
@@ -240,16 +240,23 @@ public abstract class DAPBreakpointHandlerBase<B extends XBreakpoint<?>> extends
      * @param arguments           the 'setBreakpoints' arguments.
      * @param ijBreakpoints       the IJ breakpoint of each source breakpoint of the arguments, in the same order, and
      *                            null for the temporary breakpoint.
+     * @param token               the token of the request in {@link #sentSources}.
      * @return the future.
      */
     private CompletableFuture<Void> setBreakpoints(@NotNull IDebugProtocolServer debugProtocolServer,
                                                    @NotNull SetBreakpointsArguments arguments,
-                                                   @NotNull List<@Nullable B> ijBreakpoints) {
+                                                   @NotNull List<@Nullable B> ijBreakpoints,
+                                                   @NotNull Object token) {
         CompletableFuture<SetBreakpointsResponse> future = debugProtocolServer.setBreakpoints(arguments);
         return future
                 .thenAccept(response -> {
                     var breakpoints = response.getBreakpoints();
                     if (breakpoints == null) {
+                        return;
+                    }
+                    // A later request for this source replaced this one: its breakpoints may have changed or moved
+                    // to another source since, so this response must not override the state of the later one
+                    if (sentSources.get(arguments.getSource()) != token) {
                         return;
                     }
                     for (int i = 0; i < breakpoints.length; i++) {

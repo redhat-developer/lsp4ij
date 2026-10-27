@@ -30,6 +30,9 @@ public class DAPMovedFileBreakpointTest extends HeavyPlatformTestCase {
 
     private final List<SetBreakpointsArguments> requests = new ArrayList<>();
     private boolean failClears;
+    // The responses which are held back, and null to answer each request at once
+    private List<Runnable> heldResponses;
+    private int nextBreakpointId = 1;
     private Path dir;
     private DAPBreakpointHandlerBase<?> sharedHandler;
     private DAPForwardedLineBreakpointHandler forwardedHandler;
@@ -109,6 +112,27 @@ public class DAPMovedFileBreakpointTest extends HeavyPlatformTestCase {
         assertFalse(sent.containsKey("a.lua"));
         assertEquals(Integer.valueOf(0), sent.get("c.lua"));
         assertFalse(sharedHandler.hasSentBreakpoints());
+    }
+
+    public void testLateResponseOfMovedBreakpointIsIgnored() throws Exception {
+        var file = file("a.lua");
+        var breakpoint = lineBreakpoint(file);
+        sharedHandler.initialize(server(), new Capabilities()).join();
+
+        // The response for a.lua is held back while the breakpoint moves to b.lua
+        var lateResponses = new ArrayList<Runnable>();
+        heldResponses = lateResponses;
+        forwardedHandler.registerBreakpoint(breakpoint);
+        heldResponses = null;
+        WriteAction.runAndWait(() -> file.rename(this, "b.lua"));
+        forwardedHandler.unregisterBreakpoint(breakpoint, false);
+        forwardedHandler.registerBreakpoint(breakpoint);
+        Integer movedId = breakpoint.getUserData(BreakpointHandlerBase.DAP_BREAKPOINT_ID);
+        assertNotNull(movedId);
+
+        // The late response for a.lua must not override the id given by b.lua
+        lateResponses.forEach(Runnable::run);
+        assertEquals(movedId, breakpoint.getUserData(BreakpointHandlerBase.DAP_BREAKPOINT_ID));
     }
 
     @SuppressWarnings({"unchecked", "rawtypes"})
@@ -195,7 +219,18 @@ public class DAPMovedFileBreakpointTest extends HeavyPlatformTestCase {
                     return CompletableFuture.failedFuture(new IllegalStateException("setBreakpoints failed"));
                 }
                 var response = new SetBreakpointsResponse();
-                response.setBreakpoints(new Breakpoint[0]);
+                response.setBreakpoints(Arrays.stream(arguments.getBreakpoints()).map(b -> {
+                    var breakpoint = new Breakpoint();
+                    breakpoint.setId(nextBreakpointId++);
+                    breakpoint.setVerified(true);
+                    breakpoint.setLine(b.getLine());
+                    return breakpoint;
+                }).toArray(Breakpoint[]::new));
+                if (heldResponses != null) {
+                    var future = new CompletableFuture<SetBreakpointsResponse>();
+                    heldResponses.add(() -> future.complete(response));
+                    return future;
+                }
                 return CompletableFuture.completedFuture(response);
             }
             if (m.getName().equals("equals")) return p == a[0];
