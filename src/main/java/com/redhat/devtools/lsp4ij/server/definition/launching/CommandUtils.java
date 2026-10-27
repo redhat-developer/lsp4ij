@@ -15,6 +15,7 @@ import com.intellij.execution.util.ProgramParametersUtil;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.project.ProjectManager;
+import com.intellij.openapi.util.SystemInfo;
 import com.intellij.util.EnvironmentUtil;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -25,6 +26,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeMap;
 
 /**
  * Command utilities.
@@ -84,7 +86,6 @@ public class CommandUtils {
      * Returns the commands to execute with {@link Process} from the given commandline.
      *
      * @param commandLine the command line.
-     *
      * @return the commands to execute with {@link Process} from the given commandline.
      */
     @NotNull
@@ -177,8 +178,11 @@ public class CommandUtils {
                 return;
             }
 
-            Map<String, String> effectiveEnvironment = new HashMap<>(commandLine.getParentEnvironment());
-            effectiveEnvironment.putAll(commandLine.getEnvironment());
+            Map<String, String> effectiveEnvironment = mergeEnvironmentVariables(
+                    commandLine.getParentEnvironment(),
+                    commandLine.getEnvironment(),
+                    SystemInfo.isWindows);
+
             boolean customized = false;
 
             for (Object customizer : customizers) {
@@ -200,6 +204,32 @@ public class CommandUtils {
         } catch (ReflectiveOperationException | LinkageError e) {
             LOG.debug("Directory-aware command-line environment customization is unavailable", e);
         }
+    }
+
+    /**
+     * Merges inherited and configured environment variables.
+     * Variable names are case-insensitive on Windows.
+     *
+     * @param parentEnvironment inherited environment variables.
+     * @param configuredEnvironment explicitly configured environment variables.
+     * @param caseInsensitive whether variable names should be compared case-insensitively.
+     * @return the merged environment.
+     */
+    static Map<String, String> mergeEnvironmentVariables(
+            Map<String, String> parentEnvironment,
+            Map<String, String> configuredEnvironment,
+            boolean caseInsensitive) {
+
+        Map<String, String> effectiveEnvironment;
+        if (caseInsensitive) {
+            effectiveEnvironment = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
+        } else {
+            effectiveEnvironment = new HashMap<>();
+        }
+
+        effectiveEnvironment.putAll(parentEnvironment);
+        effectiveEnvironment.putAll(configuredEnvironment);
+        return effectiveEnvironment;
     }
 
     /**
