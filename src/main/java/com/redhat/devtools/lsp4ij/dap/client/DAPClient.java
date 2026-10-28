@@ -338,7 +338,7 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
         // The process of the session is the debug adapter's, which ends with its own exit code: keep the program's
         var processHandler = debugProcess.getProcessHandler();
         if (processHandler != null) {
-            processHandler.putUserData(DAPDebugProcess.PROGRAM_EXIT_CODE, args.getExitCode());
+            DAPDebugProcess.keepProgramExitCode(processHandler, args.getExitCode(), parentClient != null);
         }
     }
 

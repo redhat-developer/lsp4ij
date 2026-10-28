@@ -107,6 +107,23 @@ public class DAPDebugProcess extends XDebugProcess implements Disposable {
      */
     public static final Key<Integer> PROGRAM_EXIT_CODE = Key.create("lsp4ij.dap.programExitCode");
 
+    /**
+     * Keeps the exit code that a DAP session's 'exited' event reports on the session's process handler, under
+     * {@link #PROGRAM_EXIT_CODE}. The child sessions that 'startDebugging' starts share that process: the exit code of
+     * the session that started them wins, and a child's is kept only until that session reports one.
+     *
+     * @param processHandler the process handler of the debug session.
+     * @param exitCode       the exit code that the 'exited' event reports.
+     * @param childSession   true for a child session started with 'startDebugging', and false otherwise.
+     */
+    public static void keepProgramExitCode(@NotNull ProcessHandler processHandler, int exitCode, boolean childSession) {
+        if (childSession) {
+            processHandler.putUserDataIfAbsent(PROGRAM_EXIT_CODE, exitCode);
+        } else {
+            processHandler.putUserData(PROGRAM_EXIT_CODE, exitCode);
+        }
+    }
+
     private final @NotNull DAPCommandLineState dapState;
     private final @NotNull ExecutionResult executionResult;
     private final @NotNull XDebuggerEditorsProvider editorsProvider;

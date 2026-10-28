@@ -44,6 +44,36 @@ public class DAPProcessTerminatedListenerTest extends LightPlatformTestCase {
         assertTrue(output, output.contains("exit code 143"));
     }
 
+    public void testAChildSessionDoesNotReplaceTheExitCodeOfTheSessionThatStartedIt() {
+        var adapter = new AdapterProcess();
+        DAPDebugProcess.keepProgramExitCode(adapter, 7, false);
+        DAPDebugProcess.keepProgramExitCode(adapter, 0, true);
+
+        String output = terminate(adapter);
+
+        assertTrue(output, output.contains("exit code 7"));
+    }
+
+    public void testTheSessionThatStartedAChildReplacesItsExitCode() {
+        var adapter = new AdapterProcess();
+        DAPDebugProcess.keepProgramExitCode(adapter, 0, true);
+        DAPDebugProcess.keepProgramExitCode(adapter, 7, false);
+
+        String output = terminate(adapter);
+
+        assertTrue(output, output.contains("exit code 7"));
+    }
+
+    public void testAChildSessionsExitCodeIsShownWithoutOneOfTheSessionThatStartedIt() {
+        var adapter = new AdapterProcess();
+        DAPDebugProcess.keepProgramExitCode(adapter, 3, true);
+
+        String output = terminate(adapter);
+
+        assertTrue(output, output.contains("exit code 3"));
+        assertFalse(output, output.contains("143"));
+    }
+
     private static String terminate(AdapterProcess adapter) {
         DAPProcessTerminatedListener.attach(adapter);
         var output = new StringBuilder();
