@@ -47,6 +47,8 @@ public class MockTextDocumentService implements TextDocumentService {
     private SignatureHelp mockSignatureHelp;
     private List<CodeLens> mockCodeLenses;
     private List<DocumentLink> mockDocumentLinks;
+    private Function<DocumentLink, CompletableFuture<DocumentLink>> documentLinkResolveProcessor;
+    private final List<DocumentLink> documentLinkResolveRequests = new CopyOnWriteArrayList<>();
     private Map<Position, List<? extends DocumentHighlight>> mockDocumentHighlights;
     private LinkedEditingRanges mockLinkedEditingRanges;
     private List<SelectionRange> mockSelectionRanges;
@@ -160,6 +162,15 @@ public class MockTextDocumentService implements TextDocumentService {
     @Override
     public CompletableFuture<List<DocumentLink>> documentLink(DocumentLinkParams params) {
         return CompletableFuture.completedFuture(mockDocumentLinks);
+    }
+
+    @Override
+    public CompletableFuture<DocumentLink> documentLinkResolve(DocumentLink params) {
+        documentLinkResolveRequests.add(params);
+        if (documentLinkResolveProcessor != null) {
+            return documentLinkResolveProcessor.apply(params);
+        }
+        return CompletableFuture.completedFuture(params);
     }
 
     @Override
@@ -372,6 +383,17 @@ public class MockTextDocumentService implements TextDocumentService {
         this.mockDocumentLinks = documentLinks;
     }
 
+    public void setDocumentLinkResolveProcessor(Function<DocumentLink, CompletableFuture<DocumentLink>> documentLinkResolveProcessor) {
+        this.documentLinkResolveProcessor = documentLinkResolveProcessor;
+    }
+
+    /**
+     * @return the documentLink/resolve requests received since the last reset, in order
+     */
+    public List<DocumentLink> getDocumentLinkResolveRequests() {
+        return documentLinkResolveRequests;
+    }
+
     public void reset() {
         this.mockCompletionList = new CompletionList();
         this.mockCompletionItem = null;
@@ -393,6 +415,8 @@ public class MockTextDocumentService implements TextDocumentService {
         this.codeActionRequests = 0;
         this.lastCodeActionParams = null;
         this.resolveCompletionItemProcessor = null;
+        this.documentLinkResolveProcessor = null;
+        this.documentLinkResolveRequests.clear();
     }
 
     public void setResolveCompletionItemProcessor(Function<CompletionItem, CompletableFuture<CompletionItem>> resolveCompletionItemProcessor) {

@@ -33,7 +33,7 @@ Current state of [Language Features]( https://microsoft.github.io/language-serve
  * ✅ [textDocument/diagnostic](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_pullDiagnostics) (see [implementation details](#pull-diagnostics))
  * ✅ [workspace/diagnostic/refresh](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#diagnostic_refresh) 
  * ✅ [textDocument/documentLink](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_documentLink) (see [implementation details](#document-link))
- * ❌ [documentLink/resolve](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#documentLink_resolve).
+ * ✅ [documentLink/resolve](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#documentLink_resolve) (see [implementation details](#document-link)).
  * ✅ [textDocument/hover](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_hover) (see [implementation details](#hover))
  * ✅ [textDocument/codeLens](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_codeLens) (see [implementation details](#codeLens))
  * ✅ [codeLens/resolve](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#codeLens_resolve)
@@ -234,6 +234,9 @@ Here is an example with the [Qute language server](https://github.com/redhat-dev
 
 * an `externalAnnotator` extension point, to display a `documentLink` with an hyperlink renderer.
 * a `gotoDeclarationHandler` extension point, to open the file of the `documentLink`.`
+
+A language server which supports [documentLink/resolve](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#documentLink_resolve) (`resolveProvider`) can leave the target of a
+document link to it: Ctrl+Click on a document link without a target resolves the link, then opens its target.
 
 As those extension points support `any` language, `textDocument/documentLink` works out-of-the-box.
 

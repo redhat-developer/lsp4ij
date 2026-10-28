@@ -29,6 +29,7 @@ public class LSPRequestConstants {
     public static final String TEXT_DOCUMENT_DEFINITION = "textDocument/definition";
     public static final String TEXT_DOCUMENT_DIAGNOSTIC = "textDocument/diagnostic";
     public static final String TEXT_DOCUMENT_DOCUMENT_LINK = "textDocument/documentLink";
+    public static final String DOCUMENT_LINK_RESOLVE = "documentLink/resolve";
     public static final String TEXT_DOCUMENT_FOLDING_RANGE = "textDocument/foldingRange";
     public static final String TEXT_DOCUMENT_SELECTION_RANGE = "textDocument/selectionRange";
     public static final String TEXT_DOCUMENT_SEMANTIC_TOKENS = "textDocument/semanticTokens";
