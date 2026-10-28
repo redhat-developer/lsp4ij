@@ -123,7 +123,7 @@ public class DAPBreakOnValueChangeSessionTest extends HeavyPlatformTestCase {
         var info = PlatformTestUtil.waitForFuture(server.dataBreakpointInfo, 10_000);
         assertEquals(Integer.valueOf(COUNTER_REFERENCE), info.getVariablesReference());
         assertEquals("count", info.getName());
-        assertEquals(FRAME_ID, info.getFrameId());
+        assertEquals(Integer.valueOf(FRAME_ID), info.getFrameId());
 
         // and given a data breakpoint on that data, which IntelliJ shows by the DAP server's description
         PlatformTestUtil.waitWithEventsDispatching("the data breakpoint is sent",
