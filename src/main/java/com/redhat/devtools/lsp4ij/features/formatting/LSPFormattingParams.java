@@ -15,17 +15,18 @@ import com.intellij.openapi.util.TextRange;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import org.eclipse.lsp4j.FormattingOptions;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
+
+import java.util.List;
 
 /**
  * LSP formatting parameters.
  *
- * @param textRange             the text range and null otherwise.
+ * @param textRanges            the text ranges to format, or an empty list to format the whole document.
  * @param document              the document.
  * @param formattingServer
  * @param formattingOptions
  */
-public record LSPFormattingParams(@Nullable TextRange textRange,
+public record LSPFormattingParams(@NotNull List<TextRange> textRanges,
                                   @NotNull Document document,
                                   @NotNull LanguageServerItem formattingServer,
                                   @NotNull FormattingOptions formattingOptions) {

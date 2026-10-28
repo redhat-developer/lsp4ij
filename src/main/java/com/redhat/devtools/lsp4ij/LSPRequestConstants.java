@@ -49,6 +49,7 @@ public class LSPRequestConstants {
     public static final String TEXT_DOCUMENT_DOCUMENT_HIGHLIGHT = "textDocument/documentHighlight";
     public static final String TEXT_DOCUMENT_FORMATTING = "textDocument/formatting";
     public static final String TEXT_DOCUMENT_RANGE_FORMATTING = "textDocument/rangeFormatting";
+    public static final String TEXT_DOCUMENT_RANGES_FORMATTING = "textDocument/rangesFormatting";
     public static final String TEXT_DOCUMENT_ON_TYPE_FORMATTING = "textDocument/onTypeFormatting";
     public static final String TEXT_DOCUMENT_IMPLEMENTATION = "textDocument/implementation";
     public static final String TEXT_DOCUMENT_REFERENCES = "textDocument/references";

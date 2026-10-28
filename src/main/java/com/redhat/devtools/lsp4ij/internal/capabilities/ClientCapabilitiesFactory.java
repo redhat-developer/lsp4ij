@@ -243,8 +243,10 @@ public class ClientCapabilitiesFactory {
         // textDocument/formatting
         textDocumentClientCapabilities.setFormatting(new FormattingCapabilities(Boolean.TRUE));
 
-        // textDocument/rangeFormatting
-        textDocumentClientCapabilities.setRangeFormatting(new RangeFormattingCapabilities(Boolean.TRUE));
+        // textDocument/rangeFormatting and textDocument/rangesFormatting
+        var rangeFormattingCapabilities = new RangeFormattingCapabilities(Boolean.TRUE);
+        rangeFormattingCapabilities.setRangesSupport(Boolean.TRUE);
+        textDocumentClientCapabilities.setRangeFormatting(rangeFormattingCapabilities);
 
         // textDocument/rename support
         final var renameCapabilities = new RenameCapabilities(Boolean.TRUE);
