@@ -10,7 +10,10 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.dap.breakpoints;
 
+import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
+import com.intellij.xdebugger.breakpoints.XLineBreakpoint;
+import com.intellij.xdebugger.breakpoints.ui.XBreakpointCustomPropertiesPanel;
 import com.redhat.devtools.lsp4ij.dap.DAPBundle;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -30,6 +33,11 @@ public class DAPBreakpointType extends DAPBreakpointTypeBase<DAPBreakpointProper
     @Nullable
     public DAPBreakpointProperties createBreakpointProperties(@NotNull final VirtualFile file, final int line) {
         return new DAPBreakpointProperties();
+    }
+
+    @Override
+    public @NotNull XBreakpointCustomPropertiesPanel<XLineBreakpoint<DAPBreakpointProperties>> createCustomPropertiesPanel(@NotNull Project project) {
+        return new DAPBreakpointPropertiesPanel();
     }
 
 }
