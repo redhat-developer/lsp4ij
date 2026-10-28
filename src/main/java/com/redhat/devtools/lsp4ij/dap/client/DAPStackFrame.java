@@ -55,7 +55,7 @@ public class DAPStackFrame extends XStackFrame {
     private volatile @Nullable XSourcePosition sourcePosition;
     private @Nullable DisassemblyDeferredSourcePosition disassemblyInstructionSourcePosition;
     private XDebuggerEvaluator evaluator;
-    private CompletableFuture<DebugVariableContext> variablesContext;
+    private volatile @Nullable CompletableFuture<DebugVariableContext> variablesContext;
 
     public DAPStackFrame(@NotNull DAPClient client,
                          @NotNull StackFrame stackFrame) {
@@ -144,10 +144,9 @@ public class DAPStackFrame extends XStackFrame {
     }
 
     private CompletableFuture<DebugVariableContext> getVariablesContext() {
-        if (variablesContext != null) {
-            return variablesContext;
-        }
-        return getVariablesContextSync();
+        // read once: clearVariablesContext() can drop it at any time
+        var context = variablesContext;
+        return context != null ? context : getVariablesContextSync();
     }
 
     private synchronized CompletableFuture<DebugVariableContext> getVariablesContextSync() {
