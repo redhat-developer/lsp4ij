@@ -222,15 +222,23 @@ and the program stays stopped where it was.
 
 ## Inline value
 
-The values of the variables are displayed inline, but this is not perfect because a DAP server generally cannot handle variable positions (only their values). 
-To retrieve the variable positions, LSP4IJ uses the syntax highlighting information from the editor (TextMate or others).
+The values of the variables are displayed inline, but a DAP server gives only their values, not their positions.
+
+When a language server of the stopped file supports
+[textDocument/inlineValue](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_inlineValue)
+(`inlineValueProvider`), LSP4IJ asks it where the variables are, up to the stopped line, and shows the value of each
+variable that it names at the last line where it names it, before or on the stopped line (see
+[implementation details](../LSPSupport.md#inline-value)).
+
+Otherwise, and for the variables that the language server doesn't name, LSP4IJ uses the syntax highlighting information
+from the editor (TextMate or others), which is not perfect.
+
+The debugger computes inline values only for the variables it shows, so the group of the frame's local variables (the
+scope that the DAP server presents as `locals`, or else its first scope) is expanded when the frame is shown.
 
 Here a de demo with JavaScript:
 
 ![DAP inline value](./images/DAP_inline_value_demo.gif)
-
-Theoretically, inline values should be handled by a language server via [textDocument/inlineValue](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_inlineValue)
-but as no language servers seems implement this LSP request for the moment LSP4IJ doesn't use this strategy.
 
 ## Evaluate expression
 

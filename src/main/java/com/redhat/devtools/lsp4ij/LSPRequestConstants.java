@@ -40,6 +40,7 @@ public class LSPRequestConstants {
     public static final String TEXT_DOCUMENT_HOVER = "textDocument/hover";
     public static final String TEXT_DOCUMENT_INLAY_HINT = "textDocument/inlayHint";
     public static final String INLAY_HINT_RESOLVE = "inlayHint/resolve";
+    public static final String TEXT_DOCUMENT_INLINE_VALUE = "textDocument/inlineValue";
     public static final String TEXT_DOCUMENT_DOCUMENT_COLOR = "textDocument/documentColor";
     public static final String TEXT_DOCUMENT_COLOR_PRESENTATION = "textDocument/colorPresentation";
     public static final String TEXT_DOCUMENT_COMPLETION = "textDocument/completion";

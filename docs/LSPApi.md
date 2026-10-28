@@ -20,6 +20,7 @@ The [LSPClientFeatures](https://github.com/redhat-developer/lsp4ij/blob/main/src
 - [LSP hover feature](#lsp-hover-feature)
 - [LSP implementation feature](#lsp-implementation-feature)
 - [LSP inlayHint feature](#lsp-inlayHint-feature)
+- [LSP inlineValue feature](#lsp-inlineValue-feature)
 - [LSP progress feature](#lsp-progress-feature) 
 - [LSP references feature](#lsp-references-feature)
 - [LSP rename feature](#lsp-rename-feature)
@@ -575,6 +576,15 @@ Integrates the LSP [`textDocument/selectionRange`](https://microsoft.github.io/l
 |-----------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------------------|
 | boolean isEnabled(PsiFile file)   | Returns `true` if the LSP feature is enabled for the given file and `false` otherwise.                                                                                                                                             | `true`                      |
 | boolean isSupported(PsiFile file) | Returns `true` if the LSP feature is supported for the given file and `false` otherwise. <br/>This supported state is called after starting the language server, which matches the file and user with the LSP server capabilities. | Check the server capability |
+
+## LSP InlineValue Feature
+
+| API                               | Description                                                                                                                                                                                                                        | Default Behaviour           |
+|-----------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------------------|
+| boolean isEnabled(PsiFile file)   | Returns `true` if the LSP feature is enabled for the given file and `false` otherwise.                                                                                                                                             | `true`                      |
+| boolean isSupported(PsiFile file) | Returns `true` if the LSP feature is supported for the given file and `false` otherwise. <br/>This supported state is called after starting the language server, which matches the file and user with the LSP server capabilities. | Check the server capability |
+
+The inline value feature gives the positions of the values which a DAP debug session shows inline in the editor.
 
 ## LSP Progress Feature
 
