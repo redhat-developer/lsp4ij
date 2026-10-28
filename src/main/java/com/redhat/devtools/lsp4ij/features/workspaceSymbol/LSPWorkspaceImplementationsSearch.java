@@ -89,7 +89,12 @@ public class LSPWorkspaceImplementationsSearch extends QueryExecutorBase<PsiElem
             return;
         }
 
-        int offset = element.getTextRange().getStartOffset();
+        var textRange = element.getTextRange();
+        if (textRange == null) {
+            // ex: a workspace symbol whose location has no range yet
+            return;
+        }
+        int offset = textRange.getStartOffset();
         LSPImplementationParams params = new LSPImplementationParams(
                 new TextDocumentIdentifier(),
                 LSPIJUtils.toPosition(offset, document),
