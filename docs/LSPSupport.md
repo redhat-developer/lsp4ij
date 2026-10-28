@@ -60,12 +60,12 @@ Current state of [Language Features]( https://microsoft.github.io/language-serve
  * ✅ [typeHierarchy/subtypes](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#typeHierarchy_subtypes). 
  * ✅ [typeHierarchy/supertypes](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#typeHierarchy_supertypes).
  * ✅ [textDocument/foldingRange](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_foldingRange)  (see [implementation details](#folding-range))
- * ❌ [workspace/foldingRange/refresh](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.18/specification/#workspace_foldingRange_refresh) (LSP 3.18).
+ * ✅ [workspace/foldingRange/refresh](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.18/specification/#workspace_foldingRange_refresh) (LSP 3.18).
  * ✅ [textDocument/selectionRange](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_selectionRange)  (see [implementation details](#selection-range))
  * ✅ [textDocument/documentSymbol](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_documentSymbol) (see [implementation details](#document-symbol))
  * ✅ [textDocument/semanticTokens (experimental)](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_semanticTokens) (see [implementation details](#semantic-tokens))
  * ✅ [textDocument/inlineValue](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_inlineValue) (see [implementation details](#inline-value)).
- * ❌ [workspace/inlineValue/refresh](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_inlineValue_refresh).
+ * ✅ [workspace/inlineValue/refresh](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_inlineValue_refresh).
  * ❌ [textDocument/moniker](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_moniker).
  * ✅ [textDocument/formatting](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_formatting) (see [implementation details](#formatting))
  * ✅ [textDocument/rangeFormatting](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_rangeFormatting) (see [implementation details](#formatting)).
@@ -340,7 +340,8 @@ per variable, the value is shown at the last line, before or on the stopped line
 The `InlineValueText` and `InlineValueEvaluatableExpression` inline values are ignored.
 
 The language servers are waited for 2 seconds at most; a variable which they don't name is placed with the syntax
-highlighting of the editor, as without a language server. `workspace/inlineValue/refresh` is not supported.
+highlighting of the editor, as without a language server. A `workspace/inlineValue/refresh` asks the language servers again
+for the inline values of the current stack frame of each stopped debug session.
 
 ### Document Color
 

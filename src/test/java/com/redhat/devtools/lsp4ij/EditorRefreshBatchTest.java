@@ -21,6 +21,7 @@ import com.intellij.testFramework.PlatformTestUtil;
 import com.redhat.devtools.lsp4ij.client.LanguageClientImpl;
 import com.redhat.devtools.lsp4ij.mock.MockLanguageServerDefinition;
 import org.eclipse.lsp4j.CodeLensParams;
+import org.eclipse.lsp4j.FoldingRangeRequestParams;
 import org.eclipse.lsp4j.InlayHintParams;
 import org.eclipse.lsp4j.Position;
 import org.eclipse.lsp4j.Range;
@@ -121,6 +122,37 @@ public class EditorRefreshBatchTest extends LightPlatformTestCase {
             // The refresh scheduled a debounced daemon restart for this file. The light project
             // outlives the test, so the restart could run in a later test while the project is
             // temporarily disposed. Disposing the support cancels it.
+            Disposer.dispose(support);
+        }
+    }
+
+    public void testFoldingRefreshEvictsTheFoldingRangesOfAnOpenEditor() {
+        var file = new LightVirtualFile("folding.txt", "text");
+        var document = FileDocumentManager.getInstance().getDocument(file);
+        assertNotNull(document);
+        var psiFile = PsiManager.getInstance(getProject()).findFile(file);
+        assertNotNull(psiFile);
+        var support = LSPFileSupport.getSupport(psiFile);
+        var editor = EditorFactory.getInstance().createEditor(document, getProject());
+        try {
+            var identifier = new TextDocumentIdentifier(file.getUrl());
+            var request = ReadAction.compute(() ->
+                    support.getFoldingRangeSupport().getFoldingRanges(new FoldingRangeRequestParams(identifier)));
+            PlatformTestUtil.waitForFuture(request, 30_000);
+            assertNotNull(support.getFoldingRangeSupport().getFuture());
+
+            var wrapper = new CountingWrapper();
+            var client = client(wrapper);
+            ApplicationManager.getApplication().runWriteAction(() -> {
+                client.refreshFoldingRanges().join();
+                wrapper.addDocument(file);
+            });
+            NonBlockingReadActionImpl.waitForAsyncTaskCompletion();
+
+            assertEquals("The folding ranges of the server are refreshed in one file pass", 1, wrapper.filePasses.get());
+            assertNull("The folding ranges are asked for again", support.getFoldingRangeSupport().getFuture());
+        } finally {
+            EditorFactory.getInstance().releaseEditor(editor);
             Disposer.dispose(support);
         }
     }

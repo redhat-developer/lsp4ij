@@ -55,7 +55,7 @@ public class DAPStackFrame extends XStackFrame {
     private volatile @Nullable XSourcePosition sourcePosition;
     private @Nullable DisassemblyDeferredSourcePosition disassemblyInstructionSourcePosition;
     private XDebuggerEvaluator evaluator;
-    private CompletableFuture<DebugVariableContext> variablesContext;
+    private volatile @Nullable CompletableFuture<DebugVariableContext> variablesContext;
 
     public DAPStackFrame(@NotNull DAPClient client,
                          @NotNull StackFrame stackFrame) {
@@ -135,11 +135,18 @@ public class DAPStackFrame extends XStackFrame {
                 .thenApply(context -> context.getSourcePositionFor(variable));
     }
 
+    /**
+     * Drops the variables context of this stack frame, with the inline values which the language servers answered,
+     * so that they are asked again the next time the variables of this frame are computed.
+     */
+    public synchronized void clearVariablesContext() {
+        variablesContext = null;
+    }
+
     private CompletableFuture<DebugVariableContext> getVariablesContext() {
-        if (variablesContext != null) {
-            return variablesContext;
-        }
-        return getVariablesContextSync();
+        // read once: clearVariablesContext() can drop it at any time
+        var context = variablesContext;
+        return context != null ? context : getVariablesContextSync();
     }
 
     private synchronized CompletableFuture<DebugVariableContext> getVariablesContextSync() {
