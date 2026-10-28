@@ -25,6 +25,7 @@ import com.intellij.openapi.progress.ProgressIndicator;
 import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.progress.Task;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.util.Key;
 import com.intellij.openapi.util.NlsContexts;
 import com.intellij.openapi.vfs.LocalFileSystem;
 import com.intellij.openapi.vfs.VirtualFile;
@@ -98,6 +99,13 @@ import java.util.function.Supplier;
  * Debug Adapter Protocol (DAP) debug process.
  */
 public class DAPDebugProcess extends XDebugProcess implements Disposable {
+
+    /**
+     * The exit code of the debugged program, which the debug adapter reports with the DAP 'exited' event. It is put on
+     * the process handler of the session, which is the debug adapter's: the handler LSP4IJ creates shows it when the
+     * process ends, and a custom one can read it.
+     */
+    public static final Key<Integer> PROGRAM_EXIT_CODE = Key.create("lsp4ij.dap.programExitCode");
 
     private final @NotNull DAPCommandLineState dapState;
     private final @NotNull ExecutionResult executionResult;

@@ -10,7 +10,7 @@ Current state of [Events](https://microsoft.github.io/debug-adapter-protocol//sp
 * ✅ [Breakpoint](https://microsoft.github.io/debug-adapter-protocol//specification.html#Events_Breakpoint).
 * ❌ [Capabilities](https://microsoft.github.io/debug-adapter-protocol//specification.html#Events_Capabilities).
 * ❌ [Continued](https://microsoft.github.io/debug-adapter-protocol//specification.html#Events_Continued).
-* ❌ [Exited](https://microsoft.github.io/debug-adapter-protocol//specification.html#Events_Exited).
+* ✅ [Exited](https://microsoft.github.io/debug-adapter-protocol//specification.html#Events_Exited): the console shows the exit code of the debugged program when the debug adapter's process ends.
 * ✅ [Initialized](https://microsoft.github.io/debug-adapter-protocol//specification.html#Events_Initialized).
 * ✅ [Invalidated](https://microsoft.github.io/debug-adapter-protocol//specification.html#Events_Invalidated).
 * ✅ [LoadedSource](https://microsoft.github.io/debug-adapter-protocol//specification.html#Events_LoadedSource).
