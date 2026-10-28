@@ -25,6 +25,7 @@ import com.intellij.openapi.progress.ProgressIndicator;
 import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.progress.Task;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.util.Key;
 import com.intellij.openapi.util.NlsContexts;
 import com.intellij.openapi.vfs.LocalFileSystem;
 import com.intellij.openapi.vfs.VirtualFile;
@@ -98,6 +99,30 @@ import java.util.function.Supplier;
  * Debug Adapter Protocol (DAP) debug process.
  */
 public class DAPDebugProcess extends XDebugProcess implements Disposable {
+
+    /**
+     * The exit code of the debugged program, which the debug adapter reports with the DAP 'exited' event. It is put on
+     * the process handler of the session, which is the debug adapter's: the handler LSP4IJ creates shows it when the
+     * process ends, and a custom one can read it.
+     */
+    public static final Key<Integer> PROGRAM_EXIT_CODE = Key.create("lsp4ij.dap.programExitCode");
+
+    /**
+     * Keeps the exit code that a DAP session's 'exited' event reports on the session's process handler, under
+     * {@link #PROGRAM_EXIT_CODE}. The child sessions that 'startDebugging' starts share that process: the exit code of
+     * the session that started them wins, and a child's is kept only until that session reports one.
+     *
+     * @param processHandler the process handler of the debug session.
+     * @param exitCode       the exit code that the 'exited' event reports.
+     * @param childSession   true for a child session started with 'startDebugging', and false otherwise.
+     */
+    public static void keepProgramExitCode(@NotNull ProcessHandler processHandler, int exitCode, boolean childSession) {
+        if (childSession) {
+            processHandler.putUserDataIfAbsent(PROGRAM_EXIT_CODE, exitCode);
+        } else {
+            processHandler.putUserData(PROGRAM_EXIT_CODE, exitCode);
+        }
+    }
 
     private final @NotNull DAPCommandLineState dapState;
     private final @NotNull ExecutionResult executionResult;

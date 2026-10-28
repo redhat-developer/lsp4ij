@@ -16,7 +16,6 @@ import com.intellij.execution.configurations.RunConfigurationOptions;
 import com.intellij.execution.process.OSProcessHandler;
 import com.intellij.execution.process.ProcessHandler;
 import com.intellij.execution.process.ProcessHandlerFactory;
-import com.intellij.execution.process.ProcessTerminatedListener;
 import com.intellij.execution.runners.ExecutionEnvironment;
 import com.intellij.openapi.fileTypes.FileType;
 import com.intellij.openapi.project.Project;
@@ -102,7 +101,7 @@ public abstract class DebugAdapterDescriptor implements DebuggableFile {
         OSProcessHandler processHandler =
                 ProcessHandlerFactory.getInstance()
                         .createColoredProcessHandler(commandLine);
-        ProcessTerminatedListener.attach(processHandler);
+        DAPProcessTerminatedListener.attach(processHandler);
         Integer port = commandLine.getUserData(SERVER_PORT);
         if (port != null) {
             processHandler.putUserData(SERVER_PORT, port);
