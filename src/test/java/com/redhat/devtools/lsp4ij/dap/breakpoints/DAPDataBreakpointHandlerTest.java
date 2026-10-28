@@ -108,7 +108,7 @@ public class DAPDataBreakpointHandlerTest extends HeavyPlatformTestCase {
             assertEquals(1, asked.size());
             assertEquals(Integer.valueOf(7), asked.get(0).getVariablesReference());
             assertEquals("i", asked.get(0).getName());
-            assertEquals(3, asked.get(0).getFrameId());
+            assertEquals(Integer.valueOf(3), asked.get(0).getFrameId());
             // the DAP server says why it can't watch the variable, and nothing is added
             assertEquals(List.of("Only a field of an object can be watched."), refusals);
             assertEmpty(dataBreakpoints());

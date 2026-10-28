@@ -271,7 +271,7 @@ public class DAPDataBreakpointHandler extends BreakpointHandlerBase<XBreakpoint<
         var arguments = new DataBreakpointInfoArguments();
         arguments.setVariablesReference(variablesReference);
         arguments.setName(name);
-        // LSP4J always sends a frame id: the DAP server ignores it when the variable has a container
+        // the frame id is always sent: the DAP server ignores it when the variable has a container
         arguments.setFrameId(frameId);
         return arguments;
     }
