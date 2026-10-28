@@ -56,8 +56,9 @@ public class ClientCapabilitiesFactory {
         // schemes, which it can also register dynamically
         workspaceClientCapabilities.setTextDocumentContent(new TextDocumentContentCapabilities(Boolean.TRUE));
 
-        // Support for 'workspace/symbol'
+        // Support for 'workspace/symbol', and 'workspaceSymbol/resolve' for a symbol whose location has no range
         var symbolCapabilities = new SymbolCapabilities();
+        symbolCapabilities.setResolveSupport(new WorkspaceSymbolResolveSupportCapabilities(List.of("location.range")));
         workspaceClientCapabilities.setSymbol(symbolCapabilities);
 
         // See https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#executeCommandClientCapabilities

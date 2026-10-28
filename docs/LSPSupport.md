@@ -83,7 +83,7 @@ Current state of [Workspace Features]( https://microsoft.github.io/language-serv
  * ✅ [workspace/executeCommand](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_executeCommand).
  * ✅ [workspace/applyEdit](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_applyEdit).
  * ✅ [workspace/symbol](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_symbol) (see [implementation details](#workspace-symbol))
- * ❌ [workspace/symbolResolve](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_symbolResolve).
+ * ✅ [workspace/symbolResolve](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_symbolResolve) (see [implementation details](#workspace-symbol)).
  * ✅ [workspace/configuration](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_configuration) (see [implementation details](./DeveloperGuide.md#workspace-configuration))
  * ✅ [workspace/workspaceFolders](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_workspaceFolders) (see [implementation details](./DeveloperGuide.md#workspace-folders))
  * ✅ [workspace/didChangeWorkspaceFolders](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_didChangeWorkspaceFolders) (see [implementation details](./DeveloperGuide.md#workspace-folders))
@@ -888,6 +888,8 @@ After setting the cursor position in a file, you can view the Type Hierarchy usi
 Here is an example with the [MicroProfile language server](https://github.com/eclipse/lsp4mp/tree/master/microprofile.ls) collecting JAX-RS endpoints:
 
 ![workspace/symbol](./images/lsp-support/workspace_symbol.gif)
+
+A language server which supports [workspaceSymbol/resolve](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_symbolResolve) (`resolveProvider`) can return a symbol whose location has a URI but no range, since the client declares that it resolves `location.range`. The range is then resolved when the symbol is opened.
 
 ### Text Document Content
 

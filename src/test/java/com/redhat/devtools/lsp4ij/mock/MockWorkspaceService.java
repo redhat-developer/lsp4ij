@@ -44,6 +44,26 @@ public class MockWorkspaceService implements WorkspaceService {
     private final List<RenameFilesParams> willRenameRequests = new CopyOnWriteArrayList<>();
     private final Map<String, String> documentContents = new ConcurrentHashMap<>();
     private Function<WorkspaceDiagnosticParams, CompletableFuture<WorkspaceDiagnosticReport>> diagnosticHandler;
+    private Function<WorkspaceSymbol, CompletableFuture<WorkspaceSymbol>> workspaceSymbolResolveProcessor;
+    private final List<WorkspaceSymbol> workspaceSymbolResolveRequests = new CopyOnWriteArrayList<>();
+
+    public void setWorkspaceSymbolResolveProcessor(Function<WorkspaceSymbol, CompletableFuture<WorkspaceSymbol>> processor) {
+        this.workspaceSymbolResolveProcessor = processor;
+    }
+
+    /**
+     * @return the workspaceSymbol/resolve requests this server received, in order
+     */
+    public List<WorkspaceSymbol> getWorkspaceSymbolResolveRequests() {
+        return workspaceSymbolResolveRequests;
+    }
+
+    @Override
+    public CompletableFuture<WorkspaceSymbol> resolveWorkspaceSymbol(WorkspaceSymbol workspaceSymbol) {
+        workspaceSymbolResolveRequests.add(workspaceSymbol);
+        var processor = workspaceSymbolResolveProcessor;
+        return processor != null ? processor.apply(workspaceSymbol) : CompletableFuture.completedFuture(workspaceSymbol);
+    }
 
     public void setDiagnosticHandler(Function<WorkspaceDiagnosticParams, CompletableFuture<WorkspaceDiagnosticReport>> handler) {
         this.diagnosticHandler = handler;
