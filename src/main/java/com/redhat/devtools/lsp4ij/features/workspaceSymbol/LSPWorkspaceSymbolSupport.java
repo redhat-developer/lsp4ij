@@ -13,7 +13,6 @@ package com.redhat.devtools.lsp4ij.features.workspaceSymbol;
 import com.intellij.openapi.project.Project;
 import com.redhat.devtools.lsp4ij.LSPRequestConstants;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
-import com.redhat.devtools.lsp4ij.client.features.FileUriSupport;
 import com.redhat.devtools.lsp4ij.features.AbstractLSPWorkspaceFeatureSupport;
 import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
 import com.redhat.devtools.lsp4ij.internal.CompletableFutures;
@@ -99,7 +98,7 @@ public class LSPWorkspaceSymbolSupport extends AbstractLSPWorkspaceFeatureSuppor
                         List<? extends WorkspaceSymbol> ws = symbols.getRight();
                         for (var si : ws) {
                             if (params.accept(si)) {
-                                WorkspaceSymbolData item = createItem(si, languageServer.getClientFeatures(),project);
+                                WorkspaceSymbolData item = createItem(si, languageServer, project);
                                 items.add(item);
                             }
                         }
@@ -109,15 +108,15 @@ public class LSPWorkspaceSymbolSupport extends AbstractLSPWorkspaceFeatureSuppor
     }
 
     private static WorkspaceSymbolData createItem(WorkspaceSymbol si,
-                                                  FileUriSupport fileUriSupport,
+                                                  LanguageServerItem languageServer,
                                                   Project project) {
         String name = si.getName();
         SymbolKind symbolKind = si.getKind();
         if (si.getLocation().isLeft()) {
             return new WorkspaceSymbolData(
-                    name, symbolKind, si.getLocation().getLeft(), fileUriSupport, project);
+                    name, symbolKind, si.getLocation().getLeft(), languageServer.getClientFeatures(), project);
         }
-        return new WorkspaceSymbolData(
-                name, symbolKind, si.getLocation().getRight().getUri(), null, fileUriSupport, project);
+        // The location has no range: the symbol is resolved when it is opened
+        return new WorkspaceSymbolData(si, languageServer, project);
     }
 }

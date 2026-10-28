@@ -36,6 +36,19 @@ public class LSPWorkspaceSymbolFeature extends AbstractLSPWorkspaceFeature {
                 hasCapability(serverCapabilities.getWorkspaceSymbolProvider());
     }
 
+    /**
+     * Returns true if the language server resolves the location of a workspace symbol with 'workspaceSymbol/resolve'
+     * and false otherwise.
+     *
+     * @return true if the language server resolves the location of a workspace symbol and false otherwise.
+     */
+    public boolean isResolveSupported() {
+        var serverCapabilities = getClientFeatures().getServerWrapper().getServerCapabilitiesSync();
+        var workspaceSymbolProvider = serverCapabilities != null ? serverCapabilities.getWorkspaceSymbolProvider() : null;
+        return workspaceSymbolProvider != null && workspaceSymbolProvider.isRight()
+                && Boolean.TRUE.equals(workspaceSymbolProvider.getRight().getResolveProvider());
+    }
+
     @Override
     public void setServerCapabilities(@Nullable ServerCapabilities serverCapabilities) {
         // Do nothing
