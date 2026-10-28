@@ -69,7 +69,7 @@ Current state of [Language Features]( https://microsoft.github.io/language-serve
  * ❌ [textDocument/moniker](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_moniker).
  * ✅ [textDocument/formatting](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_formatting) (see [implementation details](#formatting))
  * ✅ [textDocument/rangeFormatting](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_rangeFormatting) (see [implementation details](#formatting)).
- * ❌ [textDocument/rangesFormatting](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.18/specification/#textDocument_rangeFormatting) (LSP 3.18).
+ * ✅ [textDocument/rangesFormatting](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.18/specification/#textDocument_rangeFormatting) (LSP 3.18, see [implementation details](#formatting)).
  * ✅ [textDocument/onTypeFormatting](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_onTypeFormatting) (see [implementation details](#on-type-formatting)).
  * ✅ [textDocument/prepareRename](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_prepareRename).
  * ✅ [textDocument/rename](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_rename) (see [implementation details](#rename)).
@@ -571,7 +571,9 @@ Here is an example with the [TypeScript Language Server](./user-defined-ls/types
 [LSPFormattingOnlyService](https://github.com/redhat-developer/lsp4ij/blob/main/src/main/java/com/redhat/devtools/lsp4ij/features/formatting/LSPFormattingOnlyService.java) /
 [LSPFormattingAndRangeBothService](https://github.com/redhat-developer/lsp4ij/blob/main/src/main/java/com/redhat/devtools/lsp4ij/features/formatting/LSPFormattingAndRangeBothService.java) with the `formattingService` extension point.
 
-When IntelliJ asks to format several ranges of a file at once, only the first range is formatted.
+When IntelliJ formats several ranges of a file at once, as **Reformat Code** does with **Only VCS changed text**, a language server
+which supports `textDocument/rangesFormatting` (LSP 3.18) formats them all with one request. Any other language server formats them
+one after the other with `textDocument/rangeFormatting`, and two ranges whose edits overlap are formatted again as one range.
 
 ### On-Type Formatting
 

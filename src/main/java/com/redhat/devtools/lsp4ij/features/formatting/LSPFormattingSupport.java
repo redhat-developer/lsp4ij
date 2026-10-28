@@ -26,6 +26,8 @@ import org.eclipse.lsp4j.*;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
@@ -39,6 +41,9 @@ import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.awaitWithCh
  */
 public class LSPFormattingSupport extends AbstractLSPDocumentFeatureSupport<LSPFormattingParams, List<? extends TextEdit>> {
 
+    private static final Comparator<Position> POSITION_ORDER = Comparator.comparingInt(Position::getLine)
+            .thenComparingInt(Position::getCharacter);
+
     private final AtomicReference<CancellationSupport> formattingCancellation = new AtomicReference<>();
 
     public LSPFormattingSupport(@NotNull PsiFile file) {
@@ -48,7 +53,7 @@ public class LSPFormattingSupport extends AbstractLSPDocumentFeatureSupport<LSPF
     public void format(@NotNull Document document,
                        @NotNull PsiFile file,
                        @Nullable Editor editor,
-                       @Nullable TextRange textRange,
+                       @NotNull List<TextRange> textRanges,
                        @NotNull AsyncFormattingRequest formattingRequest) {
         String original = formattingRequest.getDocumentText();
         long modificationStamp = document.getModificationStamp();
@@ -62,7 +67,7 @@ public class LSPFormattingSupport extends AbstractLSPDocumentFeatureSupport<LSPF
                 formattingRequest.onTextReady(null);
                 return;
             }
-            LanguageServerItem formattingServer = findFormattingServer(file, textRange, cancellation, connections);
+            LanguageServerItem formattingServer = findFormattingServer(file, textRanges, cancellation, connections);
             if (formattingServer == null || formattingCancellation.get() != cancellation
                     || !isCurrent(document, file, original, modificationStamp)) {
                 formattingRequest.onTextReady(null);
@@ -70,7 +75,7 @@ public class LSPFormattingSupport extends AbstractLSPDocumentFeatureSupport<LSPF
             }
             // We are currently in a ReadAction; this call must occur here because it may access PSI or CodeStyleSettings.
             var formattingOptions = formattingServer.getClientFeatures().getFormattingFeature().getFormattingOptions(file, editor);
-            LSPFormattingParams params = new LSPFormattingParams(textRange, document, formattingServer, formattingOptions);
+            LSPFormattingParams params = new LSPFormattingParams(textRanges, document, formattingServer, formattingOptions);
             CompletableFuture<List<? extends TextEdit>> formatFuture = trackFormattingFuture(
                     getFormatting(params, cancellation), cancellation);
             awaitWithCheckCanceled(formatFuture);
@@ -146,14 +151,29 @@ public class LSPFormattingSupport extends AbstractLSPDocumentFeatureSupport<LSPF
 
     protected @NotNull CompletableFuture<List<? extends TextEdit>> getFormatting(@NotNull LSPFormattingParams params,
                                                                                  @NotNull CancellationSupport cancellationSupport) {
-        boolean isRangeFormatting = params.textRange() != null;
+        boolean isRangeFormatting = !params.textRanges().isEmpty();
         var formattingServer = params.formattingServer();
         if (isRangeFormatting && formattingServer.isDocumentRangeFormattingSupported()) {
-            // Range formatting
-            DocumentRangeFormattingParams lspParams = createDocumentRangeFormattingParams(params.formattingOptions(), params.textRange(), params.document(), formattingServer);
-            return cancellationSupport.execute(formattingServer
-                    .getTextDocumentService()
-                    .rangeFormatting(lspParams), formattingServer, LSPRequestConstants.TEXT_DOCUMENT_RANGE_FORMATTING);
+            List<Range> ranges = params.textRanges().stream()
+                    .map(textRange -> LSPIJUtils.toRange(textRange, params.document()))
+                    .toList();
+            if (ranges.size() == 1) {
+                // Range formatting
+                DocumentRangeFormattingParams lspParams = createDocumentRangeFormattingParams(params.formattingOptions(), ranges.get(0), formattingServer);
+                return getRangeFormatting(lspParams, formattingServer, cancellationSupport);
+            }
+            if (formattingServer.isDocumentRangesFormattingSupported()) {
+                // Ranges formatting
+                DocumentRangesFormattingParams lspParams = createDocumentRangesFormattingParams(params.formattingOptions(), ranges, formattingServer);
+                return cancellationSupport.execute(formattingServer
+                        .getTextDocumentService()
+                        .rangesFormatting(lspParams), formattingServer, LSPRequestConstants.TEXT_DOCUMENT_RANGES_FORMATTING);
+            }
+            // Range formatting of each range
+            List<DocumentRangeFormattingParams> lspParams = ranges.stream()
+                    .map(range -> createDocumentRangeFormattingParams(params.formattingOptions(), range, formattingServer))
+                    .toList();
+            return formatEachRange(lspParams, List.of(), formattingServer, cancellationSupport);
         }
 
         // Full document formatting
@@ -163,15 +183,83 @@ public class LSPFormattingSupport extends AbstractLSPDocumentFeatureSupport<LSPF
                 .formatting(lspParams), formattingServer, LSPRequestConstants.TEXT_DOCUMENT_FORMATTING);
     }
 
+    private @NotNull CompletableFuture<List<? extends TextEdit>> getRangeFormatting(@NotNull DocumentRangeFormattingParams lspParams,
+                                                                                   @NotNull LanguageServerItem formattingServer,
+                                                                                   @NotNull CancellationSupport cancellationSupport) {
+        return cancellationSupport.execute(formattingServer
+                .getTextDocumentService()
+                .rangeFormatting(lspParams), formattingServer, LSPRequestConstants.TEXT_DOCUMENT_RANGE_FORMATTING);
+    }
+
+    /**
+     * Formats several ranges for a language server which can't format them at once: one
+     * {@code textDocument/rangeFormatting} after the other, as VS Code does. All the edits are for the
+     * same text, so they are applied together, unless the edits of two ranges overlap: then those two
+     * ranges are formatted again as one range which covers both.
+     *
+     * @param requests  the requests of the ranges still to format.
+     * @param formatted the ranges formatted so far, with their edits.
+     */
+    private @NotNull CompletableFuture<List<? extends TextEdit>> formatEachRange(@NotNull List<DocumentRangeFormattingParams> requests,
+                                                                                @NotNull List<FormattedRange> formatted,
+                                                                                @NotNull LanguageServerItem formattingServer,
+                                                                                @NotNull CancellationSupport cancellationSupport) {
+        if (!requests.isEmpty()) {
+            DocumentRangeFormattingParams request = requests.get(0);
+            return getRangeFormatting(request, formattingServer, cancellationSupport)
+                    .thenCompose(edits -> {
+                        // Ask for nothing more once the formatting is cancelled.
+                        cancellationSupport.checkCanceled();
+                        var formattedNow = new ArrayList<>(formatted);
+                        formattedNow.add(new FormattedRange(request, edits != null ? edits : List.of()));
+                        return formatEachRange(requests.subList(1, requests.size()), formattedNow, formattingServer, cancellationSupport);
+                    });
+        }
+        for (int i = 0; i < formatted.size(); i++) {
+            for (int j = i + 1; j < formatted.size(); j++) {
+                FormattedRange first = formatted.get(i);
+                FormattedRange second = formatted.get(j);
+                if (first.overlaps(second)) {
+                    var others = new ArrayList<>(formatted);
+                    others.remove(j);
+                    others.remove(i);
+                    return formatEachRange(List.of(first.cover(second)), others, formattingServer, cancellationSupport);
+                }
+            }
+        }
+        return CompletableFuture.completedFuture(formatted.stream()
+                .<TextEdit>flatMap(formattedRange -> formattedRange.edits().stream())
+                .toList());
+    }
+
+    private record FormattedRange(@NotNull DocumentRangeFormattingParams request, @NotNull List<? extends TextEdit> edits) {
+
+        boolean overlaps(@NotNull FormattedRange other) {
+            // Edits which only touch overlap too: two insertions at one offset have no defined order.
+            return edits.stream().anyMatch(edit -> other.edits.stream().anyMatch(otherEdit ->
+                    POSITION_ORDER.compare(edit.getRange().getStart(), otherEdit.getRange().getEnd()) <= 0
+                            && POSITION_ORDER.compare(otherEdit.getRange().getStart(), edit.getRange().getEnd()) <= 0));
+        }
+
+        /** Returns the request to format this range and the other one as one range. */
+        @NotNull DocumentRangeFormattingParams cover(@NotNull FormattedRange other) {
+            Range range = request.getRange();
+            Range otherRange = other.request.getRange();
+            Position start = POSITION_ORDER.compare(range.getStart(), otherRange.getStart()) <= 0 ? range.getStart() : otherRange.getStart();
+            Position end = POSITION_ORDER.compare(range.getEnd(), otherRange.getEnd()) >= 0 ? range.getEnd() : otherRange.getEnd();
+            return new DocumentRangeFormattingParams(request.getTextDocument(), request.getOptions(), new Range(start, end));
+        }
+    }
+
 
     /**
      * Finds a {@link LanguageServerItem} that supports document formatting for the given PSI file.
      * <p>
-     * Depending on whether a {@link TextRange} is provided, this method looks for a language server
+     * Depending on whether text ranges are provided, this method looks for a language server
      * that supports either:
      * <ul>
-     *   <li>{@code textDocument/formatting} – when {@code textRange} is {@code null},</li>
-     *   <li>{@code textDocument/rangeFormatting} or {@code textDocument/formatting} – when a range is provided.</li>
+     *   <li>{@code textDocument/formatting} – when {@code textRanges} is empty,</li>
+     *   <li>{@code textDocument/rangeFormatting} or {@code textDocument/formatting} – when ranges are provided.</li>
      * </ul>
      * <p>
      * The method connects the current document to matching servers before selecting one through
@@ -180,17 +268,17 @@ public class LSPFormattingSupport extends AbstractLSPDocumentFeatureSupport<LSPF
      * If no suitable server is found, {@code null} is returned.
      *
      * @param file      the PSI file for which formatting is requested.
-     * @param textRange the range to format, or {@code null} to format the entire document.
+     * @param textRanges the ranges to format, or an empty list to format the entire document.
      * @param cancellation cancellation for both the server connection and formatting request.
      * @param connections temporary connection ownership for this formatting operation.
      * @return a {@link LanguageServerItem} supporting formatting, or {@code null} if none is available.
      */
     private @Nullable LanguageServerItem findFormattingServer(@NotNull PsiFile file,
-                                                              @Nullable TextRange textRange,
+                                                              @NotNull List<TextRange> textRanges,
                                                               @NotNull CancellationSupport cancellation,
                                                               @NotNull DocumentConnectionScope connections) {
-        boolean isRangeFormatting = textRange != null;
-        var servers = trackFormattingFuture(findFormattingServers(file, textRange, connections), cancellation);
+        boolean isRangeFormatting = !textRanges.isEmpty();
+        var servers = trackFormattingFuture(findFormattingServers(file, textRanges, connections), cancellation);
         awaitWithCheckCanceled(servers);
         LanguageServerItem selected = null;
         for (var server : servers.join()) {
@@ -205,12 +293,12 @@ public class LSPFormattingSupport extends AbstractLSPDocumentFeatureSupport<LSPF
 
     /** Connects formatting candidates before applying formatter preferences. */
     CompletableFuture<List<LanguageServerItem>> findFormattingServers(@NotNull PsiFile file,
-                                                                     @Nullable TextRange textRange,
+                                                                     @NotNull List<TextRange> textRanges,
                                                                      @NotNull DocumentConnectionScope connections) {
         return LanguageServiceAccessor.getInstance(file.getProject()).getLanguageServersForScope(file,
                 features -> features.getFormattingFeature().isEnabled(file),
                 features -> features.getFormattingFeature().isFormattingSupported(file)
-                        || (textRange != null && features.getFormattingFeature().isRangeFormattingSupported(file)), connections);
+                        || (!textRanges.isEmpty() && features.getFormattingFeature().isRangeFormattingSupported(file)), connections);
     }
 
     private @NotNull DocumentFormattingParams createDocumentFormattingParams(@NotNull FormattingOptions options,
@@ -222,14 +310,22 @@ public class LSPFormattingSupport extends AbstractLSPDocumentFeatureSupport<LSPF
     }
 
     private @NotNull DocumentRangeFormattingParams createDocumentRangeFormattingParams(@NotNull FormattingOptions options,
-                                                                                       @NotNull TextRange textRange,
-                                                                                       @NotNull Document document,
+                                                                                       @NotNull Range range,
                                                                                        @NotNull LanguageServerItem languageServer) {
         DocumentRangeFormattingParams params = new DocumentRangeFormattingParams();
         params.setTextDocument(new TextDocumentIdentifier(FileUriSupport.toString(getFile().getVirtualFile(), languageServer.getClientFeatures())));
         params.setOptions(options);
-        Range range = LSPIJUtils.toRange(textRange, document);
         params.setRange(range);
+        return params;
+    }
+
+    private @NotNull DocumentRangesFormattingParams createDocumentRangesFormattingParams(@NotNull FormattingOptions options,
+                                                                                         @NotNull List<Range> ranges,
+                                                                                         @NotNull LanguageServerItem languageServer) {
+        DocumentRangesFormattingParams params = new DocumentRangesFormattingParams();
+        params.setTextDocument(new TextDocumentIdentifier(FileUriSupport.toString(getFile().getVirtualFile(), languageServer.getClientFeatures())));
+        params.setOptions(options);
+        params.setRanges(ranges);
         return params;
     }
 }
