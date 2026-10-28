@@ -135,6 +135,14 @@ public class DAPStackFrame extends XStackFrame {
                 .thenApply(context -> context.getSourcePositionFor(variable));
     }
 
+    /**
+     * Drops the variables context of this stack frame, with the inline values which the language servers answered,
+     * so that they are asked again the next time the variables of this frame are computed.
+     */
+    public synchronized void clearVariablesContext() {
+        variablesContext = null;
+    }
+
     private CompletableFuture<DebugVariableContext> getVariablesContext() {
         if (variablesContext != null) {
             return variablesContext;

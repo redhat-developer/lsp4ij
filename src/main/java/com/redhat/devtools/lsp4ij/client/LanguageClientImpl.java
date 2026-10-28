@@ -23,6 +23,7 @@ import com.intellij.util.concurrency.AppExecutorUtil;
 import com.redhat.devtools.lsp4ij.*;
 import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
 import com.redhat.devtools.lsp4ij.client.features.FileUriSupport;
+import com.redhat.devtools.lsp4ij.dap.client.variables.providers.LSPDebugVariablePositionProvider;
 import com.redhat.devtools.lsp4ij.features.diagnostics.WorkspaceDiagnosticManager;
 import com.redhat.devtools.lsp4ij.features.diagnostics.LSPDiagnosticHandler;
 import com.redhat.devtools.lsp4ij.features.documentContent.DocumentContentProvider;
@@ -370,7 +371,15 @@ public class LanguageClientImpl implements LanguageClient, Disposable {
 
     @Override
     public CompletableFuture<Void> refreshInlineValues() {
+        if (!isDisposed()) {
+            LSPDebugVariablePositionProvider.refreshInlineValues(project);
+        }
         return CompletableFuture.completedFuture(null);
+    }
+
+    @Override
+    public CompletableFuture<Void> refreshFoldingRanges() {
+        return refreshEditorFeatures(EditorFeatureType.FOLDING);
     }
 
     /**

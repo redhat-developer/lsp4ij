@@ -101,6 +101,12 @@ public class ClientCapabilitiesFactory {
         // Refresh support for InlayHint
         workspaceClientCapabilities.setInlayHint(new InlayHintWorkspaceCapabilities(Boolean.TRUE));
 
+        // Refresh support for InlineValue, for the inline values of a DAP debug session
+        workspaceClientCapabilities.setInlineValue(new InlineValueWorkspaceCapabilities(Boolean.TRUE));
+
+        // Refresh support for FoldingRange (LSP 3.18)
+        workspaceClientCapabilities.setFoldingRange(new FoldingRangeWorkspaceCapabilities(Boolean.TRUE));
+
         // Refresh support for SemanticTokens
         workspaceClientCapabilities.setSemanticTokens(new SemanticTokensWorkspaceCapabilities(Boolean.TRUE));
 

@@ -12,10 +12,13 @@ package com.redhat.devtools.lsp4ij.dap.client.variables.providers;
 
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
+import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.Key;
 import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiFile;
+import com.intellij.xdebugger.XDebugSession;
+import com.intellij.xdebugger.XDebuggerManager;
 import com.intellij.xdebugger.XDebuggerUtil;
 import com.intellij.xdebugger.XSourcePosition;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
@@ -44,6 +47,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
@@ -202,6 +206,33 @@ public class LSPDebugVariablePositionProvider implements DebugVariablePositionPr
         int line = Math.min(stoppedLine, lineCount - 1);
         int character = document.getLineEndOffset(line) - document.getLineStartOffset(line);
         return new Range(start, new Position(line, character));
+    }
+
+    /**
+     * Asks the language servers again for the inline values of the stopped DAP debug sessions of the given project, as
+     * a 'workspace/inlineValue/refresh' request asks.
+     *
+     * @param project the project.
+     */
+    public static void refreshInlineValues(@NotNull Project project) {
+        if (!project.isDisposed()) {
+            refreshInlineValues(List.of(XDebuggerManager.getInstance(project).getDebugSessions()));
+        }
+    }
+
+    /**
+     * Drops the inline values of the current stack frame of each stopped DAP debug session, and rebuilds the views of
+     * the session, which computes the variables of the frame, and so asks for its inline values again.
+     *
+     * @param sessions the debug sessions.
+     */
+    static void refreshInlineValues(@NotNull Collection<? extends XDebugSession> sessions) {
+        for (var session : sessions) {
+            if (session.isSuspended() && session.getCurrentStackFrame() instanceof DAPStackFrame frame) {
+                frame.clearVariablesContext();
+                session.rebuildViews();
+            }
+        }
     }
 
     /**
