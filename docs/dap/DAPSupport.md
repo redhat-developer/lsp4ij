@@ -23,7 +23,7 @@ Current state of [Events](https://microsoft.github.io/debug-adapter-protocol//sp
 * ❌ [ProgressUpdate](https://microsoft.github.io/debug-adapter-protocol//specification.html#Events_ProgressUpdate).
 * ✅ [Stopped](https://microsoft.github.io/debug-adapter-protocol//specification.html#Events_Stopped).
 * ✅ [Terminated](https://microsoft.github.io/debug-adapter-protocol//specification.html#Events_Terminated).
-* ❌ [Thread](https://microsoft.github.io/debug-adapter-protocol//specification.html#Events_Thread).
+* ✅ [Thread](https://microsoft.github.io/debug-adapter-protocol//specification.html#Events_Thread).
  
 ## Requests
 
@@ -31,6 +31,7 @@ Current state of [Requests](https://microsoft.github.io/debug-adapter-protocol//
 
 * ✅ [Attach](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_Attach).
 * ❌ [BreakpointLocations](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_BreakpointLocations).
+* ❌ [Cancel](https://microsoft.github.io/debug-adapter-protocol//specification.html#Base_Protocol_Cancel).
 * ✅ [Completions](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_Completions) (see [user guide](./UserGuide.md#completion)).
 * ✅ [ConfigurationDone](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_ConfigurationDone).
 * ✅ [Continue](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_Continue).
