@@ -16,11 +16,13 @@ import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.util.Pair;
+import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.LSPFileSupport;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import com.redhat.devtools.lsp4ij.features.AbstractLSPDeclarativeInlayHintsProvider;
+import com.redhat.devtools.lsp4ij.features.documentation.MarkdownConverter;
 import org.eclipse.lsp4j.*;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
 import org.jetbrains.annotations.NotNull;
@@ -117,18 +119,20 @@ public class LSPInlayHintsProvider extends AbstractLSPDeclarativeInlayHintsProvi
         elements.forEach(p -> {
             Either<String, List<InlayHintLabelPart>> label = p.second.inlayHint().getLabel();
             if (label.isLeft()) {
-                buildBasicInlayHint(label.getLeft(), p.second, position, sink);
+                buildBasicInlayHint(psiFile, label.getLeft(), p.second, position, sink);
             } else {
                 buildMultipartInlayHint(psiFile, label.getRight(), p.second, position, sink);
             }
         });
     }
 
-    private void buildBasicInlayHint(@NotNull String label,
+    private void buildBasicInlayHint(@NotNull PsiFile psiFile,
+                                     @NotNull String label,
                                      @NotNull InlayHintData hintData,
                                      @NotNull InlayPosition position,
                                      @NotNull InlayTreeSink sink) {
-        sink.addPresentation(position, null, null, getHintFormat(hintData.inlayHint()), builder -> {
+        String tooltip = toHtmlTooltip(hintData.inlayHint().getTooltip(), psiFile);
+        sink.addPresentation(position, null, tooltip, getHintFormat(hintData.inlayHint()), builder -> {
             builder.text(label, null);
             return null;
         });
@@ -154,14 +158,17 @@ public class LSPInlayHintsProvider extends AbstractLSPDeclarativeInlayHintsProvi
             builds.add(info.build);
             if (info.tooltip != null) {
                 if (hasTooltip) {
-                    tooltip.append('\n');
+                    tooltip.append("<br>");
                 }
                 tooltip.append(info.tooltip);
                 hasTooltip = true;
             }
             index++;
         }
-        sink.addPresentation(position, null, hasTooltip ? tooltip.toString() : null, getHintFormat(hintData.inlayHint()), builder -> {
+        // The tooltip of the hint, if it has one, and otherwise the tooltips of its label parts
+        String hintTooltip = toHtmlTooltip(hintData.inlayHint().getTooltip(), psiFile);
+        String shownTooltip = hintTooltip != null ? hintTooltip : hasTooltip ? tooltip.toString() : null;
+        sink.addPresentation(position, null, shownTooltip, getHintFormat(hintData.inlayHint()), builder -> {
             for (var build: builds) {
                 build.accept(builder);
             }
@@ -174,13 +181,7 @@ public class LSPInlayHintsProvider extends AbstractLSPDeclarativeInlayHintsProvi
             InlayHintData hintData,
             int index,
             InlayHintLabelPart part) {
-        var tooltip = part.getTooltip();
-        final String tooltipStr;
-        if (tooltip != null && tooltip.isLeft()) {
-            tooltipStr = tooltip.getLeft();
-        } else {
-            tooltipStr = null;
-        }
+        final String tooltipStr = toHtmlTooltip(part.getTooltip(), psiFile);
         String text = part.getValue();
         final InlayActionData data;
         if (hasCommand(part)) {
@@ -197,6 +198,38 @@ public class LSPInlayHintsProvider extends AbstractLSPDeclarativeInlayHintsProvi
                 builder.text(text, data);
             }
         });
+    }
+
+    /**
+     * Returns the tooltip of an inlay hint or of one of its label parts as HTML, which is how IntelliJ shows the
+     * tooltip of an inlay: Markdown converted to HTML, and plain text escaped, with its line breaks kept.
+     *
+     * @param tooltip the tooltip, or null.
+     * @param psiFile the file of the inlay hint.
+     * @return the tooltip as HTML, and null if there is none.
+     */
+    static @Nullable String toHtmlTooltip(@Nullable Either<String, MarkupContent> tooltip, @NotNull PsiFile psiFile) {
+        if (tooltip == null) {
+            return null;
+        }
+        if (tooltip.isLeft()) {
+            return toHtml(tooltip.getLeft());
+        }
+        MarkupContent content = tooltip.getRight();
+        if (content == null || StringUtil.isEmpty(content.getValue())) {
+            return null;
+        }
+        if (MarkupKind.MARKDOWN.equals(content.getKind())) {
+            return MarkdownConverter.getInstance(psiFile.getProject()).toHtml(content.getValue(), psiFile);
+        }
+        return toHtml(content.getValue());
+    }
+
+    private static @Nullable String toHtml(@Nullable String text) {
+        if (StringUtil.isEmpty(text)) {
+            return null;
+        }
+        return StringUtil.escapeXmlEntities(text).replace("\n", "<br>");
     }
 
     private static boolean hasCommand(InlayHintLabelPart part) {

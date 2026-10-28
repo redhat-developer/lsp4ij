@@ -324,6 +324,8 @@ Here is an example with the [Qute language server](https://github.com/redhat-dev
 
 ![textDocument/inlayHint](./images/lsp-support/textDocument_inlayHint.png)
 
+Hovering over an inlay hint shows its tooltip, or, when the hint has none, the tooltips of its label parts. A Markdown tooltip is rendered, and a plain text one is shown as it is.
+
 ### Inline Value
 
 [textDocument/inlineValue](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_inlineValue) is implemented with
