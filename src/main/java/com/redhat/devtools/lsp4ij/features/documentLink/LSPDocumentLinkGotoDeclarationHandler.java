@@ -25,11 +25,15 @@ import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.LSPFileSupport;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
+import com.redhat.devtools.lsp4ij.LSPRequestConstants;
+import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
 import com.redhat.devtools.lsp4ij.client.features.FileUriSupport;
+import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
 import org.eclipse.lsp4j.DocumentLink;
 import org.eclipse.lsp4j.DocumentLinkParams;
 import org.eclipse.lsp4j.TextDocumentIdentifier;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -84,9 +88,10 @@ public class LSPDocumentLinkGotoDeclarationHandler implements GotoDeclarationHan
                     TextRange range = LSPIJUtils.toTextRange(documentLink.getRange(), document);
                     if (range != null && range.contains(offset)) {
                         // The Ctrl+Click has been done in a LSP document link,try to open the document.
-                        final String target = documentLink.getTarget();
+                        DocumentLink resolvedLink = resolveTarget(documentLinkData, psiFile);
+                        final String target = resolvedLink != null ? resolvedLink.getTarget() : null;
                         if (target != null && !target.isEmpty()) {
-                            String tooltip = documentLink.getTooltip();
+                            String tooltip = resolvedLink.getTooltip();
                             FileUriSupport fileUriSupport = documentLinkData.languageServer().getClientFeatures();
                             if (isHttpUrl(target)) {
                                 // the target is a Http url which must be opened in the browser
@@ -106,6 +111,39 @@ public class LSPDocumentLinkGotoDeclarationHandler implements GotoDeclarationHan
             }
         }
         return PsiElement.EMPTY_ARRAY;
+    }
+
+    /**
+     * Returns the given document link with its target. A language server can leave the target of a link to
+     * 'documentLink/resolve': a link without a target is then resolved, if the language server supports it.
+     *
+     * @param documentLinkData the document link and its language server.
+     * @param psiFile          the Psi file of the document link.
+     * @return the document link with its target, the document link as it is if it has a target or cannot be
+     * resolved, or null if the resolve failed or was cancelled.
+     */
+    private static @Nullable DocumentLink resolveTarget(@NotNull DocumentLinkData documentLinkData,
+                                                        @NotNull PsiFile psiFile) {
+        DocumentLink documentLink = documentLinkData.documentLink();
+        String target = documentLink.getTarget();
+        LanguageServerItem languageServer = documentLinkData.languageServer();
+        if ((target != null && !target.isEmpty())
+                || !languageServer.getClientFeatures().getDocumentLinkFeature().isResolveDocumentLinkSupported(psiFile)) {
+            return documentLink;
+        }
+        var cancellationSupport = new CancellationSupport();
+        CompletableFuture<DocumentLink> resolveFuture = cancellationSupport.execute(languageServer
+                .getTextDocumentService()
+                .documentLinkResolve(documentLink), languageServer, LSPRequestConstants.DOCUMENT_LINK_RESOLVE);
+        try {
+            awaitWithCheckCanceled(resolveFuture);
+        } catch (ProcessCanceledException e) {
+            cancellationSupport.cancel();
+            throw e;
+        } catch (CancellationException ignore) {
+            return null;
+        }
+        return isDoneNormally(resolveFuture) ? resolveFuture.getNow(null) : null;
     }
 
 }
