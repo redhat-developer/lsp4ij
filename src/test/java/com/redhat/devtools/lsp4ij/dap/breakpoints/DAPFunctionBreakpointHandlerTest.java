@@ -21,6 +21,7 @@ import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.testFramework.HeavyPlatformTestCase;
 import com.intellij.xdebugger.XDebugSession;
+import com.intellij.xdebugger.XDebugSessionListener;
 import com.intellij.xdebugger.XDebuggerManager;
 import com.intellij.xdebugger.XDebuggerUtil;
 import com.intellij.xdebugger.breakpoints.XBreakpoint;
@@ -52,6 +53,7 @@ public class DAPFunctionBreakpointHandlerTest extends HeavyPlatformTestCase {
     private final List<SetFunctionBreakpointsArguments> requests = new ArrayList<>();
     // What the IJ breakpoints were shown as, in order
     private final List<String> shown = new ArrayList<>();
+    private final List<XDebugSessionListener> sessionListeners = new ArrayList<>();
 
     public void testNothingIsSentToADebugAdapterWithoutFunctionBreakpoints() throws Exception {
         assertFalse(DAPFunctionBreakpointHandler.isSupportsFunctionBreakpoints(new Capabilities()));
@@ -127,6 +129,23 @@ public class DAPFunctionBreakpointHandlerTest extends HeavyPlatformTestCase {
             // another breakpoint's id is not one of these
             handler.updateBreakpoint(answer(99, false, "a line breakpoint"), null);
             assertEquals(List.of("verified nope"), shown);
+        } finally {
+            handler.dispose();
+        }
+    }
+
+    public void testTheIconsAreClearedWhenTheSessionEnds() throws Exception {
+        var twice = breakpoint("twice");
+        var handler = handler();
+        try {
+            handler.registerBreakpoint(twice);
+            handler.initialize(server(arguments -> new Breakpoint[0]), supported()).join();
+            shown.clear();
+
+            sessionListeners.forEach(XDebugSessionListener::sessionStopped);
+
+            // IntelliJ computes the icon of a line breakpoint again, not the icon of a function breakpoint
+            assertEquals(List.of("cleared twice"), shown);
         } finally {
             handler.dispose();
         }
@@ -284,7 +303,12 @@ public class DAPFunctionBreakpointHandlerTest extends HeavyPlatformTestCase {
                 return true;
             }
         };
-        var session = (XDebugSession) Proxy.newProxyInstance(XDebugSession.class.getClassLoader(), new Class[]{XDebugSession.class}, (p, m, a) -> null);
+        var session = (XDebugSession) Proxy.newProxyInstance(XDebugSession.class.getClassLoader(), new Class[]{XDebugSession.class}, (p, m, a) -> {
+            if (m.getName().equals("addSessionListener")) {
+                sessionListeners.add((XDebugSessionListener) a[0]);
+            }
+            return null;
+        });
         return new DAPFunctionBreakpointHandler(session, descriptor, getProject()) {
             @Override
             protected void setBreakpointVerified(XBreakpoint<DAPFunctionBreakpointProperties> ijBreakpoint) {
@@ -294,6 +318,13 @@ public class DAPFunctionBreakpointHandlerTest extends HeavyPlatformTestCase {
             @Override
             protected void setBreakpointInvalid(XBreakpoint<DAPFunctionBreakpointProperties> ijBreakpoint, String message) {
                 shown.add("invalid " + ijBreakpoint.getProperties().getName() + ": " + message);
+            }
+
+            @Override
+            protected void clearIcon(XBreakpoint<?> ijBreakpoint) {
+                if (ijBreakpoint.getProperties() instanceof DAPFunctionBreakpointProperties properties) {
+                    shown.add("cleared " + properties.getName());
+                }
             }
         };
     }

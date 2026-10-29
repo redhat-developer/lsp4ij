@@ -93,7 +93,7 @@ public abstract class BreakpointHandlerBase<B extends XBreakpoint<?>> extends XB
     private void clearIconsOfNonLineBreakpoints() {
         breakpoints.stream()
                 .filter(breakpoint -> !(breakpoint instanceof XLineBreakpoint<?>))
-                .forEach(BreakpointHandlerBase::clearIcon);
+                .forEach(this::clearIcon);
     }
 
     public CompletableFuture<@Nullable Void> initialize(@NotNull IDebugProtocolServer debugProtocolServer,
@@ -386,10 +386,12 @@ public abstract class BreakpointHandlerBase<B extends XBreakpoint<?>> extends XB
 
     /**
      * Clears the icon of the given breakpoint, which keeps the icon of its session until it is computed again.
+     * <p>
+     * Tests override this method to check that the icon is cleared.
      *
      * @param ijBreakpoint the IJ breakpoint.
      */
-    protected static void clearIcon(@NotNull XBreakpoint<?> ijBreakpoint) {
+    protected void clearIcon(@NotNull XBreakpoint<?> ijBreakpoint) {
         if (ijBreakpoint instanceof XBreakpointBase<?, ?, ?> breakpointBase) {
             breakpointBase.clearIcon();
         }

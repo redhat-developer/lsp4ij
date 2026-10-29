@@ -323,6 +323,23 @@ public class DAPDataBreakpointHandlerTest extends HeavyPlatformTestCase {
         }
     }
 
+    public void testTheIconsAreClearedWhenTheSessionEnds() throws Exception {
+        var handler = handler();
+        try {
+            var server = server("server", arguments -> new Breakpoint[0]);
+            handler.initialize(server, supported()).join();
+            handler.registerBreakpoint(breakpoint("9:size", server, true));
+            shown.clear();
+
+            sessionListeners.forEach(XDebugSessionListener::sessionStopped);
+
+            // IntelliJ computes the icon of a line breakpoint again, not the icon of a data breakpoint
+            assertEquals(List.of("cleared 9:size"), shown);
+        } finally {
+            handler.dispose();
+        }
+    }
+
     public void testTheBreakpointsWhichCantPersistAreRemovedWhenTheSessionEnds() throws Exception {
         var handler = handler();
         try {
@@ -511,6 +528,13 @@ public class DAPDataBreakpointHandlerTest extends HeavyPlatformTestCase {
             @Override
             protected void setBreakpointInvalid(XBreakpoint<DAPDataBreakpointProperties> ijBreakpoint, String message) {
                 shown.add("invalid " + ijBreakpoint.getProperties().getDataId() + ": " + message);
+            }
+
+            @Override
+            protected void clearIcon(XBreakpoint<?> ijBreakpoint) {
+                if (ijBreakpoint.getProperties() instanceof DAPDataBreakpointProperties properties) {
+                    shown.add("cleared " + properties.getDataId());
+                }
             }
 
             @Override
