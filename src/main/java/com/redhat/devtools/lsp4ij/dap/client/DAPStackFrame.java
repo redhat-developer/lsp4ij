@@ -13,7 +13,6 @@ package com.redhat.devtools.lsp4ij.dap.client;
 import com.intellij.icons.AllIcons;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.fileEditor.FileEditorManager;
-import com.intellij.openapi.vfs.LocalFileSystem;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.ui.ColoredTextContainer;
 import com.intellij.ui.SimpleTextAttributes;
@@ -28,6 +27,7 @@ import com.intellij.xdebugger.frame.XValueChildrenList;
 import com.redhat.devtools.lsp4ij.dap.client.files.DAPFileRegistry;
 import com.redhat.devtools.lsp4ij.dap.client.files.DAPSourceReferencePosition;
 import com.redhat.devtools.lsp4ij.dap.client.files.DeferredLocalFileSourcePosition;
+import com.redhat.devtools.lsp4ij.dap.client.files.LocalSourceFiles;
 import com.redhat.devtools.lsp4ij.dap.client.variables.DAPValueGroup;
 import com.redhat.devtools.lsp4ij.dap.client.variables.providers.DebugVariableContext;
 import com.redhat.devtools.lsp4ij.dap.disassembly.DisassemblyDeferredSourcePosition;
@@ -119,8 +119,8 @@ public class DAPStackFrame extends XStackFrame {
             return new DeferredLocalFileSourcePosition(filePath, line);
         }
 
-        VirtualFile file = LocalFileSystem.getInstance().findFileByPath(filePath.toString());
-        if (file == null || !file.isValid()) {
+        VirtualFile file = LocalSourceFiles.findFile(filePath);
+        if (file == null) {
             return null;
         }
         return XDebuggerUtil.getInstance().createPosition(file, line);
