@@ -13,12 +13,15 @@ import com.intellij.xdebugger.breakpoints.XBreakpoint;
 import com.intellij.xdebugger.breakpoints.XBreakpointType;
 import com.intellij.xdebugger.breakpoints.XLineBreakpoint;
 import com.intellij.xdebugger.breakpoints.XLineBreakpointType;
+import com.intellij.xdebugger.impl.breakpoints.XBreakpointBase;
 import com.redhat.devtools.lsp4ij.dap.configurations.DAPRunConfigurationOptions;
+import kotlinx.coroutines.flow.MutableSharedFlow;
 import org.eclipse.lsp4j.debug.*;
 import org.eclipse.lsp4j.debug.services.IDebugProtocolServer;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -30,7 +33,8 @@ import java.util.concurrent.CompletableFuture;
  * {@link BreakpointHandlerBase#refreshTooltip}).
  * <p>
  * The tests run on IntelliJ 2024.2, where the refresh itself does nothing, so the handler records the breakpoints
- * whose tooltip it refreshes. This test is only about that workaround: remove it together with
+ * whose tooltip it refreshes; one test checks the refresh itself on versions which have it. This test is only about
+ * that workaround: remove it together with
  * {@code refreshTooltip()} once IntelliJ refreshes the tooltip itself.
  */
 public class DAPBreakpointTooltipRefreshTest extends HeavyPlatformTestCase {
@@ -116,13 +120,45 @@ public class DAPBreakpointTooltipRefreshTest extends HeavyPlatformTestCase {
     }
 
     /**
-     * Returns a handler which adds each breakpoint whose tooltip it refreshes to the given list.
+     * Without an override of {@code refreshTooltip()}: on an IntelliJ version which has
+     * {@code XBreakpointBase.emitBreakpointChanged()} (2025.2+, as the "Latest IJ" workflow uses), refreshing the
+     * tooltip emits the breakpoint change. Nothing to check on older versions, such as 2024.2.
+     */
+    public void testTooltipRefreshEmitsTheBreakpointChange() throws Exception {
+        Method breakpointChangedFlow;
+        try {
+            XBreakpointBase.class.getMethod("emitBreakpointChanged");
+            breakpointChangedFlow = XBreakpointBase.class.getMethod("breakpointChangedFlow");
+        } catch (NoSuchMethodException e) {
+            return;
+        }
+        var handler = handler(true, null);
+        var dir = Files.createTempDirectory("dap-breakpoints-");
+        try {
+            var file = file(dir.resolve("a.lua"));
+            XLineBreakpoint<DAPBreakpointProperties> breakpoint = WriteAction.compute(() -> XDebuggerManager.getInstance(getProject()).getBreakpointManager()
+                    .addLineBreakpoint(new DAPBreakpointType(), file.getUrl(), 0, new DAPBreakpointProperties()));
+            // The flow keeps the last emission
+            var changes = (MutableSharedFlow<?>) breakpointChangedFlow.invoke(breakpoint);
+            changes.resetReplayCache();
+
+            handler.refreshTooltip(breakpoint);
+            assertFalse(changes.getReplayCache().isEmpty());
+        } finally {
+            handler.dispose();
+            com.intellij.openapi.util.io.FileUtil.delete(dir.toFile());
+        }
+    }
+
+    /**
+     * Returns a handler which adds each breakpoint whose tooltip it refreshes to the given list, or which refreshes the
+     * tooltip if the list is null.
      *
      * @param debuggable true if the debug adapter can debug the files, false otherwise.
-     * @param refreshed  the breakpoints whose tooltip is refreshed.
+     * @param refreshed  the breakpoints whose tooltip is refreshed, or null.
      */
     private DAPBreakpointHandlerBase<XLineBreakpoint<DAPBreakpointProperties>> handler(boolean debuggable,
-                                                                                     List<XBreakpoint<?>> refreshed) throws Exception {
+                                                                                     @Nullable List<XBreakpoint<?>> refreshed) throws Exception {
         var type = Arrays.stream(com.intellij.execution.configurations.ConfigurationType.CONFIGURATION_TYPE_EP.getExtensions())
                 .filter(t -> t.getId().equals("DAPConfiguration")).findFirst().orElseThrow();
         var config = type.getConfigurationFactories()[0].createTemplateConfiguration(getProject());
@@ -151,6 +187,9 @@ public class DAPBreakpointTooltipRefreshTest extends HeavyPlatformTestCase {
         };
         // The presentation itself is checked by the other breakpoint tests
         var session = (XDebugSession) Proxy.newProxyInstance(XDebugSession.class.getClassLoader(), new Class[]{XDebugSession.class}, (p, m, a) -> null);
+        if (refreshed == null) {
+            return new DAPBreakpointHandlerBase<>(DAPBreakpointType.class, session, descriptor, getProject()) {};
+        }
         return new DAPBreakpointHandlerBase<>(DAPBreakpointType.class, session, descriptor, getProject()) {
             @Override
             protected void refreshTooltip(@NotNull XBreakpoint<?> ijBreakpoint) {
