@@ -13,7 +13,6 @@ package com.redhat.devtools.lsp4ij.dap.breakpoints;
 import com.intellij.icons.AllIcons;
 import com.intellij.openapi.project.Project;
 import com.intellij.xdebugger.XDebugSession;
-import com.intellij.xdebugger.XDebugSessionListener;
 import com.intellij.xdebugger.XExpression;
 import com.intellij.xdebugger.breakpoints.SuspendPolicy;
 import com.intellij.xdebugger.breakpoints.XBreakpoint;
@@ -54,14 +53,6 @@ public class DAPFunctionBreakpointHandler extends BreakpointHandlerBase<XBreakpo
                                         @NotNull DebugAdapterDescriptor debugAdapterDescriptor,
                                         @NotNull Project project) {
         super(DAPFunctionBreakpointType.class, debugSession, debugAdapterDescriptor, project);
-        debugSession.addSessionListener(new XDebugSessionListener() {
-            @Override
-            public void sessionStopped() {
-                // The breakpoints keep the icons of this session until they are computed again: IntelliJ does that for
-                // line breakpoints only
-                breakpoints.forEach(DAPFunctionBreakpointHandler::clearIcon);
-            }
-        });
     }
 
     @Override
@@ -183,34 +174,11 @@ public class DAPFunctionBreakpointHandler extends BreakpointHandlerBase<XBreakpo
     }
 
     /**
-     * Update IntelliJ function breakpoint with the given DAP breakpoint information: it is shown verified, or invalid
-     * with the message of the DAP server, as a line breakpoint is.
-     *
-     * @param breakpoint   the DAP breakpoint information.
-     * @param ijBreakpoint the IJ Breakpoint and null otherwise.
-     */
-    @Override
-    public void updateBreakpoint(@NotNull Breakpoint breakpoint,
-                                 @Nullable XBreakpoint<DAPFunctionBreakpointProperties> ijBreakpoint) {
-        if (ijBreakpoint == null) {
-            // Retrieve the IntelliJ breakpoint by the id.
-            ijBreakpoint = findBreakpointById(breakpoint.getId());
-        }
-        if (ijBreakpoint == null) {
-            return;
-        }
-        if (breakpoint.isVerified()) {
-            setBreakpointVerified(ijBreakpoint);
-        } else {
-            setBreakpointInvalid(ijBreakpoint, breakpoint.getMessage());
-        }
-    }
-
-    /**
      * Shows the given function breakpoint as verified in the session.
      *
      * @param ijBreakpoint the IJ function breakpoint.
      */
+    @Override
     protected void setBreakpointVerified(@NotNull XBreakpoint<DAPFunctionBreakpointProperties> ijBreakpoint) {
         Icon icon = ijBreakpoint.getSuspendPolicy() == SuspendPolicy.NONE
                 ? AllIcons.Debugger.Db_verified_no_suspend_method_breakpoint
@@ -224,6 +192,7 @@ public class DAPFunctionBreakpointHandler extends BreakpointHandlerBase<XBreakpo
      * @param ijBreakpoint the IJ function breakpoint.
      * @param message      the message of the DAP server, or null.
      */
+    @Override
     protected void setBreakpointInvalid(@NotNull XBreakpoint<DAPFunctionBreakpointProperties> ijBreakpoint,
                                         @Nullable String message) {
         updateBreakpointPresentation(ijBreakpoint, AllIcons.Debugger.Db_invalid_breakpoint, message);
