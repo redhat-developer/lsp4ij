@@ -18,6 +18,7 @@ import com.intellij.openapi.util.Comparing;
 import com.intellij.openapi.util.Key;
 import com.intellij.util.containers.ContainerUtil;
 import com.intellij.xdebugger.XDebugSession;
+import com.intellij.xdebugger.XDebugSessionListener;
 import com.intellij.xdebugger.XDebuggerManager;
 import com.intellij.xdebugger.XSourcePosition;
 import com.intellij.xdebugger.breakpoints.XBreakpoint;
@@ -76,6 +77,16 @@ public abstract class BreakpointHandlerBase<B extends XBreakpoint<?>> extends XB
         this.debugSession = debugSession;
         this.debugAdapterDescriptor = debugAdapterDescriptor;
         this.project = project;
+        debugSession.addSessionListener(new XDebugSessionListener() {
+            @Override
+            public void sessionStopped() {
+                // The breakpoints keep the icons of this session until they are computed again: IntelliJ does that for
+                // line breakpoints only (see updateBreakpointPresentation)
+                breakpoints.stream()
+                        .filter(breakpoint -> !(breakpoint instanceof XLineBreakpoint<?>))
+                        .forEach(BreakpointHandlerBase::clearIcon);
+            }
+        });
     }
 
     public CompletableFuture<@Nullable Void> initialize(@NotNull IDebugProtocolServer debugProtocolServer,

@@ -78,9 +78,6 @@ public class DAPDataBreakpointHandler extends BreakpointHandlerBase<XBreakpoint<
         debugSession.addSessionListener(new XDebugSessionListener() {
             @Override
             public void sessionStopped() {
-                // The breakpoints keep the icons of this session until they are computed again: IntelliJ does that for
-                // line breakpoints only
-                breakpoints.forEach(DAPDataBreakpointHandler::clearIcon);
                 endSession();
             }
         });

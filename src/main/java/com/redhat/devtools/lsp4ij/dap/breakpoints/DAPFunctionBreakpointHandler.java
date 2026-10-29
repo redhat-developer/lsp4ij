@@ -13,7 +13,6 @@ package com.redhat.devtools.lsp4ij.dap.breakpoints;
 import com.intellij.icons.AllIcons;
 import com.intellij.openapi.project.Project;
 import com.intellij.xdebugger.XDebugSession;
-import com.intellij.xdebugger.XDebugSessionListener;
 import com.intellij.xdebugger.XExpression;
 import com.intellij.xdebugger.breakpoints.SuspendPolicy;
 import com.intellij.xdebugger.breakpoints.XBreakpoint;
@@ -54,14 +53,6 @@ public class DAPFunctionBreakpointHandler extends BreakpointHandlerBase<XBreakpo
                                         @NotNull DebugAdapterDescriptor debugAdapterDescriptor,
                                         @NotNull Project project) {
         super(DAPFunctionBreakpointType.class, debugSession, debugAdapterDescriptor, project);
-        debugSession.addSessionListener(new XDebugSessionListener() {
-            @Override
-            public void sessionStopped() {
-                // The breakpoints keep the icons of this session until they are computed again: IntelliJ does that for
-                // line breakpoints only
-                breakpoints.forEach(DAPFunctionBreakpointHandler::clearIcon);
-            }
-        });
     }
 
     @Override
