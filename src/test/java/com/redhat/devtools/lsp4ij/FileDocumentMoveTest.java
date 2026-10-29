@@ -79,7 +79,7 @@ public class FileDocumentMoveTest extends LSPCodeInsightFixtureTestCase {
     public void testRenameTwiceBeforeReconnectOpensOnlyTheFinalUri() throws Exception {
         var context = openDocument();
         var reopened = new CompletableFuture<DidOpenTextDocumentParams>();
-        MockLanguageServer.INSTANCE.getTextDocumentService().setDidOpenCallback(reopened);
+        expectDidOpenOfAnotherUri(reopened, context.wrapper().toUri(context.file()));
         write(() -> {
             context.file().rename(this, "intermediate.foo");
             context.file().rename(this, "final.foo");
@@ -131,15 +131,24 @@ public class FileDocumentMoveTest extends LSPCodeInsightFixtureTestCase {
         return new Context(file, servers.get(0).getServerWrapper());
     }
 
+    /**
+     * Expects the next didOpen of a URI other than the given one. The servers are returned once the didOpen of
+     * the file is sent, and the mock server can read it after the expectation is set.
+     */
+    private static void expectDidOpenOfAnotherUri(CompletableFuture<DidOpenTextDocumentParams> opened, URI uri) {
+        MockLanguageServer.INSTANCE.getTextDocumentService().setDidOpenCallback(opened,
+                params -> !uri.equals(URI.create(params.getTextDocument().getUri())));
+    }
+
     private void reconnectAfter(Context context, Runnable operation) {
         var closed = new CompletableFuture<DidCloseTextDocumentParams>();
         var opened = new CompletableFuture<DidOpenTextDocumentParams>();
         var renamed = new CompletableFuture<RenameFilesParams>();
         var closedBeforeOpen = opened.thenApply(ignored -> closed.isDone());
-        MockLanguageServer.INSTANCE.getTextDocumentService().setDidCloseCallback(closed);
-        MockLanguageServer.INSTANCE.getTextDocumentService().setDidOpenCallback(opened);
-        MockLanguageServer.INSTANCE.getWorkspaceService().setDidRenameCallback(renamed);
         URI oldUri = context.wrapper().toUri(context.file());
+        MockLanguageServer.INSTANCE.getTextDocumentService().setDidCloseCallback(closed);
+        expectDidOpenOfAnotherUri(opened, oldUri);
+        MockLanguageServer.INSTANCE.getWorkspaceService().setDidRenameCallback(renamed);
         operation.run();
         PlatformTestUtil.waitWithEventsDispatching("rename must deliver close, open and workspace notification",
                 () -> closed.isDone() && opened.isDone() && renamed.isDone() && closedBeforeOpen.isDone(), 10);
