@@ -10,6 +10,7 @@ import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.testFramework.HeavyPlatformTestCase;
 import com.intellij.xdebugger.XDebugSession;
 import com.intellij.xdebugger.XDebuggerManager;
+import com.intellij.xdebugger.breakpoints.XBreakpoint;
 import com.intellij.xdebugger.breakpoints.XBreakpointProperties;
 import com.intellij.xdebugger.breakpoints.XBreakpointType;
 import com.intellij.xdebugger.breakpoints.XLineBreakpoint;
@@ -56,7 +57,8 @@ public class DAPShadowedBreakpointTest extends HeavyPlatformTestCase {
             }
             return null;
         });
-        var handler = (BreakpointHandlerBase) handler(session);
+        var refreshed = new ArrayList<XBreakpoint<?>>();
+        var handler = (BreakpointHandlerBase) handler(session, refreshed);
         var requests = new ArrayList<SetBreakpointsArguments>();
         var server = server(requests);
 
@@ -75,19 +77,23 @@ public class DAPShadowedBreakpointTest extends HeavyPlatformTestCase {
             handler.initialize(server, new Capabilities()).join();
             assertEquals("a == 1", single(requests).getCondition());
             assertTrue(presentations.isEmpty());
+            assertTrue(refreshed.isEmpty());
             requests.clear();
 
             // A DAP breakpoint on the same line: only the DAP breakpoint is sent, the native one is marked
             handler.registerBreakpoint(dapBreakpoint);
             assertNull(single(requests).getCondition());
             assertEquals(List.of("inactive:" + DAPBundle.message("dap.breakpoints.shadowed")), presentations);
+            assertEquals(List.of(nativeBreakpoint), refreshed);
             requests.clear();
             presentations.clear();
+            refreshed.clear();
 
             // DAP breakpoint removed: the native breakpoint is forwarded again and its presentation reset
             handler.unregisterBreakpoint(dapBreakpoint, false);
             assertEquals("a == 1", single(requests).getCondition());
             assertEquals(List.of("reset:null"), presentations);
+            assertEquals(List.of(nativeBreakpoint), refreshed);
         } finally {
             handler.dispose();
             com.intellij.openapi.util.io.FileUtil.delete(dir.toFile());
@@ -116,7 +122,8 @@ public class DAPShadowedBreakpointTest extends HeavyPlatformTestCase {
             }
             return null;
         });
-        var handler = (BreakpointHandlerBase) handler(session);
+        var refreshed = new ArrayList<XBreakpoint<?>>();
+        var handler = (BreakpointHandlerBase) handler(session, refreshed);
         var requests = new ArrayList<SetBreakpointsArguments>();
         // Like the Fule adapter: each request installs the breakpoints with a new id, pending until the script is loaded
         var server = server(requests, "pending native script resolution");
@@ -137,8 +144,10 @@ public class DAPShadowedBreakpointTest extends HeavyPlatformTestCase {
             assertNull(single(requests).getCondition());
             assertEquals(List.of("native inactive:" + DAPBundle.message("dap.breakpoints.shadowed"),
                     "dap invalid:pending native script resolution"), presentations);
+            assertEquals(List.of(nativeBreakpoint, dapBreakpoint), refreshed);
             requests.clear();
             presentations.clear();
+            refreshed.clear();
 
             // The DAP breakpoint is disabled in the IDE: IntelliJ unregisters it, then registers it again (ignored as disabled)
             dapBreakpoint.setEnabled(false);
@@ -146,7 +155,9 @@ public class DAPShadowedBreakpointTest extends HeavyPlatformTestCase {
             handler.registerBreakpoint(dapBreakpoint);
             assertEquals("a == 1", single(requests).getCondition());
             assertEquals(List.of("native reset:null", "native invalid:pending native script resolution"), presentations);
+            assertEquals(List.of(nativeBreakpoint, nativeBreakpoint), refreshed);
             presentations.clear();
+            refreshed.clear();
 
             // The script is loaded: the debug adapter verifies the native breakpoint by its id (DAP 'breakpoint' event)
             var changed = new Breakpoint();
@@ -155,6 +166,7 @@ public class DAPShadowedBreakpointTest extends HeavyPlatformTestCase {
             changed.setLine(1);
             handler.updateBreakpoint(changed, null);
             assertEquals(List.of("native verified"), presentations);
+            assertEquals(List.of(nativeBreakpoint), refreshed);
         } finally {
             handler.dispose();
             com.intellij.openapi.util.io.FileUtil.delete(dir.toFile());
@@ -183,7 +195,8 @@ public class DAPShadowedBreakpointTest extends HeavyPlatformTestCase {
             }
             return null;
         });
-        var handler = (BreakpointHandlerBase) handler(session);
+        var refreshed = new ArrayList<XBreakpoint<?>>();
+        var handler = (BreakpointHandlerBase) handler(session, refreshed);
         var requests = new ArrayList<SetBreakpointsArguments>();
         var responses = new ArrayList<CompletableFuture<SetBreakpointsResponse>>();
         // A debug adapter which answers only when the test completes the response
@@ -217,18 +230,23 @@ public class DAPShadowedBreakpointTest extends HeavyPlatformTestCase {
             handler.registerBreakpoint(dapBreakpoint);
             assertEquals(2, requests.size());
             assertEquals(List.of("native inactive:" + DAPBundle.message("dap.breakpoints.shadowed")), presentations);
+            assertEquals(List.of(nativeBreakpoint), refreshed);
             presentations.clear();
+            refreshed.clear();
 
             // The late response for the native breakpoint arrives: it is ignored
             responses.get(0).complete(response(1, 1));
             assertNull(nativeBreakpoint.getUserData(BreakpointHandlerBase.DAP_BREAKPOINT_ID));
             assertTrue(presentations.isEmpty());
+            assertTrue(refreshed.isEmpty());
 
             // The response for the DAP breakpoint gives it its id
             responses.get(1).complete(response(2, 1));
             assertEquals(Integer.valueOf(2), dapBreakpoint.getUserData(BreakpointHandlerBase.DAP_BREAKPOINT_ID));
             assertEquals(List.of("dap verified"), presentations);
+            assertEquals(List.of(dapBreakpoint), refreshed);
             presentations.clear();
+            refreshed.clear();
 
             // A breakpoint event with the id of the late response doesn't reach the shadowed native breakpoint
             var changed = new Breakpoint();
@@ -236,6 +254,7 @@ public class DAPShadowedBreakpointTest extends HeavyPlatformTestCase {
             changed.setVerified(true);
             handler.updateBreakpoint(changed, null);
             assertTrue(presentations.isEmpty());
+            assertTrue(refreshed.isEmpty());
         } finally {
             handler.dispose();
             com.intellij.openapi.util.io.FileUtil.delete(dir.toFile());
@@ -268,7 +287,12 @@ public class DAPShadowedBreakpointTest extends HeavyPlatformTestCase {
         return requests.get(0).getBreakpoints()[0];
     }
 
-    private DAPBreakpointHandlerBase<XLineBreakpoint<DAPBreakpointProperties>> handler(XDebugSession session) throws Exception {
+    /**
+     * Returns a handler which adds each breakpoint whose tooltip it refreshes to the given list: on IntelliJ 2024.2,
+     * where the tests run, the tooltip refresh itself does nothing.
+     */
+    private DAPBreakpointHandlerBase<XLineBreakpoint<DAPBreakpointProperties>> handler(XDebugSession session,
+                                                                                     List<XBreakpoint<?>> refreshed) throws Exception {
         var type = Arrays.stream(com.intellij.execution.configurations.ConfigurationType.CONFIGURATION_TYPE_EP.getExtensions())
                 .filter(t -> t.getId().equals("DAPConfiguration")).findFirst().orElseThrow();
         var config = type.getConfigurationFactories()[0].createTemplateConfiguration(getProject());
@@ -295,7 +319,12 @@ public class DAPShadowedBreakpointTest extends HeavyPlatformTestCase {
                 return true;
             }
         };
-        return new DAPBreakpointHandlerBase<>(DAPBreakpointType.class, session, descriptor, getProject()) {};
+        return new DAPBreakpointHandlerBase<>(DAPBreakpointType.class, session, descriptor, getProject()) {
+            @Override
+            protected void refreshTooltip(@NotNull XBreakpoint<?> ijBreakpoint) {
+                refreshed.add(ijBreakpoint);
+            }
+        };
     }
 
     private static IDebugProtocolServer server(List<SetBreakpointsArguments> requests) {

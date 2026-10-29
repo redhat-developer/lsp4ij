@@ -303,10 +303,12 @@ public abstract class BreakpointHandlerBase<B extends XBreakpoint<?>> extends XB
      * The method is called by reflection because it doesn't exist in IntelliJ 2024.2, the version LSP4IJ is
      * compiled against. Nothing needs to be refreshed there: the tooltip reads the error message of the
      * breakpoint each time it is shown.
+     * <p>
+     * Tests override this method to check that the tooltip is refreshed.
      *
      * @param ijBreakpoint the IJ breakpoint.
      */
-    protected static void refreshTooltip(@NotNull XBreakpoint<?> ijBreakpoint) {
+    protected void refreshTooltip(@NotNull XBreakpoint<?> ijBreakpoint) {
         if (EMIT_BREAKPOINT_CHANGED != null && ijBreakpoint instanceof XBreakpointBase<?, ?, ?> breakpointBase) {
             try {
                 EMIT_BREAKPOINT_CHANGED.invoke(breakpointBase);
