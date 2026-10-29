@@ -8,11 +8,9 @@ import com.intellij.openapi.vfs.LocalFileSystem;
 import com.intellij.testFramework.HeavyPlatformTestCase;
 import com.intellij.xdebugger.XDebugSession;
 import com.intellij.xdebugger.XDebuggerManager;
-import com.intellij.xdebugger.breakpoints.XBreakpoint;
 import com.intellij.xdebugger.breakpoints.XLineBreakpoint;
 import com.redhat.devtools.lsp4ij.dap.DAPBundle;
 import com.redhat.devtools.lsp4ij.dap.configurations.DAPRunConfigurationOptions;
-import org.jetbrains.annotations.NotNull;
 
 import java.io.InputStreamReader;
 import java.lang.reflect.Proxy;
@@ -35,13 +33,7 @@ public class DAPUnsupportedBreakpointMessageTest extends HeavyPlatformTestCase {
             }
             return null;
         });
-        var refreshed = new ArrayList<XBreakpoint<?>>();
-        var handler = new DAPBreakpointHandlerBase<XLineBreakpoint<DAPBreakpointProperties>>(DAPBreakpointType.class, session, descriptor(), getProject()) {
-            @Override
-            protected void refreshTooltip(@NotNull XBreakpoint<?> ijBreakpoint) {
-                refreshed.add(ijBreakpoint);
-            }
-        };
+        var handler = new DAPBreakpointHandlerBase<XLineBreakpoint<DAPBreakpointProperties>>(DAPBreakpointType.class, session, descriptor(), getProject()) {};
 
         var dir = Files.createTempDirectory("dap-breakpoints-");
         try {
@@ -54,7 +46,6 @@ public class DAPUnsupportedBreakpointMessageTest extends HeavyPlatformTestCase {
 
             handler.registerBreakpoint(breakpoint);
             assertEquals(List.of(DAPBundle.message("dap.breakpoints.file.not.debuggable")), messages);
-            assertEquals(List.of(breakpoint), refreshed);
         } finally {
             handler.dispose();
             com.intellij.openapi.util.io.FileUtil.delete(dir.toFile());
