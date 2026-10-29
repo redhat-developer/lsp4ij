@@ -13,6 +13,7 @@ package com.redhat.devtools.lsp4ij.dap.descriptors;
 import com.intellij.execution.ExecutionException;
 import com.intellij.execution.configurations.GeneralCommandLine;
 import com.intellij.execution.configurations.RunConfigurationOptions;
+import com.intellij.execution.process.NopProcessHandler;
 import com.intellij.execution.process.OSProcessHandler;
 import com.intellij.execution.process.ProcessHandler;
 import com.intellij.execution.process.ProcessHandlerFactory;
@@ -89,6 +90,21 @@ public abstract class DebugAdapterDescriptor implements DebuggableFile {
      * @throws ExecutionException
      */
     public abstract ProcessHandler startServer() throws ExecutionException;
+
+    /**
+     * Start the process of a debug session in the given debug mode. A launch starts the Debug Adapter server
+     * ({@link #startServer()}). An attach starts no process by default: the client connects to a Debug Adapter that
+     * already runs, at the address and port of {@link #getServerReadyConfig(DebugMode)}. A descriptor whose Debug
+     * Adapter is reached through its process, as one that carries the session over another connection is, overrides
+     * this to start that process for an attach too.
+     *
+     * @param debugMode the debug mode of the session.
+     * @return the process of the session.
+     * @throws ExecutionException
+     */
+    public ProcessHandler startServer(@NotNull DebugMode debugMode) throws ExecutionException {
+        return debugMode == DebugMode.ATTACH ? new NopProcessHandler() : startServer();
+    }
 
     /**
      * Start the Debug Adapter server with the given command line.

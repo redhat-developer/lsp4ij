@@ -13,7 +13,6 @@ package com.redhat.devtools.lsp4ij.dap.configurations;
 import com.intellij.execution.ExecutionException;
 import com.intellij.execution.configurations.CommandLineState;
 import com.intellij.execution.configurations.RunConfigurationOptions;
-import com.intellij.execution.process.NopProcessHandler;
 import com.intellij.execution.process.ProcessHandler;
 import com.intellij.execution.runners.ExecutionEnvironment;
 import com.intellij.openapi.fileTypes.FileType;
@@ -52,14 +51,8 @@ public class DAPCommandLineState extends CommandLineState implements CommandLine
     protected @NotNull ProcessHandler startProcess() throws ExecutionException {
         var debugMode = getDebugMode();
         var config = getServerReadyConfig(debugMode);
-        ProcessHandler processHandler;
-        if (debugMode == DebugMode.ATTACH) {
-            // attach
-            processHandler = new NopProcessHandler();
-        } else {
-            // launch
-            processHandler = serverDescriptor.startServer();
-        }
+        // a launch starts the Debug Adapter server; an attach connects to one that runs, unless the descriptor starts it
+        ProcessHandler processHandler = serverDescriptor.startServer(debugMode);
         new DAPServerReadyTracker(config, debugMode, processHandler);
         return processHandler;
     }
