@@ -362,6 +362,10 @@ public abstract class BreakpointHandlerBase<B extends XBreakpoint<?>> extends XB
      * compiled against. Nothing needs to be refreshed there: the tooltip reads the error message of the
      * breakpoint each time it is shown.
      * <p>
+     * Remove this workaround once the minimum IntelliJ version supported by LSP4IJ contains the fix for
+     * <a href="https://youtrack.jetbrains.com/issue/IJPL-259978">IJPL-259978</a>, where IntelliJ emits the state
+     * itself after a presentation update.
+     * <p>
      * Tests override this method to check that the tooltip is refreshed.
      *
      * @param ijBreakpoint the IJ breakpoint.
