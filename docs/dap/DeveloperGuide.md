@@ -122,6 +122,19 @@ public class TypeScriptDebugAdapterDescriptor extends DebugAdapterDescriptor {
 }
 ```
 
+A descriptor's `getDebugMode()` says whether its sessions launch a program or attach to one. An attach
+starts no process by default: the DAP client connects to a Debug Adapter that already runs, at the address
+and port of `getServerReadyConfig(DebugMode.ATTACH)`. A descriptor whose Debug Adapter is reached through
+the process that `startServer()` starts, such as one that carries its sessions over another connection,
+overrides `startServer(DebugMode)` to start that process for an attach too:
+
+```java
+@Override
+public ProcessHandler startServer(@NotNull DebugMode debugMode) throws ExecutionException {
+    return startServer();
+}
+```
+
 ### DebugAdapterDescriptorFactory
 
 Create the `TypeScriptDebugAdapterDescriptorFactory` class like this:
