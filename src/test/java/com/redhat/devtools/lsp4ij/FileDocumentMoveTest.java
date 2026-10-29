@@ -21,6 +21,7 @@ import com.intellij.util.ThrowableRunnable;
 import com.intellij.util.concurrency.AppExecutorUtil;
 import com.redhat.devtools.lsp4ij.fixtures.LSPCodeInsightFixtureTestCase;
 import com.redhat.devtools.lsp4ij.mock.MockLanguageServer;
+import com.redhat.devtools.lsp4ij.mock.MockTextDocumentService.OpenCloseNotification;
 import org.eclipse.lsp4j.DidCloseTextDocumentParams;
 import org.eclipse.lsp4j.DidOpenTextDocumentParams;
 import org.eclipse.lsp4j.FileOperationFilter;
@@ -33,6 +34,7 @@ import org.eclipse.lsp4j.WorkspaceServerCapabilities;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.net.URI;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
@@ -156,6 +158,13 @@ public class FileDocumentMoveTest extends LSPCodeInsightFixtureTestCase {
         assertTrue("didClose must precede didOpen", closedBeforeOpen.join());
         assertEquals(oldUri, URI.create(closed.join().getTextDocument().getUri()));
         assertEquals(newUri, URI.create(opened.join().getTextDocument().getUri()));
+        // The server reads the notifications in the order they were sent. Up to the reopen, each didOpen of the old
+        // URI must be matched by a didClose: a late didOpen of the connection is, a reopen of the old URI is not.
+        var read = List.copyOf(MockLanguageServer.INSTANCE.getTextDocumentService().getOpenCloseNotifications());
+        var beforeReopen = read.subList(0, read.lastIndexOf(new OpenCloseNotification(true, newUri)));
+        assertEquals("the old URI must not be reopened",
+                Collections.frequency(beforeReopen, new OpenCloseNotification(false, oldUri)),
+                Collections.frequency(beforeReopen, new OpenCloseNotification(true, oldUri)));
         assertEquals("unsaved", opened.join().getTextDocument().getText());
         assertEquals(1, renamed.join().getFiles().size());
         assertEquals(oldUri, URI.create(renamed.join().getFiles().get(0).getOldUri()));

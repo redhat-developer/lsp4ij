@@ -61,6 +61,13 @@ public class MockTextDocumentService implements TextDocumentService {
     // Set by the test thread and read by the thread that reads the messages, so the future and its filter
     // are published together
     private final AtomicReference<DidOpenExpectation> didOpenExpectation = new AtomicReference<>();
+
+    /**
+     * A didOpen or didClose this server read, with the full URI of its document.
+     */
+    public record OpenCloseNotification(boolean open, URI uri) {}
+
+    private final List<OpenCloseNotification> openCloseNotifications = new CopyOnWriteArrayList<>();
     private CompletableFuture<DidSaveTextDocumentParams> didSaveCallback;
     private CompletableFuture<DidCloseTextDocumentParams> didCloseCallback;
     private List<TextEdit> mockWillSaveWaitUntilTextEdits;
@@ -256,6 +263,7 @@ public class MockTextDocumentService implements TextDocumentService {
     public void didOpen(DidOpenTextDocumentParams params) {
         String opened = params.getTextDocument().getUri();
         MockLanguageServer.INSTANCE.record("didOpen:" + opened.substring(opened.lastIndexOf('/') + 1));
+        openCloseNotifications.add(new OpenCloseNotification(true, URI.create(opened)));
         var expectation = didOpenExpectation.get();
         if (expectation != null && expectation.filter().test(params)
                 && didOpenExpectation.compareAndSet(expectation, null)) {
@@ -288,6 +296,7 @@ public class MockTextDocumentService implements TextDocumentService {
 
     @Override
     public void didClose(DidCloseTextDocumentParams params) {
+        openCloseNotifications.add(new OpenCloseNotification(false, URI.create(params.getTextDocument().getUri())));
         if (didCloseCallback != null) {
             didCloseCallback.complete(params);
             didCloseCallback = null;
@@ -362,6 +371,14 @@ public class MockTextDocumentService implements TextDocumentService {
     public void setDidOpenCallback(CompletableFuture<DidOpenTextDocumentParams> didOpenExpectation,
                                    Predicate<DidOpenTextDocumentParams> filter) {
         this.didOpenExpectation.set(new DidOpenExpectation(didOpenExpectation, filter));
+    }
+
+    /**
+     * @return the didOpen and didClose notifications this server read, in the order it read them, which is the
+     * order they were sent in. Each is recorded before the callback it completes.
+     */
+    public List<OpenCloseNotification> getOpenCloseNotifications() {
+        return openCloseNotifications;
     }
 
     public List<DidChangeTextDocumentParams> getDidChangeEvents() {
