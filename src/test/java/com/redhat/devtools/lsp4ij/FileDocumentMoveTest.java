@@ -21,6 +21,7 @@ import com.intellij.util.ThrowableRunnable;
 import com.intellij.util.concurrency.AppExecutorUtil;
 import com.redhat.devtools.lsp4ij.fixtures.LSPCodeInsightFixtureTestCase;
 import com.redhat.devtools.lsp4ij.mock.MockLanguageServer;
+import com.redhat.devtools.lsp4ij.mock.MockTextDocumentService.OpenCloseNotification;
 import org.eclipse.lsp4j.DidCloseTextDocumentParams;
 import org.eclipse.lsp4j.DidOpenTextDocumentParams;
 import org.eclipse.lsp4j.FileOperationFilter;
@@ -33,6 +34,7 @@ import org.eclipse.lsp4j.WorkspaceServerCapabilities;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.net.URI;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
@@ -79,7 +81,7 @@ public class FileDocumentMoveTest extends LSPCodeInsightFixtureTestCase {
     public void testRenameTwiceBeforeReconnectOpensOnlyTheFinalUri() throws Exception {
         var context = openDocument();
         var reopened = new CompletableFuture<DidOpenTextDocumentParams>();
-        MockLanguageServer.INSTANCE.getTextDocumentService().setDidOpenCallback(reopened);
+        expectDidOpenOfAnotherUri(reopened, context.wrapper().toUri(context.file()));
         write(() -> {
             context.file().rename(this, "intermediate.foo");
             context.file().rename(this, "final.foo");
@@ -131,15 +133,24 @@ public class FileDocumentMoveTest extends LSPCodeInsightFixtureTestCase {
         return new Context(file, servers.get(0).getServerWrapper());
     }
 
+    /**
+     * Expects the next didOpen of a URI other than the given one. The servers are returned once the didOpen of
+     * the file is sent, and the mock server can read it after the expectation is set.
+     */
+    private static void expectDidOpenOfAnotherUri(CompletableFuture<DidOpenTextDocumentParams> opened, URI uri) {
+        MockLanguageServer.INSTANCE.getTextDocumentService().setDidOpenCallback(opened,
+                params -> !uri.equals(URI.create(params.getTextDocument().getUri())));
+    }
+
     private void reconnectAfter(Context context, Runnable operation) {
         var closed = new CompletableFuture<DidCloseTextDocumentParams>();
         var opened = new CompletableFuture<DidOpenTextDocumentParams>();
         var renamed = new CompletableFuture<RenameFilesParams>();
         var closedBeforeOpen = opened.thenApply(ignored -> closed.isDone());
-        MockLanguageServer.INSTANCE.getTextDocumentService().setDidCloseCallback(closed);
-        MockLanguageServer.INSTANCE.getTextDocumentService().setDidOpenCallback(opened);
-        MockLanguageServer.INSTANCE.getWorkspaceService().setDidRenameCallback(renamed);
         URI oldUri = context.wrapper().toUri(context.file());
+        MockLanguageServer.INSTANCE.getTextDocumentService().setDidCloseCallback(closed);
+        expectDidOpenOfAnotherUri(opened, oldUri);
+        MockLanguageServer.INSTANCE.getWorkspaceService().setDidRenameCallback(renamed);
         operation.run();
         PlatformTestUtil.waitWithEventsDispatching("rename must deliver close, open and workspace notification",
                 () -> closed.isDone() && opened.isDone() && renamed.isDone() && closedBeforeOpen.isDone(), 10);
@@ -147,6 +158,13 @@ public class FileDocumentMoveTest extends LSPCodeInsightFixtureTestCase {
         assertTrue("didClose must precede didOpen", closedBeforeOpen.join());
         assertEquals(oldUri, URI.create(closed.join().getTextDocument().getUri()));
         assertEquals(newUri, URI.create(opened.join().getTextDocument().getUri()));
+        // The server reads the notifications in the order they were sent. Up to the reopen, each didOpen of the old
+        // URI must be matched by a didClose: a late didOpen of the connection is, a reopen of the old URI is not.
+        var read = List.copyOf(MockLanguageServer.INSTANCE.getTextDocumentService().getOpenCloseNotifications());
+        var beforeReopen = read.subList(0, read.lastIndexOf(new OpenCloseNotification(true, newUri)));
+        assertEquals("the old URI must not be reopened",
+                Collections.frequency(beforeReopen, new OpenCloseNotification(false, oldUri)),
+                Collections.frequency(beforeReopen, new OpenCloseNotification(true, oldUri)));
         assertEquals("unsaved", opened.join().getTextDocument().getText());
         assertEquals(1, renamed.join().getFiles().size());
         assertEquals(oldUri, URI.create(renamed.join().getFiles().get(0).getOldUri()));

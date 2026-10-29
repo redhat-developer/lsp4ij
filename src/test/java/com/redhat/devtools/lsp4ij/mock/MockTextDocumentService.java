@@ -30,7 +30,9 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
+import java.util.function.Predicate;
 
 /**
  * This class is a copy/paste from <a href="https://github.com/eclipse/lsp4e/blob/master/org.eclipse.lsp4e.tests.mock/src/org/eclipse/lsp4e/tests/mock/MockTextDocumentService.java">...</a>
@@ -53,7 +55,19 @@ public class MockTextDocumentService implements TextDocumentService {
     private LinkedEditingRanges mockLinkedEditingRanges;
     private List<SelectionRange> mockSelectionRanges;
 
-    private CompletableFuture<DidOpenTextDocumentParams> didOpenCallback;
+    private record DidOpenExpectation(CompletableFuture<DidOpenTextDocumentParams> future,
+                                      Predicate<DidOpenTextDocumentParams> filter) {}
+
+    // Set by the test thread and read by the thread that reads the messages, so the future and its filter
+    // are published together
+    private final AtomicReference<DidOpenExpectation> didOpenExpectation = new AtomicReference<>();
+
+    /**
+     * A didOpen or didClose this server read, with the full URI of its document.
+     */
+    public record OpenCloseNotification(boolean open, URI uri) {}
+
+    private final List<OpenCloseNotification> openCloseNotifications = new CopyOnWriteArrayList<>();
     private CompletableFuture<DidSaveTextDocumentParams> didSaveCallback;
     private CompletableFuture<DidCloseTextDocumentParams> didCloseCallback;
     private List<TextEdit> mockWillSaveWaitUntilTextEdits;
@@ -249,9 +263,11 @@ public class MockTextDocumentService implements TextDocumentService {
     public void didOpen(DidOpenTextDocumentParams params) {
         String opened = params.getTextDocument().getUri();
         MockLanguageServer.INSTANCE.record("didOpen:" + opened.substring(opened.lastIndexOf('/') + 1));
-        if (didOpenCallback != null) {
-            didOpenCallback.complete(params);
-            didOpenCallback = null;
+        openCloseNotifications.add(new OpenCloseNotification(true, URI.create(opened)));
+        var expectation = didOpenExpectation.get();
+        if (expectation != null && expectation.filter().test(params)
+                && didOpenExpectation.compareAndSet(expectation, null)) {
+            expectation.future().complete(params);
         }
         String uri = params.getTextDocument().getUri();
         if (this.publishDiagnostics != null && !this.publishDiagnostics.isEmpty()) {
@@ -280,6 +296,7 @@ public class MockTextDocumentService implements TextDocumentService {
 
     @Override
     public void didClose(DidCloseTextDocumentParams params) {
+        openCloseNotifications.add(new OpenCloseNotification(false, URI.create(params.getTextDocument().getUri())));
         if (didCloseCallback != null) {
             didCloseCallback.complete(params);
             didCloseCallback = null;
@@ -344,7 +361,24 @@ public class MockTextDocumentService implements TextDocumentService {
     }
 
     public void setDidOpenCallback(CompletableFuture<DidOpenTextDocumentParams> didOpenExpectation) {
-        this.didOpenCallback = didOpenExpectation;
+        setDidOpenCallback(didOpenExpectation, params -> true);
+    }
+
+    /**
+     * Completes the given future with the next didOpen that the filter accepts. A didOpen it rejects leaves the
+     * future pending.
+     */
+    public void setDidOpenCallback(CompletableFuture<DidOpenTextDocumentParams> didOpenExpectation,
+                                   Predicate<DidOpenTextDocumentParams> filter) {
+        this.didOpenExpectation.set(new DidOpenExpectation(didOpenExpectation, filter));
+    }
+
+    /**
+     * @return the didOpen and didClose notifications this server read, in the order it read them, which is the
+     * order they were sent in. Each is recorded before the callback it completes.
+     */
+    public List<OpenCloseNotification> getOpenCloseNotifications() {
+        return openCloseNotifications;
     }
 
     public List<DidChangeTextDocumentParams> getDidChangeEvents() {
