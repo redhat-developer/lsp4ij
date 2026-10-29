@@ -385,34 +385,11 @@ public class DAPDataBreakpointHandler extends BreakpointHandlerBase<XBreakpoint<
     }
 
     /**
-     * Update IntelliJ data breakpoint with the given DAP breakpoint information: it is shown verified, or invalid
-     * with the message of the DAP server, as a line breakpoint is.
-     *
-     * @param breakpoint   the DAP breakpoint information.
-     * @param ijBreakpoint the IJ Breakpoint and null otherwise.
-     */
-    @Override
-    public void updateBreakpoint(@NotNull Breakpoint breakpoint,
-                                 @Nullable XBreakpoint<DAPDataBreakpointProperties> ijBreakpoint) {
-        if (ijBreakpoint == null) {
-            // Retrieve the IntelliJ breakpoint by the id.
-            ijBreakpoint = findBreakpointById(breakpoint.getId());
-        }
-        if (ijBreakpoint == null) {
-            return;
-        }
-        if (breakpoint.isVerified()) {
-            setBreakpointVerified(ijBreakpoint);
-        } else {
-            setBreakpointInvalid(ijBreakpoint, breakpoint.getMessage());
-        }
-    }
-
-    /**
      * Shows the given data breakpoint as verified in the session.
      *
      * @param ijBreakpoint the IJ data breakpoint.
      */
+    @Override
     protected void setBreakpointVerified(@NotNull XBreakpoint<DAPDataBreakpointProperties> ijBreakpoint) {
         Icon icon = ijBreakpoint.getSuspendPolicy() == SuspendPolicy.NONE
                 ? AllIcons.Debugger.Db_verified_no_suspend_field_breakpoint
@@ -426,6 +403,7 @@ public class DAPDataBreakpointHandler extends BreakpointHandlerBase<XBreakpoint<
      * @param ijBreakpoint the IJ data breakpoint.
      * @param message      the message of the DAP server, or null.
      */
+    @Override
     protected void setBreakpointInvalid(@NotNull XBreakpoint<DAPDataBreakpointProperties> ijBreakpoint,
                                         @Nullable String message) {
         updateBreakpointPresentation(ijBreakpoint, AllIcons.Debugger.Db_invalid_breakpoint, message);

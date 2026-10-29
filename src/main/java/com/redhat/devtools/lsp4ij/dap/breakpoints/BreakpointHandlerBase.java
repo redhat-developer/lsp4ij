@@ -111,12 +111,11 @@ public abstract class BreakpointHandlerBase<B extends XBreakpoint<?>> extends XB
                        breakpoint.getType().getClass().getSimpleName());
 
             // Mark the breakpoint as invalid so the user sees visual feedback
-            if (breakpoint instanceof XLineBreakpoint<?> lineBreakpoint) {
+            if (breakpoint instanceof XLineBreakpoint<?>) {
                 String message = sourcePosition == null
                     ? DAPBundle.message("dap.breakpoints.location.not.available")
                     : DAPBundle.message("dap.breakpoints.file.not.debuggable");
-                debugSession.setBreakpointInvalid(lineBreakpoint, message);
-                refreshTooltip(lineBreakpoint);
+                setBreakpointInvalid(breakpoint, message);
             }
             return;
         }
@@ -188,14 +187,45 @@ public abstract class BreakpointHandlerBase<B extends XBreakpoint<?>> extends XB
             // Retrieve the IntelliJ breakpoint by the id.
             ijBreakpoint = findBreakpointById(breakpoint.getId());
         }
+        if (ijBreakpoint == null) {
+            return;
+        }
+        // Update the IntelliJ breakpoint according the DAP breakpoint 'verified' flag.
+        if (breakpoint.isVerified()) {
+            setBreakpointVerified(ijBreakpoint);
+        } else {
+            setBreakpointInvalid(ijBreakpoint, breakpoint.getMessage());
+        }
+    }
+
+    /**
+     * Shows the given breakpoint as verified in the session.
+     * <p>
+     * The session shows a line breakpoint. Handlers of other breakpoints override this method and show the
+     * breakpoint with {@link #updateBreakpointPresentation}.
+     *
+     * @param ijBreakpoint the IJ breakpoint.
+     */
+    protected void setBreakpointVerified(@NotNull B ijBreakpoint) {
         if (ijBreakpoint instanceof XLineBreakpoint<?> lineBreakpoint) {
-            // Update the IntelliJ breakpoint according the DAP breakpoint 'verified' flag.
-            if (breakpoint.isVerified()) {
-                debugSession.setBreakpointVerified(lineBreakpoint);
-            } else {
-                debugSession.setBreakpointInvalid(lineBreakpoint, breakpoint.getMessage());
-            }
-            refreshTooltip(lineBreakpoint);
+            debugSession.setBreakpointVerified(lineBreakpoint);
+            refreshTooltip(ijBreakpoint);
+        }
+    }
+
+    /**
+     * Shows the given breakpoint as invalid in the session, with the given message.
+     * <p>
+     * The session shows a line breakpoint. Handlers of other breakpoints override this method and show the
+     * breakpoint with {@link #updateBreakpointPresentation}.
+     *
+     * @param ijBreakpoint the IJ breakpoint.
+     * @param message      the message, or null.
+     */
+    protected void setBreakpointInvalid(@NotNull B ijBreakpoint, @Nullable String message) {
+        if (ijBreakpoint instanceof XLineBreakpoint<?> lineBreakpoint) {
+            debugSession.setBreakpointInvalid(lineBreakpoint, message);
+            refreshTooltip(ijBreakpoint);
         }
     }
 
@@ -255,9 +285,11 @@ public abstract class BreakpointHandlerBase<B extends XBreakpoint<?>> extends XB
     }
 
     /**
-     * Shows the given breakpoint, which is not a line breakpoint, with the given icon and error message in the session,
-     * as {@link XDebugSession#updateBreakpointPresentation} shows a line breakpoint: IntelliJ 2024.2 takes only line
-     * breakpoints there, so the presentation which the session keeps for each of its breakpoints is set here.
+     * Shows the given breakpoint with the given icon and error message in the session.
+     * <p>
+     * A line breakpoint is shown with {@link XDebugSession#updateBreakpointPresentation}. IntelliJ 2024.2 takes only
+     * line breakpoints there, so for other breakpoints the presentation which the session keeps for each of its
+     * breakpoints is set here.
      *
      * @param ijBreakpoint the IJ breakpoint.
      * @param icon         the icon, or null.
@@ -266,6 +298,11 @@ public abstract class BreakpointHandlerBase<B extends XBreakpoint<?>> extends XB
     protected void updateBreakpointPresentation(@NotNull XBreakpoint<?> ijBreakpoint,
                                                 @Nullable Icon icon,
                                                 @Nullable String errorMessage) {
+        if (ijBreakpoint instanceof XLineBreakpoint<?> lineBreakpoint) {
+            debugSession.updateBreakpointPresentation(lineBreakpoint, icon, errorMessage);
+            refreshTooltip(ijBreakpoint);
+            return;
+        }
         if (!(debugSession instanceof XDebugSessionImpl session)) {
             return;
         }
@@ -292,6 +329,9 @@ public abstract class BreakpointHandlerBase<B extends XBreakpoint<?>> extends XB
 
     /**
      * Refreshes the tooltip of the given breakpoint after its presentation in the session has changed.
+     * <p>
+     * {@link #setBreakpointVerified}, {@link #setBreakpointInvalid} and {@link #updateBreakpointPresentation} call it,
+     * so handlers which show a breakpoint with these methods don't call it themselves.
      * <p>
      * Since IntelliJ 2025.2 the editor shows the breakpoint state (with its tooltip) which the backend
      * emits when {@link XBreakpointBase#breakpointChangedFlow()} emits. Updating the presentation of a
