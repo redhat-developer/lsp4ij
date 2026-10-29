@@ -80,13 +80,20 @@ public abstract class BreakpointHandlerBase<B extends XBreakpoint<?>> extends XB
         debugSession.addSessionListener(new XDebugSessionListener() {
             @Override
             public void sessionStopped() {
-                // The breakpoints keep the icons of this session until they are computed again: IntelliJ does that for
-                // line breakpoints only (see updateBreakpointPresentation)
-                breakpoints.stream()
-                        .filter(breakpoint -> !(breakpoint instanceof XLineBreakpoint<?>))
-                        .forEach(BreakpointHandlerBase::clearIcon);
+                clearIconsOfNonLineBreakpoints();
             }
         });
+    }
+
+    /**
+     * Clears the icons of the breakpoints which are not line breakpoints: they keep the icons of this session until
+     * they are computed again, and IntelliJ does that for line breakpoints only (see
+     * {@link #updateBreakpointPresentation}).
+     */
+    private void clearIconsOfNonLineBreakpoints() {
+        breakpoints.stream()
+                .filter(breakpoint -> !(breakpoint instanceof XLineBreakpoint<?>))
+                .forEach(BreakpointHandlerBase::clearIcon);
     }
 
     public CompletableFuture<@Nullable Void> initialize(@NotNull IDebugProtocolServer debugProtocolServer,
