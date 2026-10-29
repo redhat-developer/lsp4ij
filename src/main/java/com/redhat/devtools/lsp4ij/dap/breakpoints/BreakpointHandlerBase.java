@@ -38,6 +38,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.swing.*;
+import java.lang.reflect.Method;
 import java.util.Collections;
 import java.util.IdentityHashMap;
 import java.util.List;
@@ -55,6 +56,7 @@ public abstract class BreakpointHandlerBase<B extends XBreakpoint<?>> extends XB
 
     protected static final CompletableFuture<?>[] EMPTY_COMPLETABLE_FUTURES = new CompletableFuture[0];
     protected static final @NotNull Key<Integer> DAP_BREAKPOINT_ID = Key.create("dap.breakpoint.id");
+    private static final @Nullable Method EMIT_BREAKPOINT_CHANGED = findEmitBreakpointChanged();
 
     protected final @NotNull XDebugSession debugSession;
     protected final @NotNull DebugAdapterDescriptor debugAdapterDescriptor;
@@ -114,6 +116,7 @@ public abstract class BreakpointHandlerBase<B extends XBreakpoint<?>> extends XB
                     ? DAPBundle.message("dap.breakpoints.location.not.available")
                     : DAPBundle.message("dap.breakpoints.file.not.debuggable");
                 debugSession.setBreakpointInvalid(lineBreakpoint, message);
+                refreshTooltip(lineBreakpoint);
             }
             return;
         }
@@ -192,6 +195,7 @@ public abstract class BreakpointHandlerBase<B extends XBreakpoint<?>> extends XB
             } else {
                 debugSession.setBreakpointInvalid(lineBreakpoint, breakpoint.getMessage());
             }
+            refreshTooltip(lineBreakpoint);
         }
     }
 
@@ -277,11 +281,46 @@ public abstract class BreakpointHandlerBase<B extends XBreakpoint<?>> extends XB
         presentation.setErrorMessage(errorMessage);
         // The breakpoint keeps its icon until it is computed again with the presentation
         clearIcon(ijBreakpoint);
+        refreshTooltip(ijBreakpoint);
         if (XDebuggerManager.getInstance(project).getBreakpointManager() instanceof XBreakpointManagerImpl breakpointManager) {
             ApplicationManager.getApplication().invokeLater(
                     () -> breakpointManager.fireBreakpointPresentationUpdated(ijBreakpoint, session),
                     ModalityState.any(),
                     project.getDisposed());
+        }
+    }
+
+    /**
+     * Refreshes the tooltip of the given breakpoint after its presentation in the session has changed.
+     * <p>
+     * Since IntelliJ 2025.2 the editor shows the breakpoint state (with its tooltip) which the backend
+     * emits when {@link XBreakpointBase#breakpointChangedFlow()} emits. Updating the presentation of a
+     * breakpoint in the session only updates its icon, so the tooltip kept the previous error message until
+     * the breakpoint was changed (ex: disabled and enabled again). {@code emitBreakpointChanged()} emits the
+     * state again without notifying the breakpoint listeners, so the breakpoint is not registered again in
+     * the session.
+     * <p>
+     * The method is called by reflection because it doesn't exist in IntelliJ 2024.2, the version LSP4IJ is
+     * compiled against. Nothing needs to be refreshed there: the tooltip reads the error message of the
+     * breakpoint each time it is shown.
+     *
+     * @param ijBreakpoint the IJ breakpoint.
+     */
+    protected static void refreshTooltip(@NotNull XBreakpoint<?> ijBreakpoint) {
+        if (EMIT_BREAKPOINT_CHANGED != null && ijBreakpoint instanceof XBreakpointBase<?, ?, ?> breakpointBase) {
+            try {
+                EMIT_BREAKPOINT_CHANGED.invoke(breakpointBase);
+            } catch (ReflectiveOperationException e) {
+                LOGGER.warn("Cannot refresh the tooltip of the breakpoint", e);
+            }
+        }
+    }
+
+    private static @Nullable Method findEmitBreakpointChanged() {
+        try {
+            return XBreakpointBase.class.getMethod("emitBreakpointChanged");
+        } catch (NoSuchMethodException e) {
+            return null;
         }
     }
 

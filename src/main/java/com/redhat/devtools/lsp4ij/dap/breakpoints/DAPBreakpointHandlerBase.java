@@ -337,10 +337,12 @@ public abstract class DAPBreakpointHandlerBase<B extends XBreakpoint<?>> extends
                 // Not an error: the inactive dependent icon instead of the invalid one
                 debugSession.updateBreakpointPresentation(lineBreakpoint,
                         lineBreakpoint.getType().getInactiveDependentIcon(), DAPBundle.message("dap.breakpoints.shadowed"));
+                refreshTooltip(lineBreakpoint);
             }
         } else if (shadowedBreakpoints.remove(breakpoint)) {
             // Reset the presentation; the response of the debug adapter updates it when the breakpoint is sent
             debugSession.updateBreakpointPresentation(lineBreakpoint, null, null);
+            refreshTooltip(lineBreakpoint);
         }
     }
 
