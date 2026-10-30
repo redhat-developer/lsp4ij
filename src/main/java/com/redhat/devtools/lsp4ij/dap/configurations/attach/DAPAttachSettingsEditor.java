@@ -10,7 +10,6 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.dap.configurations.attach;
 
-import com.intellij.execution.ExecutionBundle;
 import com.intellij.openapi.options.ConfigurationException;
 import com.intellij.openapi.options.SettingsEditor;
 import com.intellij.openapi.project.Project;
@@ -48,9 +47,9 @@ public class DAPAttachSettingsEditor<Settings extends DAPAttachRunConfiguration<
             if (StringUtil.isNotEmpty(pt)) {
                 try {
                     int portValue = Integer.parseInt(pt);
-                    return portValue >= 0 && portValue <= 65535 ? null : new ValidationInfo(ExecutionBundle.message("incorrect.port.range.set.value.between"), this.myPort);
+                    return portValue >= 0 && portValue <= 65535 ? null : new ValidationInfo(DAPBundle.message("dap.settings.editor.configuration.attach.port.invalid.range"), this.myPort);
                 } catch (NumberFormatException var3) {
-                    return new ValidationInfo(ExecutionBundle.message("port.value.should.be.a.number.between"), this.myPort);
+                    return new ValidationInfo(DAPBundle.message("dap.settings.editor.configuration.attach.port.invalid.value"), this.myPort);
                 }
             } else {
                 return null;

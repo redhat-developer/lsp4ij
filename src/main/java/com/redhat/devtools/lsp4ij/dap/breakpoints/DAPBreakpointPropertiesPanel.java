@@ -14,7 +14,6 @@ import com.intellij.ui.components.JBTextField;
 import com.intellij.util.ui.FormBuilder;
 import com.intellij.xdebugger.breakpoints.XLineBreakpoint;
 import com.intellij.xdebugger.breakpoints.ui.XBreakpointCustomPropertiesPanel;
-import com.intellij.xdebugger.impl.breakpoints.XBreakpointBase;
 import com.redhat.devtools.lsp4ij.dap.DAPBundle;
 import org.jetbrains.annotations.NotNull;
 
@@ -54,6 +53,6 @@ class DAPBreakpointPropertiesPanel extends XBreakpointCustomPropertiesPanel<XLin
         }
         properties.setHitCondition(hitCondition);
         // IntelliJ doesn't see a change of the properties: tell it, so that the debug sessions send the breakpoint again
-        ((XBreakpointBase<?, ?, ?>) breakpoint).fireBreakpointChanged();
+        BreakpointInternalSupport.fireBreakpointChanged(breakpoint);
     }
 }
