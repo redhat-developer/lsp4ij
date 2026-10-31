@@ -29,20 +29,21 @@ import java.util.Map;
 public class CommandUtils {
 
     /**
-     * Returns the commands to execute with {@link Process} from the given commandline.
+     * Returns the commands to execute with {@link Process} from the given command line.
      *
      * @param commandLine the command line.
-     *
-     * @return the commands to execute with {@link Process} from the given commandline.
+     * @return the commands to execute with {@link Process}.
      */
     @NotNull
     public static List<String> createCommands(@NotNull String commandLine) {
         List<String> commands = new ArrayList<>();
         StringBuilder commandPart = new StringBuilder();
         boolean inString = false;
+
         for (int i = 0; i < commandLine.length(); i++) {
             char c = commandLine.charAt(i);
-            switch(c) {
+
+            switch (c) {
                 case '"':
                     inString = !inString;
                     break;
@@ -59,10 +60,12 @@ public class CommandUtils {
                     break;
             }
         }
+
         if (commandPart.length() > 0) {
             addArg(commandPart, commands);
             commandPart.setLength(0);
         }
+
         return commands;
     }
 
@@ -74,40 +77,60 @@ public class CommandUtils {
     }
 
     @NotNull
-    public static GeneralCommandLine createCommandLine(@NotNull String commandLine,
-                                                       @NotNull Map<String, String> userEnvironmentVariables,
-                                                       boolean includeSystemEnvironmentVariables) {
-        return createCommandLine(commandLine, null, userEnvironmentVariables, includeSystemEnvironmentVariables);
+    public static GeneralCommandLine createCommandLine(
+            @NotNull String commandLine,
+            @NotNull Map<String, String> userEnvironmentVariables,
+            boolean includeSystemEnvironmentVariables) {
+        return createCommandLine(
+                commandLine,
+                null,
+                userEnvironmentVariables,
+                includeSystemEnvironmentVariables
+        );
     }
 
     @NotNull
-    public static GeneralCommandLine createCommandLine(@NotNull String commandLine,
-                                                       @Nullable String workingDir,
-                                                       @NotNull Map<String, String> userEnvironmentVariables,
-                                                       boolean includeSystemEnvironmentVariables) {
-        Map<String, String> environmentVariables = new HashMap<>(userEnvironmentVariables);
-        // Add System environment variables
+    public static GeneralCommandLine createCommandLine(
+            @NotNull String commandLine,
+            @Nullable String workingDir,
+            @NotNull Map<String, String> userEnvironmentVariables,
+            boolean includeSystemEnvironmentVariables) {
+
+        Map<String, String> environmentVariables =
+                new HashMap<>(userEnvironmentVariables);
+
+        // Add system environment variables when requested.
         if (includeSystemEnvironmentVariables) {
             environmentVariables.putAll(EnvironmentUtil.getEnvironmentMap());
         }
-        GeneralCommandLine generalCommandLine = new GeneralCommandLine(CommandUtils.createCommands(commandLine))
-                .withEnvironment(environmentVariables);
+
+        GeneralCommandLine generalCommandLine =
+                new GeneralCommandLine(createCommands(commandLine))
+                        .withEnvironment(environmentVariables);
+
         if (workingDir != null && !workingDir.isBlank()) {
             generalCommandLine.setWorkDirectory(workingDir);
         }
+
         return generalCommandLine;
     }
 
     /**
      * Returns the resolved command line with expanded macros.
      *
+     * @param commandLine the command line.
      * @param project the project.
      * @return the resolved command line with expanded macros.
      * @see <a href="https://www.jetbrains.com/help/idea/built-in-macros.html">Built In Macro</a>
      */
-    public static String resolveCommandLine(@NotNull String commandLine, @Nullable Project project) {
-        var nonNullProject = project!= null ? project : ProjectManager.getInstance().getDefaultProject();
-        return ProgramParametersUtil.expandPathAndMacros(commandLine, null, nonNullProject);
-    }
+    public static String resolveCommandLine(
+            @NotNull String commandLine,
+            @Nullable Project project) {
+        var nonNullProject = project != null
+                ? project
+                : ProjectManager.getInstance().getDefaultProject();
 
+        return ProgramParametersUtil.expandPathAndMacros(
+                commandLine, null, nonNullProject);
+    }
 }

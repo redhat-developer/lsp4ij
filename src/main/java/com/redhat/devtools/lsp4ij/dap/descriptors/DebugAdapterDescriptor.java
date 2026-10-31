@@ -70,8 +70,8 @@ public abstract class DebugAdapterDescriptor implements DebuggableFile {
     private @NotNull DebugAdapterVariableSupport variableSupport;
 
     public DebugAdapterDescriptor(@NotNull RunConfigurationOptions options,
-                                  @NotNull ExecutionEnvironment environment,
-                                  @Nullable DebugAdapterServerDefinition serverDefinition) {
+                                   @NotNull ExecutionEnvironment environment,
+                                   @Nullable DebugAdapterServerDefinition serverDefinition) {
         this.options = options;
         this.environment = environment;
         this.serverDefinition = serverDefinition;
@@ -127,7 +127,6 @@ public abstract class DebugAdapterDescriptor implements DebuggableFile {
 
     protected @NotNull GeneralCommandLine createStartServerCommandLine(@Nullable String command) throws ExecutionException {
         return createStartServerCommandLine(null, command, Collections.emptyMap(), false);
-
     }
 
     protected @NotNull GeneralCommandLine createStartServerCommandLine(@Nullable String workingDirectory,
@@ -137,19 +136,27 @@ public abstract class DebugAdapterDescriptor implements DebuggableFile {
         if (StringUtils.isBlank(command)) {
             throw new ExecutionException("DAP server command must be specified.");
         }
+
         Integer port = null;
         int portIndex = command.indexOf($_PORT);
         if (portIndex != -1) {
             port = getAvailablePort();
             command = command.replace($_PORT, String.valueOf(port));
         }
-        GeneralCommandLine commandLine = createCommandLine(command, userEnvironmentVariables, includeSystemEnvironmentVariables);
+
+        // Validate the working directory before creating the command line.
+        String effectiveWorkingDirectory = null;
         if (StringUtils.isNotBlank(workingDirectory)) {
             File workingDir = new File(workingDirectory);
             if (workingDir.isDirectory()) {
-                commandLine = commandLine.withWorkingDirectory(workingDir.toPath());
+                effectiveWorkingDirectory = workingDirectory;
             }
         }
+
+        // Pass the working directory early so environment customizers can use it.
+        GeneralCommandLine commandLine = createCommandLine(command, effectiveWorkingDirectory,
+                userEnvironmentVariables, includeSystemEnvironmentVariables);
+
         if (port != null) {
             commandLine.putUserData(DebugAdapterDescriptor.SERVER_PORT, port);
         }
@@ -173,7 +180,6 @@ public abstract class DebugAdapterDescriptor implements DebuggableFile {
                                   @Nullable DAPClient parentClient) {
         return new DAPClient(debugProcess, dapParameters, isDebug, debugMode, serverTrace, parentClient);
     }
-
 
     /**
      * Returns the port used by the DAP server and null otherwise.

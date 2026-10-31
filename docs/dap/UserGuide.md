@@ -34,6 +34,8 @@ The `Mappings` tab to specify the files which can be debugged to allow adding/re
 
 The `Configuration` tab to specify the working directory and the file you want to run/debug:
 
+The working directory specified in the DAP configuration is applied before environment customization. This allows environment customizers to access the configured working directory when preparing environment variables for the debug adapter.
+
   ![DAP Configuration Type/Configuration](./images/DAP_config_type_configuration.png)
 
 
