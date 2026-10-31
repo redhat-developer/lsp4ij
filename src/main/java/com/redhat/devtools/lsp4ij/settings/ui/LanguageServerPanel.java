@@ -652,7 +652,11 @@ public class LanguageServerPanel implements Disposable {
     @Override
     public void dispose() {
         if (configurationWidget != null) {
-            configurationWidget.resetJsonSchema();
+            // Only release the schema provider slot; the virtual file is
+            // about to be garbage-collected, so renaming it is unnecessary
+            // and would call LSPIJUtils.getFile() which requires a
+            // non-blocking read action that cannot run on the EDT.
+            configurationWidget.releaseJsonSchemaIndex();
         }
         // InstallerPanel and WorkspaceFoldersPanel are automatically disposed via Disposer.register
     }
