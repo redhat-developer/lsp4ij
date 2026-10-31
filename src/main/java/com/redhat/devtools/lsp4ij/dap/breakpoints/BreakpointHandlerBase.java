@@ -327,7 +327,7 @@ public abstract class BreakpointHandlerBase<B extends XBreakpoint<?>> extends XB
      * so handlers which show a breakpoint with these methods don't call it themselves.
      * <p>
      * Since IntelliJ 2025.2 the editor shows the breakpoint state (with its tooltip) which the backend
-     * emits when {@link XBreakpointBase#breakpointChangedFlow()} emits. Updating the presentation of a
+     * emits when {@code XBreakpointBase.breakpointChangedFlow()} emits. Updating the presentation of a
      * breakpoint in the session only updates its icon, so the tooltip kept the previous error message until
      * the breakpoint was changed (ex: disabled and enabled again). {@code emitBreakpointChanged()} emits the
      * state again without notifying the breakpoint listeners, so the breakpoint is not registered again in
