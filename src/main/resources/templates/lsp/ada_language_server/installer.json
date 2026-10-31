@@ -2,11 +2,23 @@
   "id": "ada_language_server",
   "name": "Ada Language Server",
   "executeOnStartServer": false,
+  "properties": {
+    "serverDist": "$USER_HOME$/.lsp4ij/lsp/ada_language_server"
+  },
   "check": {
-    "exec": {
-      "name": "Trying current command",
-      "command": "${server.command}",
-      "timeout": 2000
+    "fileExists": {
+      "name": "Check if Ada Language Server is installed",
+      "file": {
+        "windows": "${serverDist}/vscode/ada/x64/win32/ada_language_server.exe",
+        "unix": {
+          "amd64": "${serverDist}/vscode/ada/x64/linux/ada_language_server",
+          "arm64": "${serverDist}/vscode/ada/arm64/linux/ada_language_server"
+        },
+        "mac": {
+          "aarch64": "${serverDist}/vscode/ada/x64/darwin/ada_language_server",
+          "arm64": "${serverDist}/vscode/ada/arm64/darwin/ada_language_server"
+        }
+      }
     }
   },
   "run": {
@@ -29,7 +41,7 @@
         }
       },
       "output": {
-        "dir": "$USER_HOME$/.lsp4ij/lsp/ada_language_server",
+        "dir": "${serverDist}",
         "file": {
           "name": {
             "windows": "vscode/ada/x64/win32/ada_language_server.exe",
