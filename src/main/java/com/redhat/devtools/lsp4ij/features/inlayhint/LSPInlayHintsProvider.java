@@ -48,7 +48,11 @@ public class LSPInlayHintsProvider extends AbstractLSPDeclarativeInlayHintsProvi
 
     private static final Logger LOGGER = LoggerFactory.getLogger(LSPInlayHintsProvider.class);
 
-    public static final String PROVIDER_ID = "LSPInlayHintsProvider";
+    public static final String PROVIDER_ID_PREFIX = "LSPInlayHintsProvider";
+
+    public static @NotNull String getProviderId(@NotNull String languageId) {
+        return PROVIDER_ID_PREFIX + "." + languageId;
+    }
     private static final HintFormat TYPE_HINT_FORMAT =
         HintFormat.Companion.getDefault()
                 .withFontSize(HintFontSize.ABitSmallerThanInEditor);

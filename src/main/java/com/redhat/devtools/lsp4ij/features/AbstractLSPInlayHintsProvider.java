@@ -89,12 +89,6 @@ public abstract class AbstractLSPInlayHintsProvider implements InlayHintsProvide
         return key;
     }
 
-    @NotNull
-    @Override
-    public String getName() {
-        return "LSP";
-    }
-
     @Nullable
     @Override
     public String getPreviewText() {

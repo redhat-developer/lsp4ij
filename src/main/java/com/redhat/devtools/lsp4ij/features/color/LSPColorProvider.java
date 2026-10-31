@@ -27,6 +27,7 @@ import com.intellij.ui.ColorChooserService;
 import com.intellij.ui.picker.ColorListener;
 import com.redhat.devtools.lsp4ij.LSPFileSupport;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
+import com.redhat.devtools.lsp4ij.LanguageServerBundle;
 import com.redhat.devtools.lsp4ij.features.AbstractLSPInlayHintsProvider;
 import org.eclipse.lsp4j.Color;
 import org.eclipse.lsp4j.ColorPresentation;
@@ -56,6 +57,12 @@ import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.isDoneNorma
 public class LSPColorProvider extends AbstractLSPInlayHintsProvider {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(LSPColorProvider.class);
+
+    @NotNull
+    @Override
+    public String getName() {
+        return LanguageServerBundle.message("lsp.color.provider.name");
+    }
 
     private enum ColorFormatType {
         HEX,
