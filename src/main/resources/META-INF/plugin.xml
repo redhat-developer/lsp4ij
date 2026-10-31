@@ -599,6 +599,9 @@
         <codeInsight.declarativeInlayProviderFactory
                 id="LSPDeclarativeInlayHintProvidersFactory"
                 implementation="com.redhat.devtools.lsp4ij.features.inlayhint.LSPDeclarativeInlayHintProvidersFactory"/>
+        <config.inlaySettingsProvider
+                id="LSPInlayHintsSettingsProvider"
+                implementation="com.redhat.devtools.lsp4ij.features.inlayhint.LSPInlayHintsSettingsProvider"/>
 
         <codeInsight.inlayActionHandler
                 handlerId="LSP4IJ"

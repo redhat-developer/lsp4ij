@@ -409,7 +409,7 @@ public class LanguageServersRegistry implements Disposable {
         Map<String, List<InlayProviderInfo>> next = new HashMap<>();
         for (Language language : distinctLanguages) {
             List<InlayProviderInfo> hints = new ArrayList<>();
-            hints.add(new InlayProviderInfo(lspInlayHintsProvider, LSPInlayHintsProvider.PROVIDER_ID, Collections.emptySet(), true, LanguageServerBundle.message("lsp.hints.declarative.provider.name")));
+            hints.add(new InlayProviderInfo(lspInlayHintsProvider, LSPInlayHintsProvider.getProviderId(language.getID()), Collections.emptySet(), true, LanguageServerBundle.message("lsp.hints.declarative.provider.name")));
             next.put(language.getID(), hints);
         }
         declarativeInlayHintsProviders = Map.copyOf(next);
