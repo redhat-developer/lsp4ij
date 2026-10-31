@@ -51,6 +51,14 @@ public class SchemaBackedJsonTextField extends JsonTextField {
      */
     public void resetJsonSchema() {
         setJsonFilename("lsp.server.settings.no.schema.json");
+        releaseJsonSchemaIndex();
+    }
+
+    /**
+     * Release the JSON Schema provider slot without renaming the virtual file.
+     * Safe to call from the EDT (e.g. during dispose).
+     */
+    public void releaseJsonSchemaIndex() {
         if (index != null) {
             var project = getProject();
             if (!project.isDisposed()) {
@@ -59,6 +67,7 @@ public class SchemaBackedJsonTextField extends JsonTextField {
                     manager.reset(index);
                 }
             }
+            index = null;
         }
     }
 
