@@ -10,6 +10,7 @@
       "items": {
         "type": "object",
         "anyOf": [
+          { "$ref": "#/definitions/fileExists" },
           { "$ref": "#/definitions/exec" },
           { "$ref": "#/definitions/showMessage" }
         ]
@@ -17,6 +18,33 @@
     }
   },
   "definitions": {
+    "fileExists": {
+      "type": "object",
+      "properties": {
+        "fileExists": {
+          "type": "object",
+          "properties": {
+            "name": { "type": "string" },
+            "file": {
+              "anyOf": [
+                { "type": "string" },
+                {
+                  "type": "object",
+                  "properties": {
+                    "windows": { "type": "string" },
+                    "linux": { "type": "string" },
+                    "mac": { "type": "string" },
+                    "default": { "type": "string" }
+                  },
+                  "additionalProperties": false
+                }
+              ]
+            }
+          },
+          "required": ["file"]
+        }
+      }
+    },
     "exec": {
       "type": "object",
       "properties": {

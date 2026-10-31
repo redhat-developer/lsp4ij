@@ -1,11 +1,16 @@
 {
   "id": "jdt-ls",
   "name": "jdt-ls",
+  "properties": {
+    "serverDist": "$USER_HOME$/.lsp4ij/lsp/jdt-ls"
+  },
   "check": {
-    "exec": {
-      "name": "Trying current command",
-      "command": "${server.command}",
-      "timeout": 2000
+    "fileExists": {
+      "name": "Check if jdt-ls is installed",
+      "file": {
+        "windows": "${serverDist}/bin/jdtls.bat",
+        "default": "${serverDist}/bin/jdtls"
+      }
     }
   },
   "run": {
@@ -13,7 +18,7 @@
       "name": "Download jdt-ls",
       "url": "https://www.eclipse.org/downloads/download.php?file=/jdtls/snapshots/jdt-language-server-latest.tar.gz",
       "output": {
-        "dir": "$USER_HOME$/.lsp4ij/lsp/jdt-ls",
+        "dir": "${serverDist}",
         "file": {
           "name": {
             "windows": "bin/jdtls.bat",

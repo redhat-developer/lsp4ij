@@ -2,11 +2,16 @@
   "id": "clangd-installer",
   "name": "clangd",
   "executeOnStartServer": false,
+  "properties": {
+    "serverDist": "$USER_HOME$/.lsp4ij/lsp"
+  },
   "check": {
-    "exec": {
-      "name": "Trying current command",
-      "command": "${server.command}",
-      "timeout": 2000
+    "fileExists": {
+      "name": "Check if clangd is installed",
+      "file": {
+        "windows": "${serverDist}/clangd*/bin/clangd.exe",
+        "default": "${serverDist}/clangd*/bin/clangd"
+      }
     }
   },
   "run": {
@@ -28,7 +33,7 @@
         "mac": " https://github.com/clangd/clangd/releases/download/snapshot_20250518/clangd-mac-snapshot_20250518.zip"
       },
       "output": {
-        "dir": "$USER_HOME$/.lsp4ij/lsp",
+        "dir": "${serverDist}",
         "file": {
           "name": {
             "windows": "bin/clangd.exe",

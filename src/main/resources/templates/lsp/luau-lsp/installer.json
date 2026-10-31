@@ -2,11 +2,16 @@
   "id": "luau-lsp",
   "name": "Luau Language Server",
   "executeOnStartServer": false,
+  "properties": {
+    "serverDist": "$USER_HOME$/.lsp4ij/lsp/luau-lsp"
+  },
   "check": {
-    "exec": {
-      "name": "Trying current command",
-      "command": "${server.command}",
-      "timeout": 2000
+    "fileExists": {
+      "name": "Check if luau-lsp is installed",
+      "file": {
+        "windows": "${serverDist}/luau-lsp.exe",
+        "default": "${serverDist}/luau-lsp"
+      }
     }
   },
   "run": {
@@ -26,7 +31,7 @@
         }
       },
       "output": {
-        "dir": "$USER_HOME$/.lsp4ij/lsp/luau-lsp",
+        "dir": "${serverDist}",
         "file": {
           "name": {
             "windows": "luau-lsp.exe",

@@ -89,6 +89,7 @@ import javax.swing.*;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
@@ -198,6 +199,14 @@ public class DAPDebugProcess extends XDebugProcess implements Disposable {
         Integer port = serverReadyFuture.getPort();
         String address = serverReadyFuture.getAddress();
         String taskTitle = getStartingServerTaskTitle(dapState.getFile(), dapState.getServerName(), address, port, dapState.getDebugMode());
+        // Resolved here (not inside the background task) because it accesses DataContext, which requires a read action
+        Map<String, Object> resolvedParams;
+        try {
+            resolvedParams = dapState.getDAPParameters();
+        } catch (Exception e) {
+            resolvedParams = new HashMap<>();
+        }
+        var dapParameters = resolvedParams;
 
         ProgressManager.getInstance().run(new Task.Backgroundable(project, taskTitle, true) {
 
@@ -232,7 +241,7 @@ public class DAPDebugProcess extends XDebugProcess implements Disposable {
                         // 2. Connect DAP client to the DAP server by using Socket port or simple streams.
                         DebugMode debugMode = dapState.getDebugMode();
                         ServerTrace serverTrace = dapState.getServerTrace();
-                        var parameters = new HashMap<>(dapState.getDAPParameters());
+                        var parameters = new HashMap<>(dapParameters);
                         if (debugMode == DebugMode.LAUNCH) {
                             parameters.put("noDebug", !isDebug); // standard DAP parameter
                         }

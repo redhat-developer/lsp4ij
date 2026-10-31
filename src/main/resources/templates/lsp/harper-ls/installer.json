@@ -2,11 +2,16 @@
   "id": "harper-ls-installer",
   "name": "harper-ls",
   "executeOnStartServer": false,
+  "properties": {
+    "serverDist": "$USER_HOME$/.lsp4ij/lsp/harper-ls"
+  },
   "check": {
-    "exec": {
-      "name": "Trying current command",
-      "command": "${server.command}",
-      "timeout": 2000
+    "fileExists": {
+      "name": "Check if harper-ls is installed",
+      "file": {
+        "windows": "${serverDist}/harper-ls.exe",
+        "default": "${serverDist}/harper-ls"
+      }
     }
   },
   "run": {
@@ -29,7 +34,7 @@
         }
       },
       "output": {
-        "dir": "$USER_HOME$/.lsp4ij/lsp/harper-ls",
+        "dir": "${serverDist}",
         "file": {
           "name": {
             "windows": "harper-ls.exe",
