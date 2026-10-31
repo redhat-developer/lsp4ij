@@ -119,7 +119,7 @@ public class DAPShadowedBreakpointTest extends HeavyPlatformTestCase {
         var handler = (BreakpointHandlerBase) handler(session);
         var requests = new ArrayList<SetBreakpointsArguments>();
         // Like the Fule adapter: each request installs the breakpoints with a new id, pending until the script is loaded
-        var server = server(requests, "pending native script resolution");
+        var server = server(requests, "Pending native script resolution");
 
         var dir = Files.createTempDirectory("dap-breakpoints-");
         var path = dir.resolve("a.lua");
@@ -136,7 +136,7 @@ public class DAPShadowedBreakpointTest extends HeavyPlatformTestCase {
             handler.initialize(server, new Capabilities()).join();
             assertNull(single(requests).getCondition());
             assertEquals(List.of("native inactive:" + DAPBundle.message("dap.breakpoints.shadowed"),
-                    "dap invalid:pending native script resolution"), presentations);
+                    "dap invalid:Pending native script resolution"), presentations);
             requests.clear();
             presentations.clear();
 
@@ -145,7 +145,7 @@ public class DAPShadowedBreakpointTest extends HeavyPlatformTestCase {
             handler.unregisterBreakpoint(dapBreakpoint, false);
             handler.registerBreakpoint(dapBreakpoint);
             assertEquals("a == 1", single(requests).getCondition());
-            assertEquals(List.of("native reset:null", "native invalid:pending native script resolution"), presentations);
+            assertEquals(List.of("native reset:null", "native invalid:Pending native script resolution"), presentations);
             presentations.clear();
 
             // The script is loaded: the debug adapter verifies the native breakpoint by its id (DAP 'breakpoint' event)
