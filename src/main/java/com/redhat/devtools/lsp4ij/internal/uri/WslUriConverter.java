@@ -106,8 +106,12 @@ class WslUriConverter implements UriConverter {
                 String authority = uncPath.substring(0, firstSep);
                 String uriPath = uncPath.substring(firstSep).replace('\\', '/');
 
-                // Use lenient parsing to allow WSL authority such as "wsl$"
-                return URI.create("file://" + authority + uriPath);
+                // Use multi-argument constructor to percent-encode non-ASCII characters
+                try {
+                    return new URI("file", authority, uriPath, null, null);
+                } catch (URISyntaxException e) {
+                    LOGGER.warn("Failed to create WSL URI for path: " + path, e);
+                }
             }
         }
         return null;
