@@ -612,7 +612,7 @@ public class LSPCompletionProposal extends LookupElement implements Pointer<LSPC
                 }
                 return DocumentationResult.documentation(convertToHtml(contents, null, file));
             } else {
-                DocumentationResult.asyncDocumentation(() -> {
+                return DocumentationResult.asyncDocumentation(() -> {
                     // The LSP completion item 'documentation' is not filled, try to resolve it
                     // As documentation is computed in a Thread it should not impact performance.
                     CompletionItem resolved = getResolvedCompletionItem();
