@@ -100,6 +100,7 @@ Here are some projects that use LSP4IJ:
  * [GN Language Server](https://github.com/google/gn-language-server/)
  * [OPA IDEA Plugin](https://github.com/open-policy-agent/opa-idea-plugin)
  * [aer Local Apex Debugger](https://www.octoberswimmer.com/tools/aer/docs/intellij-debugging/)
+ * [SOSA Analyzer](https://github.com/secure-software-engineering/sosa-analyzer/pulls)
  * [Rider Unreal Angelscript](https://github.com/scriptacus/rider-unreal-angelscript)
  * [agnix](https://github.com/agent-sh/agnix)
  * [Xonsh plugin for JetBrains IDEs](https://github.com/nahoj/xonsh-jetbrains)
