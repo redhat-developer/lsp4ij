@@ -1422,6 +1422,10 @@ public class LSPIJUtils {
         }
         // Convert TextEdit positions into RangeMarkers
         final var pairs = new ArrayList<Pair<TextEdit, RangeMarker>>();
+        // The index in pairs of the first insert at each offset. The marker of an insert stays in front of text which
+        // an earlier insert puts at its offset, so the inserts at an offset are applied as one, with their new texts in
+        // array order
+        final var firstInserts = new HashMap<Integer, Integer>();
         for (var textEdit : ownedEdits) {
             var range = textEdit.getRange();
             if (range != null) {
@@ -1429,8 +1433,17 @@ public class LSPIJUtils {
                 int end = toOffset(range.getEnd(), document);
                 // Range is valid, add it to the converted list
                 if (end >= start) {
-                    var marker = document.createRangeMarker(start, end);
-                    pairs.add(Pair.create(textEdit, marker));
+                    Integer firstInsert = start == end ? firstInserts.putIfAbsent(start, pairs.size()) : null;
+                    if (firstInsert == null) {
+                        var marker = document.createRangeMarker(start, end);
+                        pairs.add(Pair.create(textEdit, marker));
+                    } else {
+                        // Append the new text to the first insert at this offset
+                        var pair = pairs.get(firstInsert);
+                        var newText = StringUtil.notNullize(pair.first.getNewText())
+                                + StringUtil.notNullize(textEdit.getNewText());
+                        pairs.set(firstInsert, Pair.create(new TextEdit(pair.first.getRange(), newText), pair.second));
+                    }
                 }
             }
         }
