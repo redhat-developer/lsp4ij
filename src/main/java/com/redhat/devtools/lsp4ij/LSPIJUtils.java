@@ -1423,6 +1423,12 @@ public class LSPIJUtils {
         }
         // Convert TextEdit positions into RangeMarkers
         final var pairs = new ArrayList<Pair<TextEdit, RangeMarker>>();
+        // The index in pairs of the first insert at each offset. The marker of an insert stays in front of text which
+        // an earlier insert puts at its offset, so the inserts at an offset are applied as one, with their new texts in
+        // array order
+        final var firstInserts = new HashMap<Integer, Integer>();
+        // The new texts of the inserts at an offset, joined once all edits are seen, by the index of the first in pairs
+        final var joinedInserts = new HashMap<Integer, StringBuilder>();
         for (var textEdit : ownedEdits) {
             var range = textEdit.getRange();
             if (range != null) {
@@ -1430,11 +1436,23 @@ public class LSPIJUtils {
                 int end = toOffset(range.getEnd(), document);
                 // Range is valid, add it to the converted list
                 if (end >= start) {
-                    var marker = document.createRangeMarker(start, end);
-                    pairs.add(Pair.create(textEdit, marker));
+                    Integer firstInsert = start == end ? firstInserts.putIfAbsent(start, pairs.size()) : null;
+                    if (firstInsert == null) {
+                        var marker = document.createRangeMarker(start, end);
+                        pairs.add(Pair.create(textEdit, marker));
+                    } else {
+                        // Append the new text to those of the inserts at this offset
+                        joinedInserts.computeIfAbsent(firstInsert,
+                                        index -> new StringBuilder(StringUtil.notNullize(pairs.get(index).first.getNewText())))
+                                .append(StringUtil.notNullize(textEdit.getNewText()));
+                    }
                 }
             }
         }
+        joinedInserts.forEach((index, newText) -> {
+            var pair = pairs.get(index);
+            pairs.set(index, Pair.create(new TextEdit(pair.first.getRange(), newText.toString()), pair.second));
+        });
         if (pairs.isEmpty()) {
             return;
         }
