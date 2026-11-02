@@ -19,10 +19,14 @@ import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.progress.Task;
 import com.intellij.openapi.progress.util.ProgressIndicatorUtils;
 import com.intellij.psi.PsiFile;
+import com.intellij.util.ExceptionUtil;
+import com.redhat.devtools.lsp4ij.server.LanguageServerException;
 import org.eclipse.lsp4j.jsonrpc.CancelChecker;
 import org.eclipse.lsp4j.jsonrpc.CompletableFutures.FutureCancelChecker;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -35,6 +39,8 @@ import java.util.function.Function;
  * @author Angelo ZERR
  */
 public class CompletableFutures {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(CompletableFutures.class);
 
     private CompletableFutures() {
 
@@ -125,11 +131,49 @@ public class CompletableFutures {
         });
     }
 
+    /**
+     * Wait for the done of the given future and stop the wait if {@link ProcessCanceledException} is thrown.
+     * <p>
+     * A failure of the future is not thrown: the caller checks {@link #isDoneNormally(CompletableFuture)}
+     * and skips a failed future.
+     *
+     * @param future the future to wait.
+     * @throws CancellationException if the future is cancelled, or the progress is canceled
+     *                               ({@link ProcessCanceledException}).
+     */
     public static void awaitWithCheckCanceled(@Nullable Future<?> future) {
         if (future == null) {
             return;
         }
-        ProgressIndicatorUtils.awaitWithCheckCanceled(future);
+        try {
+            ProgressIndicatorUtils.awaitWithCheckCanceled(future);
+        } catch (CancellationException e) {
+            // Since 2024.2 ProcessCanceledException extends CancellationException
+            throw e;
+        } catch (RuntimeException e) {
+            // ProgressIndicatorUtils rethrows the failure of the future, an ExecutionException, in a RuntimeException
+            if (!(e.getCause() instanceof ExecutionException failure)) {
+                throw e;
+            }
+            logFailure(failure);
+        }
+    }
+
+    /**
+     * Logs the failure of an awaited future, which the wait doesn't throw.
+     * <p>
+     * A language server which cannot start, or which stopped, has already been reported when it failed, and an LSP
+     * error response is reported by {@link CancellationSupport}, which completes the request with null. Any other
+     * failure is unexpected.
+     *
+     * @param failure the failure of the future.
+     */
+    static void logFailure(@NotNull ExecutionException failure) {
+        if (ExceptionUtil.causedBy(failure, LanguageServerException.class)) {
+            LOGGER.debug("Skipped a future whose language server is not running", failure);
+        } else {
+            LOGGER.warn("Skipped a failed future", failure);
+        }
     }
 
     public static CompletableFuture<Void> allOf(CompletableFuture<?>... cfs) {

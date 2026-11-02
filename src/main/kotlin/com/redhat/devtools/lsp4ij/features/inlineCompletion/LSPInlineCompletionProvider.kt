@@ -23,11 +23,11 @@ import com.intellij.openapi.application.EDT
 import com.intellij.openapi.application.readAction
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.progress.ProcessCanceledException
-import com.intellij.openapi.progress.util.ProgressIndicatorUtils
 import com.redhat.devtools.lsp4ij.LSPFileSupport
 import com.redhat.devtools.lsp4ij.LSPIJUtils
 import com.redhat.devtools.lsp4ij.LanguageServiceAccessor
 import com.redhat.devtools.lsp4ij.client.features.LSPCompletionProposal
+import com.redhat.devtools.lsp4ij.internal.CompletableFutures.awaitWithCheckCanceled
 import com.redhat.devtools.lsp4ij.internal.CompletableFutures.isDoneNormally
 import java.util.concurrent.CancellationException
 import java.util.concurrent.ExecutionException
@@ -101,7 +101,7 @@ class LSPInlineCompletionProvider : DebouncedInlineCompletionProvider() {
         val future = support.getInlineCompletions(params)
 
         try {
-            ProgressIndicatorUtils.awaitWithCheckCanceled(future)
+            awaitWithCheckCanceled(future)
 
             if (!isDoneNormally(future)) {
                 return InlineCompletionSuggestion.Empty
