@@ -245,6 +245,9 @@ public class LSPUsageSearcher extends CustomUsageSearcher {
      * outside the text range, like the default one of a fake or light element, is replaced by {@code startOffset}.
      * </p>
      * <p>
+     * A one-character name has no position inside it: the position is then its end, the boundary after the name.
+     * </p>
+     * <p>
      * For example, if the element is the identifier {@code myVar} spanning offsets [10, 15]:
      * <ul>
      *   <li>textOffset = startOffset = 10</li>
