@@ -114,7 +114,7 @@ public class LSPPsiElement extends FakePsiElement {
 
     @Override
     public boolean isValid() {
-        return true;
+        return file.isValid();
     }
 
 }
