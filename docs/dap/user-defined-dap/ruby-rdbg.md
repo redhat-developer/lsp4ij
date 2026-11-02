@@ -67,8 +67,8 @@ you need to select `Trace` with `verbose`.
 
 ## Configure file mappings
 
-To allows settings breakpoints to Python files, you need configure mappings in the `Mappings` tab.
-As you have selected `Python- Debugpy` server, it will automatically populate the file mappings like this:
+To allows settings breakpoints to Ruby files, you need configure mappings in the `Mappings` tab.
+As you have selected `Ruby Debug` server, it will automatically populate the file mappings like this:
 
 ![File mappings](../images/ruby-rdbg/file_mappings.png)
 
