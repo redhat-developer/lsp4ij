@@ -1588,8 +1588,9 @@ public class LSPIJUtils {
             lastModifiedOffset = LSPIJUtils.toOffset(textEdit.getRange().getEnd(), document);
         }
         spans.add(text.substring(lastModifiedOffset));
-        //
-        return String.join("", spans);
+        // A document accepts only \n line separators, and a language server may reply with \r\n or \r. Convert the
+        // joined text, so that a \r which ends an edit and the \n after it stay one line separator
+        return StringUtil.convertLineSeparators(String.join("", spans));
     }
 
     /**
