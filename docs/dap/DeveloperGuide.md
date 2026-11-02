@@ -83,6 +83,8 @@ tasks {
 }
 ```
 
+![Embed VSCode JS Debug](images/developer-guide/DAP_server_embed.png)
+
 At runtime, your plugin's directory is the plugin path of your plugin's descriptor, which your plugin's class loader
 (a `com.intellij.ide.plugins.cl.PluginAwareClassLoader`) gives:
 
