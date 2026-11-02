@@ -21,6 +21,7 @@ import com.redhat.devtools.lsp4ij.dap.client.DAPClient;
 import com.redhat.devtools.lsp4ij.dap.client.DAPStackFrame;
 import com.redhat.devtools.lsp4ij.dap.client.DAPSuspendContext;
 import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.awaitWithCheckCanceled;
+import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.isDoneNormally;
 import org.eclipse.lsp4j.debug.StepInTarget;
 import org.eclipse.lsp4j.debug.StepInTargetsResponse;
 import org.jetbrains.annotations.NotNull;
@@ -69,7 +70,7 @@ public class DAPSmartStepIntoHandler extends XSmartStepIntoHandler<DAPStepIntoVa
             return Collections.emptyList();
         }
 
-        List<DAPStepIntoVariant> result = future.getNow(null);
+        List<DAPStepIntoVariant> result = isDoneNormally(future) ? future.getNow(null) : null;
         return result != null ? result : Collections.emptyList();
     }
 

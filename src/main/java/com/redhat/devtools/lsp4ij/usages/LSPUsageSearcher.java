@@ -41,6 +41,7 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
 import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.awaitWithCheckCanceled;
+import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.isDoneNormally;
 
 import static com.redhat.devtools.lsp4ij.internal.ApplicationUtils.runCancellableReadAction;
 import static com.redhat.devtools.lsp4ij.usages.LSPFindUsagesHandlerFactory.isUsageSupportedByLanguageServer;
@@ -168,7 +169,7 @@ public class LSPUsageSearcher extends CustomUsageSearcher {
             // This allows the ForkJoinPool background threads to freely acquire ReadActions
             // to resolve the PSI elements during mapping!
             awaitWithCheckCanceled(usagesFuture);
-            if (usagesFuture.isDone()) {
+            if (isDoneNormally(usagesFuture)) {
                 List<LSPUsagePsiElement> usages = usagesFuture.getNow(null);
                 if (usages != null && !usages.isEmpty()) {
                     // 4. Process the results (requires ReadAction again for VFS/PSI mapping)

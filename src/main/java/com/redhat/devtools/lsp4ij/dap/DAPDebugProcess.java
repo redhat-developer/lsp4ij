@@ -24,6 +24,7 @@ import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.progress.ProgressIndicator;
 import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.progress.Task;
+import com.intellij.openapi.progress.util.ProgressIndicatorUtils;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.Key;
 import com.intellij.openapi.util.NlsContexts;
@@ -71,7 +72,6 @@ import com.redhat.devtools.lsp4ij.dap.stepping.DAPStepIntoVariant;
 import com.redhat.devtools.lsp4ij.dap.threads.ThreadsPanel;
 import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
 import com.redhat.devtools.lsp4ij.internal.CompletableFutures;
-import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.awaitWithCheckCanceled;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import com.redhat.devtools.lsp4ij.settings.ServerTrace;
 import com.redhat.devtools.lsp4ij.settings.ui.InstallerPanel;
@@ -222,7 +222,8 @@ public class DAPDebugProcess extends XDebugProcess implements Disposable {
                 try {
                     // Wait for DAP server is ready...
                     serverReadyFuture.track();
-                    awaitWithCheckCanceled(serverReadyFuture);
+                    // Throws a failure for the catch below to print, unlike CompletableFutures.awaitWithCheckCanceled
+                    ProgressIndicatorUtils.awaitWithCheckCanceled(serverReadyFuture);
                     if (CompletableFutures.isDoneNormally(serverReadyFuture)) {
                         // At this step the DAP server is started and ready to consume it with DAP clients
 
@@ -249,7 +250,7 @@ public class DAPDebugProcess extends XDebugProcess implements Disposable {
                         connectToServerFuture = parentClient.connectToServer(indicator);
 
                         // Wait for DAP client is connecting to the DAP server...
-                        awaitWithCheckCanceled(connectToServerFuture);
+                        ProgressIndicatorUtils.awaitWithCheckCanceled(connectToServerFuture);
                         DAPDebugProcess.this.status = Status.STARTED;
 
                         // Refresh Threads panel
