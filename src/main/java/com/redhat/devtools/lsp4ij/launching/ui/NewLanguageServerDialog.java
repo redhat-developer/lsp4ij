@@ -254,6 +254,7 @@ public class NewLanguageServerDialog extends DialogWrapper {
         List<ValidationInfo> validations = new ArrayList<>();
         addValidationInfo(validateServerName(), validations);
         addValidationInfo(validateCommand(), validations);
+        validations.addAll(this.languageServerPanel.validateJsonFields());
         return validations;
     }
 

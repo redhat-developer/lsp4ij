@@ -351,7 +351,7 @@ public abstract class LanguageServerSettings implements PersistentStateComponent
                         configuration = parseJson(configurationContent, isExpandConfiguration());
                     }
                 } catch (Exception e) {
-                    //LOGGER.error("Error while parsing JSON configuration for the language server '{}'", getServerId(), e);
+                    LOGGER.warn("Error while parsing JSON configuration for a language server", e);
                 }
             }
             return configuration;
@@ -395,7 +395,7 @@ public abstract class LanguageServerSettings implements PersistentStateComponent
                         initializationOptions = JsonParser.parseReader(new StringReader(initializationOptionsContent));
                     }
                 } catch (Exception e) {
-                    //LOGGER.error("Error while parsing JSON Initialization Options for the language server '{}'", getServerId(), e);
+                    LOGGER.warn("Error while parsing JSON Initialization Options for a language server", e);
                 }
             }
             return initializationOptions;
@@ -422,7 +422,7 @@ public abstract class LanguageServerSettings implements PersistentStateComponent
                         experimental = JsonParser.parseReader(new StringReader(experimentalContent));
                     }
                 } catch (Exception e) {
-                    //LOGGER.error("Error while parsing JSON Initialization Options for the language server '{}'", getServerId(), e);
+                    LOGGER.warn("Error while parsing JSON Experimental for a language server", e);
                 }
             }
             return experimental;

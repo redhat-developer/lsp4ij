@@ -10,6 +10,8 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.settings.ui;
 
+import com.google.gson.JsonParseException;
+import com.google.gson.JsonParser;
 import com.intellij.execution.configuration.EnvironmentVariablesComponent;
 import com.intellij.execution.configuration.EnvironmentVariablesData;
 import com.intellij.ide.BrowserUtil;
@@ -19,6 +21,7 @@ import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.Disposer;
 import com.intellij.openapi.ui.ComboBox;
 import com.intellij.openapi.ui.TextFieldWithBrowseButton;
+import com.intellij.openapi.ui.ValidationInfo;
 import com.intellij.openapi.util.NlsContexts;
 import com.intellij.ui.ContextHelpLabel;
 import com.intellij.ui.HyperlinkLabel;
@@ -42,13 +45,18 @@ import com.redhat.devtools.lsp4ij.settings.UIConfiguration;
 import com.redhat.devtools.lsp4ij.settings.jsonSchema.LSPClientConfigurationJsonSchemaFileProvider;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.jetbrains.annotations.PropertyKey;
 
 import javax.swing.*;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 import java.awt.*;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
+import static com.redhat.devtools.lsp4ij.LanguageServerBundle.BUNDLE;
 import static com.redhat.devtools.lsp4ij.server.definition.launching.CommandUtils.resolveCommandLine;
 
 /**
@@ -617,6 +625,51 @@ public class LanguageServerPanel implements Disposable {
             return;
         }
         workspaceFoldersPanel.setJsonConfiguration(workspaceFolderStrategyConfiguration);
+    }
+
+    /**
+     * Returns an error for each JSON field whose content is not valid JSON, in tab order.
+     *
+     * <p>The content is parsed with the lenient Gson parser which reads it when the language server uses it,
+     * so what that parser accepts (comments for instance) stays valid, and so does an empty field.</p>
+     *
+     * @return an error for each JSON field whose content is not valid JSON.
+     */
+    public @NotNull List<ValidationInfo> validateJsonFields() {
+        List<ValidationInfo> errors = new ArrayList<>();
+        addJsonError("language.server.validation.json.configuration", getConfigurationContent(), errors);
+        addJsonError("language.server.validation.json.initializationOptions",
+                getInitializationOptionsContent(),
+                errors);
+        addJsonError("language.server.validation.json.experimental", getExperimentalContent(), errors);
+        addJsonError("language.server.validation.json.clientConfiguration", getClientConfigurationContent(), errors);
+        addJsonError("language.server.validation.json.installer", getInstallerConfigurationContent(), errors);
+        addJsonError("language.server.validation.json.workspaceFolders",
+                workspaceFoldersPanel != null ? workspaceFoldersPanel.getJsonConfiguration() : null,
+                errors);
+        return errors;
+    }
+
+    private static void addJsonError(@NotNull @PropertyKey(resourceBundle = BUNDLE) String fieldKey,
+                                     @Nullable String content,
+                                     @NotNull List<ValidationInfo> errors) {
+        if (StringUtils.isBlank(content)) {
+            return;
+        }
+        try {
+            JsonParser.parseString(content);
+        } catch (JsonParseException e) {
+            // The reader error, wrapped by Gson, tells where the content breaks; newer Gson
+            // versions add a troubleshooting link on a second line
+            Throwable cause = e.getCause() != null ? e.getCause() : e;
+            String reason = Objects.toString(cause.getMessage(), "").lines().findFirst().orElse("");
+            String message = LanguageServerBundle.message("language.server.validation.json.invalid",
+                    LanguageServerBundle.message(fieldKey),
+                    reason);
+            // No component: an error bound to a field only shows on the tab of that field,
+            // and the new language server dialog opens on the Server tab
+            errors.add(new ValidationInfo(message));
+        }
     }
 
     public JBCheckBox getDebugSuspendCheckBox() {

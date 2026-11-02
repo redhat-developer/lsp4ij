@@ -18,6 +18,7 @@ import com.intellij.lang.Language;
 import com.intellij.openapi.Disposable;
 import com.intellij.openapi.fileTypes.FileNameMatcher;
 import com.intellij.openapi.fileTypes.FileType;
+import com.intellij.openapi.options.ConfigurationException;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.project.ProjectManager;
 import com.intellij.openapi.util.Disposer;
@@ -306,8 +307,15 @@ public class LanguageServerView implements Disposable {
 
     /**
      * Update the proper language server settings and language server definition from the UI fields.
+     *
+     * @throws ConfigurationException if a JSON field is not valid JSON, in which case nothing is saved.
      */
-    public void apply() {
+    public void apply() throws ConfigurationException {
+        var jsonErrors = languageServerPanel.validateJsonFields();
+        if (!jsonErrors.isEmpty()) {
+            throw new ConfigurationException(jsonErrors.get(0).message);
+        }
+
         String languageServerId = languageServerDefinition.getId();
 
         // Update commons settings
