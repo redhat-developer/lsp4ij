@@ -1426,6 +1426,8 @@ public class LSPIJUtils {
         // an earlier insert puts at its offset, so the inserts at an offset are applied as one, with their new texts in
         // array order
         final var firstInserts = new HashMap<Integer, Integer>();
+        // The new texts of the inserts at an offset, joined once all edits are seen, by the index of the first in pairs
+        final var joinedInserts = new HashMap<Integer, StringBuilder>();
         for (var textEdit : ownedEdits) {
             var range = textEdit.getRange();
             if (range != null) {
@@ -1438,15 +1440,18 @@ public class LSPIJUtils {
                         var marker = document.createRangeMarker(start, end);
                         pairs.add(Pair.create(textEdit, marker));
                     } else {
-                        // Append the new text to the first insert at this offset
-                        var pair = pairs.get(firstInsert);
-                        var newText = StringUtil.notNullize(pair.first.getNewText())
-                                + StringUtil.notNullize(textEdit.getNewText());
-                        pairs.set(firstInsert, Pair.create(new TextEdit(pair.first.getRange(), newText), pair.second));
+                        // Append the new text to those of the inserts at this offset
+                        joinedInserts.computeIfAbsent(firstInsert,
+                                        index -> new StringBuilder(StringUtil.notNullize(pairs.get(index).first.getNewText())))
+                                .append(StringUtil.notNullize(textEdit.getNewText()));
                     }
                 }
             }
         }
+        joinedInserts.forEach((index, newText) -> {
+            var pair = pairs.get(index);
+            pairs.set(index, Pair.create(new TextEdit(pair.first.getRange(), newText.toString()), pair.second));
+        });
         if (pairs.isEmpty()) {
             return;
         }
