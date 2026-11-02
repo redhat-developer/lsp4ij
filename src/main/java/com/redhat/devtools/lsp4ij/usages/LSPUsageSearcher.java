@@ -235,14 +235,19 @@ public class LSPUsageSearcher extends CustomUsageSearcher {
     /**
      * Computes the LSP position to use for querying usages of the given element.
      * <p>
-     * The position is calculated as {@code startOffset + 1}, clamped to not exceed {@code endOffset}.
+     * The position is calculated as {@code textOffset + 1}, clamped to not exceed {@code endOffset}.
      * This ensures the position is inside the element's text range (not at the very start boundary),
      * which is important for language servers that may not recognize positions at token boundaries.
      * </p>
      * <p>
+     * The text offset of a named element is the offset of its name, while its text range can start earlier,
+     * for example at the decorators of a Python function, which are not the symbol to query. A text offset
+     * outside the text range, like the default one of a fake or light element, is replaced by {@code startOffset}.
+     * </p>
+     * <p>
      * For example, if the element is the identifier {@code myVar} spanning offsets [10, 15]:
      * <ul>
-     *   <li>startOffset = 10</li>
+     *   <li>textOffset = startOffset = 10</li>
      *   <li>endOffset = 15</li>
      *   <li>returned position = offset 11 (inside the identifier)</li>
      * </ul>
@@ -263,7 +268,10 @@ public class LSPUsageSearcher extends CustomUsageSearcher {
         if (document == null) {
             return null;
         }
-        return LSPIJUtils.toPosition(Math.min(element.getTextRange().getStartOffset() + 1, element.getTextRange().getEndOffset()), document);
+        TextRange textRange = element.getTextRange();
+        int textOffset = element.getTextOffset();
+        int offset = textRange.containsOffset(textOffset) ? textOffset : textRange.getStartOffset();
+        return LSPIJUtils.toPosition(Math.min(offset + 1, textRange.getEndOffset()), document);
     }
 }
 

@@ -77,6 +77,7 @@ public class MockTextDocumentService implements TextDocumentService {
     private Function<?, ? extends CompletableFuture<?>> _futureFactory;
     private List<LanguageClient> remoteProxies;
     private Location[] mockReferences = new Location[0];
+    private final List<ReferenceParams> referenceRequests = new CopyOnWriteArrayList<>();
     private List<Diagnostic> publishDiagnostics;
     private DocumentDiagnosticReport pullDiagnostics;
     private List<Either<Command, CodeAction>> mockCodeActions;
@@ -148,6 +149,7 @@ public class MockTextDocumentService implements TextDocumentService {
 
     @Override
     public CompletableFuture<List<? extends Location>> references(ReferenceParams params) {
+        referenceRequests.add(params);
         return futureFactory(Arrays.asList(this.mockReferences));
     }
 
@@ -409,6 +411,13 @@ public class MockTextDocumentService implements TextDocumentService {
         this.mockReferences = locations;
     }
 
+    /**
+     * @return the textDocument/references requests received since the last reset, in order
+     */
+    public List<ReferenceParams> getReferenceRequests() {
+        return referenceRequests;
+    }
+
     public void setMockFormattingTextEdits(List<? extends TextEdit> formattingTextEdits) {
         this.mockFormattingTextEdits = formattingTextEdits;
     }
@@ -436,6 +445,7 @@ public class MockTextDocumentService implements TextDocumentService {
         this.mockHover = null;
         this.mockCodeLenses = null;
         this.mockReferences = null;
+        this.referenceRequests.clear();
         this.remoteProxies = new ArrayList<>();
         this.mockCodeActions = new ArrayList<>();
         this.mockResolvedCodeAction = new CodeAction();
