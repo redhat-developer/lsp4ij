@@ -58,6 +58,7 @@ import org.eclipse.lsp4j.jsonrpc.Launcher;
 import org.eclipse.lsp4j.jsonrpc.MessageConsumer;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
 import org.eclipse.lsp4j.jsonrpc.messages.Message;
+import org.eclipse.lsp4j.jsonrpc.messages.NotificationMessage;
 import org.eclipse.lsp4j.services.LanguageServer;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
@@ -135,6 +136,7 @@ public class LanguageServerWrapper implements Disposable {
     private @NotNull CompletableFuture<LanguageServer> lastNotification = CompletableFuture.completedFuture(null);
     private final ExecutorService listener;
     private final ExecutorService messageWriter;
+    private final ExecutorService requestWriter;
     private final SimpleModificationTracker modificationTracker = new SimpleModificationTracker();
     /**
      * Map containing unregistration handlers for dynamic capability registrations.
@@ -216,6 +218,16 @@ public class LanguageServerWrapper implements Disposable {
                 })
                 .build());
 
+        String requestWriterThreadNameFormat = "LS-" + serverDefinition.getId() + projectName + "#requestWriter-%d"; //$NON-NLS-1$ //$NON-NLS-2$
+        this.requestWriter = Executors.newCachedThreadPool(new ThreadFactoryBuilder()
+                .setNameFormat(requestWriterThreadNameFormat)
+                .setThreadFactory(r -> {
+                    var t = new Thread(r);
+                    t.setContextClassLoader(workerCtxClassLoader);
+                    return t;
+                })
+                .build());
+
         String listenerThreadNameFormat = "LS-" + serverDefinition.getId() + projectName + "#listener-%d"; //$NON-NLS-1$ //$NON-NLS-2$
         this.listener = Executors.newCachedThreadPool(new ThreadFactoryBuilder()
                 .setNameFormat(listenerThreadNameFormat)
@@ -263,6 +275,7 @@ public class LanguageServerWrapper implements Disposable {
     void stopDispatcher() {
         this.dispatcher.shutdownNow();
         this.messageWriter.shutdownNow();
+        this.requestWriter.shutdownNow();
 
         // Only really needed for testing - the listener (an instance of ConcurrentMessageProcessor) should exit
         // as soon as the input stream from the LS is closed, and a cached thread pool will recycle idle
@@ -279,6 +292,10 @@ public class LanguageServerWrapper implements Disposable {
             }
             if (!this.messageWriter.awaitTermination(2, TimeUnit.SECONDS)) {
                 LOGGER.warn("Message writer executor for language server '{}' did not terminate within 2s; classloader unload may be blocked",
+                        serverDefinition.getId());
+            }
+            if (!this.requestWriter.awaitTermination(2, TimeUnit.SECONDS)) {
+                LOGGER.warn("Request writer executor for language server '{}' did not terminate within 2s; classloader unload may be blocked",
                         serverDefinition.getId());
             }
             if (!this.listener.awaitTermination(2, TimeUnit.SECONDS)) {
@@ -516,17 +533,19 @@ public class LanguageServerWrapper implements Disposable {
                             }
                             logMessage(message, consumer);
                             try {
-                                // To avoid having some lock problem when message is written in the stream output
-                                // (when there are a lot of messages to write it)
-                                // we consume the message in async mode
-                                CompletableFuture.runAsync(() -> consumer.consume(message), messageWriter)
+                                // Notifications use the single-thread messageWriter to preserve
+                                // ordering (didOpen before didChange before didClose).
+                                // Requests and responses use a separate requestWriter pool so they
+                                // are never blocked behind a slow notification write (pipe saturation).
+                                ExecutorService writer = message instanceof NotificationMessage
+                                        ? messageWriter
+                                        : requestWriter;
+                                CompletableFuture.runAsync(() -> consumer.consume(message), writer)
                                         .exceptionally(e -> {
-                                            // Log in the LSP console the error
                                             getLanguageServerLifecycleManager().onError(this, e);
                                             return null;
                                         });
                             } catch (Throwable e) {
-                                // Log in the LSP console the error
                                 getLanguageServerLifecycleManager().onError(this, e);
                                 throw e;
                             }
