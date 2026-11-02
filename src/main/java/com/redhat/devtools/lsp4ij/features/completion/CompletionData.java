@@ -13,6 +13,7 @@ package com.redhat.devtools.lsp4ij.features.completion;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import org.eclipse.lsp4j.CompletionItem;
 import org.eclipse.lsp4j.CompletionList;
+import org.eclipse.lsp4j.CompletionTriggerKind;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
 import org.jetbrains.annotations.NotNull;
 
@@ -23,7 +24,9 @@ import java.util.List;
  *
  * @param completion               the LSP completion response
  * @param languageServer         the language server which has created the completion response.
+ * @param triggerKind            how the completion request was triggered for the language server.
  */
 record CompletionData(@NotNull Either<List<CompletionItem>, CompletionList> completion,
-                      @NotNull LanguageServerItem languageServer) {
+                      @NotNull LanguageServerItem languageServer,
+                      @NotNull CompletionTriggerKind triggerKind) {
 }
