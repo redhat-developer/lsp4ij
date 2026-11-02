@@ -812,6 +812,10 @@
                 implementation="com.redhat.devtools.lsp4ij.features.rename.LSPRenameHandler"
                 order="first"/>
 
+        <!-- LSP textDocument/linkedEditingRange request support -->
+        <editorFactoryListener
+                implementation="com.redhat.devtools.lsp4ij.features.linkedEditingRange.LSPLinkedEditingRangeEditorFactoryListener"/>
+
         <!-- LSP workspace/willRenameFiles for rename and move refactorings, sent before their write action -->
         <renamePsiElementProcessor
                 implementation="com.redhat.devtools.lsp4ij.features.files.WillRenameFilesRenameProcessor"

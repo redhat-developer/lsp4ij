@@ -214,6 +214,9 @@ public class ClientCapabilitiesFactory {
         // DocumentHighlight support
         textDocumentClientCapabilities.setDocumentHighlight(new DocumentHighlightCapabilities(Boolean.TRUE));
 
+        // LinkedEditingRange support
+        textDocumentClientCapabilities.setLinkedEditingRange(new LinkedEditingRangeCapabilities(Boolean.TRUE));
+
         // DocumentLink support
         textDocumentClientCapabilities.setDocumentLink(new DocumentLinkCapabilities(Boolean.TRUE));
 

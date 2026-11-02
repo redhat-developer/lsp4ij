@@ -73,7 +73,7 @@ Current state of [Language Features]( https://microsoft.github.io/language-serve
  * ✅ [textDocument/onTypeFormatting](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_onTypeFormatting) (see [implementation details](#on-type-formatting)).
  * ✅ [textDocument/prepareRename](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_prepareRename).
  * ✅ [textDocument/rename](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_rename) (see [implementation details](#rename)).
- * ❌ [textDocument/linkedEditingRange](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_linkedEditingRange).
+ * ✅ [textDocument/linkedEditingRange](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_linkedEditingRange) (see [implementation details](#linked-editing-range)).
 
 ## Workspace Features
 
@@ -567,6 +567,22 @@ declared with the `renameHandler` extension point.
 Here is an example with the [TypeScript Language Server](./user-defined-ls/typescript-language-server.md) showing rename of function name:
 
 ![textDocument/rename](./images/lsp-support/textDocument_rename.gif)
+
+### Linked Editing Range
+
+[textDocument/linkedEditingRange](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_linkedEditingRange) is implemented with
+[LSPLinkedEditingRangeSynchronizer](https://github.com/redhat-developer/lsp4ij/blob/main/src/main/java/com/redhat/devtools/lsp4ij/features/linkedEditingRange/LSPLinkedEditingRangeSynchronizer.java),
+which edits linked ranges together while typing, as IntelliJ edits the start and the end tag of an HTML element.
+
+When the caret stops in an editor, the language servers of the file which support it (`linkedEditingRangeProvider`) are asked for
+the ranges linked at the caret, such as the declaration and the uses of a local variable. A text typed in the range with the
+caret is then copied into the other ranges by the same command, so that one undo reverts them all. The edited range must match
+the `wordPattern` of the ranges, or, when the language server gives none, VS Code's default word definition, which excludes
+whitespace and punctuation. A text which doesn't match, a change outside the range, a second caret and a caret which leaves the
+range stop the linked editing until the caret stops again.
+
+Linked editing is used with every language server which supports it; a client can turn it off with
+[LSPLinkedEditingRangeFeature](./LSPApi.md#lsp-linkedEditingRange-feature).
 
 ### Formatting
 
