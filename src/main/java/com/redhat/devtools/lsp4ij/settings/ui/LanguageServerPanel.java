@@ -637,38 +637,62 @@ public class LanguageServerPanel implements Disposable {
      */
     public @NotNull List<ValidationInfo> validateJsonFields() {
         List<ValidationInfo> errors = new ArrayList<>();
-        addJsonError("language.server.validation.json.configuration", getConfigurationContent(), errors);
+        // The language server reads these three once their variables, such as $PROJECT_DIR$, are expanded
+        addJsonError("language.server.validation.json.configuration", getConfigurationContent(), true, errors);
         addJsonError("language.server.validation.json.initializationOptions",
                 getInitializationOptionsContent(),
+                true,
                 errors);
-        addJsonError("language.server.validation.json.experimental", getExperimentalContent(), errors);
-        addJsonError("language.server.validation.json.clientConfiguration", getClientConfigurationContent(), errors);
-        addJsonError("language.server.validation.json.installer", getInstallerConfigurationContent(), errors);
+        addJsonError("language.server.validation.json.experimental", getExperimentalContent(), true, errors);
+        addJsonError("language.server.validation.json.clientConfiguration",
+                getClientConfigurationContent(),
+                false,
+                errors);
+        addJsonError("language.server.validation.json.installer", getInstallerConfigurationContent(), false, errors);
         addJsonError("language.server.validation.json.workspaceFolders",
                 workspaceFoldersPanel != null ? workspaceFoldersPanel.getJsonConfiguration() : null,
+                false,
                 errors);
         return errors;
     }
 
-    private static void addJsonError(@NotNull @PropertyKey(resourceBundle = BUNDLE) String fieldKey,
-                                     @Nullable String content,
-                                     @NotNull List<ValidationInfo> errors) {
+    private void addJsonError(@NotNull @PropertyKey(resourceBundle = BUNDLE) String fieldKey,
+                              @Nullable String content,
+                              boolean expanded,
+                              @NotNull List<ValidationInfo> errors) {
         if (StringUtils.isBlank(content)) {
             return;
         }
-        try {
-            JsonParser.parseString(content);
-        } catch (JsonParseException e) {
-            // The reader error, wrapped by Gson, tells where the content breaks; newer Gson
-            // versions add a troubleshooting link on a second line
-            Throwable cause = e.getCause() != null ? e.getCause() : e;
-            String reason = Objects.toString(cause.getMessage(), "").lines().findFirst().orElse("");
+        String reason = jsonError(content);
+        if (reason == null && expanded && content.contains("$")) {
+            // A value can be valid JSON only until its variables are expanded, as with a Windows path in a string
+            String expandedReason = jsonError(resolveCommandLine(content, project));
+            if (expandedReason != null) {
+                reason = LanguageServerBundle.message("language.server.validation.json.expanded", expandedReason);
+            }
+        }
+        if (reason != null) {
             String message = LanguageServerBundle.message("language.server.validation.json.invalid",
                     LanguageServerBundle.message(fieldKey),
                     reason);
             // No component: an error bound to a field only shows on the tab of that field,
             // and the new language server dialog opens on the Server tab
             errors.add(new ValidationInfo(message));
+        }
+    }
+
+    /**
+     * Returns why the content is not valid JSON, or null if it is.
+     */
+    private static @Nullable String jsonError(@NotNull String content) {
+        try {
+            JsonParser.parseString(content);
+            return null;
+        } catch (JsonParseException e) {
+            // The reader error, wrapped by Gson, tells where the content breaks; newer Gson
+            // versions add a troubleshooting link on a second line
+            Throwable cause = e.getCause() != null ? e.getCause() : e;
+            return Objects.toString(cause.getMessage(), "").lines().findFirst().orElse("");
         }
     }
 

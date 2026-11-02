@@ -54,6 +54,16 @@ public class NewLanguageServerDialogJsonValidationTest extends BasePlatformTestC
         assertInvalid("language.server.validation.json.installer", errors.get(4));
     }
 
+    public void testAValueWhichIsInvalidOnceItsVariablesAreExpandedIsReported() {
+        // the lenient parser takes $PROJECT_DIR$ as an unquoted string, but not the path it expands to, which
+        // the language server is given
+        var errors = validate(template -> template.setConfiguration("{\"root\": $PROJECT_DIR$}"));
+        assertEquals(1, errors.size());
+        assertInvalid("language.server.validation.json.configuration", errors.get(0));
+        String expanded = LanguageServerBundle.message("language.server.validation.json.expanded", "");
+        assertTrue(errors.get(0).message, errors.get(0).message.endsWith(expanded));
+    }
+
     public void testValidFieldsAreAccepted() {
         assertEmpty(validate(template -> {
             template.setConfiguration("{\"a.b\": true}");
@@ -95,5 +105,7 @@ public class NewLanguageServerDialogJsonValidationTest extends BasePlatformTestC
                 LanguageServerBundle.message(fieldKey),
                 "");
         assertTrue(error.message, error.message.startsWith(prefix));
+        // an error, not a warning: OK stays disabled until the field is valid
+        assertFalse(error.message, error.okEnabled);
     }
 }

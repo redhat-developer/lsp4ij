@@ -30,7 +30,9 @@ import org.slf4j.LoggerFactory;
 import java.io.StringReader;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -323,6 +325,9 @@ public abstract class LanguageServerSettings implements PersistentStateComponent
         private String experimentalContent;
         private volatile Object experimental;
 
+        // the JSON contents whose parse failure was logged, each with what it is
+        private final Set<String> failedContents = ConcurrentHashMap.newKeySet();
+
         private String debugPort;
         private boolean debugSuspend;
         private ServerTrace serverTrace;
@@ -351,7 +356,7 @@ public abstract class LanguageServerSettings implements PersistentStateComponent
                         configuration = parseJson(configurationContent, isExpandConfiguration());
                     }
                 } catch (Exception e) {
-                    LOGGER.warn("Error while parsing JSON configuration for a language server", e);
+                    warnOnce("configuration", configurationContent, e);
                 }
             }
             return configuration;
@@ -395,10 +400,20 @@ public abstract class LanguageServerSettings implements PersistentStateComponent
                         initializationOptions = JsonParser.parseReader(new StringReader(initializationOptionsContent));
                     }
                 } catch (Exception e) {
-                    LOGGER.warn("Error while parsing JSON Initialization Options for a language server", e);
+                    warnOnce("initialization options", initializationOptionsContent, e);
                 }
             }
             return initializationOptions;
+        }
+
+        /**
+         * Logs that a JSON content could not be parsed, once for each content: an invalid content stays stored, and
+         * every read parses it again, as each workspace/configuration request and each start attempt does.
+         */
+        private void warnOnce(@NotNull String what, @NotNull String content, @NotNull Exception e) {
+            if (failedContents.add(what + '\0' + content)) {
+                LOGGER.warn("Error while parsing the JSON {} of a language server", what, e);
+            }
         }
 
         public String getExperimentalContent() {
@@ -422,7 +437,7 @@ public abstract class LanguageServerSettings implements PersistentStateComponent
                         experimental = JsonParser.parseReader(new StringReader(experimentalContent));
                     }
                 } catch (Exception e) {
-                    LOGGER.warn("Error while parsing JSON Experimental for a language server", e);
+                    warnOnce("experimental", experimentalContent, e);
                 }
             }
             return experimental;
