@@ -1496,7 +1496,15 @@ public class LSPIJUtils {
             return -getIncrement(start, end, caretOffset);
         }
 
-        newText = newText.replaceAll("\r", "");
+        // A document accepts only \n line separators, and a language server may send \r\n or \r. A \r which ends the
+        // new text before a \n of the document is the \r of a \r\n, so drop it rather than make it a second line
+        // separator. This sees the document, not the edits still to apply, so a \r which ends an edit and a \n which a
+        // later edit puts after it make two line separators
+        CharSequence text = document.getCharsSequence();
+        if (newText.endsWith("\r") && end < text.length() && text.charAt(end) == '\n') {
+            newText = newText.substring(0, newText.length() - 1);
+        }
+        newText = StringUtil.convertLineSeparators(newText);
 
         if (start == end) {
             // Insert operation
