@@ -708,16 +708,25 @@ public class LanguageServerWrapper implements Disposable {
 
     /**
      * Stops the language server once the delay after its last document disconnected has passed, unless something keeps
-     * it alive by then, such as {@link LSPClientFeatures#keepServerAlive()}, which is asked again here.
+     * it alive by then, such as {@link LSPClientFeatures#keepServerAlive()}, which is asked again here. A check that
+     * fails keeps the server, as a yes does: it is not stopped on an error, and stops when its last document or lease
+     * goes next.
      */
     void stopIfNotKeptAlive() {
+        boolean keptAlive;
         try {
-            if (keepAlive()) {
-                if (getServerStatus() == ServerStatus.stopping) {
-                    updateStatus(ServerStatus.started);
-                }
-                return;
+            keptAlive = keepAlive();
+        } catch (RuntimeException e) {
+            LOGGER.error("Failed to check whether language server {} is kept alive", serverDefinition.getId(), e);
+            keptAlive = true;
+        }
+        if (keptAlive) {
+            if (getServerStatus() == ServerStatus.stopping) {
+                updateStatus(ServerStatus.started);
             }
+            return;
+        }
+        try {
             stop();
         } catch (Throwable t) {
             LOGGER.error("Failed to stop language server {}", serverDefinition.getId(), t);

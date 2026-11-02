@@ -17,6 +17,7 @@ import com.redhat.devtools.lsp4ij.fixtures.LSPTestFixtureFactory;
 import com.redhat.devtools.lsp4ij.mock.MockLanguageServerDefinition;
 import com.redhat.devtools.lsp4ij.templates.ServerMappingSettings;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
 import java.util.concurrent.TimeUnit;
@@ -24,7 +25,7 @@ import java.util.concurrent.TimeUnit;
 /**
  * Once its last document has disconnected, a language server is stopped after lastDocumentDisconnectedTimeout,
  * unless something keeps it alive by then: a lease taken while the stop is pending cancels it, and a stop that comes
- * due while keepServerAlive() says so leaves the server running.
+ * due while keepServerAlive() says so, or fails to answer, leaves the server running.
  */
 public class KeepAliveDuringPendingStopTest extends UsefulTestCase {
     private LSPCodeInsightTestFixture fixture;
@@ -86,6 +87,28 @@ public class KeepAliveDuringPendingStopTest extends UsefulTestCase {
         assertTrue(wrapper.isActive());
     }
 
+    public void testAScheduledStopThatComesDueWhileTheClientKeepsTheServerAliveLeavesItRunning() throws Exception {
+        definition.stopAtOnce = true;
+        var wrapper = start().getServerWrapper();
+        definition.keepAlive = true;
+        startStopTimer(wrapper);
+
+        PlatformTestUtil.waitWithEventsDispatching("the scheduled stop must run",
+                () -> wrapper.getServerStatus() != ServerStatus.stopping, 10);
+        assertEquals(ServerStatus.started, wrapper.getServerStatus());
+        assertTrue(wrapper.isActive());
+    }
+
+    public void testAStopThatComesDueWhenTheKeepAliveCheckFailsLeavesTheServerRunning() throws Exception {
+        var wrapper = start().getServerWrapper();
+        wrapper.updateStatus(ServerStatus.stopping);
+        definition.keepAliveFailure = new IllegalStateException("keepServerAlive() failed");
+
+        wrapper.stopIfNotKeptAlive();
+        assertEquals(ServerStatus.started, wrapper.getServerStatus());
+        assertTrue(wrapper.isActive());
+    }
+
     public void testAStopThatComesDueWithNothingKeepingTheServerStopsIt() throws Exception {
         var wrapper = start().getServerWrapper();
         wrapper.updateStatus(ServerStatus.stopping);
@@ -118,9 +141,16 @@ public class KeepAliveDuringPendingStopTest extends UsefulTestCase {
 
     private static class KeptServer extends MockLanguageServerDefinition {
         volatile boolean keepAlive;
+        volatile @Nullable RuntimeException keepAliveFailure;
+        volatile boolean stopAtOnce;
 
         KeptServer() {
             super("keep-alive-during-pending-stop", false);
+        }
+
+        @Override
+        public int getLastDocumentDisconnectedTimeout() {
+            return stopAtOnce ? 0 : super.getLastDocumentDisconnectedTimeout();
         }
 
         @Override
@@ -128,6 +158,10 @@ public class KeepAliveDuringPendingStopTest extends UsefulTestCase {
             return new LSPClientFeatures() {
                 @Override
                 public boolean keepServerAlive() {
+                    var failure = keepAliveFailure;
+                    if (failure != null) {
+                        throw failure;
+                    }
                     return keepAlive;
                 }
             };
