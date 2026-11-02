@@ -21,7 +21,7 @@ The [LSPClientFeatures](https://github.com/redhat-developer/lsp4ij/blob/main/src
 - [LSP implementation feature](#lsp-implementation-feature)
 - [LSP inlayHint feature](#lsp-inlayHint-feature)
 - [LSP inlineValue feature](#lsp-inlineValue-feature)
-- [LSP linkedEditingRange feature](#lsp-linkedEditingRange-feature)
+- [LSP linkedEditingRange feature](#lsp-linkededitingrange-feature)
 - [LSP progress feature](#lsp-progress-feature) 
 - [LSP references feature](#lsp-references-feature)
 - [LSP rename feature](#lsp-rename-feature)

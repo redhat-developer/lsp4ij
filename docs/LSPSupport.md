@@ -582,7 +582,7 @@ whitespace and punctuation. A text which doesn't match, a change outside the ran
 range stop the linked editing until the caret stops again.
 
 Linked editing is used with every language server which supports it; a client can turn it off with
-[LSPLinkedEditingRangeFeature](./LSPApi.md#lsp-linkedEditingRange-feature).
+[LSPLinkedEditingRangeFeature](./LSPApi.md#lsp-linkededitingrange-feature).
 
 ### Formatting
 

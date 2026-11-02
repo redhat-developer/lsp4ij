@@ -23,6 +23,7 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+import java.util.regex.Pattern;
 
 /**
  * A language server which supports 'textDocument/linkedEditingRange' links ranges, such as the declaration and the uses
@@ -86,6 +87,29 @@ public class LSPLinkedEditingRangeSynchronizerTest extends LSPCodeInsightFixture
         assertEquals("var id = 1; print(id); id++;", text());
     }
 
+    public void testDeletingARangeAndTypingANewNameEditsTheOthers() throws Exception {
+        open(new LinkedEditingRanges(NAME_RANGES));
+        linkedAt(AFTER_DECLARATION);
+
+        myFixture.type("\b\b\b\b");
+        assertEquals("the other ranges are emptied too", "var  = 1; print(); ++;", text());
+        myFixture.type("id");
+
+        assertEquals("var id = 1; print(id); id++;", text());
+    }
+
+    public void testTheRangesWhereTheEditorOpensAreAskedFor() throws Exception {
+        // the caret stays at offset 0, where the editor opens
+        open("name = 1; print(name);", new LinkedEditingRanges(List.of(range(0, 4), range(16, 20))));
+        var synchronizer = synchronizer();
+
+        PlatformTestUtil.waitWithEventsDispatching("linked editing ranges where the editor opens",
+                () -> !synchronizer.getRanges().isEmpty(), 30);
+        myFixture.type("x");
+
+        assertEquals("xname = 1; print(xname);", text());
+    }
+
     public void testATextWhichIsNotAWordIsNotCopied() throws Exception {
         open(new LinkedEditingRanges(NAME_RANGES));
         linkedAt(AFTER_DECLARATION);
@@ -131,6 +155,21 @@ public class LSPLinkedEditingRangeSynchronizerTest extends LSPCodeInsightFixture
         assertEmpty(linkedAt(AFTER_DECLARATION));
     }
 
+    public void testTouchingRangesAreIgnored() throws Exception {
+        // a text typed between them would grow both
+        open("var abab = 1;", new LinkedEditingRanges(List.of(range(4, 6), range(6, 8))));
+
+        assertEmpty(linkedAt(5));
+    }
+
+    public void testAWordPatternWhichBacktracksWithoutEndDoesNotMatch() {
+        var backtracking = Pattern.compile("(a+)+$");
+
+        assertFalse(LSPLinkedEditingRangeSynchronizer.isWord("a".repeat(40) + "!", backtracking));
+        assertTrue(LSPLinkedEditingRangeSynchronizer.isWord("a".repeat(40), backtracking));
+        assertTrue("an empty range can be typed again", LSPLinkedEditingRangeSynchronizer.isWord("", backtracking));
+    }
+
     public void testASingleRangeIsIgnored() throws Exception {
         open(new LinkedEditingRanges(List.of(range(4, 8))));
 
@@ -151,8 +190,12 @@ public class LSPLinkedEditingRangeSynchronizerTest extends LSPCodeInsightFixture
     }
 
     private void open(@Nullable LinkedEditingRanges linkedEditingRanges) throws Exception {
+        open(TEXT, linkedEditingRanges);
+    }
+
+    private void open(String text, @Nullable LinkedEditingRanges linkedEditingRanges) throws Exception {
         MockLanguageServer.INSTANCE.setLinkedEditingRanges(linkedEditingRanges);
-        var file = myFixture.configureByText("main.foo", TEXT);
+        var file = myFixture.configureByText("main.foo", text);
         LanguageServiceAccessor.getInstance(myFixture.getProject()).getLanguageServers(file, null, null)
                 .get(30, TimeUnit.SECONDS);
     }

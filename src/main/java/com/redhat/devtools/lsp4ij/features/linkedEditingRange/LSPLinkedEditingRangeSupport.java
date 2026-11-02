@@ -17,6 +17,7 @@ import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
 import com.redhat.devtools.lsp4ij.features.AbstractLSPDocumentFeatureSupport;
 import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
 import org.eclipse.lsp4j.LinkedEditingRanges;
+import org.eclipse.lsp4j.TextDocumentIdentifier;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
@@ -31,7 +32,8 @@ import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.mergeInOneF
  *     <li>LSP 'textDocument/linkedEditingRange' requests</li>
  * </ul>
  * <p>
- * The result has the linked editing ranges of each language server which gives some.
+ * The result has the linked editing ranges of each language server which gives some. Each editor has its own support,
+ * so that the request of one editor of a file doesn't cancel the request of another.
  */
 public class LSPLinkedEditingRangeSupport extends AbstractLSPDocumentFeatureSupport<LSPLinkedEditingRangeParams, List<LinkedEditingRanges>> {
 
@@ -98,11 +100,13 @@ public class LSPLinkedEditingRangeSupport extends AbstractLSPDocumentFeatureSupp
                                                                                          @NotNull PsiFile file,
                                                                                          @NotNull LanguageServerItem languageServer,
                                                                                          @NotNull CancellationSupport cancellationSupport) {
+        // Each language server gets its own parameters, since its request is written later, on its own thread
+        var serverParams = new LSPLinkedEditingRangeParams(new TextDocumentIdentifier(), params.getPosition(), params.getOffset());
         // Update textDocument Uri with custom file Uri if needed
-        updateTextDocumentUri(params.getTextDocument(), file, languageServer);
+        updateTextDocumentUri(serverParams.getTextDocument(), file, languageServer);
         return cancellationSupport.execute(languageServer
                         .getTextDocumentService()
-                        .linkedEditingRange(params), languageServer, LSPRequestConstants.TEXT_DOCUMENT_LINKED_EDITING_RANGE)
+                        .linkedEditingRange(serverParams), languageServer, LSPRequestConstants.TEXT_DOCUMENT_LINKED_EDITING_RANGE)
                 .thenApplyAsync(linkedEditingRanges -> {
                     if (linkedEditingRanges == null || linkedEditingRanges.getRanges() == null
                             || linkedEditingRanges.getRanges().isEmpty()) {

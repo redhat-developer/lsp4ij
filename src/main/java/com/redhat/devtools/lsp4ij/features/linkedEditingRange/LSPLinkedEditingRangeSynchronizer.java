@@ -36,7 +36,6 @@ import com.intellij.openapi.util.TextRange;
 import com.intellij.psi.PsiDocumentManager;
 import com.intellij.psi.PsiFile;
 import com.intellij.util.Alarm;
-import com.redhat.devtools.lsp4ij.LSPFileSupport;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
 import com.redhat.devtools.lsp4ij.client.ExecuteLSPFeatureStatus;
@@ -78,6 +77,10 @@ public final class LSPLinkedEditingRangeSynchronizer implements CaretListener, D
     // The time, in milliseconds, which the caret stays at an offset before the linked editing ranges are asked for
     private static final int REQUEST_DELAY = 100;
 
+    // The most characters which matching a word pattern may read: a word pattern of the language server which
+    // backtracks without end must not hang the EDT
+    private static final int WORD_PATTERN_READ_LIMIT = 100_000;
+
     // The word pattern of the ranges when the language server gives none: VS Code's default word definition
     private static final Pattern DEFAULT_WORD_PATTERN = Pattern.compile("(-?\\d*\\.\\d\\w*)|([^`~!@#$%^&*()\\-=+\\[{\\]}\\\\|;:'\",.<>/?\\s]+)");
 
@@ -92,6 +95,8 @@ public final class LSPLinkedEditingRangeSynchronizer implements CaretListener, D
     private boolean changed;
     // true while the other ranges are changed
     private boolean applying;
+    // the requests of this editor, which another editor of the file doesn't cancel
+    private @Nullable LSPLinkedEditingRangeSupport support;
     // completes once the result of the last request is applied or dropped
     private @Nullable CompletableFuture<Void> request;
 
@@ -119,6 +124,8 @@ public final class LSPLinkedEditingRangeSynchronizer implements CaretListener, D
         editor.getDocument().addDocumentListener(synchronizer, synchronizer);
         ApplicationManager.getApplication().getMessageBus().connect(synchronizer).subscribe(CommandListener.TOPIC, synchronizer);
         editor.putUserData(SYNCHRONIZER_KEY, synchronizer);
+        // the caret may stay where the editor opens
+        synchronizer.requestAlarm.addRequest(synchronizer::requestLinkedEditingRanges, REQUEST_DELAY);
     }
 
     /**
@@ -233,9 +240,13 @@ public final class LSPLinkedEditingRangeSynchronizer implements CaretListener, D
         var params = new LSPLinkedEditingRangeParams(new TextDocumentIdentifier(), LSPIJUtils.toPosition(offset, document), offset);
         var applied = new CompletableFuture<Void>();
         request = applied;
-        LSPFileSupport.getSupport(file)
-                .getLinkedEditingRangeSupport()
-                .getLinkedEditingRanges(params)
+        if (support == null || support.getFile() != file) {
+            if (support != null) {
+                support.cancel();
+            }
+            support = new LSPLinkedEditingRangeSupport(file);
+        }
+        support.getLinkedEditingRanges(params)
                 .whenComplete((result, error) -> {
                     if (result == null) {
                         // cancelled, or the language server failed, which LSP4IJ has reported
@@ -288,8 +299,8 @@ public final class LSPLinkedEditingRangeSynchronizer implements CaretListener, D
 
     /**
      * Returns the text ranges of the given linked editing ranges, the one with the caret first, or null when they are
-     * not ranges which can be edited together at the caret: fewer than two, out of the document, overlapping, with
-     * different texts, or none with the caret.
+     * not ranges which can be edited together at the caret: fewer than two, out of the document, overlapping or
+     * touching (a text typed between two ranges would grow both), with different texts, or none with the caret.
      */
     private static @Nullable List<TextRange> toTextRanges(@NotNull LinkedEditingRanges linkedEditingRanges,
                                                           int offset,
@@ -317,7 +328,7 @@ public final class LSPLinkedEditingRangeSynchronizer implements CaretListener, D
                 .toList();
         for (int i = 0; i < sorted.size(); i++) {
             if (!text.equals(document.getText(sorted.get(i)))
-                    || (i > 0 && sorted.get(i - 1).getEndOffset() > sorted.get(i).getStartOffset())) {
+                    || (i > 0 && sorted.get(i - 1).getEndOffset() >= sorted.get(i).getStartOffset())) {
                 return null;
             }
         }
@@ -342,12 +353,62 @@ public final class LSPLinkedEditingRangeSynchronizer implements CaretListener, D
     }
 
     /**
-     * Returns true if the first match of the word pattern in the text is the whole text, as VS Code checks it.
+     * Returns true if the first match of the word pattern in the text is the whole text, as VS Code checks it. An empty
+     * text is a word, so that a range can be deleted and typed again. A match which reads too many characters is not
+     * a word.
      */
     static boolean isWord(@NotNull String text, @NotNull Pattern wordPattern) {
-        var matcher = wordPattern.matcher(text);
-        int matchLength = matcher.find() ? matcher.end() - matcher.start() : 0;
-        return matchLength == text.length();
+        var matcher = wordPattern.matcher(new ReadLimitedText(text, WORD_PATTERN_READ_LIMIT));
+        try {
+            int matchLength = matcher.find() ? matcher.end() - matcher.start() : 0;
+            return matchLength == text.length();
+        } catch (ReadLimitExceededException e) {
+            LOGGER.warn("Stopped matching the word pattern '{}' of linked editing ranges, after {} characters", wordPattern, WORD_PATTERN_READ_LIMIT);
+            return false;
+        }
+    }
+
+    /**
+     * A text which can be read a limited number of times, which bounds the work of a regular expression on it.
+     */
+    private static final class ReadLimitedText implements CharSequence {
+
+        private final @NotNull String text;
+        private int readsLeft;
+
+        private ReadLimitedText(@NotNull String text, int readLimit) {
+            this.text = text;
+            this.readsLeft = readLimit;
+        }
+
+        @Override
+        public int length() {
+            return text.length();
+        }
+
+        @Override
+        public char charAt(int index) {
+            if (--readsLeft < 0) {
+                throw new ReadLimitExceededException();
+            }
+            return text.charAt(index);
+        }
+
+        @Override
+        public @NotNull CharSequence subSequence(int start, int end) {
+            return text.subSequence(start, end);
+        }
+
+        @Override
+        public @NotNull String toString() {
+            return text;
+        }
+    }
+
+    private static final class ReadLimitExceededException extends RuntimeException {
+        private ReadLimitExceededException() {
+            super(null, null, false, false);
+        }
     }
 
     private boolean isInFirstRange(@NotNull DocumentEvent event) {
@@ -370,6 +431,11 @@ public final class LSPLinkedEditingRangeSynchronizer implements CaretListener, D
 
     @Override
     public void dispose() {
+        if (support != null) {
+            // releases this synchronizer from a request which the language server hasn't answered
+            support.cancel();
+            support = null;
+        }
         clearRanges();
         editor.putUserData(SYNCHRONIZER_KEY, null);
     }

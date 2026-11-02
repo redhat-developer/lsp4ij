@@ -40,7 +40,6 @@ import com.redhat.devtools.lsp4ij.features.formatting.LSPOnTypeFormattingSupport
 import com.redhat.devtools.lsp4ij.features.highlight.LSPHighlightSupport;
 import com.redhat.devtools.lsp4ij.features.implementation.LSPImplementationSupport;
 import com.redhat.devtools.lsp4ij.features.inlayhint.LSPInlayHintsSupport;
-import com.redhat.devtools.lsp4ij.features.linkedEditingRange.LSPLinkedEditingRangeSupport;
 import com.redhat.devtools.lsp4ij.features.navigation.LSPDefinitionSupport;
 import com.redhat.devtools.lsp4ij.features.references.LSPReferenceSupport;
 import com.redhat.devtools.lsp4ij.features.rename.LSPPrepareRenameSupport;
@@ -87,7 +86,6 @@ public class LSPFileSupport extends UserDataHolderBase implements Disposable {
     private final LSPIntentionCodeActionSupport intentionCodeActionSupport;
     private final LSPPrepareRenameSupport prepareRenameSupport;
     private final LSPRenameSupport renameSupport;
-    private final LSPLinkedEditingRangeSupport linkedEditingRangeSupport;
     private final LSPCompletionSupport completionSupport;
     private final LSPInlineCompletionSupport inlineCompletionSupport;
     private final LSPImplementationSupport implementationSupport;
@@ -124,7 +122,6 @@ public class LSPFileSupport extends UserDataHolderBase implements Disposable {
         this.intentionCodeActionSupport = new LSPIntentionCodeActionSupport(file);
         this.prepareRenameSupport = new LSPPrepareRenameSupport(file);
         this.renameSupport = new LSPRenameSupport(file);
-        this.linkedEditingRangeSupport = new LSPLinkedEditingRangeSupport(file);
         this.completionSupport = new LSPCompletionSupport(file);
         this.inlineCompletionSupport = new LSPInlineCompletionSupport(file);
         this.implementationSupport = new LSPImplementationSupport(file);
@@ -199,7 +196,6 @@ public class LSPFileSupport extends UserDataHolderBase implements Disposable {
         getIntentionCodeActionSupport().cancel();
         getPrepareRenameSupport().cancel();
         getRenameSupport().cancel();
-        getLinkedEditingRangeSupport().cancel();
         getCompletionSupport().cancel();
         getImplementationSupport().cancel();
         getReferenceSupport().cancel();
@@ -354,15 +350,6 @@ public class LSPFileSupport extends UserDataHolderBase implements Disposable {
      */
     public LSPRenameSupport getRenameSupport() {
         return renameSupport;
-    }
-
-    /**
-     * Returns the LSP linked editing range support.
-     *
-     * @return the LSP linked editing range support.
-     */
-    public LSPLinkedEditingRangeSupport getLinkedEditingRangeSupport() {
-        return linkedEditingRangeSupport;
     }
 
     /**
