@@ -37,12 +37,14 @@ import com.intellij.platform.backend.presentation.TargetPresentation;
 import com.intellij.psi.PsiFile;
 import com.intellij.util.containers.ContainerUtil;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
+import com.redhat.devtools.lsp4ij.LSPRequestConstants;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import com.redhat.devtools.lsp4ij.commands.CommandExecutor;
 import com.redhat.devtools.lsp4ij.commands.LSPCommandContext;
 import com.redhat.devtools.lsp4ij.features.completion.CompletionProposalTools;
 import com.redhat.devtools.lsp4ij.features.completion.SnippetTemplateFactory;
 import com.redhat.devtools.lsp4ij.features.completion.snippet.LspSnippetIndentOptions;
+import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import org.eclipse.lsp4j.*;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
@@ -520,14 +522,18 @@ public class LSPCompletionProposal extends LookupElement implements Pointer<LSPC
     /**
      * Returns the LSP 'completionItem/resolve' request of the completion item, sent on the first call.
      * The EDT (apply) and background threads (expensive renderer, documentation) can both reach it.
+     * An error of the language server is reported like other LSP errors, and the request then completes
+     * with null, so that the completion item is used unresolved.
      *
      * @return the LSP 'completionItem/resolve' request of the completion item.
      */
     private synchronized CompletableFuture<CompletionItem> getResolvedCompletionItemFuture() {
         if (resolvedCompletionItemFuture == null) {
-            resolvedCompletionItemFuture = completionContext.getLanguageServer().getServer()
-                    .getTextDocumentService()
-                    .resolveCompletionItem(item);
+            LanguageServerItem languageServer = completionContext.getLanguageServer();
+            resolvedCompletionItemFuture = new CancellationSupport().execute(
+                    languageServer.getTextDocumentService().resolveCompletionItem(item),
+                    languageServer,
+                    LSPRequestConstants.COMPLETION_ITEM_RESOLVE);
         }
         return resolvedCompletionItemFuture;
     }
