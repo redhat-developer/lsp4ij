@@ -68,6 +68,8 @@ public class CompletionWhileTypingTest extends LSPCodeInsightFixtureTestCase {
         tester.typeWithPauses("l");
 
         assertEquals(2, requests().size());
+        // No trigger characters are configured, so the request typing makes is an invoked one
+        assertEquals(CompletionTriggerKind.Invoked, requests().get(1).getContext().getTriggerKind());
         assertEquals(List.of("alpine", "alps"), lookupStrings());
     }
 
