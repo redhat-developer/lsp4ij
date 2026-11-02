@@ -45,6 +45,8 @@ public class MockTextDocumentService implements TextDocumentService {
     private Hover mockHover;
     private List<? extends Location> mockDefinitionLocations;
     private List<? extends LocationLink> mockTypeDefinitions;
+    private List<? extends Location> mockImplementations;
+    private final List<ImplementationParams> implementationRequests = new CopyOnWriteArrayList<>();
     private List<? extends TextEdit> mockFormattingTextEdits;
     private SignatureHelp mockSignatureHelp;
     private List<CodeLens> mockCodeLenses;
@@ -344,6 +346,13 @@ public class MockTextDocumentService implements TextDocumentService {
     }
 
     @Override
+    public CompletableFuture<Either<List<? extends Location>, List<? extends LocationLink>>> implementation(
+            ImplementationParams params) {
+        implementationRequests.add(params);
+        return CompletableFuture.completedFuture(Either.forLeft(this.mockImplementations));
+    }
+
+    @Override
     public CompletableFuture<CodeAction> resolveCodeAction(CodeAction unresolved) {
         return CompletableFuture.completedFuture(mockResolvedCodeAction);
     }
@@ -433,6 +442,8 @@ public class MockTextDocumentService implements TextDocumentService {
         this.mockCompletionItem = null;
         this.mockDefinitionLocations = Collections.emptyList();
         this.mockTypeDefinitions = Collections.emptyList();
+        this.mockImplementations = Collections.emptyList();
+        this.implementationRequests.clear();
         this.mockHover = null;
         this.mockCodeLenses = null;
         this.mockReferences = null;
@@ -510,6 +521,17 @@ public class MockTextDocumentService implements TextDocumentService {
 
     public void setMockTypeDefinitions(List<? extends LocationLink> mockTypeDefinitions) {
         this.mockTypeDefinitions = mockTypeDefinitions;
+    }
+
+    public void setMockImplementations(List<? extends Location> mockImplementations) {
+        this.mockImplementations = mockImplementations;
+    }
+
+    /**
+     * @return the textDocument/implementation requests received since the last reset, in order
+     */
+    public List<ImplementationParams> getImplementationRequests() {
+        return implementationRequests;
     }
 
     public void setDocumentSymbols(List<DocumentSymbol> symbols) {
