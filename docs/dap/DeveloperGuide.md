@@ -241,11 +241,14 @@ description from a resource bundle.
 
 ### Declare the files that the DAP server debugs
 
-The files that a DAP server debugs are the ones where the user can put its breakpoints, and the ones that **Run** and
-**Debug** in the editor's context menu run with it.
+The files that a DAP server debugs are the ones where the user can put its breakpoints, the ones that **Run** and
+**Debug** in the editor's context menu run with it, and the ones whose breakpoints a debug session sends to it. Two
+`isDebuggableFile` methods decide this: the factory's, for where breakpoints can be put and for the context menu, and
+the descriptor's, for the breakpoints that a running session sends. By default both read the DAP server's file
+mappings.
 
-You can declare them with the [file mappings](../DeveloperGuide.md#declare-file-mappings) of language servers, whose
-`serverId` is the id of the DAP server:
+You can declare these mappings with the [file mappings](../DeveloperGuide.md#declare-file-mappings) of language
+servers, whose `serverId` is the id of the DAP server:
 
 ```xml
 <extensions defaultExtensionNs="com.redhat.devtools.lsp4ij">
@@ -255,12 +258,23 @@ You can declare them with the [file mappings](../DeveloperGuide.md#declare-file-
 ```
 
 LSP4IJ's language server registry logs a warning for a mapping whose `serverId` is not a language server's. To avoid
-it, or to decide in code, override `isDebuggableFile` in your factory instead:
+it, or to decide in code, override `isDebuggableFile` in your factory:
 
 ```java
 @Override
 public boolean isDebuggableFile(@NotNull VirtualFile file, @NotNull Project project) {
     return "ts".equals(file.getExtension());
+}
+```
+
+and in your descriptor too, for example by asking the factory. Otherwise the descriptor still reads only the
+mappings, and a debug session marks the breakpoints in your files as invalid:
+
+```java
+@Override
+public boolean isDebuggableFile(@NotNull VirtualFile file, @NotNull Project project) {
+    DebugAdapterServerDefinition serverDefinition = getServerDefinition();
+    return serverDefinition != null && serverDefinition.getFactory().isDebuggableFile(file, project);
 }
 ```
 
