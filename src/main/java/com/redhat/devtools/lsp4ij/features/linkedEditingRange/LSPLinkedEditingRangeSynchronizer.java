@@ -354,10 +354,14 @@ public final class LSPLinkedEditingRangeSynchronizer implements CaretListener, D
 
     /**
      * Returns true if the first match of the word pattern in the text is the whole text, as VS Code checks it. An empty
-     * text is a word, so that a range can be deleted and typed again. A match which reads too many characters is not
-     * a word.
+     * text is a word, so that a range can be deleted and typed again. A text longer than the read limit, and a match
+     * which reads more characters than it, are not words.
      */
     static boolean isWord(@NotNull String text, @NotNull Pattern wordPattern) {
+        if (text.length() > WORD_PATTERN_READ_LIMIT) {
+            // a word pattern which reads no characters, such as (?!), still tries each offset of the text
+            return false;
+        }
         var matcher = wordPattern.matcher(new ReadLimitedText(text, WORD_PATTERN_READ_LIMIT));
         try {
             int matchLength = matcher.find() ? matcher.end() - matcher.start() : 0;
