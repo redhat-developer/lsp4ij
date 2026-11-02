@@ -70,6 +70,7 @@ import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
+import java.util.stream.Collectors;
 
 /**
  * Utilities class for LSP.
@@ -1439,16 +1440,54 @@ public class LSPIJUtils {
         }
         final int oldCaretOffset = editor != null ? editor.getCaretModel().getOffset() : -1;
         int newCaretOffset = oldCaretOffset;
+        // A \r which ends an edit's text and a \n which follows it, in the document or in another edit's text, are one
+        // \r\n, so each edit's \r becomes a \n, and once all edits are applied, a \n made of a trailing \r is dropped
+        // if a \n of the text follows it. A \n made of a \r which starts an edit's text, alone or in a \r\n, doesn't
+        // count: \r followed by \r\n is two line separators. This converts the edits' joined text, as
+        // applyEdits(Document, List) does
+        final var trailingCrs = new ArrayList<RangeMarker>();
+        final var leadingCrs = new ArrayList<RangeMarker>();
         // Apply each text edit to update the given document
         for (var pair : pairs) {
             var edit = pair.first;
             var marker = pair.second;
-            int increment = applyEdit(marker.getStartOffset(), marker.getEndOffset(), edit.getNewText(), document, oldCaretOffset);
+            int start = marker.getStartOffset();
+            String newText = edit.getNewText();
+            int increment = applyEdit(start, marker.getEndOffset(), newText, document, oldCaretOffset, false);
             if (newCaretOffset != -1) {
                 newCaretOffset += increment;
             }
+            if (newText != null && newText.startsWith("\r")) {
+                leadingCrs.add(document.createRangeMarker(start, start + 1));
+            }
+            if (newText != null && newText.endsWith("\r")) {
+                int lf = start + StringUtil.convertLineSeparators(newText).length() - 1;
+                trailingCrs.add(document.createRangeMarker(lf, lf + 1));
+            }
             marker.dispose();
         }
+        if (!trailingCrs.isEmpty()) {
+            var crs = leadingCrs.stream()
+                    .filter(RangeMarker::isValid)
+                    .map(RangeMarker::getStartOffset)
+                    .collect(Collectors.toSet());
+            CharSequence text = document.getCharsSequence();
+            var joined = trailingCrs.stream()
+                    .filter(cr -> cr.isValid() && cr.getEndOffset() == cr.getStartOffset() + 1)
+                    .map(RangeMarker::getStartOffset)
+                    .filter(lf -> lf + 1 < text.length() && text.charAt(lf) == '\n' && text.charAt(lf + 1) == '\n'
+                            && !crs.contains(lf + 1))
+                    .sorted(Comparator.reverseOrder())
+                    .toList();
+            for (int lf : joined) {
+                document.deleteString(lf, lf + 1);
+                if (newCaretOffset != -1 && lf < newCaretOffset) {
+                    newCaretOffset--;
+                }
+            }
+        }
+        trailingCrs.forEach(RangeMarker::dispose);
+        leadingCrs.forEach(RangeMarker::dispose);
         if (newCaretOffset > -1 && oldCaretOffset != newCaretOffset) {
             editor.getCaretModel().moveToOffset(newCaretOffset);
         }
@@ -1476,6 +1515,28 @@ public class LSPIJUtils {
                                 @Nullable String newText,
                                 @NotNull Document document,
                                 int caretOffset) {
+        return applyEdit(start, end, newText, document, caretOffset, true);
+    }
+
+    /**
+     * Apply text edit by updating the given document.
+     *
+     * @param start              the start offset of the text edit.
+     * @param end                the end offset of the text edit.
+     * @param newText            the text to insert/replace and empty or null if delete must be done.
+     * @param document           the document to update.
+     * @param caretOffset        the current caret offset and -1 if caret must be not moved.
+     * @param joinTrailingCr     true if a \r which ends the new text before a \n of the document is dropped, as the \r
+     *                           of a \r\n, and false if it becomes a \n, which the caller joins once all its edits
+     *                           are applied.
+     * @return the increment (positive or negative) used to update caret offset.
+     */
+    private static int applyEdit(int start,
+                                 int end,
+                                 @Nullable String newText,
+                                 @NotNull Document document,
+                                 int caretOffset,
+                                 boolean joinTrailingCr) {
         if (StringUtils.isEmpty(newText)) {
             // Delete operation
 
@@ -1496,7 +1557,14 @@ public class LSPIJUtils {
             return -getIncrement(start, end, caretOffset);
         }
 
-        newText = newText.replaceAll("\r", "");
+        // A document accepts only \n line separators, and a language server may send \r\n or \r. A \r which ends the
+        // new text before a \n of the document is the \r of a \r\n, so drop it rather than make it a second line
+        // separator
+        CharSequence text = document.getCharsSequence();
+        if (joinTrailingCr && newText.endsWith("\r") && end < text.length() && text.charAt(end) == '\n') {
+            newText = newText.substring(0, newText.length() - 1);
+        }
+        newText = StringUtil.convertLineSeparators(newText);
 
         if (start == end) {
             // Insert operation
