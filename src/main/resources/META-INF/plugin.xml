@@ -1105,7 +1105,7 @@
     <applicationListeners>
         <listener
                 topic="com.intellij.openapi.project.ProjectManagerListener"
-                class="com.redhat.devtools.lsp4ij.ConnectDocumentToLanguageServerSetupParticipant"/>
+                class="com.redhat.devtools.lsp4ij.ConnectDocumentToLanguageServerSetupParticipant$ProjectClosingListener"/>
         <listener
                 topic="com.intellij.openapi.fileEditor.FileDocumentManagerListener"
                 class="com.redhat.devtools.lsp4ij.LSPDocumentSaveListener"/>
@@ -1114,6 +1114,8 @@
     </applicationListeners>
 
     <projectListeners>
+        <listener topic="com.intellij.openapi.fileEditor.FileEditorManagerListener"
+                  class="com.redhat.devtools.lsp4ij.ConnectDocumentToLanguageServerSetupParticipant"/>
         <listener topic="com.intellij.codeInsight.lookup.LookupManagerListener"
                   class="com.redhat.devtools.lsp4ij.features.completion.LSPCompletionContributor$LSPLookupManagerListener"/>
         <listener class="com.redhat.devtools.lsp4ij.client.indexing.ProjectIndexingOnlyDumbStrategy"

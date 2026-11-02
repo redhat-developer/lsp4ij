@@ -19,53 +19,29 @@ import com.intellij.openapi.project.ProjectManagerListener;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiFile;
 import com.intellij.util.concurrency.AppExecutorUtil;
-import com.intellij.util.messages.MessageBusConnection;
 import com.redhat.devtools.lsp4ij.client.indexing.ProjectIndexingManager;
 import com.redhat.devtools.lsp4ij.lifecycle.LanguageServerLifecycleManager;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Manages the connection between open editor files and Language Servers:
  * <ul>
  *   <li>Starts Language Servers when a supported file becomes active in the editor.</li>
  *   <li>Releases resources when a file is closed.</li>
- *   <li>Properly stops Language Servers when the project is closed.</li>
+ *   <li>Properly stops Language Servers when the project is closed ({@link ProjectClosingListener}).</li>
  * </ul>
+ * <p>
+ * It is declared as a project listener, so the platform delivers it the editor events of a project from the start,
+ * including the selection of the editors reopened when the project opens.
  */
-public class ConnectDocumentToLanguageServerSetupParticipant implements ProjectManagerListener, FileEditorManagerListener {
-
-    // Store connections per project to properly dispose them
-    private final Map<Project, MessageBusConnection> projectConnections = new ConcurrentHashMap<>();
+public class ConnectDocumentToLanguageServerSetupParticipant implements FileEditorManagerListener {
 
     private static void connectToLanguageServer(@NotNull PsiFile psiFile, @NotNull Project project) {
         LanguageServiceAccessor.getInstance(project)
                 .getLanguageServers(psiFile, null, null);
-    }
-
-    @Override
-    public void projectOpened(@NotNull Project project) {
-        // Subscribe to file open/close/selection events for this project.
-        MessageBusConnection connection = project.getMessageBus().connect();
-        connection.subscribe(FileEditorManagerListener.FILE_EDITOR_MANAGER, this);
-        projectConnections.put(project, connection);
-    }
-
-    @Override
-    public void projectClosing(@NotNull Project project) {
-        // Stop active Language Servers and clean up resources before the project is closed.
-        LanguageServerLifecycleManager.getInstance(project).dispose();
-        LanguageServiceAccessor.getInstance(project).projectClosing(project);
-
-        // Properly dispose MessageBusConnection to prevent memory leak
-        MessageBusConnection connection = projectConnections.remove(project);
-        if (connection != null) {
-            connection.disconnect();
-        }
     }
 
     @Override
@@ -135,5 +111,18 @@ public class ConnectDocumentToLanguageServerSetupParticipant implements ProjectM
                 .coalesceBy(this, file, project)
                 .expireWhen(() -> project.isDisposed())
                 .submit(AppExecutorUtil.getAppExecutorService());
+    }
+
+    /**
+     * Stops the active Language Servers of a project when it is closed.
+     */
+    public static class ProjectClosingListener implements ProjectManagerListener {
+
+        @Override
+        public void projectClosing(@NotNull Project project) {
+            // Stop active Language Servers and clean up resources before the project is closed.
+            LanguageServerLifecycleManager.getInstance(project).dispose();
+            LanguageServiceAccessor.getInstance(project).projectClosing(project);
+        }
     }
 }
