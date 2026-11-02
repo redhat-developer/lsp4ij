@@ -530,9 +530,10 @@ public class LSPCompletionProposal extends LookupElement implements Pointer<LSPC
     private synchronized CompletableFuture<CompletionItem> getResolvedCompletionItemFuture() {
         if (resolvedCompletionItemFuture == null) {
             LanguageServerItem languageServer = completionContext.getLanguageServer();
-            resolvedCompletionItemFuture = new CancellationSupport().execute(languageServer
-                    .getTextDocumentService()
-                    .resolveCompletionItem(item), languageServer, LSPRequestConstants.COMPLETION_ITEM_RESOLVE);
+            resolvedCompletionItemFuture = new CancellationSupport().execute(
+                    languageServer.getTextDocumentService().resolveCompletionItem(item),
+                    languageServer,
+                    LSPRequestConstants.COMPLETION_ITEM_RESOLVE);
         }
         return resolvedCompletionItemFuture;
     }
