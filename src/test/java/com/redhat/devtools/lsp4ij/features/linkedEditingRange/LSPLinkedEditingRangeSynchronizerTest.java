@@ -177,6 +177,35 @@ public class LSPLinkedEditingRangeSynchronizerTest extends LSPCodeInsightFixture
         assertEquals("the word pattern doesn't run on it", 0, text.reads());
     }
 
+    public void testATextAtTheReadLimitIsMatched() {
+        var text = new LSPLinkedEditingRangeSynchronizer.ReadLimitedText("a".repeat(10), 10);
+
+        assertTrue(LSPLinkedEditingRangeSynchronizer.isWord(text, Pattern.compile("a+")));
+    }
+
+    public void testAWordPatternWhichExhaustsTheStackDoesNotMatch() {
+        // each repetition of the group recurses, and the text is read only once per character
+        var text = new LSPLinkedEditingRangeSynchronizer.ReadLimitedText("a".repeat(100_000), 100_000);
+
+        assertFalse(LSPLinkedEditingRangeSynchronizer.isWord(text, Pattern.compile("(a|b)+")));
+    }
+
+    public void testTheRangesAreAskedForAgainWhenOneCaretIsLeft() throws Exception {
+        open(new LinkedEditingRanges(NAME_RANGES));
+        linkedAt(AFTER_DECLARATION);
+        var caretModel = myFixture.getEditor().getCaretModel();
+        var second = caretModel.addCaret(myFixture.getEditor().offsetToVisualPosition(20));
+        assertNotNull(second);
+        var synchronizer = synchronizer();
+        assertEmpty("a second caret drops the ranges", synchronizer.getRanges());
+
+        caretModel.removeCaret(second);
+
+        PlatformTestUtil.waitWithEventsDispatching("linked editing ranges once one caret is left",
+                () -> !synchronizer.getRanges().isEmpty(), 30);
+        assertEquals(NAME_TEXT_RANGES, synchronizer.getRanges());
+    }
+
     public void testASingleRangeIsIgnored() throws Exception {
         open(new LinkedEditingRanges(List.of(range(4, 8))));
 

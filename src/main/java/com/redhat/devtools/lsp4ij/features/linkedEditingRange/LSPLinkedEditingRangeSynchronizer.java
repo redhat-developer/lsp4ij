@@ -172,6 +172,17 @@ public final class LSPLinkedEditingRangeSynchronizer implements CaretListener, D
     }
 
     /**
+     * Asks again for the ranges at the caret once one caret is left.
+     */
+    @Override
+    public void caretRemoved(@NotNull CaretEvent event) {
+        requestAlarm.cancelAllRequests();
+        if (editor.getCaretModel().getCaretCount() == 1) {
+            requestAlarm.addRequest(this::requestLinkedEditingRanges, REQUEST_DELAY);
+        }
+    }
+
+    /**
      * Notes a change of the current command in the range with the caret, and drops the ranges on any other change:
      * outside that range or outside a command, during an undo or a redo, or in a bulk update.
      */
@@ -403,6 +414,10 @@ public final class LSPLinkedEditingRangeSynchronizer implements CaretListener, D
             return matchLength == text.length();
         } catch (ReadLimitExceededException e) {
             LOGGER.warn("Stopped matching the word pattern '{}' of linked editing ranges, after {} characters", wordPattern, text.readLimit);
+            return false;
+        } catch (StackOverflowError e) {
+            // the read limit doesn't bound the recursion of a repeated group, such as (a|b)+, on a long text
+            LOGGER.warn("Stopped matching the word pattern '{}' of linked editing ranges, which exhausted the stack", wordPattern);
             return false;
         }
     }
