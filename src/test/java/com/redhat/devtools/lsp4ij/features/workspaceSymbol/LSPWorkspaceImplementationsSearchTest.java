@@ -67,6 +67,13 @@ public class LSPWorkspaceImplementationsSearchTest extends LSPCodeInsightFixture
         assertEquals(AT_NAME, searchedPosition(file, new TestElement(file, NAME, -1)));
     }
 
+    public void testAnElementWithATextOffsetAfterItIsSearchedAtItsStart() throws Exception {
+        PsiFile file = open();
+
+        // one character past the end of the element, still in the document
+        assertEquals(AT_NAME, searchedPosition(file, new TestElement(file, NAME, NAME.getEndOffset() + 1)));
+    }
+
     private PsiFile open() throws Exception {
         MockLanguageServer.reset(() -> {
             var capabilities = MockLanguageServer.defaultServerCapabilities();
