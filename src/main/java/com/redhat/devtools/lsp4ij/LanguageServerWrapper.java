@@ -138,7 +138,6 @@ public class LanguageServerWrapper implements Disposable {
     private final ExecutorService listener;
     private final ExecutorService messageWriter;
     private final ExecutorService requestWriter;
-    private volatile @NotNull CompletableFuture<Void> lastNotificationWriteFuture = CompletableFuture.completedFuture(null);
     private final SimpleModificationTracker modificationTracker = new SimpleModificationTracker();
     /**
      * Map containing unregistration handlers for dynamic capability registrations.
@@ -541,7 +540,7 @@ public class LanguageServerWrapper implements Disposable {
                                     // (didOpen before didChange before didClose).
                                     var writeFuture = CompletableFuture.runAsync(
                                             () -> consumer.consume(message), messageWriter);
-                                    lastNotificationWriteFuture = writeFuture;
+                                    initializingContext.lastNotificationWriteFuture = writeFuture;
                                     writeFuture.exceptionally(e -> {
                                         getLanguageServerLifecycleManager().onError(this, e);
                                         return null;
@@ -560,7 +559,7 @@ public class LanguageServerWrapper implements Disposable {
                                     // Client-initiated requests (completion, hover, ...) wait for
                                     // the last notification write so the server processes them
                                     // against the up-to-date document state.
-                                    lastNotificationWriteFuture
+                                    initializingContext.lastNotificationWriteFuture
                                             .thenRunAsync(() -> consumer.consume(message), requestWriter)
                                             .exceptionally(e -> {
                                                 getLanguageServerLifecycleManager().onError(this, e);
@@ -2146,7 +2145,6 @@ public class LanguageServerWrapper implements Disposable {
                     disconnect(this.openedDocuments.keySet().iterator().next(), false);
                 }
                 // Old replies are refused by connection identity, so the new connection can start afresh.
-                lastNotificationWriteFuture = CompletableFuture.completedFuture(null);
                 documentVersion.set(0);
                 if (!closedDocuments.isEmpty()) {
                     Set<URI> fileUris = new HashSet<>(closedDocuments.keySet());
@@ -2299,6 +2297,9 @@ public class LanguageServerWrapper implements Disposable {
         public LanguageServer languageServer;
         public Future<?> launcherFuture;
         public InitializeResult initializeResult;
+        // Per-connection barrier: requests chain on this so the server processes them
+        // against the document state described by the last notification write.
+        public volatile @NotNull CompletableFuture<Void> lastNotificationWriteFuture = CompletableFuture.completedFuture(null);
     }
 
 
