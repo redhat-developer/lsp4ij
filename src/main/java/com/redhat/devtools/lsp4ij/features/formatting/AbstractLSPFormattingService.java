@@ -12,6 +12,7 @@ package com.redhat.devtools.lsp4ij.features.formatting;
 
 import com.intellij.formatting.service.AsyncDocumentFormattingService;
 import com.intellij.formatting.service.AsyncFormattingRequest;
+import com.intellij.lang.LanguageFormattingRestriction;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.project.Project;
@@ -115,9 +116,26 @@ public abstract class AbstractLSPFormattingService extends AsyncDocumentFormatti
             // The file is not associated to a language server
             return false;
         }
+        if (!isFormatterAllowed(file)) {
+            // The file is excluded from formatting (ex: a "Do not format" pattern of the code style settings)
+            return false;
+        }
         Project project = file.getProject();
         return LanguageServiceAccessor.getInstance(project)
                 .hasAny(file, ls -> canSupportFormatting(ls, file));
+    }
+
+    /**
+     * Returns true if no {@link LanguageFormattingRestriction} forbids formatting the given file. IntelliJ asks the
+     * restrictions only for its own formatter (in {@code LanguageFormatting#forContext}), so a formatting service
+     * must ask them itself.
+     *
+     * @param file the Psi file.
+     * @return true if no {@link LanguageFormattingRestriction} forbids formatting the given file.
+     */
+    private static boolean isFormatterAllowed(@NotNull PsiFile file) {
+        return LanguageFormattingRestriction.EP_NAME.getExtensionList().stream()
+                .allMatch(restriction -> restriction.isFormatterAllowed(file));
     }
 
     private boolean canSupportFormatting(@NotNull LanguageServerWrapper ls,
