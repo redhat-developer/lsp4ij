@@ -87,30 +87,51 @@ public class LSPInlayHintsSupport extends AbstractLSPDocumentFeatureSupport<Inla
         return cancellationSupport.execute(languageServer
                         .getTextDocumentService()
                         .inlayHint(params), languageServer, LSPRequestConstants.TEXT_DOCUMENT_INLAY_HINT)
-                .thenApplyAsync(inlayHints -> {
+                .thenComposeAsync(inlayHints -> {
                     if (inlayHints == null) {
                         // textDocument/inlayHint may return null
-                        return Collections.emptyList();
+                        return CompletableFuture.completedFuture(Collections.emptyList());
                     }
-                    List<InlayHintData> data = new ArrayList<>();
+                    List<CompletableFuture<InlayHintData>> data = new ArrayList<>();
                     inlayHints.stream()
                             .filter(Objects::nonNull)
                             .forEach(inlayHint -> {
-                                CompletableFuture<InlayHint> resolvedInlayHintFuture = null;
                                 if (inlayHint.getLabel() == null && languageServer.getClientFeatures().getInlayHintFeature().isResolveInlayHintSupported(file)) {
                                     // - the inlayHint has no label, and the language server supports inlayHint/resolve
-                                    // prepare the future which resolves the inlayHint.
-                                    resolvedInlayHintFuture = cancellationSupport.execute(languageServer
-                                            .getTextDocumentService()
-                                            .resolveInlayHint(inlayHint), languageServer, LSPRequestConstants.INLAY_HINT_RESOLVE);
-                                }
-                                if (hasValidLabel(inlayHint) || resolvedInlayHintFuture != null) {
-                                    // The inlayHint content is filled with valid label or the inlayHint must be resolved
-                                    data.add(new InlayHintData(inlayHint, languageServer, resolvedInlayHintFuture));
+                                    // resolve the inlayHint, which is dropped when its resolve fails or gives no valid label.
+                                    data.add(resolveInlayHint(inlayHint, languageServer, cancellationSupport));
+                                } else if (hasValidLabel(inlayHint)) {
+                                    // The inlayHint content is filled with valid label
+                                    data.add(CompletableFuture.completedFuture(new InlayHintData(inlayHint, languageServer)));
                                 }
                             });
-                    return data;
+                    // Wait for the inlayHint/resolve requests, and keep the inlay hints which have a valid label
+                    return CompletableFuture.allOf(data.toArray(new CompletableFuture[0]))
+                            .thenApply(unused -> data.stream()
+                                    .map(CompletableFuture::join)
+                                    .filter(Objects::nonNull)
+                                    .toList());
                 });
+    }
+
+    /**
+     * Resolves an inlay hint which has no label.
+     *
+     * @param inlayHint           the inlay hint without label.
+     * @param languageServer      the language server which has created the inlay hint.
+     * @param cancellationSupport the cancellation support.
+     * @return the future of the resolved inlay hint data, which is null when the language server answers the
+     * inlayHint/resolve request with an error, or with an inlay hint without a valid label.
+     */
+    private static CompletableFuture<InlayHintData> resolveInlayHint(@NotNull InlayHint inlayHint,
+                                                                     @NotNull LanguageServerItem languageServer,
+                                                                     @NotNull CancellationSupport cancellationSupport) {
+        return cancellationSupport.execute(
+                        languageServer.getTextDocumentService().resolveInlayHint(inlayHint),
+                        languageServer,
+                        LSPRequestConstants.INLAY_HINT_RESOLVE)
+                .thenApply(resolvedInlayHint -> resolvedInlayHint != null && hasValidLabel(resolvedInlayHint) ?
+                        new InlayHintData(resolvedInlayHint, languageServer) : null);
     }
 
     /**

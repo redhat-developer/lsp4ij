@@ -51,6 +51,9 @@ public class MockTextDocumentService implements TextDocumentService {
     private List<DocumentLink> mockDocumentLinks;
     private Function<DocumentLink, CompletableFuture<DocumentLink>> documentLinkResolveProcessor;
     private final List<DocumentLink> documentLinkResolveRequests = new CopyOnWriteArrayList<>();
+    private List<InlayHint> mockInlayHints;
+    private Function<InlayHint, CompletableFuture<InlayHint>> inlayHintResolveProcessor;
+    private final List<InlayHint> inlayHintResolveRequests = new CopyOnWriteArrayList<>();
     private Map<Position, List<? extends DocumentHighlight>> mockDocumentHighlights;
     private LinkedEditingRanges mockLinkedEditingRanges;
     private List<SelectionRange> mockSelectionRanges;
@@ -185,6 +188,20 @@ public class MockTextDocumentService implements TextDocumentService {
             return documentLinkResolveProcessor.apply(params);
         }
         return CompletableFuture.completedFuture(params);
+    }
+
+    @Override
+    public CompletableFuture<List<InlayHint>> inlayHint(InlayHintParams params) {
+        return CompletableFuture.completedFuture(mockInlayHints);
+    }
+
+    @Override
+    public CompletableFuture<InlayHint> resolveInlayHint(InlayHint unresolved) {
+        inlayHintResolveRequests.add(unresolved);
+        if (inlayHintResolveProcessor != null) {
+            return inlayHintResolveProcessor.apply(unresolved);
+        }
+        return CompletableFuture.completedFuture(unresolved);
     }
 
     @Override
@@ -428,6 +445,21 @@ public class MockTextDocumentService implements TextDocumentService {
         return documentLinkResolveRequests;
     }
 
+    public void setMockInlayHints(List<InlayHint> inlayHints) {
+        this.mockInlayHints = inlayHints;
+    }
+
+    public void setInlayHintResolveProcessor(Function<InlayHint, CompletableFuture<InlayHint>> inlayHintResolveProcessor) {
+        this.inlayHintResolveProcessor = inlayHintResolveProcessor;
+    }
+
+    /**
+     * @return the inlayHint/resolve requests received since the last reset, in order
+     */
+    public List<InlayHint> getInlayHintResolveRequests() {
+        return inlayHintResolveRequests;
+    }
+
     public void reset() {
         this.mockCompletionList = new CompletionList();
         this.mockCompletionItem = null;
@@ -451,6 +483,9 @@ public class MockTextDocumentService implements TextDocumentService {
         this.resolveCompletionItemProcessor = null;
         this.documentLinkResolveProcessor = null;
         this.documentLinkResolveRequests.clear();
+        this.mockInlayHints = null;
+        this.inlayHintResolveProcessor = null;
+        this.inlayHintResolveRequests.clear();
     }
 
     public void setResolveCompletionItemProcessor(Function<CompletionItem, CompletableFuture<CompletionItem>> resolveCompletionItemProcessor) {

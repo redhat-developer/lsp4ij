@@ -13,18 +13,14 @@ package com.redhat.devtools.lsp4ij.features.inlayhint;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import org.eclipse.lsp4j.InlayHint;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
-
-import java.util.concurrent.CompletableFuture;
 
 /**
  * Inlay hint Data
  *
- * @param inlayHint               the LSP inlayHint
- * @param languageServer         the language server which has created the inlayHint.
- * @param resolvedInlayHintsFuture the inlayHint/resolve future and null otherwise.
+ * @param inlayHint      the LSP inlayHint, which has a valid label: resolved with inlayHint/resolve when the
+ *                       language server has given it without label.
+ * @param languageServer the language server which has created the inlayHint.
  */
 record InlayHintData(@NotNull InlayHint inlayHint,
-                     @NotNull LanguageServerItem languageServer,
-                     @Nullable CompletableFuture<InlayHint> resolvedInlayHintsFuture) {
+                     @NotNull LanguageServerItem languageServer) {
 }
