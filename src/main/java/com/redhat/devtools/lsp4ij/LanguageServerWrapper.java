@@ -721,8 +721,11 @@ public class LanguageServerWrapper implements Disposable {
             keptAlive = true;
         }
         if (keptAlive) {
-            if (getServerStatus() == ServerStatus.stopping) {
-                updateStatus(ServerStatus.started);
+            synchronized (this) {
+                // Only the pending stop's status: an explicit stop() has dropped the server's context, as stop(boolean) checks
+                if (getServerStatus() == ServerStatus.stopping && currentInitializingContext != null) {
+                    updateStatus(ServerStatus.started);
+                }
             }
             return;
         }

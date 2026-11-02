@@ -25,7 +25,7 @@ import java.util.concurrent.TimeUnit;
 /**
  * Once its last document has disconnected, a language server is stopped after lastDocumentDisconnectedTimeout,
  * unless something keeps it alive by then: a lease taken while the stop is pending cancels it, and a stop that comes
- * due while keepServerAlive() says so, or fails to answer, leaves the server running.
+ * due while keepServerAlive() says so, or fails to answer, leaves the server running. It does not undo an explicit stop.
  */
 public class KeepAliveDuringPendingStopTest extends UsefulTestCase {
     private LSPCodeInsightTestFixture fixture;
@@ -107,6 +107,18 @@ public class KeepAliveDuringPendingStopTest extends UsefulTestCase {
         wrapper.stopIfNotKeptAlive();
         assertEquals(ServerStatus.started, wrapper.getServerStatus());
         assertTrue(wrapper.isActive());
+    }
+
+    public void testAStopThatComesDueDuringAnExplicitStopLeavesItStopping() throws Exception {
+        var wrapper = start().getServerWrapper();
+        wrapper.stop().get(10, TimeUnit.SECONDS);
+        // What an explicit stop() leaves while its shutdown runs: stopping, with the server's context dropped
+        wrapper.updateStatus(ServerStatus.stopping);
+        definition.keepAlive = true;
+
+        wrapper.stopIfNotKeptAlive();
+        assertEquals(ServerStatus.stopping, wrapper.getServerStatus());
+        assertFalse(wrapper.isActive());
     }
 
     public void testAStopThatComesDueWithNothingKeepingTheServerStopsIt() throws Exception {
