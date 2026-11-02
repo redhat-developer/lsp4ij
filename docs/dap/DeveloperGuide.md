@@ -282,7 +282,9 @@ public boolean isDebuggableFile(@NotNull VirtualFile file, @NotNull Project proj
 
 **Run** and **Debug** in the editor's context menu create a generic DAP Run/Debug configuration, which the factory's
 `prepareConfiguration(RunConfiguration, VirtualFile, Project)` fills with the file and the DAP server. Override it to
-fill it otherwise, or return `false` to create none, for example when your DAP server only attaches.
+fill it otherwise, or return `false` to create none, for example when your DAP server only attaches. When a saved
+generic DAP Run/Debug configuration already runs that file, the context menu copies it instead, and does not ask the
+factory.
 
 ### Test your debugAdapterServer
 
