@@ -92,7 +92,13 @@ public class LSPCompletionContributor extends CompletionContributor {
                 CompletionPrefix completionPrefix = new CompletionPrefix(offset, document);
                 for (var item : data) {
                     ProgressManager.checkCanceled();
-                    addCompletionItems(parameters, completionPrefix, item.completion(), item.languageServer(), result);
+                    addCompletionItems(
+                            parameters,
+                            completionPrefix,
+                            item.completion(),
+                            item.languageServer(),
+                            item.triggerKind(),
+                            result);
                 }
             }
         }
@@ -102,15 +108,28 @@ public class LSPCompletionContributor extends CompletionContributor {
                                     @NotNull CompletionPrefix completionPrefix,
                                     @NotNull Either<List<CompletionItem>, CompletionList> completion,
                                     @NotNull LanguageServerItem languageServer,
+                                    @NotNull CompletionTriggerKind triggerKind,
                                     @NotNull CompletionResultSet result) {
         CompletionItemDefaults itemDefaults = null;
         List<CompletionItem> items = new ArrayList<>();
+        boolean incomplete = false;
         if (completion.isLeft()) {
             items.addAll(completion.getLeft());
         } else {
             CompletionList completionList = completion.getRight();
             itemDefaults = completionList.getItemDefaults();
             items.addAll(completionList.getItems());
+            incomplete = completionList.isIncomplete();
+        }
+
+        // Restart the completion when the prefix changes, which asks all language servers again instead of filtering
+        // their items, if this language server returned:
+        // - an incomplete list: further typing must recompute it
+        // - no items for the trigger character which opened the auto popup: IntelliJ would otherwise skip the auto
+        //   popup for the next letter typed (see CompletionPhase.EmptyAutoPopup), so the language server would never
+        //   be asked for the word which follows
+        if (incomplete || (items.isEmpty() && triggerKind == CompletionTriggerKind.TriggerCharacter)) {
+            result.restartCompletionOnAnyPrefixChange();
         }
 
         PsiFile originalFile = parameters.getOriginalFile();

@@ -17,7 +17,11 @@ import com.redhat.devtools.lsp4ij.features.AbstractLSPDocumentFeatureSupport;
 import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
 import com.redhat.devtools.lsp4ij.internal.CompletableFutures;
 import org.eclipse.lsp4j.CompletionContext;
+import org.eclipse.lsp4j.CompletionItem;
+import org.eclipse.lsp4j.CompletionList;
 import org.eclipse.lsp4j.CompletionTriggerKind;
+import org.eclipse.lsp4j.TextDocumentIdentifier;
+import org.eclipse.lsp4j.jsonrpc.messages.Either;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.Collections;
@@ -85,18 +89,28 @@ public class LSPCompletionSupport extends AbstractLSPDocumentFeatureSupport<LSPC
                                                                              @NotNull LanguageServerItem languageServer,
                                                                              @NotNull CancellationSupport cancellationSupport) {
 
+        // Each language server gets params of its own: the request is written later, on the messageWriter
+        // thread, so shared params could carry the next language server's document Uri and context
+        LSPCompletionParams serverParams = new LSPCompletionParams(
+                new TextDocumentIdentifier(),
+                params.getPosition(),
+                params.getOffset(),
+                params.getCompletionChar(),
+                params.isAutoPopup());
         // Update textDocument Uri with custom file Uri if needed
-        updateTextDocumentUri(params.getTextDocument(), file, languageServer);
-        params.setContext(createCompletionContext(params, file, languageServer));
+        updateTextDocumentUri(serverParams.getTextDocument(), file, languageServer);
+        CompletionContext context = createCompletionContext(serverParams, file, languageServer);
+        serverParams.setContext(context);
         return cancellationSupport.execute(languageServer
                         .getTextDocumentService()
-                        .completion(params), languageServer, LSPRequestConstants.TEXT_DOCUMENT_COMPLETION)
+                        .completion(serverParams), languageServer, LSPRequestConstants.TEXT_DOCUMENT_COMPLETION)
                 .thenApplyAsync(result -> {
-                    if (result == null) {
-                        // textDocument/completion may return null
-                        return Collections.emptyList();
-                    }
-                    return List.of(new CompletionData(result, languageServer));
+                    // textDocument/completion may return null: keep it as an empty list, so that
+                    // LSPCompletionContributor asks again on typing when a trigger character gets no items
+                    Either<List<CompletionItem>, CompletionList> completion = result != null
+                            ? result
+                            : Either.forLeft(List.of());
+                    return List.of(new CompletionData(completion, languageServer, context.getTriggerKind()));
                 });
     }
 

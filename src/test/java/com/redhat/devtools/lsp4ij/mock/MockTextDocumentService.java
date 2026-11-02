@@ -40,6 +40,7 @@ import java.util.function.Predicate;
 public class MockTextDocumentService implements TextDocumentService {
 
     private CompletionList mockCompletionList;
+    private final List<CompletionParams> completionRequests = new CopyOnWriteArrayList<>();
     private CompletionItem mockCompletionItem;
     private Either<List<InlineCompletionItem>, InlineCompletionList> mockInlineCompletion;
     private Hover mockHover;
@@ -114,6 +115,7 @@ public class MockTextDocumentService implements TextDocumentService {
 
     @Override
     public CompletableFuture<Either<List<CompletionItem>, CompletionList>> completion(CompletionParams position) {
+        completionRequests.add(position);
         return futureFactory(Either.forRight(mockCompletionList));
     }
 
@@ -354,6 +356,13 @@ public class MockTextDocumentService implements TextDocumentService {
         this.mockCompletionList = completionList;
     }
 
+    /**
+     * @return the textDocument/completion requests received since the last reset, in order
+     */
+    public List<CompletionParams> getCompletionRequests() {
+        return completionRequests;
+    }
+
     public void setMockInlineCompletion(Either<List<InlineCompletionItem>, InlineCompletionList> inlineCompletion) {
         this.mockInlineCompletion = inlineCompletion;
     }
@@ -439,6 +448,7 @@ public class MockTextDocumentService implements TextDocumentService {
 
     public void reset() {
         this.mockCompletionList = new CompletionList();
+        this.completionRequests.clear();
         this.mockCompletionItem = null;
         this.mockDefinitionLocations = Collections.emptyList();
         this.mockTypeDefinitions = Collections.emptyList();

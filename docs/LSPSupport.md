@@ -364,6 +364,7 @@ the `ColorChooserService`:
 [LSPCompletionContributor](https://github.com/redhat-developer/lsp4ij/blob/main/src/main/java/com/redhat/devtools/lsp4ij/features/completion/LSPCompletionContributor.java) class
 declared with the
 `completion.contributor` extension point. As this extension point supports `any` language, it works out-of-the-box.
+When a language server returns an incomplete list (`isIncomplete: true`), or no items for a trigger character, typing further asks the language servers again instead of filtering the items they gave.
 
 Here is an example with the [Qute language server](https://github.com/redhat-developer/quarkus-ls/tree/master/qute.ls) showing method completion:
 
