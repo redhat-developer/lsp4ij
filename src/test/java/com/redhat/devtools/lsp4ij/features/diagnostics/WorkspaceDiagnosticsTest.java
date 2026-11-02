@@ -9,6 +9,7 @@ package com.redhat.devtools.lsp4ij.features.diagnostics;
 
 import com.intellij.openapi.fileEditor.FileEditorManager;
 import com.intellij.openapi.command.WriteCommandAction;
+import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.fileEditor.FileDocumentManager;
 import com.intellij.openapi.fileEditor.FileEditorManagerListener;
 import com.intellij.openapi.project.Project;
@@ -37,6 +38,8 @@ public class WorkspaceDiagnosticsTest extends UsefulTestCase {
     private LSPCodeInsightTestFixture fixture;
     private ScopedServer definition;
     private LanguageServerWrapper wrapper;
+    /** The document of the file whose retained match is checked, kept until the test ends. */
+    private Document matchedDocument;
     private final BlockingQueue<Request> requests = new LinkedBlockingQueue<>();
 
     @Override protected void setUp() throws Exception {
@@ -303,8 +306,12 @@ public class WorkspaceDiagnosticsTest extends UsefulTestCase {
         });
         var file = fixture.addFileToProject("cached.routed", "value").getVirtualFile();
         // Load the document before caching a match, so the unsaved-edit test
-        // changes only its text, not the set of PSI files in the project.
-        assertNotNull(FileDocumentManager.getInstance().getDocument(file));
+        // changes only its text, not the set of PSI files in the project. Keep it:
+        // FileDocumentManager holds an unmodified document weakly, and the matching
+        // version includes the cached document's stamp, so a collected document
+        // would make the unchanged report match again.
+        matchedDocument = FileDocumentManager.getInstance().getDocument(file);
+        assertNotNull(matchedDocument);
         String uri = LSPIJUtils.toUri(file).toString();
         start(true);
         var full = report(file, "cached", null);

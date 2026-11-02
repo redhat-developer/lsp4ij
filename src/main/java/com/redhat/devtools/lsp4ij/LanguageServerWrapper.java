@@ -743,13 +743,37 @@ public class LanguageServerWrapper implements Disposable {
     private void startStopTimer() {
         updateStatus(ServerStatus.stopping);
         int delayMs = (int) TimeUnit.SECONDS.toMillis(serverDefinition.getLastDocumentDisconnectedTimeout());
-        getStopAlarm().addRequest(() -> {
-            try {
-                stop();
-            } catch (Throwable t) {
-                LOGGER.error("Failed to stop language server {}", serverDefinition.getId(), t);
+        getStopAlarm().addRequest(this::stopIfNotKeptAlive, delayMs);
+    }
+
+    /**
+     * Stops the language server once the delay after its last document disconnected has passed, unless something keeps
+     * it alive by then, such as {@link LSPClientFeatures#keepServerAlive()}, which is asked again here. A check that
+     * fails keeps the server, as a yes does: it is not stopped on an error, and stops when its last document or lease
+     * goes next.
+     */
+    void stopIfNotKeptAlive() {
+        boolean keptAlive;
+        try {
+            keptAlive = keepAlive();
+        } catch (RuntimeException e) {
+            LOGGER.error("Failed to check whether language server {} is kept alive", serverDefinition.getId(), e);
+            keptAlive = true;
+        }
+        if (keptAlive) {
+            synchronized (this) {
+                // Only the pending stop's status: an explicit stop() has dropped the server's context, as stop(boolean) checks
+                if (getServerStatus() == ServerStatus.stopping && currentInitializingContext != null) {
+                    updateStatus(ServerStatus.started);
+                }
             }
-        }, delayMs);
+            return;
+        }
+        try {
+            stop();
+        } catch (Throwable t) {
+            LOGGER.error("Failed to stop language server {}", serverDefinition.getId(), t);
+        }
     }
 
     private @NotNull Alarm getStopAlarm() {
@@ -1124,6 +1148,8 @@ public class LanguageServerWrapper implements Disposable {
 
     void incrementKeepAlive() {
         keepAliveCounter.incrementAndGet();
+        // A lease taken while the last document's stop is pending keeps the server, as a document that connects does
+        removeStopTimer(false);
     }
 
     void decrementKeepAlive() {
