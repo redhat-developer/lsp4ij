@@ -170,24 +170,14 @@ public class LSPLinkedEditingRangeSynchronizerTest extends LSPCodeInsightFixture
         assertTrue("an empty range can be typed again", LSPLinkedEditingRangeSynchronizer.isWord("", backtracking));
     }
 
-    public void testATextLongerThanTheReadLimitIsNotMatched() {
-        var text = new LSPLinkedEditingRangeSynchronizer.ReadLimitedText("a".repeat(11), 10);
-
-        assertFalse(LSPLinkedEditingRangeSynchronizer.isWord(text, Pattern.compile("a+")));
-        assertEquals("the word pattern doesn't run on it", 0, text.reads());
+    public void testATextLongerThanTheWordLengthLimitIsNotAWord() {
+        assertFalse(LSPLinkedEditingRangeSynchronizer.isWord("a".repeat(257), Pattern.compile("a+")));
     }
 
-    public void testATextAtTheReadLimitIsMatched() {
-        var text = new LSPLinkedEditingRangeSynchronizer.ReadLimitedText("a".repeat(10), 10);
-
-        assertTrue(LSPLinkedEditingRangeSynchronizer.isWord(text, Pattern.compile("a+")));
-    }
-
-    public void testAWordPatternWhichExhaustsTheStackDoesNotMatch() {
-        // each repetition of the group recurses, and the text is read only once per character
-        var text = new LSPLinkedEditingRangeSynchronizer.ReadLimitedText("a".repeat(100_000), 100_000);
-
-        assertFalse(LSPLinkedEditingRangeSynchronizer.isWord(text, Pattern.compile("(a|b)+")));
+    public void testATextAtTheWordLengthLimitIsAWord() {
+        assertTrue(LSPLinkedEditingRangeSynchronizer.isWord("a".repeat(256), Pattern.compile("a+")));
+        assertTrue("a nested repeated group, which recurses for each repetition, stays within the stack",
+                LSPLinkedEditingRangeSynchronizer.isWord("a".repeat(256), Pattern.compile("((a|b)|(c|d))+")));
     }
 
     public void testTheRangesAreAskedForAgainWhenOneCaretIsLeft() throws Exception {

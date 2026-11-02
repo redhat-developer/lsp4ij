@@ -81,6 +81,10 @@ public final class LSPLinkedEditingRangeSynchronizer implements CaretListener, D
     // backtracks without end must not hang the EDT
     private static final int WORD_PATTERN_READ_LIMIT = 100_000;
 
+    // The longest text which is matched against a word pattern: a linked editing range is a name. The regular
+    // expression engine recurses for each repetition of a group, so the bound also keeps its depth far within the stack
+    private static final int WORD_LENGTH_LIMIT = 256;
+
     // The word pattern of the ranges when the language server gives none: VS Code's default word definition
     private static final Pattern DEFAULT_WORD_PATTERN = Pattern.compile("(-?\\d*\\.\\d\\w*)|([^`~!@#$%^&*()\\-=+\\[{\\]}\\\\|;:'\",.<>/?\\s]+)");
 
@@ -392,32 +396,19 @@ public final class LSPLinkedEditingRangeSynchronizer implements CaretListener, D
 
     /**
      * Returns true if the first match of the word pattern in the text is the whole text, as VS Code checks it. An empty
-     * text is a word, so that a range can be deleted and typed again. A text longer than the read limit, and a match
-     * which reads more characters than it, are not words.
+     * text is a word, so that a range can be deleted and typed again. A text longer than the word length limit is not
+     * a word, and neither is a match which reads more characters than the read limit.
      */
     static boolean isWord(@NotNull String text, @NotNull Pattern wordPattern) {
-        return isWord(new ReadLimitedText(text, WORD_PATTERN_READ_LIMIT), wordPattern);
-    }
-
-    /**
-     * Returns true if the first match of the word pattern in the text is the whole text, reading the text at most as
-     * many times as it allows.
-     */
-    static boolean isWord(@NotNull ReadLimitedText text, @NotNull Pattern wordPattern) {
-        if (text.length() > text.readLimit) {
-            // a word pattern which reads no characters, such as (?!), still tries each offset of the text
+        if (text.length() > WORD_LENGTH_LIMIT) {
             return false;
         }
-        var matcher = wordPattern.matcher(text);
+        var matcher = wordPattern.matcher(new ReadLimitedText(text, WORD_PATTERN_READ_LIMIT));
         try {
             int matchLength = matcher.find() ? matcher.end() - matcher.start() : 0;
             return matchLength == text.length();
         } catch (ReadLimitExceededException e) {
-            LOGGER.warn("Stopped matching the word pattern '{}' of linked editing ranges, after {} characters", wordPattern, text.readLimit);
-            return false;
-        } catch (StackOverflowError e) {
-            // the read limit doesn't bound the recursion of a repeated group, such as (a|b)+, on a long text
-            LOGGER.warn("Stopped matching the word pattern '{}' of linked editing ranges, which exhausted the stack", wordPattern);
+            LOGGER.warn("Stopped matching the word pattern '{}' of linked editing ranges, after {} characters", wordPattern, WORD_PATTERN_READ_LIMIT);
             return false;
         }
     }
@@ -425,22 +416,15 @@ public final class LSPLinkedEditingRangeSynchronizer implements CaretListener, D
     /**
      * A text which can be read a limited number of times, which bounds the work of a regular expression on it.
      */
-    static final class ReadLimitedText implements CharSequence {
+    private static final class ReadLimitedText implements CharSequence {
 
         private final @NotNull String text;
         private final int readLimit;
         private int reads;
 
-        ReadLimitedText(@NotNull String text, int readLimit) {
+        private ReadLimitedText(@NotNull String text, int readLimit) {
             this.text = text;
             this.readLimit = readLimit;
-        }
-
-        /**
-         * Returns how many times the text was read.
-         */
-        int reads() {
-            return reads;
         }
 
         @Override
