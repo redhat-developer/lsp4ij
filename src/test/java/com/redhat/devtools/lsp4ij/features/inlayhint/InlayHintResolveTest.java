@@ -27,6 +27,7 @@ import kotlin.Unit;
 import kotlin.jvm.functions.Function0;
 import kotlin.jvm.functions.Function1;
 import org.eclipse.lsp4j.InlayHint;
+import org.eclipse.lsp4j.InlayHintLabelPart;
 import org.eclipse.lsp4j.InlayHintRegistrationOptions;
 import org.eclipse.lsp4j.Position;
 import org.eclipse.lsp4j.jsonrpc.ResponseErrorException;
@@ -37,6 +38,7 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
@@ -96,6 +98,21 @@ public class InlayHintResolveTest extends LSPCodeInsightFixtureTestCase {
 
         assertEquals(List.of(new Inlay(LABELED_HINT_OFFSET, ": String")), collect());
         assertEquals(1, MockLanguageServer.INSTANCE.getTextDocumentService().getInlayHintResolveRequests().size());
+    }
+
+    public void testAHintWhoseResolvedLabelHasANullPartIsDropped() throws Exception {
+        serverResolvesInlayHints();
+        MockLanguageServer.INSTANCE.getTextDocumentService().setMockInlayHints(List.of(hintWithoutLabel(), hintWithLabel()));
+        MockLanguageServer.INSTANCE.getTextDocumentService().setInlayHintResolveProcessor(hint -> {
+            var resolved = new InlayHint(hint.getPosition(), Either.forRight(Arrays.asList(null, new InlayHintLabelPart(": int"))));
+            resolved.setData(hint.getData());
+            return CompletableFuture.completedFuture(resolved);
+        });
+        open();
+
+        assertEquals("the malformed hint is dropped, the other one shows",
+                List.of(new Inlay(LABELED_HINT_OFFSET, ": String")),
+                collect());
     }
 
     public void testAHintWithALabelIsNotResolved() throws Exception {

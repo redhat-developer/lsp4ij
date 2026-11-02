@@ -149,9 +149,11 @@ public class LSPInlayHintsSupport extends AbstractLSPDocumentFeatureSupport<Inla
             // Simple string label: must not be empty
             return !label.getLeft().isEmpty();
         } else {
-            // Multi-part label: at least one part must have non-empty text
+            // Multi-part label: no part may be null, and at least one part must have non-empty text
             List<InlayHintLabelPart> parts = label.getRight();
-            return parts != null && parts.stream().anyMatch(part -> part.getValue() != null && !part.getValue().isEmpty());
+            return parts != null
+                    && !parts.contains(null)
+                    && parts.stream().anyMatch(part -> part.getValue() != null && !part.getValue().isEmpty());
         }
     }
 
