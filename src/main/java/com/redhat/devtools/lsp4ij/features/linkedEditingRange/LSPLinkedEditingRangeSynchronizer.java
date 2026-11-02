@@ -40,6 +40,7 @@ import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
 import com.redhat.devtools.lsp4ij.client.ExecuteLSPFeatureStatus;
 import com.redhat.devtools.lsp4ij.client.indexing.ProjectIndexingManager;
+import com.redhat.devtools.lsp4ij.settings.LSPEditorOptions;
 import org.eclipse.lsp4j.LinkedEditingRanges;
 import org.eclipse.lsp4j.TextDocumentIdentifier;
 import org.jetbrains.annotations.ApiStatus;
@@ -195,6 +196,11 @@ public final class LSPLinkedEditingRangeSynchronizer implements CaretListener, D
         if (applying || ranges.isEmpty()) {
             return;
         }
+        if (!LSPEditorOptions.getInstance().isLinkedEditing()) {
+            // turned off in Smart Keys while the ranges were linked
+            clearRanges();
+            return;
+        }
         var undoManager = UndoManager.getInstance(project);
         if (event.getDocument().isInBulkUpdate()
                 || undoManager.isUndoInProgress() || undoManager.isRedoInProgress()
@@ -255,7 +261,8 @@ public final class LSPLinkedEditingRangeSynchronizer implements CaretListener, D
      * sets them once they come, unless the document or the caret has changed since.
      */
     private void requestLinkedEditingRanges() {
-        if (editor.isDisposed() || project.isDisposed() || editor.getCaretModel().getCaretCount() != 1) {
+        if (editor.isDisposed() || project.isDisposed() || editor.getCaretModel().getCaretCount() != 1
+                || !LSPEditorOptions.getInstance().isLinkedEditing()) {
             return;
         }
         Document document = editor.getDocument();

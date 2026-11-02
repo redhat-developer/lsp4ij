@@ -15,6 +15,7 @@ import com.intellij.testFramework.PlatformTestUtil;
 import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
 import com.redhat.devtools.lsp4ij.fixtures.LSPCodeInsightFixtureTestCase;
 import com.redhat.devtools.lsp4ij.mock.MockLanguageServer;
+import com.redhat.devtools.lsp4ij.settings.LSPEditorOptions;
 import org.eclipse.lsp4j.LinkedEditingRangeParams;
 import org.eclipse.lsp4j.LinkedEditingRanges;
 import org.eclipse.lsp4j.Position;
@@ -213,6 +214,38 @@ public class LSPLinkedEditingRangeSynchronizerTest extends LSPCodeInsightFixture
 
         assertNull(synchronizer().requestNow());
         assertEmpty(requests());
+    }
+
+    public void testWithLinkedEditingOffTheRangesAreNotAskedForNorEdited() throws Exception {
+        var options = LSPEditorOptions.getInstance();
+        options.setLinkedEditing(false);
+        try {
+            open(new LinkedEditingRanges(NAME_RANGES));
+            myFixture.getEditor().getCaretModel().moveToOffset(AFTER_DECLARATION);
+
+            assertNull(synchronizer().requestNow());
+            myFixture.type("s");
+
+            assertEquals("var names = 1; print(name); name++;", text());
+            assertEmpty(requests());
+        } finally {
+            options.setLinkedEditing(true);
+        }
+    }
+
+    public void testTurningLinkedEditingOffDropsTheLinkedRanges() throws Exception {
+        open(new LinkedEditingRanges(NAME_RANGES));
+        assertEquals(NAME_TEXT_RANGES, linkedAt(AFTER_DECLARATION));
+        var options = LSPEditorOptions.getInstance();
+        options.setLinkedEditing(false);
+        try {
+            myFixture.type("s");
+
+            assertEquals("var names = 1; print(name); name++;", text());
+            assertEmpty(synchronizer().getRanges());
+        } finally {
+            options.setLinkedEditing(true);
+        }
     }
 
     private void open(@Nullable LinkedEditingRanges linkedEditingRanges) throws Exception {
