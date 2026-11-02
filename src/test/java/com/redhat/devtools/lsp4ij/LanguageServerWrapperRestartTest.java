@@ -10,6 +10,8 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij;
 
+import com.intellij.openapi.application.Application;
+import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.Disposer;
 import com.intellij.testFramework.UsefulTestCase;
@@ -25,9 +27,17 @@ import com.redhat.devtools.lsp4ij.server.StreamConnectionProvider;
 import com.redhat.devtools.lsp4ij.templates.ServerMappingSettings;
 import org.jetbrains.annotations.NotNull;
 
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.Proxy;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BooleanSupplier;
+import java.util.function.Supplier;
 
 /**
  * Test for the restart attempts of {@link LanguageServerWrapper} after a start failure.
@@ -71,6 +81,76 @@ public class LanguageServerWrapperRestartTest extends UsefulTestCase {
 
         wrapper.stop();
         waitUntil(() -> wrapper.getServerStatus() == ServerStatus.stopped, "the server should stop");
+    }
+
+    public void testAStartWhichFailsBeforeStartReturnsStopsTheServer() throws Exception {
+        var wrapper = new LanguageServerWrapper(myFixture.getProject(), serverDefinition);
+        Disposer.register(getTestRootDisposable(), wrapper);
+
+        // The first connection fails before start() has returned, as when the pooled thread which creates it fails
+        // at once
+        var initialized = runPooledThreadTasksHere(wrapper::getInitializedServer);
+        waitUntil(() -> wrapper.getServerError() != null && wrapper.getServerStatus() == ServerStatus.stopped,
+                "the failed start should stop the server");
+        // The caller gets no server, not a NullPointerException from the failure handler
+        assertNull(initialized.get(10, TimeUnit.SECONDS));
+
+        // The next start starts the server
+        wrapper.start();
+        waitUntil(() -> wrapper.getServerStatus() == ServerStatus.started, "the next start should start the server");
+        assertNull(wrapper.getServerError());
+        assertEquals(2, serverDefinition.connectionCount.get());
+
+        wrapper.stop();
+        waitUntil(() -> wrapper.getServerStatus() == ServerStatus.stopped, "the server should stop");
+    }
+
+    /**
+     * Calls the action, running each task which this thread gives {@link Application#executeOnPooledThread(Runnable)}
+     * before that call returns, as if a pooled thread ran it at once. For the call, the application is replaced by a
+     * proxy which delegates to it.
+     */
+    private static <T> T runPooledThreadTasksHere(Supplier<T> action) {
+        var application = ApplicationManager.getApplication();
+        var thread = Thread.currentThread();
+        var inline = new AtomicBoolean(true);
+        var inlineApplication = (Application) Proxy.newProxyInstance(
+                application.getClass().getClassLoader(),
+                publicInterfaces(application.getClass()),
+                (proxy, method, args) -> {
+                    if (inline.get()
+                            && Thread.currentThread() == thread
+                            && method.getName().equals("executeOnPooledThread")
+                            && method.getParameterTypes()[0] == Runnable.class) {
+                        ((Runnable) args[0]).run();
+                        return CompletableFuture.completedFuture(null);
+                    }
+                    try {
+                        return method.invoke(application, args);
+                    } catch (InvocationTargetException e) {
+                        throw e.getCause();
+                    }
+                });
+        var restore = Disposer.newDisposable();
+        ApplicationManager.setApplication(inlineApplication, restore);
+        try {
+            return action.get();
+        } finally {
+            inline.set(false);
+            Disposer.dispose(restore);
+        }
+    }
+
+    private static Class<?>[] publicInterfaces(Class<?> type) {
+        var interfaces = new LinkedHashSet<Class<?>>();
+        for (Class<?> c = type; c != null; c = c.getSuperclass()) {
+            for (Class<?> i : c.getInterfaces()) {
+                if (Modifier.isPublic(i.getModifiers())) {
+                    interfaces.add(i);
+                }
+            }
+        }
+        return interfaces.toArray(Class<?>[]::new);
     }
 
     private static void waitUntil(BooleanSupplier condition, String message) {

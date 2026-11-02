@@ -437,7 +437,7 @@ public class LanguageServerWrapper implements Disposable {
             // We cannot use 'dispatcher' (single thread executor) as it's reserved for ordered notification dispatch.
             // See: https://github.com/redhat-developer/lsp4ij/issues/1442
             CompletableFuture<InitializingContext> startFuture = new CompletableFuture<>();
-            ApplicationManager.getApplication().executeOnPooledThread(() -> {
+            Runnable startTask = () -> {
                 try {
                         var initializingContext = context;
                         // Starting process...
@@ -496,7 +496,7 @@ public class LanguageServerWrapper implements Disposable {
                 } catch (Exception e) {
                     startFuture.completeExceptionally(e);
                 }
-            });
+            };
             this.initializeFuture = startFuture
                     .thenApply(initializingContext -> {
                         var languageClient = serverDefinition.createLanguageClient(initialProject);
@@ -606,6 +606,9 @@ public class LanguageServerWrapper implements Disposable {
                         stop(context);
                         return null;
                     });
+            // Submitted only now that initializeFuture is set: a start which fails at once runs the failure handler
+            // above, which fails initializeFuture and then stops the server, clearing it
+            ApplicationManager.getApplication().executeOnPooledThread(startTask);
         }
     }
 
