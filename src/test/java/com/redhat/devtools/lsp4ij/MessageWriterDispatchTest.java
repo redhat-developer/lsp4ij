@@ -16,23 +16,29 @@ import org.eclipse.lsp4j.jsonrpc.messages.ResponseMessage;
 
 import java.util.List;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
- * Verifies that the message writer dispatch in {@link LanguageServerWrapper} routes
- * {@link NotificationMessage}s to a single-thread executor (preserving order) and all
- * other message types to a separate pool (so they are never blocked behind a slow
- * notification write).
+ * Verifies the three-way message dispatch in {@link LanguageServerWrapper}:
+ * <ul>
+ *   <li>Notifications → single-thread messageWriter (preserves ordering)</li>
+ *   <li>Responses → requestWriter directly (never blocked behind notifications)</li>
+ *   <li>Requests → requestWriter, but only after the last notification write completes
+ *       (preserves document ordering)</li>
+ * </ul>
  */
 public class MessageWriterDispatchTest extends TestCase {
 
     private ExecutorService messageWriter;
     private ExecutorService requestWriter;
+    private volatile CompletableFuture<Void> lastNotificationWriteFuture;
 
     @Override
     protected void setUp() throws Exception {
         super.setUp();
         messageWriter = Executors.newSingleThreadExecutor(r -> new Thread(r, "test-messageWriter"));
-        requestWriter = Executors.newCachedThreadPool(r -> new Thread(r, "test-requestWriter"));
+        requestWriter = Executors.newSingleThreadExecutor(r -> new Thread(r, "test-requestWriter"));
+        lastNotificationWriteFuture = CompletableFuture.completedFuture(null);
     }
 
     @Override
@@ -61,7 +67,7 @@ public class MessageWriterDispatchTest extends TestCase {
         request.setMethod("textDocument/completion");
         dispatch(consumer, request);
 
-        assertTrue(threadName.get(5, TimeUnit.SECONDS).startsWith("test-requestWriter"));
+        assertEquals("test-requestWriter", threadName.get(5, TimeUnit.SECONDS));
     }
 
     public void testResponseDispatchesToRequestWriter() throws Exception {
@@ -72,11 +78,11 @@ public class MessageWriterDispatchTest extends TestCase {
         response.setId("1");
         dispatch(consumer, response);
 
-        assertTrue(threadName.get(5, TimeUnit.SECONDS).startsWith("test-requestWriter"));
+        assertEquals("test-requestWriter", threadName.get(5, TimeUnit.SECONDS));
     }
 
-    public void testSlowNotificationDoesNotBlockRequest() throws Exception {
-        var requestDone = new CompletableFuture<Void>();
+    public void testSlowNotificationDoesNotBlockResponse() throws Exception {
+        var responseDone = new CompletableFuture<Void>();
         var notificationBlocked = new CountDownLatch(1);
         var releaseNotification = new CountDownLatch(1);
 
@@ -89,7 +95,7 @@ public class MessageWriterDispatchTest extends TestCase {
                     Thread.currentThread().interrupt();
                 }
             } else {
-                requestDone.complete(null);
+                responseDone.complete(null);
             }
         };
 
@@ -98,13 +104,47 @@ public class MessageWriterDispatchTest extends TestCase {
         dispatch(consumer, notification);
         assertTrue(notificationBlocked.await(5, TimeUnit.SECONDS));
 
+        var response = new ResponseMessage();
+        response.setId("1");
+        dispatch(consumer, response);
+
+        responseDone.get(5, TimeUnit.SECONDS);
+
+        releaseNotification.countDown();
+    }
+
+    public void testRequestWaitsForPendingNotificationWrite() throws Exception {
+        var order = new CopyOnWriteArrayList<String>();
+        var notificationWritten = new CountDownLatch(1);
+        var requestWritten = new CountDownLatch(1);
+
+        MessageConsumer consumer = message -> {
+            if (message instanceof NotificationMessage) {
+                try {
+                    Thread.sleep(100);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+                order.add("notification");
+                notificationWritten.countDown();
+            } else {
+                order.add("request");
+                requestWritten.countDown();
+            }
+        };
+
+        var notification = new NotificationMessage();
+        notification.setMethod("textDocument/didChange");
+        dispatch(consumer, notification);
+
         var request = new RequestMessage();
         request.setMethod("textDocument/completion");
         dispatch(consumer, request);
 
-        requestDone.get(5, TimeUnit.SECONDS);
+        assertTrue(notificationWritten.await(5, TimeUnit.SECONDS));
+        assertTrue(requestWritten.await(5, TimeUnit.SECONDS));
 
-        releaseNotification.countDown();
+        assertEquals(List.of("notification", "request"), order);
     }
 
     public void testNotificationsAreSerializedOnSingleThread() throws Exception {
@@ -126,13 +166,20 @@ public class MessageWriterDispatchTest extends TestCase {
     }
 
     /**
-     * Mirrors the dispatch logic in {@link LanguageServerWrapper}: notifications go
-     * to the single-thread messageWriter, everything else to the requestWriter pool.
+     * Mirrors the three-way dispatch logic in {@link LanguageServerWrapper}:
+     * notifications → messageWriter, responses → requestWriter directly,
+     * requests → requestWriter after last notification write.
      */
     private void dispatch(MessageConsumer consumer, Message message) {
-        ExecutorService writer = message instanceof NotificationMessage
-                ? messageWriter
-                : requestWriter;
-        CompletableFuture.runAsync(() -> consumer.consume(message), writer);
+        if (message instanceof NotificationMessage) {
+            var writeFuture = CompletableFuture.runAsync(
+                    () -> consumer.consume(message), messageWriter);
+            lastNotificationWriteFuture = writeFuture;
+        } else if (message instanceof ResponseMessage) {
+            CompletableFuture.runAsync(() -> consumer.consume(message), requestWriter);
+        } else {
+            lastNotificationWriteFuture
+                    .thenRunAsync(() -> consumer.consume(message), requestWriter);
+        }
     }
 }

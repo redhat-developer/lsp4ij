@@ -59,6 +59,7 @@ import org.eclipse.lsp4j.jsonrpc.MessageConsumer;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
 import org.eclipse.lsp4j.jsonrpc.messages.Message;
 import org.eclipse.lsp4j.jsonrpc.messages.NotificationMessage;
+import org.eclipse.lsp4j.jsonrpc.messages.ResponseMessage;
 import org.eclipse.lsp4j.services.LanguageServer;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
@@ -137,6 +138,7 @@ public class LanguageServerWrapper implements Disposable {
     private final ExecutorService listener;
     private final ExecutorService messageWriter;
     private final ExecutorService requestWriter;
+    private volatile @NotNull CompletableFuture<Void> lastNotificationWriteFuture = CompletableFuture.completedFuture(null);
     private final SimpleModificationTracker modificationTracker = new SimpleModificationTracker();
     /**
      * Map containing unregistration handlers for dynamic capability registrations.
@@ -218,8 +220,8 @@ public class LanguageServerWrapper implements Disposable {
                 })
                 .build());
 
-        String requestWriterThreadNameFormat = "LS-" + serverDefinition.getId() + projectName + "#requestWriter-%d"; //$NON-NLS-1$ //$NON-NLS-2$
-        this.requestWriter = Executors.newCachedThreadPool(new ThreadFactoryBuilder()
+        String requestWriterThreadNameFormat = "LS-" + serverDefinition.getId() + projectName + "#requestWriter"; //$NON-NLS-1$ //$NON-NLS-2$
+        this.requestWriter = Executors.newSingleThreadExecutor(new ThreadFactoryBuilder()
                 .setNameFormat(requestWriterThreadNameFormat)
                 .setThreadFactory(r -> {
                     var t = new Thread(r);
@@ -284,21 +286,22 @@ public class LanguageServerWrapper implements Disposable {
         // instances of this class for each test
         this.listener.shutdownNow();
 
-        // Wait briefly for threads to actually exit.
+        // Wait briefly for threads to actually exit. All waits share one 2-second deadline.
+        long deadlineNanos = System.nanoTime() + TimeUnit.SECONDS.toNanos(2);
         try {
-            if (!this.dispatcher.awaitTermination(2, TimeUnit.SECONDS)) {
+            if (!this.dispatcher.awaitTermination(Math.max(0L, deadlineNanos - System.nanoTime()), TimeUnit.NANOSECONDS)) {
                 LOGGER.warn("Dispatcher executor for language server '{}' did not terminate within 2s; classloader unload may be blocked",
                         serverDefinition.getId());
             }
-            if (!this.messageWriter.awaitTermination(2, TimeUnit.SECONDS)) {
+            if (!this.messageWriter.awaitTermination(Math.max(0L, deadlineNanos - System.nanoTime()), TimeUnit.NANOSECONDS)) {
                 LOGGER.warn("Message writer executor for language server '{}' did not terminate within 2s; classloader unload may be blocked",
                         serverDefinition.getId());
             }
-            if (!this.requestWriter.awaitTermination(2, TimeUnit.SECONDS)) {
+            if (!this.requestWriter.awaitTermination(Math.max(0L, deadlineNanos - System.nanoTime()), TimeUnit.NANOSECONDS)) {
                 LOGGER.warn("Request writer executor for language server '{}' did not terminate within 2s; classloader unload may be blocked",
                         serverDefinition.getId());
             }
-            if (!this.listener.awaitTermination(2, TimeUnit.SECONDS)) {
+            if (!this.listener.awaitTermination(Math.max(0L, deadlineNanos - System.nanoTime()), TimeUnit.NANOSECONDS)) {
                 LOGGER.warn("Listener executor for language server '{}' did not terminate within 2s; classloader unload may be blocked",
                         serverDefinition.getId());
             }
@@ -533,18 +536,37 @@ public class LanguageServerWrapper implements Disposable {
                             }
                             logMessage(message, consumer);
                             try {
-                                // Notifications use the single-thread messageWriter to preserve
-                                // ordering (didOpen before didChange before didClose).
-                                // Requests and responses use a separate requestWriter pool so they
-                                // are never blocked behind a slow notification write (pipe saturation).
-                                ExecutorService writer = message instanceof NotificationMessage
-                                        ? messageWriter
-                                        : requestWriter;
-                                CompletableFuture.runAsync(() -> consumer.consume(message), writer)
-                                        .exceptionally(e -> {
-                                            getLanguageServerLifecycleManager().onError(this, e);
-                                            return null;
-                                        });
+                                if (message instanceof NotificationMessage) {
+                                    // Single-thread messageWriter preserves notification ordering
+                                    // (didOpen before didChange before didClose).
+                                    var writeFuture = CompletableFuture.runAsync(
+                                            () -> consumer.consume(message), messageWriter);
+                                    lastNotificationWriteFuture = writeFuture;
+                                    writeFuture.exceptionally(e -> {
+                                        getLanguageServerLifecycleManager().onError(this, e);
+                                        return null;
+                                    });
+                                } else if (message instanceof ResponseMessage) {
+                                    // Responses to server-initiated requests go directly to
+                                    // requestWriter so they are never blocked behind a slow
+                                    // notification write (pipe saturation / EDT freeze fix).
+                                    CompletableFuture.runAsync(
+                                                    () -> consumer.consume(message), requestWriter)
+                                            .exceptionally(e -> {
+                                                getLanguageServerLifecycleManager().onError(this, e);
+                                                return null;
+                                            });
+                                } else {
+                                    // Client-initiated requests (completion, hover, ...) wait for
+                                    // the last notification write so the server processes them
+                                    // against the up-to-date document state.
+                                    lastNotificationWriteFuture
+                                            .thenRunAsync(() -> consumer.consume(message), requestWriter)
+                                            .exceptionally(e -> {
+                                                getLanguageServerLifecycleManager().onError(this, e);
+                                                return null;
+                                            });
+                                }
                             } catch (Throwable e) {
                                 getLanguageServerLifecycleManager().onError(this, e);
                                 throw e;
@@ -2124,6 +2146,7 @@ public class LanguageServerWrapper implements Disposable {
                     disconnect(this.openedDocuments.keySet().iterator().next(), false);
                 }
                 // Old replies are refused by connection identity, so the new connection can start afresh.
+                lastNotificationWriteFuture = CompletableFuture.completedFuture(null);
                 documentVersion.set(0);
                 if (!closedDocuments.isEmpty()) {
                     Set<URI> fileUris = new HashSet<>(closedDocuments.keySet());
