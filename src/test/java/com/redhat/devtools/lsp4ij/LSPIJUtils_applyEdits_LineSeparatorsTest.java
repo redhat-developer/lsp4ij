@@ -69,6 +69,33 @@ public class LSPIJUtils_applyEdits_LineSeparatorsTest extends BasePlatformTestCa
         assertEquals("a = 1;\nb = 2;\n", applyEditsToTheDocument(edits));
     }
 
+    public void testACrAndALfOfTwoEditsAreOneLineSeparator() {
+        // A server may split a "\r\n" between two edits: the "\r" ends one, and the "\n" starts the next
+        List<TextEdit> edits = List.of(
+                new TextEdit(new Range(new Position(0, 0), new Position(0, 2)), "a\r"),
+                new TextEdit(new Range(new Position(0, 2), new Position(0, 4)), "\n1;"));
+        assertEquals("a\n1;\nb=2;\n", applyEditsToTheDocument(edits));
+        assertEquals("a\n1;\nb=2;\n", LSPIJUtils.applyEdits(new DocumentImpl(TEXT), edits));
+    }
+
+    public void testACrBeforeALfWhichAnotherEditReplacesIsALineSeparator() {
+        // The "\n" after the first edit is replaced, so its "\r" is a line separator of its own
+        List<TextEdit> edits = List.of(
+                new TextEdit(new Range(new Position(0, 0), new Position(0, 4)), "a = 1;\r"),
+                new TextEdit(new Range(new Position(0, 4), new Position(1, 0)), "c = 3;"));
+        assertEquals("a = 1;\nc = 3;b=2;\n", applyEditsToTheDocument(edits));
+        assertEquals("a = 1;\nc = 3;b=2;\n", LSPIJUtils.applyEdits(new DocumentImpl(TEXT), edits));
+    }
+
+    public void testACrBeforeACrlfOfAnotherEditIsTwoLineSeparators() {
+        // "\r" followed by "\r\n" is a lone CR and a CRLF
+        List<TextEdit> edits = List.of(
+                new TextEdit(new Range(new Position(0, 0), new Position(0, 4)), "a = 1;\r"),
+                new TextEdit(new Range(new Position(0, 4), new Position(1, 0)), "\r\n"));
+        assertEquals("a = 1;\n\nb=2;\n", applyEditsToTheDocument(edits));
+        assertEquals("a = 1;\n\nb=2;\n", LSPIJUtils.applyEdits(new DocumentImpl(TEXT), edits));
+    }
+
     private String applyEditsToTheDocument(List<TextEdit> edits) {
         Document document = new DocumentImpl(TEXT);
         WriteCommandAction.runWriteCommandAction(getProject(), () -> LSPIJUtils.applyEdits(null, document, edits));
