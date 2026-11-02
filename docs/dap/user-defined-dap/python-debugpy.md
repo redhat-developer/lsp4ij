@@ -109,6 +109,11 @@ Set a breakpoint in the `test.py` file:
 
 ![Set Breakpoint](../images/python-debugpy/set_breakpoint.png)
 
+If your IDE has its own Python debugger (for example PyCharm), clicking the gutter creates a
+`Python Line Breakpoint` instead of a `DAP Breakpoint`. This breakpoint is hit as it is, you don't need a
+second `DAP Breakpoint` on the same line.
+See [Forwarding native line breakpoints](../UserGuide.md#forwarding-native-line-breakpoints).
+
 ## Start Python program in a Terminal
 
 Open an `IntelliJ Terminal` (or other terminal), navigate to the directory containing your test file 

@@ -30,6 +30,21 @@ The `Mappings` tab to specify the files which can be debugged to allow adding/re
 
 ![DAP Configuration Type/Mappings](./images/DAP_config_type_mappings.png)
 
+The mappings also decide which native line breakpoints are forwarded to the DAP server, see
+[Forwarding native line breakpoints](#forwarding-native-line-breakpoints).
+
+A file matches when one of the mappings applies to it. There are three kinds of mappings:
+
+- `Language`: an [IntelliJ Language](https://plugins.jetbrains.com/docs/intellij/custom-language-support.html).
+- `File type`: an [IntelliJ File type](https://www.jetbrains.com/help/idea/creating-and-registering-file-types.html).
+  It only applies when your IDE knows this file type, which depends on the IDE and its plugins.
+  A file type your IDE doesn't know is shown as `(Unknown)`.
+- `File name patterns`: patterns for the file name, such as `*.go` or `go.mod`. They work in every IDE.
+
+The `Language Id` column is free text. Language servers use this value as the LSP
+[TextDocumentItem#languageId](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocumentItem),
+and the LSP specification lists the common values there. DAP servers don't use it, so you can leave it empty here.
+
 ### Configuration tab
 
 The `Configuration` tab to specify the working directory and the file you want to run/debug:
@@ -78,6 +93,22 @@ Macro expansion is applied to string values in DAP parameters, including values 
 When a file can be debugged using a DAP server specified in the [Mappings tab](#mappings-tab), a breakpoint can be added.
 
 ![DAP Breakpoint set](./images/DAP_breakpoint_set.png)
+
+### Forwarding native line breakpoints
+
+For a mapped file, LSP4IJ contributes its own `DAP Breakpoint` type. However, when the file's language
+already has its own debugger (for example the bundled JavaScript or Python debugger), the IDE may
+create that debugger's native line breakpoint in the gutter instead of a `DAP Breakpoint`.
+
+While a DAP session is running, LSP4IJ forwards native line breakpoints in files that match the
+[Mappings tab](#mappings-tab) to the DAP server, so they are hit like a `DAP Breakpoint`:
+
+- There is nothing to configure, and you don't need to add a second breakpoint on the same line.
+- The breakpoint keeps its native type in the gutter.
+- The language's own debugger is not affected outside a DAP session.
+
+When a `DAP Breakpoint` and a native line breakpoint are on the same line, only the `DAP Breakpoint` is
+sent to the DAP server. The native breakpoint is shown as ignored for this debug session.
 
 ### Verify breakpoint
 
