@@ -168,8 +168,13 @@ public class LSPLinkedEditingRangeSynchronizerTest extends LSPCodeInsightFixture
         assertFalse(LSPLinkedEditingRangeSynchronizer.isWord("a".repeat(40) + "!", backtracking));
         assertTrue(LSPLinkedEditingRangeSynchronizer.isWord("a".repeat(40), backtracking));
         assertTrue("an empty range can be typed again", LSPLinkedEditingRangeSynchronizer.isWord("", backtracking));
-        assertFalse("a text longer than the read limit is not a word",
-                LSPLinkedEditingRangeSynchronizer.isWord("a".repeat(100_001), Pattern.compile("a+")));
+    }
+
+    public void testATextLongerThanTheReadLimitIsNotMatched() {
+        var text = new LSPLinkedEditingRangeSynchronizer.ReadLimitedText("a".repeat(11), 10);
+
+        assertFalse(LSPLinkedEditingRangeSynchronizer.isWord(text, Pattern.compile("a+")));
+        assertEquals("the word pattern doesn't run on it", 0, text.reads());
     }
 
     public void testASingleRangeIsIgnored() throws Exception {

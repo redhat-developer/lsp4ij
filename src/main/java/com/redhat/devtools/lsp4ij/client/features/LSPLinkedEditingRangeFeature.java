@@ -41,6 +41,11 @@ public class LSPLinkedEditingRangeFeature extends AbstractLSPDocumentFeature {
         return getLinkedEditingRangeCapabilityRegistry().isLinkedEditingRangeSupported(file);
     }
 
+    /**
+     * Returns the registry of the language server's linkedEditingRange capability, static or registered.
+     *
+     * @return the registry of the language server's linkedEditingRange capability.
+     */
     public LinkedEditingRangeCapabilityRegistry getLinkedEditingRangeCapabilityRegistry() {
         if (linkedEditingRangeCapabilityRegistry == null) {
             initLinkedEditingRangeCapabilityRegistry();

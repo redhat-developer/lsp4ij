@@ -57,6 +57,12 @@ public class LSPLinkedEditingRangeSupport extends AbstractLSPDocumentFeatureSupp
         });
     }
 
+    /**
+     * Returns the linked editing ranges at the offset of the parameters, and cancels the request at another offset.
+     *
+     * @param params the parameters, with the offset.
+     * @return the linked editing ranges of each language server which gives some.
+     */
     public CompletableFuture<List<LinkedEditingRanges>> getLinkedEditingRanges(LSPLinkedEditingRangeParams params) {
         int offset = params.getOffset();
         if (previousOffset != null && !previousOffset.equals(offset)) {
@@ -96,6 +102,9 @@ public class LSPLinkedEditingRangeSupport extends AbstractLSPDocumentFeatureSupp
                 });
     }
 
+    /**
+     * Returns the linked editing ranges of one language server, as a list of one, or an empty list when it gives none.
+     */
     private static CompletableFuture<List<LinkedEditingRanges>> getLinkedEditingRangesFor(@NotNull LSPLinkedEditingRangeParams params,
                                                                                          @NotNull PsiFile file,
                                                                                          @NotNull LanguageServerItem languageServer,
