@@ -7,15 +7,18 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.usages;
 
+import com.intellij.codeInsight.highlighting.ReadWriteAccessDetector;
 import com.intellij.openapi.command.WriteCommandAction;
 import com.intellij.openapi.util.TextRange;
 import com.intellij.psi.PsiDocumentManager;
 import com.intellij.psi.PsiFile;
 import com.intellij.testFramework.fixtures.BasePlatformTestCase;
+import com.intellij.usages.ReadWriteAccessUsageInfo2UsageAdapter;
 import com.intellij.usages.UsageInfo2UsageAdapter;
 import com.intellij.util.FileContentUtilCore;
 import com.redhat.devtools.lsp4ij.features.LSPPsiElement;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * An LSP element is valid while its PSI file is. A usage in the Find view can outlive its PSI file: once the file is
@@ -64,8 +67,21 @@ public class LSPUsageValidityTest extends BasePlatformTestCase {
     }
 
     public void testStaleUsageIsInvalidInTheFindView() {
+        assertStaleUsageIsInvalidInTheFindView(null, UsageInfo2UsageAdapter.class);
+    }
+
+    public void testStaleUsageWithAccessIsInvalidInTheFindView() {
+        // a usage that reads or writes is shown by the read/write access adapter
+        assertStaleUsageIsInvalidInTheFindView(ReadWriteAccessDetector.Access.Write, ReadWriteAccessUsageInfo2UsageAdapter.class);
+    }
+
+    private void assertStaleUsageIsInvalidInTheFindView(@Nullable ReadWriteAccessDetector.Access access,
+                                                        @NotNull Class<? extends UsageInfo2UsageAdapter> adapter) {
         PsiFile file = myFixture.configureByText("test.txt", TEXT);
-        UsageInfo2UsageAdapter usage = assertInstanceOf(LSPUsageSearcher.toUsage(usage(file)), UsageInfo2UsageAdapter.class);
+        LSPUsagePsiElement element = usage(file);
+        element.setAccess(access);
+        UsageInfo2UsageAdapter usage = (UsageInfo2UsageAdapter) LSPUsageSearcher.toUsage(element);
+        assertEquals(adapter, usage.getClass());
         usage.updateCachedPresentation();
         assertTrue(usage.isValid());
 
