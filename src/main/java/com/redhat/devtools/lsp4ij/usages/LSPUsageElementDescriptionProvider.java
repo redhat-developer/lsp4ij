@@ -19,7 +19,6 @@ import com.intellij.psi.ElementDescriptionLocation;
 import com.intellij.psi.ElementDescriptionProvider;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
-import com.intellij.psi.codeStyle.NameUtil;
 import com.intellij.usageView.UsageViewLongNameLocation;
 import com.intellij.usageView.UsageViewShortNameLocation;
 import com.intellij.usageView.UsageViewTypeLocation;
@@ -31,6 +30,9 @@ import com.redhat.devtools.lsp4ij.features.semanticTokens.viewProvider.LSPSemant
 import com.redhat.devtools.lsp4ij.features.semanticTokens.viewProvider.LSPSemanticTokenPsiElement;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * {@link ElementDescriptionProvider} implementation used to show information about the target in the "Find Usages" view.
@@ -65,7 +67,7 @@ public class LSPUsageElementDescriptionProvider implements ElementDescriptionPro
             if (element instanceof LSPSemanticTokenPsiElement semanticTokenElement) {
                 String tokenType = semanticTokenElement.getType();
                 if (StringUtil.isNotEmpty(tokenType)) {
-                    return StringUtil.join(NameUtil.splitNameIntoWords(tokenType), String::toLowerCase, " ");
+                    return StringUtil.join(splitIntoWords(tokenType), String::toLowerCase, " ");
                 }
             }
 
@@ -97,5 +99,49 @@ public class LSPUsageElementDescriptionProvider implements ElementDescriptionPro
         }
 
         return null;
+    }
+
+    /**
+     * Splits a semantic token type into words, as {@code NameUtil.splitNameIntoWords} did for ASCII names before
+     * IntelliJ scheduled it for removal: at underscores, at the start of a capitalized word, around a run of capitals
+     * and around a run of digits. Any other character that isn't a letter or a digit is a word of its own. For
+     * instance, {@code enumMember} is "enum" and "Member", and {@code HTMLElement2} is "HTML", "Element" and "2".
+     */
+    static @NotNull List<String> splitIntoWords(@NotNull String tokenType) {
+        List<String> words = new ArrayList<>();
+        for (String part : tokenType.split("_")) {
+            int start = 0;
+            while (start < part.length()) {
+                int end = endOfWord(part, start);
+                words.add(part.substring(start, end));
+                start = end;
+            }
+        }
+        return words;
+    }
+
+    private static int endOfWord(@NotNull String text, int start) {
+        if (!Character.isLetterOrDigit(text.charAt(start))) {
+            return start + 1;
+        }
+        int end = start;
+        while (end < text.length() && Character.isDigit(text.charAt(end))) {
+            end++;
+        }
+        if (end > start) {
+            return end;
+        }
+        while (end < text.length() && Character.isUpperCase(text.charAt(end))) {
+            end++;
+        }
+        if (end > start + 1) {
+            // A run of capitals is a word, except for its last capital when a lower-case letter follows it
+            return end == text.length() || !Character.isLetter(text.charAt(end)) ? end : end - 1;
+        }
+        end = start + 1;
+        while (end < text.length() && Character.isLetter(text.charAt(end)) && !Character.isUpperCase(text.charAt(end))) {
+            end++;
+        }
+        return end;
     }
 }
