@@ -14,6 +14,7 @@ import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.editor.colors.EditorColors;
 import com.intellij.openapi.editor.markup.HighlighterLayer;
 import com.intellij.openapi.editor.markup.RangeHighlighter;
+import com.intellij.openapi.fileEditor.FileEditorManager;
 import com.intellij.openapi.util.TextRange;
 import com.intellij.psi.PsiFile;
 import com.intellij.usageView.UsageInfo;
@@ -91,11 +92,19 @@ public class LSPUsagePreviewTest extends LSPCodeInsightFixtureTestCase {
         List<UsageInfo2UsageAdapter> usages = findUsages(file);
 
         assertEquals(REFERENCES.size(), usages.size());
+        FileEditorManager editors = FileEditorManager.getInstance(file.getProject());
         for (int i = 0; i < usages.size(); i++) {
             Range reference = REFERENCES.get(i);
             UsageInfo2UsageAdapter usage = usages.get(i);
+            int offset = LSPIJUtils.toOffset(reference.getStart(), document);
             assertEquals(reference.getStart().getLine(), usage.getLine());
-            assertEquals(LSPIJUtils.toOffset(reference.getStart(), document), usage.getNavigationOffset());
+            assertEquals(offset, usage.getNavigationOffset());
+
+            // as when the result is opened from the usage view
+            usage.navigate(true);
+            Editor editor = editors.getSelectedTextEditor();
+            assertNotNull(editor);
+            assertEquals(offset, editor.getCaretModel().getOffset());
         }
     }
 
