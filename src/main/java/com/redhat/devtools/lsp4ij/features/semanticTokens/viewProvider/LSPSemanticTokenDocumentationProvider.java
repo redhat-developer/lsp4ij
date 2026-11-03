@@ -20,10 +20,12 @@ import com.intellij.psi.PsiFile;
 import com.intellij.psi.PsiNamedElement;
 import com.intellij.util.ThreeState;
 import com.intellij.util.containers.ContainerUtil;
+import com.intellij.util.ui.UIUtil;
 import com.redhat.devtools.lsp4ij.features.documentation.LSPDocumentationTarget;
 import com.redhat.devtools.lsp4ij.features.documentation.LSPDocumentationTargetProvider;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.Nls;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
@@ -44,8 +46,8 @@ public class LSPSemanticTokenDocumentationProvider extends AbstractDocumentation
     @Nls
     public String getQuickNavigateInfo(PsiElement targetElement,
                                        PsiElement sourceElement) {
-        String documentation = getDocumentation(sourceElement, targetElement);
-        return documentation != null ? documentation : super.getQuickNavigateInfo(targetElement, sourceElement);
+        String documentation = getDocumentation(sourceElement, targetElement, LSPSemanticTokenDocumentationProvider::toHintHtml, "<hr />");
+        return documentation != null ? "<html>" + documentation + "</html>" : super.getQuickNavigateInfo(targetElement, sourceElement);
     }
 
     /**
@@ -58,12 +60,14 @@ public class LSPSemanticTokenDocumentationProvider extends AbstractDocumentation
     @Nullable
     @ApiStatus.Internal
     public static String getDocumentation(@Nullable PsiElement element) {
-        return getDocumentation(element, element);
+        return getDocumentation(element, element, LSPDocumentationTarget::getHtml, "\n");
     }
 
     @Nullable
     private static String getDocumentation(@Nullable PsiElement sourceElement,
-                                           @Nullable PsiElement targetElement) {
+                                           @Nullable PsiElement targetElement,
+                                           @NotNull Function<LSPDocumentationTarget, String> toHtml,
+                                           @NotNull String separator) {
         LSPSemanticTokensFileViewProvider semanticTokensFileViewProvider = LSPSemanticTokensFileViewProvider.getInstance(sourceElement);
         if (semanticTokensFileViewProvider != null) {
             int offset = sourceElement.getTextOffset();
@@ -81,7 +85,7 @@ public class LSPSemanticTokenDocumentationProvider extends AbstractDocumentation
                             .map((Function<DocumentationTarget, LSPDocumentationTarget>) dt -> (LSPDocumentationTarget) dt)
                             .toList();
                     if (!ContainerUtil.isEmpty(lspDocumentationTargets)) {
-                        String documentation = StringUtil.join(lspDocumentationTargets, LSPDocumentationTarget::getHtml, "\n").trim();
+                        String documentation = StringUtil.join(lspDocumentationTargets, toHtml::apply, separator).trim();
                         if (StringUtil.isNotEmpty(documentation)) {
                             return documentation;
                         }
@@ -97,6 +101,21 @@ public class LSPSemanticTokenDocumentationProvider extends AbstractDocumentation
         // see https://github.com/redhat-developer/lsp4ij/issues/1240
         // return getFallbackDocumentation(sourceElement, targetElement);
         return null;
+    }
+
+    /**
+     * Returns the documentation of the given target as HTML for a hint, such as the Ctrl+hover one, without an
+     * {@code <html>} element.
+     * <p>
+     * A hint takes text without that element for plain text and turns its line breaks into {@code <br>} (see
+     * {@link UIUtil#getHtmlBody(String)}). So plain text goes through that method and keeps its line breaks. HTML
+     * converted from Markdown must not: it has a line break after each block tag, and each of them would become an
+     * empty line in the hint.
+     */
+    @NotNull
+    private static String toHintHtml(@NotNull LSPDocumentationTarget target) {
+        String html = target.getHtml().trim();
+        return target.hasMarkdown() ? html : UIUtil.getHtmlBody(html);
     }
 
     @Nullable

@@ -17,6 +17,7 @@ import com.intellij.platform.backend.presentation.TargetPresentation;
 import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import org.eclipse.lsp4j.MarkupContent;
+import org.eclipse.lsp4j.MarkupKind;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -63,6 +64,17 @@ public class LSPDocumentationTarget implements DocumentationTarget {
     @ApiStatus.Internal
     public String getHtml() {
         return convertToHtml(contents, languageServer, file);
+    }
+
+    /**
+     * Returns true if the documentation has Markdown content, which {@link #getHtml()} converts to HTML, and false if
+     * it is plain text only, which {@link #getHtml()} returns as it is.
+     *
+     * @return true if the documentation has Markdown content and false otherwise.
+     */
+    @ApiStatus.Internal
+    public boolean hasMarkdown() {
+        return contents.stream().anyMatch(content -> MarkupKind.MARKDOWN.equals(content.getKind()));
     }
 
     @NotNull
