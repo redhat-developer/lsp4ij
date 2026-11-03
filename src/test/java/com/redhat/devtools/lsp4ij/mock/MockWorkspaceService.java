@@ -33,6 +33,7 @@ public class MockWorkspaceService implements WorkspaceService {
 	private CompletableFuture<ExecuteCommandParams> executedCommand = new CompletableFuture<>();
 	private List<DidChangeWorkspaceFoldersParams> workspaceFoldersEvents = new ArrayList<>();
 	private final List<FileEvent> watchedFileEvents = new CopyOnWriteArrayList<>();
+	private final List<DidChangeConfigurationParams> configurationChanges = new CopyOnWriteArrayList<>();
     private WorkspaceEdit willRename;
     private WorkspaceEdit willCreate;
     private WorkspaceEdit willDelete;
@@ -189,7 +190,15 @@ public class MockWorkspaceService implements WorkspaceService {
 
 	@Override
 	public void didChangeConfiguration(DidChangeConfigurationParams params) {
+		configurationChanges.add(params);
 		MockLanguageServer.INSTANCE.record("didChangeConfiguration");
+	}
+
+	/**
+	 * @return the params of the workspace/didChangeConfiguration notifications this server received, in order
+	 */
+	public List<DidChangeConfigurationParams> getConfigurationChanges() {
+		return configurationChanges;
 	}
 
 	@Override
