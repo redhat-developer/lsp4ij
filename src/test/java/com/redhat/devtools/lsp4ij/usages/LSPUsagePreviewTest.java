@@ -14,6 +14,7 @@ import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.editor.colors.EditorColors;
 import com.intellij.openapi.editor.markup.HighlighterLayer;
 import com.intellij.openapi.editor.markup.RangeHighlighter;
+import com.intellij.openapi.fileEditor.FileDocumentManager;
 import com.intellij.openapi.fileEditor.FileEditorManager;
 import com.intellij.openapi.util.TextRange;
 import com.intellij.psi.PsiFile;
@@ -106,6 +107,24 @@ public class LSPUsagePreviewTest extends LSPCodeInsightFixtureTestCase {
             assertNotNull(editor);
             assertEquals(offset, editor.getCaretModel().getOffset());
         }
+    }
+
+    public void testOpeningAResultInAnotherFileGoesToItsReference() throws Exception {
+        PsiFile other = myFixture.addFileToProject("other.txt", "\n\ncallMe()\n");
+        PsiFile file = open();
+        Range reference = range(2, 0);
+        MockLanguageServer.INSTANCE.getTextDocumentService()
+                .setMockReferences(new Location(LSPIJUtils.toUriAsString(other), reference));
+
+        List<UsageInfo2UsageAdapter> usages = findUsages(file);
+
+        assertEquals(1, usages.size());
+        usages.get(0).navigate(true);
+        Editor editor = FileEditorManager.getInstance(file.getProject()).getSelectedTextEditor();
+        assertNotNull(editor);
+        assertEquals(other.getVirtualFile(), FileDocumentManager.getInstance().getFile(editor.getDocument()));
+        assertEquals(LSPIJUtils.toOffset(reference.getStart(), editor.getDocument()),
+                editor.getCaretModel().getOffset());
     }
 
     public void testResultIsGroupedAsAReference() throws Exception {
