@@ -581,9 +581,9 @@ the `wordPattern` of the ranges, or, when the language server gives none, VS Cod
 whitespace and punctuation. A text which doesn't match, a change outside the range, a second caret and a caret which leaves the
 range stop the linked editing until the caret stops again.
 
-Linked editing is used with every language server which supports it. A user can turn it off for all of them in
-`Settings | Editor | General | Smart Keys`, under `Language Servers`, beside XML's `Simultaneous <tag></tag> editing`;
-it is on by default. A client can turn it off with
+Linked editing is off by default, as in VS Code (`editor.linkedEditing`). A user can turn it on for every language
+server which supports it in `Settings | Editor | General | Smart Keys`, under `Language Servers`, beside XML's
+`Simultaneous <tag></tag> editing`. A client can turn it off for its language server with
 [LSPLinkedEditingRangeFeature](./LSPApi.md#lsp-linkededitingrange-feature).
 
 ### Formatting

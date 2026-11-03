@@ -29,9 +29,9 @@ public final class LSPEditorOptions implements PersistentStateComponent<LSPEdito
      */
     public static class Options {
         /**
-         * True if typing in a linked editing range edits the other ranges too.
+         * True if typing in a linked editing range edits the other ranges too, which is off by default.
          */
-        public boolean linkedEditing = true;
+        public boolean linkedEditing;
     }
 
     private Options options = new Options();
@@ -42,7 +42,7 @@ public final class LSPEditorOptions implements PersistentStateComponent<LSPEdito
 
     /**
      * Returns true if typing in a range which a language server links to others edits them too
-     * (textDocument/linkedEditingRange), which is the default.
+     * (textDocument/linkedEditingRange). It is off by default.
      *
      * @return true if linked editing is on.
      */

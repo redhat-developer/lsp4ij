@@ -594,7 +594,8 @@ The inline value feature gives the positions of the values which a DAP debug ses
 | boolean isEnabled(PsiFile file)   | Returns `true` if the LSP feature is enabled for the given file and `false` otherwise.                                                                                                                                             | `true`                      |
 | boolean isSupported(PsiFile file) | Returns `true` if the LSP feature is supported for the given file and `false` otherwise. <br/>This supported state is called after starting the language server, which matches the file and user with the LSP server capabilities. | Check the server capability |
 
-The linked editing range feature edits the ranges which the language server links at the caret together while typing.
+The linked editing range feature edits the ranges which the language server links at the caret together while typing,
+once linked editing is turned on in `Settings | Editor | General | Smart Keys`. It is off by default.
 
 ## LSP Progress Feature
 

@@ -44,6 +44,22 @@ public class LSPLinkedEditingRangeSynchronizerTest extends LSPCodeInsightFixture
         super("*.foo");
     }
 
+    @Override
+    protected void setUp() throws Exception {
+        super.setUp();
+        // linked editing is off by default
+        LSPEditorOptions.getInstance().setLinkedEditing(true);
+    }
+
+    @Override
+    protected void tearDown() throws Exception {
+        try {
+            LSPEditorOptions.getInstance().loadState(new LSPEditorOptions.Options());
+        } finally {
+            super.tearDown();
+        }
+    }
+
     public void testTypingInALinkedRangeEditsTheOthers() throws Exception {
         open(new LinkedEditingRanges(NAME_RANGES));
         assertEquals(NAME_TEXT_RANGES, linkedAt(AFTER_DECLARATION));
@@ -217,35 +233,26 @@ public class LSPLinkedEditingRangeSynchronizerTest extends LSPCodeInsightFixture
     }
 
     public void testWithLinkedEditingOffTheRangesAreNotAskedForNorEdited() throws Exception {
-        var options = LSPEditorOptions.getInstance();
-        options.setLinkedEditing(false);
-        try {
-            open(new LinkedEditingRanges(NAME_RANGES));
-            myFixture.getEditor().getCaretModel().moveToOffset(AFTER_DECLARATION);
+        LSPEditorOptions.getInstance().setLinkedEditing(false);
+        open(new LinkedEditingRanges(NAME_RANGES));
+        myFixture.getEditor().getCaretModel().moveToOffset(AFTER_DECLARATION);
 
-            assertNull(synchronizer().requestNow());
-            myFixture.type("s");
+        assertNull(synchronizer().requestNow());
+        myFixture.type("s");
 
-            assertEquals("var names = 1; print(name); name++;", text());
-            assertEmpty(requests());
-        } finally {
-            options.setLinkedEditing(true);
-        }
+        assertEquals("var names = 1; print(name); name++;", text());
+        assertEmpty(requests());
     }
 
     public void testTurningLinkedEditingOffDropsTheLinkedRanges() throws Exception {
         open(new LinkedEditingRanges(NAME_RANGES));
         assertEquals(NAME_TEXT_RANGES, linkedAt(AFTER_DECLARATION));
-        var options = LSPEditorOptions.getInstance();
-        options.setLinkedEditing(false);
-        try {
-            myFixture.type("s");
+        LSPEditorOptions.getInstance().setLinkedEditing(false);
 
-            assertEquals("var names = 1; print(name); name++;", text());
-            assertEmpty(synchronizer().getRanges());
-        } finally {
-            options.setLinkedEditing(true);
-        }
+        myFixture.type("s");
+
+        assertEquals("var names = 1; print(name); name++;", text());
+        assertEmpty(synchronizer().getRanges());
     }
 
     private void open(@Nullable LinkedEditingRanges linkedEditingRanges) throws Exception {

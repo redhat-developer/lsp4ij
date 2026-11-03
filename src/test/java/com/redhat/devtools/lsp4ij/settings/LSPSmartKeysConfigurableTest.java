@@ -20,7 +20,7 @@ import javax.swing.JCheckBox;
 import javax.swing.JComponent;
 
 /**
- * Linked editing is on unless it is turned off in Settings | Editor | General | Smart Keys, where LSP4IJ's options
+ * Linked editing is off unless it is turned on in Settings | Editor | General | Smart Keys, where LSP4IJ's options
  * are shown beside those of other languages.
  */
 public class LSPSmartKeysConfigurableTest extends BasePlatformTestCase {
@@ -33,9 +33,9 @@ public class LSPSmartKeysConfigurableTest extends BasePlatformTestCase {
                 .anyMatch(ep -> LSPSmartKeysConfigurable.class.getName().equals(ep.instanceClass)));
     }
 
-    public void testTheCheckboxTurnsLinkedEditingOffAndOn() throws ConfigurationException {
+    public void testTheCheckboxTurnsLinkedEditingOnAndOff() throws ConfigurationException {
         var options = LSPEditorOptions.getInstance();
-        assertTrue("linked editing is on by default", options.isLinkedEditing());
+        assertFalse("linked editing is off by default", options.isLinkedEditing());
         var configurable = new LSPSmartKeysConfigurable();
         try {
             JComponent component = configurable.createComponent();
@@ -44,19 +44,19 @@ public class LSPSmartKeysConfigurableTest extends BasePlatformTestCase {
             configurable.reset();
             JCheckBox checkBox = UIUtil.findComponentOfType(component, JCheckBox.class);
             assertNotNull(checkBox);
-            assertTrue(checkBox.isSelected());
-
-            checkBox.setSelected(false);
-            assertTrue(configurable.isModified());
-            configurable.apply();
-            assertFalse(options.isLinkedEditing());
+            assertFalse(checkBox.isSelected());
 
             checkBox.setSelected(true);
+            assertTrue(configurable.isModified());
             configurable.apply();
             assertTrue(options.isLinkedEditing());
+
+            checkBox.setSelected(false);
+            configurable.apply();
+            assertFalse(options.isLinkedEditing());
         } finally {
             configurable.disposeUIResources();
-            options.setLinkedEditing(true);
+            options.loadState(new LSPEditorOptions.Options());
         }
     }
 }
