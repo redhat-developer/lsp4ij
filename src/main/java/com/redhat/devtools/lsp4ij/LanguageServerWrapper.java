@@ -691,15 +691,14 @@ public class LanguageServerWrapper implements Disposable {
         getLanguageServerLifecycleManager().logLSPMessage(message, consumer, this);
     }
 
-    private void removeStopTimer(boolean stopping) {
+    /**
+     * Cancels the stop scheduled after the last document disconnected, if any. The status is left as it is: a pending
+     * stop doesn't change it.
+     */
+    private void removeStopTimer() {
         Alarm stopAlarm = this.stopAlarm;
         if (stopAlarm != null) {
-            if (stopAlarm.getActiveRequestCount() > 0) {
-                stopAlarm.cancelAllRequests();
-                if (!stopping) {
-                    updateStatus(ServerStatus.started);
-                }
-            }
+            stopAlarm.cancelAllRequests();
         }
     }
 
@@ -722,8 +721,12 @@ public class LanguageServerWrapper implements Disposable {
         }
     }
 
+    /**
+     * Schedules the stop of the language server after lastDocumentDisconnectedTimeout. The status stays as it is until
+     * the stop runs: the server is still running and usable while the stop is pending, and a document that connects or
+     * a lease cancels it.
+     */
     private void startStopTimer() {
-        updateStatus(ServerStatus.stopping);
         int delayMs = (int) TimeUnit.SECONDS.toMillis(serverDefinition.getLastDocumentDisconnectedTimeout());
         getStopAlarm().addRequest(this::stopIfNotKeptAlive, delayMs);
     }
@@ -743,12 +746,6 @@ public class LanguageServerWrapper implements Disposable {
             keptAlive = true;
         }
         if (keptAlive) {
-            synchronized (this) {
-                // Only the pending stop's status: an explicit stop() has dropped the server's context, as stop(boolean) checks
-                if (getServerStatus() == ServerStatus.stopping && currentInitializingContext != null) {
-                    updateStatus(ServerStatus.started);
-                }
-            }
             return;
         }
         try {
@@ -878,7 +875,7 @@ public class LanguageServerWrapper implements Disposable {
     private CompletableFuture<@Nullable LanguageServer> connectDocument(@NotNull VirtualFile file,
                                                                         @NotNull LSPFileConnectionInfo fileConnectionInfo,
                                                                         @Nullable DocumentConnectionClaim claim) {
-        removeStopTimer(false);
+        removeStopTimer();
 
         URI fileUri = toUri(file);
         if (fileUri == null) {
@@ -1116,7 +1113,7 @@ public class LanguageServerWrapper implements Disposable {
     private void maybeShutdown() {
         if (!keepAlive()) {
             if (this.serverDefinition.getLastDocumentDisconnectedTimeout() != 0 && !ApplicationManager.getApplication().isUnitTestMode()) {
-                removeStopTimer(true);
+                removeStopTimer();
                 startStopTimer();
             } else {
                 stop();
@@ -1131,7 +1128,7 @@ public class LanguageServerWrapper implements Disposable {
     void incrementKeepAlive() {
         keepAliveCounter.incrementAndGet();
         // A lease taken while the last document's stop is pending keeps the server, as a document that connects does
-        removeStopTimer(false);
+        removeStopTimer();
     }
 
     void decrementKeepAlive() {
@@ -2104,7 +2101,7 @@ public class LanguageServerWrapper implements Disposable {
         boolean current = initializingContext != null && initializingContext.equals(currentInitializingContext);
         try {
             updateStatus(ServerStatus.stopping);
-            removeStopTimer(true);
+            removeStopTimer();
             if (languageClient != null) {
                 languageClient.dispose();
             }
