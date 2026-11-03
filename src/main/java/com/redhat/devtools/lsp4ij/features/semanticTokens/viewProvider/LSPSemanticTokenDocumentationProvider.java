@@ -24,6 +24,7 @@ import com.redhat.devtools.lsp4ij.features.documentation.LSPDocumentationTarget;
 import com.redhat.devtools.lsp4ij.features.documentation.LSPDocumentationTargetProvider;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.Nls;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
@@ -44,7 +45,7 @@ public class LSPSemanticTokenDocumentationProvider extends AbstractDocumentation
     @Nls
     public String getQuickNavigateInfo(PsiElement targetElement,
                                        PsiElement sourceElement) {
-        String documentation = getDocumentation(sourceElement, targetElement);
+        String documentation = getDocumentation(sourceElement, targetElement, true);
         return documentation != null ? documentation : super.getQuickNavigateInfo(targetElement, sourceElement);
     }
 
@@ -58,12 +59,13 @@ public class LSPSemanticTokenDocumentationProvider extends AbstractDocumentation
     @Nullable
     @ApiStatus.Internal
     public static String getDocumentation(@Nullable PsiElement element) {
-        return getDocumentation(element, element);
+        return getDocumentation(element, element, false);
     }
 
     @Nullable
     private static String getDocumentation(@Nullable PsiElement sourceElement,
-                                           @Nullable PsiElement targetElement) {
+                                           @Nullable PsiElement targetElement,
+                                           boolean forHint) {
         LSPSemanticTokensFileViewProvider semanticTokensFileViewProvider = LSPSemanticTokensFileViewProvider.getInstance(sourceElement);
         if (semanticTokensFileViewProvider != null) {
             int offset = sourceElement.getTextOffset();
@@ -83,7 +85,7 @@ public class LSPSemanticTokenDocumentationProvider extends AbstractDocumentation
                     if (!ContainerUtil.isEmpty(lspDocumentationTargets)) {
                         String documentation = StringUtil.join(lspDocumentationTargets, LSPDocumentationTarget::getHtml, "\n").trim();
                         if (StringUtil.isNotEmpty(documentation)) {
-                            return documentation;
+                            return forHint ? toHintText(documentation, lspDocumentationTargets) : documentation;
                         }
                     }
                 } catch (ProcessCanceledException pce) {
@@ -97,6 +99,20 @@ public class LSPSemanticTokenDocumentationProvider extends AbstractDocumentation
         // see https://github.com/redhat-developer/lsp4ij/issues/1240
         // return getFallbackDocumentation(sourceElement, targetElement);
         return null;
+    }
+
+    /**
+     * Returns the text for a hint, such as the Ctrl+hover one, from the given documentation.
+     * <p>
+     * A hint takes text without an {@code <html>} element for plain text and turns its line breaks into {@code <br>}
+     * (see {@link com.intellij.util.ui.UIUtil#getHtmlBody(String)}). HTML converted from Markdown has a line break
+     * after each block tag, so it needs the element, otherwise each of them becomes an empty line in the hint.
+     */
+    @NotNull
+    private static String toHintText(@NotNull String documentation,
+                                     @NotNull List<LSPDocumentationTarget> targets) {
+        boolean plainText = targets.stream().noneMatch(LSPDocumentationTarget::hasMarkdown);
+        return plainText ? documentation : "<html>" + documentation + "</html>";
     }
 
     @Nullable
