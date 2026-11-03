@@ -184,7 +184,9 @@ intellijPlatform {
         ides {
             select {
                 types = listOf(IntelliJPlatformType.IntellijIdea)
-                channels = listOf(ProductRelease.Channel.RELEASE) // Only stable releases
+                // The latest release of each version, and the current EAP, so that an API that the coming
+                // version removes fails the verification before that version is released.
+                channels = listOf(ProductRelease.Channel.RELEASE, ProductRelease.Channel.EAP)
                 sinceBuild = "242" // From your minimum supported version
             }
         }
