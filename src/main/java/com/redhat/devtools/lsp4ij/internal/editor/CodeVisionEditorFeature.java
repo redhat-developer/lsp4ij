@@ -11,7 +11,6 @@
 package com.redhat.devtools.lsp4ij.internal.editor;
 
 import com.intellij.codeInsight.codeVision.CodeVisionHost;
-import com.intellij.codeInsight.codeVision.CodeVisionInitializer;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.project.Project;
 import com.intellij.psi.PsiFile;
@@ -92,7 +91,7 @@ public class CodeVisionEditorFeature implements EditorFeature {
                                   @NotNull List<Runnable> runnableList) {
         Runnable runnable = () -> {
             // Get the IntelliJ code vision host and fire an event to refresh only LSP code vision
-            var codeVisionHost = CodeVisionInitializer.Companion.getInstance(file.getProject()).getCodeVisionHost();
+            var codeVisionHost = file.getProject().getService(CodeVisionHost.class);
             codeVisionHost.getInvalidateProviderSignal().fire(new CodeVisionHost.LensInvalidateSignal(editor, DummyCodeVisionProviderFactory.LSP_CODE_VISION_PROVIDER_IDS));
         };
         runnableList.add(runnable);
