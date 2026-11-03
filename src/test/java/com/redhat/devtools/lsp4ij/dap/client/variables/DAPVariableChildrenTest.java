@@ -97,6 +97,16 @@ public class DAPVariableChildrenTest extends LightPlatformTestCase {
         assertTrue(more.isEmpty());
     }
 
+    public void testAShortFirstPageIsTheLast() {
+        // the variable announces 250 elements, but the debug adapter has only 20
+        available = 20;
+        children(variable(250, null)).load(node());
+
+        assertEquals(List.of("indexed 0 100"), describe(asked));
+        assertEquals(List.of("add 20 last"), calls);
+        assertTrue(more.isEmpty());
+    }
+
     public void testALargeVariablesNamedChildrenAreAskedForFirstWhenItHasSome() {
         children(variable(250, 2)).load(node());
 
