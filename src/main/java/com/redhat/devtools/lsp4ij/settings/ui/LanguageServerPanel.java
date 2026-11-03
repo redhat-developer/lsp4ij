@@ -10,6 +10,8 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.settings.ui;
 
+import com.google.gson.JsonParseException;
+import com.google.gson.JsonParser;
 import com.intellij.execution.configuration.EnvironmentVariablesComponent;
 import com.intellij.execution.configuration.EnvironmentVariablesData;
 import com.intellij.ide.BrowserUtil;
@@ -19,6 +21,7 @@ import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.Disposer;
 import com.intellij.openapi.ui.ComboBox;
 import com.intellij.openapi.ui.TextFieldWithBrowseButton;
+import com.intellij.openapi.ui.ValidationInfo;
 import com.intellij.openapi.util.NlsContexts;
 import com.intellij.ui.ContextHelpLabel;
 import com.intellij.ui.HyperlinkLabel;
@@ -42,13 +45,18 @@ import com.redhat.devtools.lsp4ij.settings.UIConfiguration;
 import com.redhat.devtools.lsp4ij.settings.jsonSchema.LSPClientConfigurationJsonSchemaFileProvider;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.jetbrains.annotations.PropertyKey;
 
 import javax.swing.*;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 import java.awt.*;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
+import static com.redhat.devtools.lsp4ij.LanguageServerBundle.BUNDLE;
 import static com.redhat.devtools.lsp4ij.server.definition.launching.CommandUtils.resolveCommandLine;
 
 /**
@@ -617,6 +625,75 @@ public class LanguageServerPanel implements Disposable {
             return;
         }
         workspaceFoldersPanel.setJsonConfiguration(workspaceFolderStrategyConfiguration);
+    }
+
+    /**
+     * Returns an error for each JSON field whose content is not valid JSON, in tab order.
+     *
+     * <p>The content is parsed with the lenient Gson parser which reads it when the language server uses it,
+     * so what that parser accepts (comments for instance) stays valid, and so does an empty field.</p>
+     *
+     * @return an error for each JSON field whose content is not valid JSON.
+     */
+    public @NotNull List<ValidationInfo> validateJsonFields() {
+        List<ValidationInfo> errors = new ArrayList<>();
+        // The language server reads these three once their variables, such as $PROJECT_DIR$, are expanded
+        addJsonError("language.server.validation.json.configuration", getConfigurationContent(), true, errors);
+        addJsonError("language.server.validation.json.initializationOptions",
+                getInitializationOptionsContent(),
+                true,
+                errors);
+        addJsonError("language.server.validation.json.experimental", getExperimentalContent(), true, errors);
+        addJsonError("language.server.validation.json.clientConfiguration",
+                getClientConfigurationContent(),
+                false,
+                errors);
+        addJsonError("language.server.validation.json.installer", getInstallerConfigurationContent(), false, errors);
+        addJsonError("language.server.validation.json.workspaceFolders",
+                workspaceFoldersPanel != null ? workspaceFoldersPanel.getJsonConfiguration() : null,
+                false,
+                errors);
+        return errors;
+    }
+
+    private void addJsonError(@NotNull @PropertyKey(resourceBundle = BUNDLE) String fieldKey,
+                              @Nullable String content,
+                              boolean expanded,
+                              @NotNull List<ValidationInfo> errors) {
+        if (StringUtils.isBlank(content)) {
+            return;
+        }
+        String reason = jsonError(content);
+        if (reason == null && expanded && content.contains("$")) {
+            // A value can be valid JSON only until its variables are expanded, as with a Windows path in a string
+            String expandedReason = jsonError(resolveCommandLine(content, project));
+            if (expandedReason != null) {
+                reason = LanguageServerBundle.message("language.server.validation.json.expanded", expandedReason);
+            }
+        }
+        if (reason != null) {
+            String message = LanguageServerBundle.message("language.server.validation.json.invalid",
+                    LanguageServerBundle.message(fieldKey),
+                    reason);
+            // No component: an error bound to a field only shows on the tab of that field,
+            // and the new language server dialog opens on the Server tab
+            errors.add(new ValidationInfo(message));
+        }
+    }
+
+    /**
+     * Returns why the content is not valid JSON, or null if it is.
+     */
+    private static @Nullable String jsonError(@NotNull String content) {
+        try {
+            JsonParser.parseString(content);
+            return null;
+        } catch (JsonParseException e) {
+            // The reader error, wrapped by Gson, tells where the content breaks; newer Gson
+            // versions add a troubleshooting link on a second line
+            Throwable cause = e.getCause() != null ? e.getCause() : e;
+            return Objects.toString(cause.getMessage(), "").lines().findFirst().orElse("");
+        }
     }
 
     public JBCheckBox getDebugSuspendCheckBox() {
