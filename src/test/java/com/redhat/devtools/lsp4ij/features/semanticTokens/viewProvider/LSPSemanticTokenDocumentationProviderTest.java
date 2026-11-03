@@ -11,8 +11,11 @@ import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
 import com.intellij.util.ui.UIUtil;
+import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
 import com.redhat.devtools.lsp4ij.fixtures.LSPSemanticTokensFileViewProviderFixtureTestCase;
 import com.redhat.devtools.lsp4ij.mock.MockLanguageServer;
+import com.redhat.devtools.lsp4ij.mock.MockLanguageServerDefinition;
+import com.redhat.devtools.lsp4ij.templates.ServerMappingSettings;
 import org.eclipse.lsp4j.Hover;
 import org.eclipse.lsp4j.MarkupContent;
 import org.eclipse.lsp4j.MarkupKind;
@@ -64,8 +67,22 @@ public class LSPSemanticTokenDocumentationProviderTest extends LSPSemanticTokens
             Opens the shop and logs in as the given user.
             """;
 
+    private MockLanguageServerDefinition secondServer;
+
     public LSPSemanticTokenDocumentationProviderTest() {
         super("*.ts", "typescript");
+    }
+
+    @Override
+    protected void tearDown() throws Exception {
+        try {
+            if (secondServer != null) {
+                secondServer.getServer().waitBeforeTearDown();
+                LanguageServersRegistry.getInstance().removeServerDefinition(myFixture.getProject(), secondServer);
+            }
+        } finally {
+            super.tearDown();
+        }
     }
 
     public void testMarkdownIsPutIntoAnHtmlElement() {
@@ -93,13 +110,44 @@ public class LSPSemanticTokenDocumentationProviderTest extends LSPSemanticTokens
         assertTrue(body, body.contains("Second."));
     }
 
-    public void testPlainTextStaysAsItIs() {
+    public void testPlainTextKeepsItsLineBreaks() {
         PsiFile file = openFile();
 
         String hintText = getHintText(file, new Hover(new MarkupContent(MarkupKind.PLAINTEXT, "First line\nSecond line")));
 
-        assertEquals("First line\nSecond line", hintText);
         assertEquals("First line<br>Second line", UIUtil.getHtmlBody(hintText));
+    }
+
+    public void testMarkdownAndPlainTextOfTwoLanguageServers() {
+        PsiFile file = openFile();
+        addSecondServer(new Hover(new MarkupContent(MarkupKind.PLAINTEXT, "First line\nSecond line")));
+
+        String hintText = getHintText(file, new Hover(new MarkupContent(MarkupKind.MARKDOWN, MARKDOWN_WITH_TABLE)));
+
+        String body = UIUtil.getHtmlBody(hintText);
+        assertTrue(body, body.contains("First line<br>Second line"));
+        assertEquals(body, 1, StringUtil.getOccurrenceCount(body, "<br>"));
+        assertTrue(body, body.contains("<table>"));
+        assertEquals(body, 1, StringUtil.getOccurrenceCount(body, "<hr />"));
+    }
+
+    public void testPlainTextOfTwoLanguageServers() {
+        PsiFile file = openFile();
+        addSecondServer(new Hover(new MarkupContent(MarkupKind.PLAINTEXT, "Third line\nFourth line")));
+
+        String hintText = getHintText(file, new Hover(new MarkupContent(MarkupKind.PLAINTEXT, "First line\nSecond line")));
+
+        String body = UIUtil.getHtmlBody(hintText);
+        assertTrue(body, body.contains("First line<br>Second line"));
+        assertTrue(body, body.contains("Third line<br>Fourth line"));
+        assertEquals(body, 1, StringUtil.getOccurrenceCount(body, "<hr />"));
+    }
+
+    private void addSecondServer(@NotNull Hover hover) {
+        secondServer = new MockLanguageServerDefinition("second-server", false);
+        secondServer.getServer().setHover(hover);
+        LanguageServersRegistry.getInstance().addServerDefinition(myFixture.getProject(), secondServer,
+                List.of(ServerMappingSettings.createFileNamePatternsMappingSettings(List.of("*.ts"), "typescript")));
     }
 
     private @NotNull PsiFile openFile() {
