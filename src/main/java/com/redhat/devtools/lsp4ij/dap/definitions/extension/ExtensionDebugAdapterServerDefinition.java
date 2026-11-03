@@ -16,6 +16,7 @@ import com.redhat.devtools.lsp4ij.dap.descriptors.DebugAdapterDescriptorFactory;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import com.redhat.devtools.lsp4ij.server.definition.ServerMapping;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -104,6 +105,17 @@ public class ExtensionDebugAdapterServerDefinition extends DebugAdapterServerDef
             icon = findIcon();
         }
         return icon;
+    }
+
+    /**
+     * Returns the description of the server, from the {@code description} element of the extension or from its
+     * {@code bundle} and {@code descriptionKey}.
+     *
+     * @return the description, or {@code null} if the extension defines none
+     */
+    @Override
+    public @Nullable String getDescription() {
+        return extension.getDescription();
     }
 
     /**
