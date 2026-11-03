@@ -20,12 +20,14 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.TimeUnit;
 
 /**
  * Once its last document has disconnected, a language server is stopped after lastDocumentDisconnectedTimeout,
  * unless something keeps it alive by then: a lease taken while the stop is pending cancels it, and a stop that comes
- * due while keepServerAlive() says so, or fails to answer, leaves the server running. It does not undo an explicit stop.
+ * due while keepServerAlive() says so, or fails to answer, leaves the server running. Until the stop runs, the server
+ * stays started, and neither the pending stop nor its cancellation changes the status of an explicit stop.
  */
 public class KeepAliveDuringPendingStopTest extends UsefulTestCase {
     private LSPCodeInsightTestFixture fixture;
@@ -59,12 +61,21 @@ public class KeepAliveDuringPendingStopTest extends UsefulTestCase {
         }
     }
 
+    public void testTheServerStaysStartedWhileItsStopIsPending() throws Exception {
+        var wrapper = start().getServerWrapper();
+        definition.statusChanges.clear();
+        // As the last document's disconnection does when nothing keeps the server alive
+        startStopTimer(wrapper);
+
+        assertEquals(ServerStatus.started, wrapper.getServerStatus());
+        assertEquals(1, stopAlarm(wrapper).getActiveRequestCount());
+        assertEmpty(definition.statusChanges);
+    }
+
     public void testALeaseTakenWhileTheStopIsPendingCancelsIt() throws Exception {
         var item = start();
         var wrapper = item.getServerWrapper();
-        // As the last document's disconnection does when nothing keeps the server alive
         startStopTimer(wrapper);
-        assertEquals(ServerStatus.stopping, wrapper.getServerStatus());
         assertEquals(1, stopAlarm(wrapper).getActiveRequestCount());
 
         var lease = item.keepAlive();
@@ -76,9 +87,24 @@ public class KeepAliveDuringPendingStopTest extends UsefulTestCase {
         }
     }
 
+    public void testALeaseThatCancelsAPendingStopLeavesAnExplicitStopStopping() throws Exception {
+        var item = start();
+        var wrapper = item.getServerWrapper();
+        startStopTimer(wrapper);
+        // An explicit stop() sets stopping, then cancels the pending stop: the lease comes in between
+        wrapper.updateStatus(ServerStatus.stopping);
+
+        var lease = item.keepAlive();
+        try {
+            assertEquals(0, stopAlarm(wrapper).getActiveRequestCount());
+            assertEquals(ServerStatus.stopping, wrapper.getServerStatus());
+        } finally {
+            lease.dispose();
+        }
+    }
+
     public void testAStopThatComesDueWhileTheClientKeepsTheServerAliveLeavesItRunning() throws Exception {
         var wrapper = start().getServerWrapper();
-        wrapper.updateStatus(ServerStatus.stopping);
         // keepServerAlive() is asked, not announced: it now says yes, while the stop is pending
         definition.keepAlive = true;
 
@@ -93,15 +119,15 @@ public class KeepAliveDuringPendingStopTest extends UsefulTestCase {
         definition.keepAlive = true;
         startStopTimer(wrapper);
 
+        var stopAlarm = stopAlarm(wrapper);
         PlatformTestUtil.waitWithEventsDispatching("the scheduled stop must run",
-                () -> wrapper.getServerStatus() != ServerStatus.stopping, 10);
+                () -> stopAlarm.getActiveRequestCount() == 0, 10);
         assertEquals(ServerStatus.started, wrapper.getServerStatus());
         assertTrue(wrapper.isActive());
     }
 
     public void testAStopThatComesDueWhenTheKeepAliveCheckFailsLeavesTheServerRunning() throws Exception {
         var wrapper = start().getServerWrapper();
-        wrapper.updateStatus(ServerStatus.stopping);
         definition.keepAliveFailure = new IllegalStateException("keepServerAlive() failed");
 
         wrapper.stopIfNotKeptAlive();
@@ -123,11 +149,15 @@ public class KeepAliveDuringPendingStopTest extends UsefulTestCase {
 
     public void testAStopThatComesDueWithNothingKeepingTheServerStopsIt() throws Exception {
         var wrapper = start().getServerWrapper();
-        wrapper.updateStatus(ServerStatus.stopping);
+        definition.statusChanges.clear();
+        startStopTimer(wrapper);
+        assertEquals(ServerStatus.started, wrapper.getServerStatus());
 
-        wrapper.stopIfNotKeptAlive();
+        // Runs the scheduled stop now, as the alarm does once lastDocumentDisconnectedTimeout has passed
+        stopAlarm(wrapper).drainRequestsInTest();
         PlatformTestUtil.waitWithEventsDispatching("the server must stop",
-                () -> wrapper.getServerStatus() == ServerStatus.stopped, 10);
+                () -> definition.statusChanges.contains(ServerStatus.stopped), 10);
+        assertEquals(List.of(ServerStatus.stopping, ServerStatus.stopped), definition.statusChanges);
     }
 
     /** The server started without a document, as LanguageServerManager starts one. */
@@ -152,6 +182,7 @@ public class KeepAliveDuringPendingStopTest extends UsefulTestCase {
     }
 
     private static class KeptServer extends MockLanguageServerDefinition {
+        final List<ServerStatus> statusChanges = new CopyOnWriteArrayList<>();
         volatile boolean keepAlive;
         volatile @Nullable RuntimeException keepAliveFailure;
         volatile boolean stopAtOnce;
@@ -175,6 +206,11 @@ public class KeepAliveDuringPendingStopTest extends UsefulTestCase {
                         throw failure;
                     }
                     return keepAlive;
+                }
+
+                @Override
+                public void handleServerStatusChanged(@NotNull ServerStatus serverStatus) {
+                    statusChanges.add(serverStatus);
                 }
             };
         }
