@@ -20,6 +20,7 @@ import com.intellij.openapi.fileChooser.FileChooserDescriptorFactory;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.Disposer;
 import com.intellij.openapi.ui.ComboBox;
+import com.intellij.openapi.ui.TextBrowseFolderListener;
 import com.intellij.openapi.ui.TextFieldWithBrowseButton;
 import com.intellij.openapi.ui.ValidationInfo;
 import com.intellij.openapi.util.NlsContexts;
@@ -436,7 +437,7 @@ public class LanguageServerPanel implements Disposable {
 
     private void createWorkingDirField(@NotNull FormBuilder builder) {
         workingDir = new TextFieldWithBrowseButton();
-        workingDir.addBrowseFolderListener(null, null, project, FileChooserDescriptorFactory.createSingleFolderDescriptor());
+        workingDir.addBrowseFolderListener(new TextBrowseFolderListener(FileChooserDescriptorFactory.createSingleFolderDescriptor(), project));
         JLabel previewWorkingDirLabel = createLabelForComponent("", workingDir);
         updatePreviewWorkingDir(workingDir, previewWorkingDirLabel, project);
         builder.addLabeledComponent(LanguageServerBundle.message("language.server.workingDir"), workingDir);
