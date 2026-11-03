@@ -48,6 +48,10 @@ public class LSPUsageTypeProvider implements UsageTypeProviderEx {
 
     @Override
     public UsageType getUsageType(PsiElement element, UsageTarget @NotNull [] targets) {
+        // The usage view shows an LSP usage with an LSPUsageViewElement
+        if (element instanceof LSPUsageViewElement usageViewElement) {
+            element = usageViewElement.getUsage();
+        }
         if (element instanceof LSPUsagePsiElement usageElement) {
             return switch (usageElement.getKind()) {
                 case declarations -> DECLARATIONS_USAGE_TYPE;

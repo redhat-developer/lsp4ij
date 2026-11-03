@@ -220,6 +220,10 @@ public class LSPUsageSearcher extends CustomUsageSearcher {
     /**
      * Wraps a usage element for the usage view.
      * <p>
+     * The usage is shown with an {@link LSPUsageViewElement}, which the usage preview highlights at the range of the
+     * usage, also in a file without real PSI.
+     * </p>
+     * <p>
      * A usage whose access is known becomes a {@link ReadWriteAccessUsage}, which is what the read and write
      * access filters and icons of the usage view act on. Any other usage is wrapped as it always was.
      * </p>
@@ -228,7 +232,7 @@ public class LSPUsageSearcher extends CustomUsageSearcher {
      * @return the usage to report.
      */
     static @NotNull Usage toUsage(@NotNull LSPUsagePsiElement usage) {
-        UsageInfo usageInfo = new UsageInfo(usage);
+        UsageInfo usageInfo = new UsageInfo(new LSPUsageViewElement(usage));
         ReadWriteAccessDetector.Access access = usage.getAccess();
         return access != null ? new ReadWriteAccessUsageInfo2UsageAdapter(usageInfo, access) : new UsageInfo2UsageAdapter(usageInfo);
     }
