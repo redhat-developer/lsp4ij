@@ -12,6 +12,7 @@ import com.intellij.openapi.application.impl.NonBlockingReadActionImpl;
 import com.intellij.openapi.fileEditor.FileEditorManager;
 import com.intellij.openapi.fileEditor.FileEditorManagerEvent;
 import com.intellij.openapi.fileEditor.FileEditorManagerListener;
+import com.intellij.testFramework.IndexingTestUtil;
 import com.intellij.testFramework.PlatformTestUtil;
 import com.redhat.devtools.lsp4ij.fixtures.LSPCodeInsightFixtureTestCase;
 import com.redhat.devtools.lsp4ij.mock.MockLanguageServer;
@@ -98,7 +99,9 @@ public class SelectedEditorConnectionTest extends LSPCodeInsightFixtureTestCase 
         // the close releases the file's LSP support in a read action of its own
         NonBlockingReadActionImpl.waitForAsyncTaskCompletion();
 
-        // The selection of the closed tab, as a connection that runs after the close sees it, on a slow machine
+        // The selection of the closed tab, as a connection that runs after the close sees it, on a slow machine.
+        // Its read action waits for indexing, which must not outlast the time checked below.
+        IndexingTestUtil.waitUntilIndexesAreReady(myFixture.getProject());
         var reopened = expectDidOpen("closed.ts");
         projectEditorListeners().selectionChanged(
                 new FileEditorManagerEvent(editors, null, null, null, closed.getVirtualFile(), null, null));
