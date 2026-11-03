@@ -15,7 +15,7 @@ import static org.junit.Assert.assertEquals;
 
 /**
  * Tests that {@link LSPUsageElementDescriptionProvider#splitIntoWords(String)} splits semantic token types as
- * {@code NameUtil.splitNameIntoWords} did.
+ * {@code NameUtil.splitNameIntoWords} did for ASCII names.
  */
 public class LSPUsageElementDescriptionProviderTest {
 
@@ -37,5 +37,22 @@ public class LSPUsageElementDescriptionProviderTest {
         assertEquals(List.of("type", "name"), LSPUsageElementDescriptionProvider.splitIntoWords("type_name"));
         assertEquals(List.of("builtin", "-", "type"), LSPUsageElementDescriptionProvider.splitIntoWords("builtin-type"));
         assertEquals(List.of("ID"), LSPUsageElementDescriptionProvider.splitIntoWords("ID"));
+    }
+
+    @Test
+    public void aLetterOutsideTheBasicMultilingualPlaneIsOneLetter() {
+        // U+20BB7 is an ideograph, U+10400 and U+10401 are Deseret capital letters, and U+10429 is a Deseret small letter
+        String ideograph = Character.toString(0x20BB7);
+        String capitalI = Character.toString(0x10400);
+        String capitalE = Character.toString(0x10401);
+        String smallE = Character.toString(0x10429);
+        assertEquals(List.of(ideograph, "Name"), LSPUsageElementDescriptionProvider.splitIntoWords(ideograph + "Name"));
+        assertEquals(List.of(capitalI, capitalE + smallE),
+                LSPUsageElementDescriptionProvider.splitIntoWords(capitalI + capitalE + smallE));
+    }
+
+    @Test
+    public void onlyALowerCaseLetterTakesTheLastCapitalOfARun() {
+        assertEquals(List.of("HTML", "中文"), LSPUsageElementDescriptionProvider.splitIntoWords("HTML中文"));
     }
 }

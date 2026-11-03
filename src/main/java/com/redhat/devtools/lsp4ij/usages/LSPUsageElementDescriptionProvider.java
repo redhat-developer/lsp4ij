@@ -33,6 +33,7 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.IntPredicate;
 
 /**
  * {@link ElementDescriptionProvider} implementation used to show information about the target in the "Find Usages" view.
@@ -106,6 +107,7 @@ public class LSPUsageElementDescriptionProvider implements ElementDescriptionPro
      * IntelliJ scheduled it for removal: at underscores, at the start of a capitalized word, around a run of capitals
      * and around a run of digits. Any other character that isn't a letter or a digit is a word of its own. For
      * instance, {@code enumMember} is "enum" and "Member", and {@code HTMLElement2} is "HTML", "Element" and "2".
+     * Like {@code NameUtil}, it reads code points, so a letter outside the Basic Multilingual Plane is one letter.
      */
     static @NotNull List<String> splitIntoWords(@NotNull String tokenType) {
         List<String> words = new ArrayList<>();
@@ -121,26 +123,34 @@ public class LSPUsageElementDescriptionProvider implements ElementDescriptionPro
     }
 
     private static int endOfWord(@NotNull String text, int start) {
-        if (!Character.isLetterOrDigit(text.charAt(start))) {
-            return start + 1;
+        int first = text.codePointAt(start);
+        int afterFirst = start + Character.charCount(first);
+        if (!Character.isLetterOrDigit(first)) {
+            return afterFirst;
         }
-        int end = start;
-        while (end < text.length() && Character.isDigit(text.charAt(end))) {
-            end++;
-        }
+        int end = skip(text, start, Character::isDigit);
         if (end > start) {
             return end;
         }
-        while (end < text.length() && Character.isUpperCase(text.charAt(end))) {
-            end++;
-        }
-        if (end > start + 1) {
+        end = skip(text, start, Character::isUpperCase);
+        if (end > afterFirst) {
             // A run of capitals is a word, except for its last capital when a lower-case letter follows it
-            return end == text.length() || !Character.isLetter(text.charAt(end)) ? end : end - 1;
+            return end < text.length() && Character.isLowerCase(text.codePointAt(end)) ? text.offsetByCodePoints(end, -1) : end;
         }
-        end = start + 1;
-        while (end < text.length() && Character.isLetter(text.charAt(end)) && !Character.isUpperCase(text.charAt(end))) {
-            end++;
+        return skip(text, afterFirst, codePoint -> Character.isLetter(codePoint) && !Character.isUpperCase(codePoint));
+    }
+
+    /**
+     * Returns the index of the first code point from {@code start} on that doesn't match, or the length of the text.
+     */
+    private static int skip(@NotNull String text, int start, @NotNull IntPredicate matches) {
+        int end = start;
+        while (end < text.length()) {
+            int codePoint = text.codePointAt(end);
+            if (!matches.test(codePoint)) {
+                break;
+            }
+            end += Character.charCount(codePoint);
         }
         return end;
     }
