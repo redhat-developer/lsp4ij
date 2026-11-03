@@ -76,6 +76,21 @@ public class ConfigurationSerializationTest {
     }
 
     @Test
+    public void initializationOptionsGivenAsAMapAreWrittenAsBefore() {
+        var params = new InitializeParams();
+        params.setInitializationOptions(Map.of("b", "x", "c", Map.of("d", List.of(1, 2))));
+        var message = new RequestMessage();
+        message.setId(1);
+        message.setMethod("initialize");
+        message.setParams(params);
+        String wire = handler().serialize(message);
+        // Written by LSP4J's own writer, which the adapter calls for options not given as JSON
+        assertEquals(JsonParser.parseString("""
+                {"b": "x", "c": {"d": [1, 2]}}
+                """), JsonParser.parseString(wire).getAsJsonObject().getAsJsonObject("params").get("initializationOptions"));
+    }
+
+    @Test
     public void configurationReplyKeepsTheNullsOfJsonSettingsOnly() {
         var reply = new ConfigurationResult();
         reply.add(JsonParser.parseString("""
