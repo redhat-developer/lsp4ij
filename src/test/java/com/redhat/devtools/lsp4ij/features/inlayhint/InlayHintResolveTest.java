@@ -115,6 +115,22 @@ public class InlayHintResolveTest extends LSPCodeInsightFixtureTestCase {
                 collect());
     }
 
+    public void testAHintWhoseResolvedLabelHasAPartWithoutAValueIsDropped() throws Exception {
+        serverResolvesInlayHints();
+        MockLanguageServer.INSTANCE.getTextDocumentService().setMockInlayHints(List.of(hintWithoutLabel(), hintWithLabel()));
+        MockLanguageServer.INSTANCE.getTextDocumentService().setInlayHintResolveProcessor(hint -> {
+            var resolved = new InlayHint(hint.getPosition(),
+                    Either.forRight(List.of(new InlayHintLabelPart(), new InlayHintLabelPart(": int"))));
+            resolved.setData(hint.getData());
+            return CompletableFuture.completedFuture(resolved);
+        });
+        open();
+
+        assertEquals("the malformed hint is dropped, the other one shows",
+                List.of(new Inlay(LABELED_HINT_OFFSET, ": String")),
+                collect());
+    }
+
     public void testAHintWithALabelIsNotResolved() throws Exception {
         serverResolvesInlayHints();
         MockLanguageServer.INSTANCE.getTextDocumentService().setMockInlayHints(List.of(hintWithLabel()));

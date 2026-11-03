@@ -22,12 +22,16 @@ import org.eclipse.lsp4j.InlayHintLabelPart;
 import org.eclipse.lsp4j.InlayHintParams;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
 import org.jetbrains.annotations.NotNull;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
+
+import static com.redhat.devtools.lsp4ij.internal.CancellationUtil.isRequestCancelledException;
 
 /**
  * LSP inlayHint support which loads and caches inlay hints by consuming:
@@ -38,6 +42,8 @@ import java.util.concurrent.CompletableFuture;
  * </ul>
  */
 public class LSPInlayHintsSupport extends AbstractLSPDocumentFeatureSupport<InlayHintParams, List<InlayHintData>> {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(LSPInlayHintsSupport.class);
 
     public LSPInlayHintsSupport(@NotNull PsiFile file) {
         super(file);
@@ -120,8 +126,8 @@ public class LSPInlayHintsSupport extends AbstractLSPDocumentFeatureSupport<Inla
      * @param inlayHint           the inlay hint without label.
      * @param languageServer      the language server which has created the inlay hint.
      * @param cancellationSupport the cancellation support.
-     * @return the future of the resolved inlay hint data, which is null when the language server answers the
-     * inlayHint/resolve request with an error, or with an inlay hint without a valid label.
+     * @return the future of the resolved inlay hint data, which is null when the inlayHint/resolve request fails, or
+     * when the language server answers it with an inlay hint without a valid label.
      */
     private static CompletableFuture<InlayHintData> resolveInlayHint(@NotNull InlayHint inlayHint,
                                                                      @NotNull LanguageServerItem languageServer,
@@ -131,7 +137,15 @@ public class LSPInlayHintsSupport extends AbstractLSPDocumentFeatureSupport<Inla
                         languageServer,
                         LSPRequestConstants.INLAY_HINT_RESOLVE)
                 .thenApply(resolvedInlayHint -> resolvedInlayHint != null && hasValidLabel(resolvedInlayHint) ?
-                        new InlayHintData(resolvedInlayHint, languageServer) : null);
+                        new InlayHintData(resolvedInlayHint, languageServer) : null)
+                .exceptionally(error -> {
+                    // Only this inlay hint is dropped, not the other inlay hints of the language server
+                    if (!isRequestCancelledException(error)) {
+                        LOGGER.warn("Failed to resolve an inlay hint with language server '{}'",
+                                languageServer.getServerDefinition().getDisplayName(), error);
+                    }
+                    return null;
+                });
     }
 
     /**
@@ -149,11 +163,11 @@ public class LSPInlayHintsSupport extends AbstractLSPDocumentFeatureSupport<Inla
             // Simple string label: must not be empty
             return !label.getLeft().isEmpty();
         } else {
-            // Multi-part label: no part may be null, and at least one part must have non-empty text
+            // Multi-part label: every part must have a value, and at least one part must have non-empty text
             List<InlayHintLabelPart> parts = label.getRight();
             return parts != null
-                    && !parts.contains(null)
-                    && parts.stream().anyMatch(part -> part.getValue() != null && !part.getValue().isEmpty());
+                    && parts.stream().allMatch(part -> part != null && part.getValue() != null)
+                    && parts.stream().anyMatch(part -> !part.getValue().isEmpty());
         }
     }
 
