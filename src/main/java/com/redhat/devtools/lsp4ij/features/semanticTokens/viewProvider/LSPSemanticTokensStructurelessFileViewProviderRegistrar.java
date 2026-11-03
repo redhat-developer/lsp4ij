@@ -16,6 +16,7 @@ import com.intellij.openapi.fileTypes.FileType;
 import com.intellij.openapi.fileTypes.FileTypeEvent;
 import com.intellij.openapi.fileTypes.FileTypeListener;
 import com.intellij.openapi.fileTypes.FileTypeManager;
+import com.intellij.openapi.fileTypes.LanguageFileType;
 import com.intellij.openapi.fileTypes.impl.AbstractFileType;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.startup.ProjectActivity;
@@ -39,14 +40,14 @@ import java.util.List;
 import java.util.Set;
 
 /**
- * We can't register plain text/abstract file type files by language or a single file type statically in plugin.xml, so
- * register them dynamically.
+ * We can't register plain text files of a file type without a language, such as an abstract file type or a file type
+ * defined by another plugin, by language or a single file type statically in plugin.xml, so register them dynamically.
  */
 public class LSPSemanticTokensStructurelessFileViewProviderRegistrar {
 
-    private static Set<FileType> registeredAbstractFileTypes = Collections.synchronizedSet(new HashSet<>());
+    private static Set<FileType> registeredFileTypes = Collections.synchronizedSet(new HashSet<>());
 
-    private static void registerAbstractFileTypes() {
+    private static void registerFileTypes() {
         // Determine the file type associations and filename matchers for language servers
         Set<FileType> lspFileTypes = new HashSet<>();
         Set<FileNameMatcher> lspFilenameMatchers = new HashSet<>();
@@ -57,24 +58,24 @@ public class LSPSemanticTokensStructurelessFileViewProviderRegistrar {
             }
         }
 
-        // Determine the abstract file types for those file types and filename matchers
+        // Determine the structureless file types for those file types and filename matchers
         Set<FileType> registerFileTypes = new LinkedHashSet<>();
         for (FileType fileType : FileTypeManager.getInstance().getRegisteredFileTypes()) {
-            if (fileType instanceof AbstractFileType abstractFileType) {
-                if (lspFileTypes.contains(abstractFileType)) {
-                    registerFileTypes.add(abstractFileType);
+            if (isStructureless(fileType)) {
+                if (lspFileTypes.contains(fileType)) {
+                    registerFileTypes.add(fileType);
                 } else {
-                    List<FileNameMatcher> filenameMatchers = FileTypeManager.getInstance().getAssociations(abstractFileType);
+                    List<FileNameMatcher> filenameMatchers = FileTypeManager.getInstance().getAssociations(fileType);
                     if (ContainerUtil.intersects(lspFilenameMatchers, filenameMatchers)) {
-                        registerFileTypes.add(abstractFileType);
+                        registerFileTypes.add(fileType);
                     }
                 }
             }
         }
 
         // Use working copies to avoid potential dirty reads
-        Set<FileType> copyOfRegisteredAbstractFileTypes = new HashSet<>(registeredAbstractFileTypes);
-        Set<FileType> workingRegisteredAbstractFileTypes = new HashSet<>();
+        Set<FileType> copyOfRegisteredFileTypes = new HashSet<>(registeredFileTypes);
+        Set<FileType> workingRegisteredFileTypes = new HashSet<>();
 
         // Register file types to use our file view provider factory if necessary
         if (!registerFileTypes.isEmpty()) {
@@ -83,12 +84,12 @@ public class LSPSemanticTokensStructurelessFileViewProviderRegistrar {
                 if (!(currentFactory instanceof LSPSemanticTokensStructurelessFileViewProviderFactory)) {
                     FileTypeFileViewProviders.INSTANCE.addExplicitExtension(registerFileType, LSPSemanticTokensStructurelessFileViewProviderFactory.INSTANCE);
                 }
-                workingRegisteredAbstractFileTypes.add(registerFileType);
+                workingRegisteredFileTypes.add(registerFileType);
             }
         }
 
         // Unregister any obsolete registrations
-        Collection<FileType> unregisterFileTypes = ContainerUtil.subtract(copyOfRegisteredAbstractFileTypes, workingRegisteredAbstractFileTypes);
+        Collection<FileType> unregisterFileTypes = ContainerUtil.subtract(copyOfRegisteredFileTypes, workingRegisteredFileTypes);
         if (!unregisterFileTypes.isEmpty()) {
             for (FileType unregisterFileType : unregisterFileTypes) {
                 FileTypeFileViewProviders.INSTANCE.removeExplicitExtension(unregisterFileType, LSPSemanticTokensStructurelessFileViewProviderFactory.INSTANCE);
@@ -96,35 +97,55 @@ public class LSPSemanticTokensStructurelessFileViewProviderRegistrar {
         }
 
         // If changed, update our retained file type/factory associations
-        if (!copyOfRegisteredAbstractFileTypes.equals(workingRegisteredAbstractFileTypes)) {
-            registeredAbstractFileTypes = workingRegisteredAbstractFileTypes;
+        if (!copyOfRegisteredFileTypes.equals(workingRegisteredFileTypes)) {
+            registeredFileTypes = workingRegisteredFileTypes;
         }
+    }
+
+    /**
+     * Whether the PSI of a file of the given type is a single plain text element, so our view provider can give it
+     * elements for its semantic tokens. That is the case for an abstract file type, and for a file type without a
+     * language, such as one a plugin defines for a language server, unless the file type has a view provider factory
+     * of its own.
+     *
+     * @param fileType the file type
+     * @return true if our view provider factory can be registered for the file type; otherwise false
+     */
+    private static boolean isStructureless(@NotNull FileType fileType) {
+        if (fileType instanceof AbstractFileType) {
+            return true;
+        }
+        if (fileType instanceof LanguageFileType || fileType.isBinary()) {
+            return false;
+        }
+        return ContainerUtil.and(FileTypeFileViewProviders.INSTANCE.allForFileType(fileType),
+                factory -> factory instanceof LSPSemanticTokensStructurelessFileViewProviderFactory);
     }
 
     // LISTENERS
 
-    // Register abstract file types when a project is opened
+    // Register structureless file types when a project is opened
     public static class ProjectOpenedListener implements ProjectActivity {
         @Override
         @Nullable
         public Object execute(@NotNull Project project, @NotNull Continuation<? super Unit> continuation) {
             // We can't register this listener in plugin.xml, so register it when the first project is opened
             LanguageServerDefinitionsChangedListener.registerOnce();
-            registerAbstractFileTypes();
+            registerFileTypes();
             return null;
         }
 
     }
 
-    // Register abstract file types when file types change
+    // Register structureless file types when file types change
     public static class FileTypesChangedListener implements FileTypeListener {
         @Override
         public void fileTypesChanged(@NotNull FileTypeEvent event) {
-            registerAbstractFileTypes();
+            registerFileTypes();
         }
     }
 
-    // Register abstract file types when language server definitions change
+    // Register structureless file types when language server definitions change
     private static class LanguageServerDefinitionsChangedListener implements LanguageServerDefinitionListener {
         private static volatile boolean addedLanguageServerDefinitionListener = false;
 
@@ -141,17 +162,17 @@ public class LSPSemanticTokensStructurelessFileViewProviderRegistrar {
 
         @Override
         public void handleAdded(@NotNull LanguageServerAddedEvent event) {
-            registerAbstractFileTypes();
+            registerFileTypes();
         }
 
         @Override
         public void handleRemoved(@NotNull LanguageServerRemovedEvent event) {
-            registerAbstractFileTypes();
+            registerFileTypes();
         }
 
         @Override
         public void handleChanged(@NotNull LanguageServerChangedEvent event) {
-            registerAbstractFileTypes();
+            registerFileTypes();
         }
     }
 }
