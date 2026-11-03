@@ -39,9 +39,16 @@ import java.util.concurrent.CompletableFuture;
  */
 public class ConnectDocumentToLanguageServerSetupParticipant implements FileEditorManagerListener {
 
+    /**
+     * Connects the file of a selected tab to its language servers. The connection is released once it is made, as a
+     * request's is: an editor that shows the file then keeps it connected, and a file whose tab closed meanwhile is
+     * disconnected again, since the close's disconnection has already happened.
+     */
     private static void connectToLanguageServer(@NotNull PsiFile psiFile, @NotNull Project project) {
+        var connection = new DocumentConnectionScope();
         LanguageServiceAccessor.getInstance(project)
-                .getLanguageServers(psiFile, null, null);
+                .getLanguageServersForScope(psiFile, null, null, connection)
+                .whenComplete((servers, error) -> connection.close());
     }
 
     @Override
@@ -79,6 +86,10 @@ public class ConnectDocumentToLanguageServerSetupParticipant implements FileEdit
                     // Execute in non-blocking ReadAction since getPsiFile and connectToLanguageServer require it
                     ReadAction.nonBlocking(() -> {
                                 if (project.isDisposed()) {
+                                    return;
+                                }
+                                if (!FileEditorManager.getInstance(project).isFileOpen(file)) {
+                                    // The tab was closed before this ran, and its file has no editor to connect for
                                     return;
                                 }
                                 PsiFile psiFile = LSPIJUtils.getPsiFile(file, project);

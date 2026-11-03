@@ -8,13 +8,17 @@
 package com.redhat.devtools.lsp4ij;
 
 import com.intellij.codeInsight.codeVision.settings.CodeVisionSettings;
+import com.intellij.openapi.application.impl.NonBlockingReadActionImpl;
 import com.intellij.openapi.fileEditor.FileEditorManager;
+import com.intellij.openapi.fileEditor.FileEditorManagerEvent;
+import com.intellij.openapi.fileEditor.FileEditorManagerListener;
 import com.intellij.testFramework.PlatformTestUtil;
 import com.redhat.devtools.lsp4ij.fixtures.LSPCodeInsightFixtureTestCase;
 import com.redhat.devtools.lsp4ij.mock.MockLanguageServer;
 import org.eclipse.lsp4j.DidOpenTextDocumentParams;
 
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Selecting the editor tab of a file connects the file to its language servers, which then receive its didOpen.
@@ -69,6 +73,46 @@ public class SelectedEditorConnectionTest extends LSPCodeInsightFixtureTestCase 
 
         PlatformTestUtil.waitWithEventsDispatching("selecting the second tab must send its didOpen",
                 secondOpened::isDone, 10);
+    }
+
+    public void testASelectionWhoseConnectionRunsAfterItsTabClosedLeavesTheFileDisconnected() throws Exception {
+        var running = myFixture.addFileToProject("running.ts", "const running=1;");
+        var closed = myFixture.addFileToProject("closed.ts", "const closed=1;");
+        var editors = FileEditorManager.getInstance(myFixture.getProject());
+        // the server runs, so a connection of the closed file would reach it at once
+        var runningOpened = expectDidOpen("running.ts");
+        editors.openFile(running.getVirtualFile(), true);
+        PlatformTestUtil.waitWithEventsDispatching("selecting the first tab must send its didOpen",
+                runningOpened::isDone, 10);
+        var closedOpened = expectDidOpen("closed.ts");
+        editors.openFile(closed.getVirtualFile(), true);
+        PlatformTestUtil.waitWithEventsDispatching("selecting the second tab must send its didOpen",
+                closedOpened::isDone, 10);
+        editors.closeFile(closed.getVirtualFile());
+        // as the platform tells the listeners of the project, which closeFile does not do here
+        var bus = myFixture.getProject().getMessageBus()
+                .syncPublisher(FileEditorManagerListener.FILE_EDITOR_MANAGER);
+        bus.fileClosed(editors, closed.getVirtualFile());
+        PlatformTestUtil.waitWithEventsDispatching("closing the second tab must send its didClose",
+                () -> MockLanguageServer.INSTANCE.getTextDocumentService().getOpenCloseNotifications().stream()
+                        .anyMatch(notification -> !notification.open()
+                                && notification.uri().getPath().endsWith("/closed.ts")), 10);
+        // the close releases the file's LSP support in a read action of its own
+        NonBlockingReadActionImpl.waitForAsyncTaskCompletion();
+
+        // The selection of the closed tab, as a connection that runs after the close sees it, on a slow machine
+        var reopened = expectDidOpen("closed.ts");
+        bus.selectionChanged(
+                new FileEditorManagerEvent(editors, null, null, null, closed.getVirtualFile(), null, null));
+        NonBlockingReadActionImpl.waitForAsyncTaskCompletion();
+
+        // A connection would send the didOpen within the time the others take, while the editor's events dispatch
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(2);
+        while (System.nanoTime() < deadline) {
+            PlatformTestUtil.dispatchAllInvocationEventsInIdeEventQueue();
+            assertFalse("the closed file must stay disconnected", reopened.isDone());
+            Thread.sleep(20);
+        }
     }
 
     private static CompletableFuture<DidOpenTextDocumentParams> expectDidOpen(String fileName) {
