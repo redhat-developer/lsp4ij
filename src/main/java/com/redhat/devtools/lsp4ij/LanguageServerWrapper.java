@@ -16,6 +16,7 @@ import com.intellij.notification.Notification;
 import com.intellij.openapi.Disposable;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.ModalityState;
+import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.fileEditor.FileEditorManager;
 import com.intellij.openapi.fileEditor.FileEditorManagerListener;
@@ -2148,6 +2149,9 @@ public class LanguageServerWrapper implements Disposable {
                 synchronized (documentsLock) {
                     scopedDocuments.clear();
                 }
+                disposeFileSupports(this.openedDocuments.values().stream()
+                        .map(OpenedDocument::getFile)
+                        .toList());
                 while (!this.openedDocuments.isEmpty()) {
                     disconnect(this.openedDocuments.keySet().iterator().next(), false);
                 }
@@ -2167,6 +2171,32 @@ public class LanguageServerWrapper implements Disposable {
                 }
             }
         }
+    }
+
+    /**
+     * Disposes the LSP file support of the given files, which were connected to the stopped language server: it
+     * cancels their pending LSP requests and drops their cached results. LSP4J does not complete the requests which are
+     * still pending when the connection closes, so without this they would never complete, and each file would return
+     * them from its cache, even after a restart, until it is modified.
+     *
+     * @param files the files which were connected to the stopped language server.
+     */
+    private void disposeFileSupports(@NotNull List<VirtualFile> files) {
+        Project project = getProject();
+        if (files.isEmpty() || project.isDisposed()) {
+            return;
+        }
+        // stop() holds the monitor of this wrapper, so it must not wait for a read action to find the Psi files
+        ReadAction.nonBlocking(() -> {
+                    for (VirtualFile file : files) {
+                        PsiFile psiFile = LSPIJUtils.getPsiFile(file, project);
+                        if (psiFile != null && LSPFileSupport.hasSupport(psiFile)) {
+                            LSPFileSupport.getSupport(psiFile).dispose();
+                        }
+                    }
+                })
+                .expireWith(project)
+                .submit(AppExecutorUtil.getAppExecutorService());
     }
 
     private void shutdownAll(LanguageServer languageServerInstance, StreamConnectionProvider provider, Future<?> serverFuture) {
