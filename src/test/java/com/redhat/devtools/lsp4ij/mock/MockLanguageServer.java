@@ -49,6 +49,7 @@ public final class MockLanguageServer implements LanguageServer {
 	private final InitializeResult initializeResult = new InitializeResult();
 	private volatile long delay = 0;
 	private volatile CompletableFuture<Void> initializeGate = CompletableFuture.completedFuture(null);
+	private volatile InitializeParams initializeParams;
 	private volatile boolean started;
 
 	private final List<LanguageClient> remoteProxies = new ArrayList<>();
@@ -148,6 +149,7 @@ public final class MockLanguageServer implements LanguageServer {
 
 	@Override
 	public CompletableFuture<InitializeResult> initialize(InitializeParams params) {
+		initializeParams = params;
 		notifications.add("initialize");
 		return initializeGate.thenCompose(ignored -> buildMaybeDelayedFuture(initializeResult));
 	}
@@ -155,6 +157,13 @@ public final class MockLanguageServer implements LanguageServer {
 	@Override
 	public void initialized(InitializedParams params) {
 		notifications.add("initialized");
+	}
+
+	/**
+	 * @return the params of the last initialize request this server received, and null before the first
+	 */
+	public InitializeParams getInitializeParams() {
+		return initializeParams;
 	}
 
 	/**

@@ -29,6 +29,7 @@ import com.redhat.devtools.lsp4ij.features.diagnostics.LSPDiagnosticHandler;
 import com.redhat.devtools.lsp4ij.features.documentContent.DocumentContentProvider;
 import com.redhat.devtools.lsp4ij.features.progress.LSPProgressManager;
 import com.redhat.devtools.lsp4ij.internal.PsiFileCancelChecker;
+import com.redhat.devtools.lsp4ij.internal.adapters.ConfigurationResult;
 import com.redhat.devtools.lsp4ij.internal.editor.EditorFeatureManager;
 import com.redhat.devtools.lsp4ij.internal.editor.EditorFeatureType;
 import com.redhat.devtools.lsp4ij.settings.GlobalLanguageServerSettings;
@@ -42,7 +43,6 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.net.URI;
-import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
@@ -433,7 +433,8 @@ public class LanguageClientImpl implements LanguageClient, Disposable {
     public CompletableFuture<List<Object>> configuration(ConfigurationParams params) {
         return CompletableFuture.supplyAsync(() -> {
             // See https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_configuration
-            List<Object> settings = new ArrayList<>();
+            // A ConfigurationResult: the settings given as JSON keep their null members on the wire
+            List<Object> settings = new ConfigurationResult();
             for (ConfigurationItem item : params.getItems()) {
                 String section = item.getSection();
                 Object result = findSettings(section);

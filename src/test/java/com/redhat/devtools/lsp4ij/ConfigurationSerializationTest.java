@@ -9,10 +9,14 @@ package com.redhat.devtools.lsp4ij;
 
 import com.google.gson.JsonElement;
 import com.google.gson.JsonParser;
+import com.redhat.devtools.lsp4ij.internal.adapters.ConfigurationResult;
 import org.eclipse.lsp4j.CompletionItem;
 import org.eclipse.lsp4j.DidChangeConfigurationParams;
+import org.eclipse.lsp4j.InitializeParams;
 import org.eclipse.lsp4j.jsonrpc.json.MessageJsonHandler;
 import org.eclipse.lsp4j.jsonrpc.messages.NotificationMessage;
+import org.eclipse.lsp4j.jsonrpc.messages.RequestMessage;
+import org.eclipse.lsp4j.jsonrpc.messages.ResponseMessage;
 import org.eclipse.lsp4j.jsonrpc.services.ServiceEndpoints;
 import org.eclipse.lsp4j.services.LanguageServer;
 import org.junit.Test;
@@ -20,6 +24,7 @@ import org.junit.Test;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -46,6 +51,46 @@ public class ConfigurationSerializationTest {
         var decoded = (NotificationMessage) handler.parseMessage(wire);
         var params = (DidChangeConfigurationParams) decoded.getParams();
         assertEquals(settings, (JsonElement) params.getSettings());
+    }
+
+    @Test
+    public void explicitNullInInitializationOptionsSurvivesTheRequestWireRoundTrip() {
+        var options = JsonParser.parseString("""
+                {"a": null, "b": "x", "c": {"d": null}, "e": [{"f": null}]}
+                """);
+        var params = new InitializeParams();
+        params.setInitializationOptions(options);
+        var message = new RequestMessage();
+        message.setId(1);
+        message.setMethod("initialize");
+        message.setParams(params);
+        var handler = handler();
+        String wire = handler.serialize(message);
+        var sent = JsonParser.parseString(wire).getAsJsonObject().getAsJsonObject("params");
+        assertEquals(options, sent.get("initializationOptions"));
+        // The other fields are written as before: the unset ones are left out, except processId and rootUri, which
+        // LSP4J always sends
+        assertEquals(Set.of("processId", "rootUri", "initializationOptions"), sent.keySet());
+        var decoded = (RequestMessage) handler.parseMessage(wire);
+        assertEquals(options, ((InitializeParams) decoded.getParams()).getInitializationOptions());
+    }
+
+    @Test
+    public void configurationReplyKeepsTheNullsOfJsonSettingsOnly() {
+        var reply = new ConfigurationResult();
+        reply.add(JsonParser.parseString("""
+                {"a": null, "b": [{"c": null}]}
+                """));
+        reply.add(new CompletionItem("name"));
+        reply.add(null);
+        var message = new ResponseMessage();
+        message.setId(1);
+        message.setResult(reply);
+        String wire = handler().serialize(message);
+        // An object setting is written as before, without its unset fields
+        assertEquals(JsonParser.parseString("""
+                [{"a": null, "b": [{"c": null}]}, {"label": "name"}, null]
+                """), JsonParser.parseString(wire).getAsJsonObject().get("result"));
     }
 
     @Test
