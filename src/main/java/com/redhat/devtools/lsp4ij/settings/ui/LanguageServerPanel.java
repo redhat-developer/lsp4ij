@@ -27,11 +27,11 @@ import com.intellij.openapi.util.NlsContexts;
 import com.intellij.ui.ContextHelpLabel;
 import com.intellij.ui.HyperlinkLabel;
 import com.intellij.ui.PortField;
-import com.intellij.ui.SimpleListCellRenderer;
 import com.intellij.ui.components.JBCheckBox;
 import com.intellij.ui.components.JBScrollPane;
 import com.intellij.ui.components.JBTabbedPane;
 import com.intellij.ui.components.JBTextField;
+import com.intellij.ui.dsl.listCellRenderer.BuilderKt;
 import com.intellij.ui.scale.JBUIScale;
 import com.intellij.util.ui.FormBuilder;
 import com.intellij.util.ui.UIUtil;
@@ -394,7 +394,7 @@ public class LanguageServerPanel implements Disposable {
 
     private void createErrorReportingCombo(@NotNull FormBuilder builder) {
 
-        errorReportingKindCombo.setRenderer(SimpleListCellRenderer.create((label, value, index) -> {
+        errorReportingKindCombo.setRenderer(BuilderKt.textListCellRenderer(value -> {
             String text = LanguageServerBundle.message("language.server.error.reporting.none");
             if (value != null) {
                 switch (value) {
@@ -403,7 +403,7 @@ public class LanguageServerPanel implements Disposable {
                     case in_log -> text = LanguageServerBundle.message("language.server.error.reporting.in_log");
                 }
             }
-            label.setText(text);
+            return text;
         }));
 
         var helpLabel = ContextHelpLabel.createWithLink("",
