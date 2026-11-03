@@ -37,6 +37,8 @@ public class DAPVariableChildrenTest extends LightPlatformTestCase {
     private final List<String> calls = new ArrayList<>();
     private final List<Runnable> more = new ArrayList<>();
     private boolean failing;
+    /** How many indexed children the debug adapter has, if fewer than the variable announces. */
+    private Integer available;
 
     public void testAVariableWithoutManyIndexedChildrenHasThemAllAskedForAtOnce() {
         children(variable(null, null)).load(node());
@@ -70,6 +72,38 @@ public class DAPVariableChildrenTest extends LightPlatformTestCase {
         more.remove(0).run();
         assertEquals(List.of("indexed 0 100", "indexed 100 100", "indexed 200 50"), describe(asked));
         assertEquals(List.of("add 100", "more 150", "add 100", "more 50", "add 50 last"), calls);
+        assertTrue(more.isEmpty());
+    }
+
+    public void testAPageWithFewerChildrenThanAskedForIsTheLast() {
+        // the variable announces 250 elements, but the debug adapter has only 120 by now
+        available = 120;
+        children(variable(250, null)).load(node());
+        assertEquals(List.of("add 100", "more 150"), calls);
+
+        more.remove(0).run();
+        assertEquals(List.of("indexed 0 100", "indexed 100 100"), describe(asked));
+        assertEquals(List.of("add 100", "more 150", "add 20 last"), calls);
+        assertTrue(more.isEmpty());
+    }
+
+    public void testAnEmptyPageIsTheLast() {
+        // the elements are gone by the time the second page is asked for
+        available = 100;
+        children(variable(250, null)).load(node());
+        more.remove(0).run();
+
+        assertEquals(List.of("add 100", "more 150", "add 0 last"), calls);
+        assertTrue(more.isEmpty());
+    }
+
+    public void testAShortFirstPageIsTheLast() {
+        // the variable announces 250 elements, but the debug adapter has only 20
+        available = 20;
+        children(variable(250, null)).load(node());
+
+        assertEquals(List.of("indexed 0 100"), describe(asked));
+        assertEquals(List.of("add 20 last"), calls);
         assertTrue(more.isEmpty());
     }
 
@@ -112,7 +146,7 @@ public class DAPVariableChildrenTest extends LightPlatformTestCase {
 
     /**
      * @return a debug adapter which answers as many children as asked for: 3 for all of them, 2 named ones, or the
-     * indexed ones from start
+     * indexed ones from start, but none beyond {@link #available}
      */
     private IDebugProtocolServer server() {
         return (IDebugProtocolServer) Proxy.newProxyInstance(IDebugProtocolServer.class.getClassLoader(),
@@ -129,6 +163,9 @@ public class DAPVariableChildrenTest extends LightPlatformTestCase {
                     int start = arguments.getStart() != null ? arguments.getStart() : 0;
                     int count = arguments.getFilter() == VariablesArgumentsFilter.INDEXED ? arguments.getCount()
                             : arguments.getFilter() == VariablesArgumentsFilter.NAMED ? 2 : 3;
+                    if (available != null && arguments.getFilter() == VariablesArgumentsFilter.INDEXED) {
+                        count = Math.max(0, Math.min(count, available - start));
+                    }
                     var response = new VariablesResponse();
                     response.setVariables(IntStream.range(start, start + count).mapToObj(i -> {
                         var child = new Variable();

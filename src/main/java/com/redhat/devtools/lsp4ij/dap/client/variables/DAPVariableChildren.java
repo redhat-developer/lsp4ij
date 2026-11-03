@@ -90,7 +90,8 @@ public class DAPVariableChildren {
 
     /**
      * Loads the page of indexed children from start, and, if there are more, IntelliJ's "..." node, which loads the
-     * next page.
+     * next page. A page with fewer children than asked for is the last one, as DAP specifies for the 'variables'
+     * request, even if the variable announced more.
      */
     private void page(@NotNull XCompositeNode node, int start, int total) {
         if (node.isObsolete()) {
@@ -100,7 +101,7 @@ public class DAPVariableChildren {
         request(VariablesArgumentsFilter.INDEXED, start, count)
                 .thenAccept(children -> {
                     int next = start + count;
-                    boolean last = next >= total;
+                    boolean last = next >= total || children.length < count;
                     node.addChildren(list(children), last);
                     if (!last) {
                         node.tooManyChildren(total - next, () -> page(node, next, total));
