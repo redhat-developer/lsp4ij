@@ -812,6 +812,16 @@
                 implementation="com.redhat.devtools.lsp4ij.features.rename.LSPRenameHandler"
                 order="first"/>
 
+        <!-- LSP textDocument/linkedEditingRange request support -->
+        <editorFactoryListener
+                implementation="com.redhat.devtools.lsp4ij.features.linkedEditingRange.LSPLinkedEditingRangeEditorFactoryListener"/>
+        <!-- turns linked editing on or off, in Settings | Editor | General | Smart Keys -->
+        <applicationService
+                serviceImplementation="com.redhat.devtools.lsp4ij.settings.LSPEditorOptions"/>
+        <editorSmartKeysConfigurable
+                id="editor.preferences.lsp4ij"
+                instance="com.redhat.devtools.lsp4ij.settings.LSPSmartKeysConfigurable"/>
+
         <!-- LSP workspace/willRenameFiles for rename and move refactorings, sent before their write action -->
         <renamePsiElementProcessor
                 implementation="com.redhat.devtools.lsp4ij.features.files.WillRenameFilesRenameProcessor"

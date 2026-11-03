@@ -109,6 +109,22 @@ If the language server can support [workspace/willRenameFiles](https://microsoft
 renamed inside IntelliJ IDEA, LSP4IJ can consume it and applies the `WorkspaceEdit`
 to apply some refactoring.
 
+## Linked Editing Range
+
+If the language server supports [textDocument/linkedEditingRange](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_linkedEditingRange),
+typing in a range which it links to others, such as the declaration of a local variable, edits the others too, such as
+the variable's uses.
+
+Linked editing is off by default. Turn it on with `Edit linked ranges together, such as a variable's declaration and its uses`
+in `Settings | Editor | General | Smart Keys`, under `Language Servers`:
+
+![Linked editing setting](./images/LSPLinkedEditingSettings.png)
+
+In this [Ecstasy](https://github.com/xtclang/) file, the language server links the declaration of `total` with its two uses: typing `sub` in the
+declaration renames all three to `subtotal`, and one undo reverts them together.
+
+![Linked editing in action](./images/lsp-support/textDocument_linkedEditingRange.gif)
+
 ## Semantic Tokens support
 
 LSP4IJ provides **experimental**  support for [LSP Semantic Tokens](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_semanticTokens).

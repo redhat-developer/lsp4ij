@@ -59,6 +59,7 @@ public class MockTextDocumentService implements TextDocumentService {
     private final List<InlayHint> inlayHintResolveRequests = new CopyOnWriteArrayList<>();
     private Map<Position, List<? extends DocumentHighlight>> mockDocumentHighlights;
     private LinkedEditingRanges mockLinkedEditingRanges;
+    private final List<LinkedEditingRangeParams> linkedEditingRangeRequests = new CopyOnWriteArrayList<>();
     private List<SelectionRange> mockSelectionRanges;
 
     private record DidOpenExpectation(CompletableFuture<DidOpenTextDocumentParams> future,
@@ -168,8 +169,16 @@ public class MockTextDocumentService implements TextDocumentService {
     }
 
     @Override
-    public CompletableFuture<LinkedEditingRanges> linkedEditingRange(LinkedEditingRangeParams position) {
+    public CompletableFuture<LinkedEditingRanges> linkedEditingRange(LinkedEditingRangeParams params) {
+        linkedEditingRangeRequests.add(params);
         return CompletableFuture.completedFuture(mockLinkedEditingRanges);
+    }
+
+    /**
+     * @return the textDocument/linkedEditingRange requests received since the last reset, in order
+     */
+    public List<LinkedEditingRangeParams> getLinkedEditingRangeRequests() {
+        return linkedEditingRangeRequests;
     }
 
     @Override
@@ -505,6 +514,8 @@ public class MockTextDocumentService implements TextDocumentService {
         this.diagnosticRequests.clear();
         this.mockInlineValues = null;
         this.inlineValueRequests.clear();
+        this.mockLinkedEditingRanges = null;
+        this.linkedEditingRangeRequests.clear();
         this.renameProcessor = null;
         this.prepareRenameProcessor = null;
         this.documentSymbols = Collections.emptyList();
