@@ -58,8 +58,7 @@ import org.eclipse.lsp4j.jsonrpc.Launcher;
 import org.eclipse.lsp4j.jsonrpc.MessageConsumer;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
 import org.eclipse.lsp4j.jsonrpc.messages.Message;
-import org.eclipse.lsp4j.jsonrpc.messages.NotificationMessage;
-import org.eclipse.lsp4j.jsonrpc.messages.ResponseMessage;
+import org.eclipse.lsp4j.jsonrpc.json.StreamMessageConsumer;
 import org.eclipse.lsp4j.services.LanguageServer;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
@@ -137,7 +136,6 @@ public class LanguageServerWrapper implements Disposable {
     private @NotNull CompletableFuture<LanguageServer> lastNotification = CompletableFuture.completedFuture(null);
     private final ExecutorService listener;
     private final ExecutorService messageWriter;
-    private final ExecutorService requestWriter;
     private final SimpleModificationTracker modificationTracker = new SimpleModificationTracker();
     /**
      * Map containing unregistration handlers for dynamic capability registrations.
@@ -219,16 +217,6 @@ public class LanguageServerWrapper implements Disposable {
                 })
                 .build());
 
-        String requestWriterThreadNameFormat = "LS-" + serverDefinition.getId() + projectName + "#requestWriter"; //$NON-NLS-1$ //$NON-NLS-2$
-        this.requestWriter = Executors.newSingleThreadExecutor(new ThreadFactoryBuilder()
-                .setNameFormat(requestWriterThreadNameFormat)
-                .setThreadFactory(r -> {
-                    var t = new Thread(r);
-                    t.setContextClassLoader(workerCtxClassLoader);
-                    return t;
-                })
-                .build());
-
         String listenerThreadNameFormat = "LS-" + serverDefinition.getId() + projectName + "#listener-%d"; //$NON-NLS-1$ //$NON-NLS-2$
         this.listener = Executors.newCachedThreadPool(new ThreadFactoryBuilder()
                 .setNameFormat(listenerThreadNameFormat)
@@ -276,7 +264,6 @@ public class LanguageServerWrapper implements Disposable {
     void stopDispatcher() {
         this.dispatcher.shutdownNow();
         this.messageWriter.shutdownNow();
-        this.requestWriter.shutdownNow();
 
         // Only really needed for testing - the listener (an instance of ConcurrentMessageProcessor) should exit
         // as soon as the input stream from the LS is closed, and a cached thread pool will recycle idle
@@ -294,10 +281,6 @@ public class LanguageServerWrapper implements Disposable {
             }
             if (!this.messageWriter.awaitTermination(Math.max(0L, deadlineNanos - System.nanoTime()), TimeUnit.NANOSECONDS)) {
                 LOGGER.warn("Message writer executor for language server '{}' did not terminate within 2s; classloader unload may be blocked",
-                        serverDefinition.getId());
-            }
-            if (!this.requestWriter.awaitTermination(Math.max(0L, deadlineNanos - System.nanoTime()), TimeUnit.NANOSECONDS)) {
-                LOGGER.warn("Request writer executor for language server '{}' did not terminate within 2s; classloader unload may be blocked",
                         serverDefinition.getId());
             }
             if (!this.listener.awaitTermination(Math.max(0L, deadlineNanos - System.nanoTime()), TimeUnit.NANOSECONDS)) {
@@ -529,51 +512,46 @@ public class LanguageServerWrapper implements Disposable {
                         }
 
                         var provider = initializingContext.provider;
-                        UnaryOperator<MessageConsumer> wrapper = consumer -> (message -> {
-                            if (isDisposed()) {
-                                return;
-                            }
-                            logMessage(message, consumer);
-                            try {
-                                if (message instanceof NotificationMessage) {
-                                    // Single-thread messageWriter preserves notification ordering
-                                    // (didOpen before didChange before didClose).
-                                    var writeFuture = CompletableFuture.runAsync(
-                                            () -> consumer.consume(message), messageWriter);
-                                    initializingContext.lastNotificationWriteFuture = writeFuture;
-                                    writeFuture.exceptionally(e -> {
-                                        getLanguageServerLifecycleManager().onError(this, e);
-                                        return null;
-                                    });
-                                } else if (message instanceof ResponseMessage) {
-                                    // Responses to server-initiated requests go directly to
-                                    // requestWriter so they are never blocked behind a slow
-                                    // notification write (pipe saturation / EDT freeze fix).
-                                    CompletableFuture.runAsync(
-                                                    () -> consumer.consume(message), requestWriter)
-                                            .exceptionally(e -> {
-                                                getLanguageServerLifecycleManager().onError(this, e);
-                                                return null;
-                                            });
-                                } else {
-                                    // Client-initiated requests (completion, hover, ...) wait for
-                                    // the last notification write so the server processes them
-                                    // against the up-to-date document state.
-                                    initializingContext.lastNotificationWriteFuture
-                                            .thenRunAsync(() -> consumer.consume(message), requestWriter)
-                                            .exceptionally(e -> {
-                                                getLanguageServerLifecycleManager().onError(this, e);
-                                                return null;
-                                            });
+                        // wrapMessages applies this wrapper to both directions:
+                        // outgoing (StreamMessageConsumer) and incoming (RemoteEndpoint).
+                        // Separate by direction so incoming server requests are never
+                        // blocked behind a slow outgoing write.
+                        // wrapMessages applies this wrapper to both directions:
+                        // outgoing (StreamMessageConsumer) and incoming (RemoteEndpoint).
+                        // Outgoing: single FIFO queue preserves message ordering
+                        // (didOpen before didChange before didClose, requests after
+                        // their preceding notifications).
+                        // Incoming: handle on the listener thread so server-initiated
+                        // requests (e.g. workspace/configuration) are never blocked
+                        // behind a slow outgoing notification write that saturates
+                        // the pipe.
+                        UnaryOperator<MessageConsumer> wrapper = consumer -> {
+                            boolean outgoing = consumer instanceof StreamMessageConsumer;
+                            return message -> {
+                                if (isDisposed()) {
+                                    return;
                                 }
-                            } catch (Throwable e) {
-                                getLanguageServerLifecycleManager().onError(this, e);
-                                throw e;
-                            }
-                            if (provider != null && isActive()) {
-                                provider.handleMessage(message, this.languageServer, rootURI);
-                            }
-                        });
+                                logMessage(message, consumer);
+                                try {
+                                    if (outgoing) {
+                                        CompletableFuture.runAsync(
+                                                        () -> consumer.consume(message), messageWriter)
+                                                .exceptionally(e -> {
+                                                    getLanguageServerLifecycleManager().onError(this, e);
+                                                    return null;
+                                                });
+                                    } else {
+                                        consumer.consume(message);
+                                    }
+                                } catch (Throwable e) {
+                                    getLanguageServerLifecycleManager().onError(this, e);
+                                    throw e;
+                                }
+                                if (provider != null && isActive()) {
+                                    provider.handleMessage(message, this.languageServer, rootURI);
+                                }
+                            };
+                        };
 
                         Launcher<LanguageServer> launcher = getClientFeatures().createLauncherBuilder() //
                                 .setLocalService(languageClient)//
@@ -2326,9 +2304,6 @@ public class LanguageServerWrapper implements Disposable {
         public LanguageServer languageServer;
         public Future<?> launcherFuture;
         public InitializeResult initializeResult;
-        // Per-connection barrier: requests chain on this so the server processes them
-        // against the document state described by the last notification write.
-        public volatile @NotNull CompletableFuture<Void> lastNotificationWriteFuture = CompletableFuture.completedFuture(null);
     }
 
 
