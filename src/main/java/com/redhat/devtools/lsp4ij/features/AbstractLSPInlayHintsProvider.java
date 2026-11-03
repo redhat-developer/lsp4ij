@@ -18,8 +18,6 @@ import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.project.Project;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
-import com.intellij.ui.layout.LCFlags;
-import com.intellij.ui.layout.LayoutKt;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import com.redhat.devtools.lsp4ij.client.ExecuteLSPFeatureStatus;
 import com.redhat.devtools.lsp4ij.client.indexing.ProjectIndexingManager;
@@ -102,9 +100,8 @@ public abstract class AbstractLSPInlayHintsProvider implements InlayHintsProvide
             @NotNull
             @Override
             public JComponent createComponent(@NotNull ChangeListener changeListener) {
-                return LayoutKt.panel(new LCFlags[0], "LSP", builder -> {
-                    return null;
-                });
+                // The LSP inlay hints have no settings of their own
+                return new JPanel();
             }
         };
     }
