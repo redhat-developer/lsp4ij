@@ -25,7 +25,7 @@ import com.intellij.openapi.util.Disposer;
 import com.intellij.ui.IdeBorderFactory;
 import com.intellij.util.ui.FormBuilder;
 import com.intellij.util.ui.JBUI;
-import com.intellij.util.ui.UI;
+import com.redhat.devtools.lsp4ij.settings.ui.DescriptionPanel;
 import com.redhat.devtools.lsp4ij.LanguageServerManager;
 import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
@@ -77,7 +77,7 @@ public class LanguageServerView implements Disposable {
         this.languageServerNameProvider = languageServerNameProvider;
         this.project = project;
         boolean isLaunchConfiguration = languageServerDefinition instanceof UserDefinedLanguageServerDefinition;
-        JComponent descriptionPanel = createDescription(languageServerDefinition.getDescription());
+        JComponent descriptionPanel = DescriptionPanel.create(languageServerDefinition.getDescription());
         JPanel settingsPanel = createSettings(descriptionPanel, isLaunchConfiguration);
         if (!isLaunchConfiguration) {
             TitledBorder title = IdeBorderFactory.createTitledBorder(languageServerDefinition.getDisplayName());
@@ -474,27 +474,6 @@ public class LanguageServerView implements Disposable {
         return configuration;
     }
 
-    private JComponent createDescription(String description) {
-        /**
-         * Normally comments are below the controls.
-         * Here we want the comments to precede the controls, we therefore create an empty, 0-sized panel.
-         */
-        JPanel titledComponent = UI.PanelFactory.grid().createPanel();
-        titledComponent.setMinimumSize(JBUI.emptySize());
-        titledComponent.setPreferredSize(JBUI.emptySize());
-        if (description == null) {
-            description = "";
-        }
-        description = description.trim();
-        if (!description.isBlank()) {
-            titledComponent = UI.PanelFactory.panel(titledComponent)
-                    .withComment(description)
-                    .resizeX(true)
-                    .resizeY(true)
-                    .createPanel();
-        }
-        return titledComponent;
-    }
 
     public JComponent getComponent() {
         return myMainPanel;
