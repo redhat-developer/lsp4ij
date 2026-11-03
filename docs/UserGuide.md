@@ -120,7 +120,7 @@ in `Settings | Editor | General | Smart Keys`, under `Language Servers`:
 
 ![Linked editing setting](./images/LSPLinkedEditingSettings.png)
 
-In this Ecstasy file, the language server links the declaration of `total` with its two uses: typing `sub` in the
+In this [Ecstasy](https://github.com/xtclang/) file, the language server links the declaration of `total` with its two uses: typing `sub` in the
 declaration renames all three to `subtotal`, and one undo reverts them together.
 
 ![Linked editing in action](./images/lsp-support/textDocument_linkedEditingRange.gif)
