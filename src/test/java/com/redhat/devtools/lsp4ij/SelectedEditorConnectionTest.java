@@ -90,9 +90,7 @@ public class SelectedEditorConnectionTest extends LSPCodeInsightFixtureTestCase 
                 closedOpened::isDone, 10);
         editors.closeFile(closed.getVirtualFile());
         // as the platform tells the listeners of the project, which closeFile does not do here
-        var bus = myFixture.getProject().getMessageBus()
-                .syncPublisher(FileEditorManagerListener.FILE_EDITOR_MANAGER);
-        bus.fileClosed(editors, closed.getVirtualFile());
+        projectEditorListeners().fileClosed(editors, closed.getVirtualFile());
         PlatformTestUtil.waitWithEventsDispatching("closing the second tab must send its didClose",
                 () -> MockLanguageServer.INSTANCE.getTextDocumentService().getOpenCloseNotifications().stream()
                         .anyMatch(notification -> !notification.open()
@@ -102,17 +100,58 @@ public class SelectedEditorConnectionTest extends LSPCodeInsightFixtureTestCase 
 
         // The selection of the closed tab, as a connection that runs after the close sees it, on a slow machine
         var reopened = expectDidOpen("closed.ts");
-        bus.selectionChanged(
+        projectEditorListeners().selectionChanged(
                 new FileEditorManagerEvent(editors, null, null, null, closed.getVirtualFile(), null, null));
         NonBlockingReadActionImpl.waitForAsyncTaskCompletion();
 
-        // A connection would send the didOpen within the time the others take, while the editor's events dispatch
-        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(2);
+        // a connection would send the didOpen within the time the others take
+        dispatchEventsFor(2);
+        assertFalse("the closed file must stay disconnected", reopened.isDone());
+    }
+
+    public void testATabThatClosesWhileItsSelectionWaitsForTheServerLeavesTheFileDisconnected() throws Exception {
+        // The selection's connection waits for the server's initialize, after the check that its tab is open
+        var initialize = MockLanguageServer.INSTANCE.holdInitialize();
+        var waiting = myFixture.addFileToProject("waiting.ts", "const waiting=1;").getVirtualFile();
+        var editors = FileEditorManager.getInstance(myFixture.getProject());
+        try {
+            editors.openFile(waiting, true);
+            PlatformTestUtil.waitWithEventsDispatching("the selection must start the server",
+                    () -> MockLanguageServer.INSTANCE.getNotifications().contains("initialize"), 10);
+            editors.closeFile(waiting);
+            projectEditorListeners().fileClosed(editors, waiting);
+        } finally {
+            initialize.complete(null);
+        }
+        PlatformTestUtil.waitWithEventsDispatching("the server must be initialized",
+                () -> MockLanguageServer.INSTANCE.getNotifications().contains("initialized"), 10);
+
+        // the connection is made now, and its release, on the EDT, disconnects the file
+        dispatchEventsFor(2);
+        assertFalse("the closed file must end disconnected", isConnected("waiting.ts"));
+    }
+
+    private FileEditorManagerListener projectEditorListeners() {
+        return myFixture.getProject().getMessageBus().syncPublisher(FileEditorManagerListener.FILE_EDITOR_MANAGER);
+    }
+
+    private static void dispatchEventsFor(int seconds) throws InterruptedException {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(seconds);
         while (System.nanoTime() < deadline) {
             PlatformTestUtil.dispatchAllInvocationEventsInIdeEventQueue();
-            assertFalse("the closed file must stay disconnected", reopened.isDone());
             Thread.sleep(20);
         }
+    }
+
+    /** True if the last didOpen or didClose of the file that the server read is a didOpen. */
+    private static boolean isConnected(String fileName) {
+        boolean connected = false;
+        for (var notification : MockLanguageServer.INSTANCE.getTextDocumentService().getOpenCloseNotifications()) {
+            if (notification.uri().getPath().endsWith("/" + fileName)) {
+                connected = notification.open();
+            }
+        }
+        return connected;
     }
 
     private static CompletableFuture<DidOpenTextDocumentParams> expectDidOpen(String fileName) {
