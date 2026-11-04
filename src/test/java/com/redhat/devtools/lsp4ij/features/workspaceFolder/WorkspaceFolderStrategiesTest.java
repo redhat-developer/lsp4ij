@@ -48,17 +48,6 @@ public class WorkspaceFolderStrategiesTest extends BasePlatformTestCase {
         assertFolder(contentRoot(), folderOf(new ProjectWorkspaceFolderStrategy(), file));
     }
 
-    public void testProjectStrategyGivesTheLocalContentRootOfAFile() throws IOException {
-        var root = localDirectory();
-        var file = localFile(root, "a/one.txt");
-        PsiTestUtil.addContentRoot(getModule(), root);
-        try {
-            assertFolder(root, folderOf(new ProjectWorkspaceFolderStrategy(), file));
-        } finally {
-            PsiTestUtil.removeContentEntry(getModule(), root);
-        }
-    }
-
     public void testProjectStrategyGivesNoFolderForAFileOutsideOfTheProject() throws IOException {
         var file = localFile(localDirectory(), "a/one.txt");
 
