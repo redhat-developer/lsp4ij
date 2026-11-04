@@ -2270,7 +2270,7 @@ public class LanguageServerWrapper implements Disposable {
         this.disposed = true;
         fileListener.disposeFileSystemWatchers();
         // A language server that never started has nothing to stop, and no status to report
-        if (getServerStatus() != ServerStatus.none) {
+        if (currentInitializingContext != null || getServerStatus() != ServerStatus.none) {
             stopAndRefreshEditorFeature(refreshEditorFeature, false);
         }
         stopDispatcher();

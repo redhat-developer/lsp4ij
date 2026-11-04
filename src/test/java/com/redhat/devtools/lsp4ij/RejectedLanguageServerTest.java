@@ -8,6 +8,7 @@
 package com.redhat.devtools.lsp4ij;
 
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.util.Disposer;
 import com.intellij.psi.PsiFile;
 import com.intellij.testFramework.PlatformTestUtil;
 import com.redhat.devtools.lsp4ij.fixtures.LSPCodeInsightFixtureTestCase;
@@ -22,6 +23,8 @@ import org.jetbrains.annotations.NotNull;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Tests a language server that the filter of a request rejects before it starts.
@@ -67,6 +70,54 @@ public class RejectedLanguageServerTest extends LSPCodeInsightFixtureTestCase {
         assertEquals(1, rejected.size());
         assertTrue(rejected.get(0).isDisposed());
         assertDoesntContain(accessor.getStartedServers(), rejected.get(0));
+    }
+
+    public void testALanguageServerIsDisposedWhenTheFilterThrows() {
+        var rejected = new ArrayList<LanguageServerWrapper>();
+
+        try {
+            waitFor(accessor.getLanguageServers(file(), features -> {
+                rejected.add(features.getServerWrapper());
+                throw new IllegalStateException("The filter fails");
+            }, null));
+        } catch (Exception e) {
+            // Whether it reaches the caller directly or through the future doesn't matter here
+        }
+
+        assertEquals(1, rejected.size());
+        assertTrue(rejected.get(0).isDisposed());
+        assertDoesntContain(accessor.getStartedServers(), rejected.get(0));
+    }
+
+    public void testALanguageServerWhoseStartIsStillQueuedIsStopped() throws Exception {
+        var startRuns = new CountDownLatch(1);
+        var startGoesOn = new CountDownLatch(1);
+        // The status changes to starting in the task of the start, which waits here
+        var languageServer = new LanguageServerWrapper(project, definition) {
+            @Override
+            public void updateStatus(@NotNull ServerStatus serverStatus) {
+                if (serverStatus == ServerStatus.starting) {
+                    startRuns.countDown();
+                    try {
+                        startGoesOn.await(10, TimeUnit.SECONDS);
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                    }
+                }
+                super.updateStatus(serverStatus);
+            }
+        };
+        try {
+            var initialized = languageServer.getInitializedServer();
+            assertTrue(startRuns.await(10, TimeUnit.SECONDS));
+            assertEquals(ServerStatus.none, languageServer.getServerStatus());
+
+            Disposer.dispose(languageServer);
+
+            assertTrue("Whoever waits for the language server must not wait any longer", initialized.isDone());
+        } finally {
+            startGoesOn.countDown();
+        }
     }
 
     public void testALanguageServerThatTheFilterRejectsReportsNoStatus() throws Exception {

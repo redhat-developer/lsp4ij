@@ -556,11 +556,17 @@ public class LanguageServiceAccessor implements Disposable {
                 if (!useExistingServer) {
                     // There are none started servers which matches the file, create and add it.
                     LanguageServerWrapper wrapper = new LanguageServerWrapper(project, serverDefinition);
-                    if (beforeStartingServerFilter == null || beforeStartingServerFilter.test(wrapper.getClientFeatures())) {
+                    boolean accepted = false;
+                    try {
+                        accepted = beforeStartingServerFilter == null || beforeStartingServerFilter.test(wrapper.getClientFeatures());
+                    } finally {
+                        if (!accepted) {
+                            Disposer.dispose(wrapper);
+                        }
+                    }
+                    if (accepted) {
                         startedServers.add(wrapper);
                         matchedServers.add(wrapper);
-                    } else {
-                        Disposer.dispose(wrapper);
                     }
                 }
             }
