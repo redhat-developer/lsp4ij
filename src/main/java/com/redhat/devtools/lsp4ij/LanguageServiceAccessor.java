@@ -559,7 +559,7 @@ public class LanguageServiceAccessor implements Disposable {
         var instanceChoices = file != null ? chooseInstances(file, serverDefinitions) : Map.<LanguageServerDefinition, InstanceChoice>of();
         synchronized (startedServers) {
             for (var serverDefinition : serverDefinitions) {
-                if (serverDefinition.isServerInstancePerFolder()) {
+                if (serverDefinition.hasServerInstances()) {
                     if (file == null) {
                         collectStartedInstances(serverDefinition, matchedServers, beforeStartingServerFilter);
                     } else if (instanceChoices.containsKey(serverDefinition)) {
@@ -600,33 +600,33 @@ public class LanguageServiceAccessor implements Disposable {
     }
 
     /**
-     * The language server instance of a file for a definition with one instance per folder: the instance that has the
-     * file connected, which keeps it, or the workspace folder of the instance that serves it.
+     * The language server instance of a file for a definition with several instances: the instance that has the file
+     * connected or provides it, which keeps it, or the root of the instance that serves it.
      */
-    private record InstanceChoice(@Nullable LanguageServerWrapper connected, @Nullable WorkspaceFolder folder) {
+    private record InstanceChoice(@Nullable LanguageServerWrapper connected, @Nullable WorkspaceFolder root) {
 
         boolean isFor(@NotNull LanguageServerWrapper instance) {
             if (connected != null) {
                 return connected == instance;
             }
-            var instanceFolder = instance.getInstanceFolder();
-            return folder != null && instanceFolder != null && folder.getUri().equals(instanceFolder.getUri());
+            var instanceRoot = instance.getInstanceRoot();
+            return root != null && instanceRoot != null && root.getUri().equals(instanceRoot.getUri());
         }
     }
 
     /**
-     * Chooses the language server instances of the given file for the definitions with one instance per folder. A
-     * definition has no entry if no instance serves the file.
+     * Chooses the language server instances of the given file for the definitions with several instances. A definition
+     * has no entry if no instance serves the file.
      */
     private @NotNull Map<LanguageServerDefinition, InstanceChoice> chooseInstances(@NotNull VirtualFile file,
                                                                                    @NotNull Set<LanguageServerDefinition> serverDefinitions) {
         Map<LanguageServerDefinition, InstanceChoice> choices = new HashMap<>();
         for (var serverDefinition : serverDefinitions) {
-            if (!serverDefinition.isServerInstancePerFolder()) {
+            if (!serverDefinition.hasServerInstances()) {
                 continue;
             }
             var choice = chooseInstance(file, serverDefinition);
-            if (choice.connected() != null || choice.folder() != null) {
+            if (choice.connected() != null || choice.root() != null) {
                 choices.put(serverDefinition, choice);
             }
         }
@@ -638,7 +638,7 @@ public class LanguageServiceAccessor implements Disposable {
         var connected = findInstanceConnectedTo(file, serverDefinition);
         return connected != null
                 ? new InstanceChoice(connected, null)
-                : new InstanceChoice(null, serverDefinition.getServerInstanceFolder(file, project));
+                : new InstanceChoice(null, serverDefinition.getServerInstanceRoot(file, project));
     }
 
     /**
@@ -654,7 +654,7 @@ public class LanguageServiceAccessor implements Disposable {
             return ACCEPT_ALL_SERVERS;
         }
         Map<LanguageServerDefinition, InstanceChoice> choices = new HashMap<>();
-        return server -> server.getInstanceFolder() == null
+        return server -> server.getInstanceRoot() == null
                 || choices.computeIfAbsent(server.getServerDefinition(), serverDefinition -> chooseInstance(file, serverDefinition))
                 .isFor(server);
     }
@@ -663,7 +663,7 @@ public class LanguageServiceAccessor implements Disposable {
                                                                     @NotNull LanguageServerDefinition serverDefinition) {
         for (var startedServer : startedServers) {
             if (startedServer.getServerDefinition().equals(serverDefinition)
-                    && startedServer.isSynchronizing(file)) {
+                    && (startedServer.isSynchronizing(file) || startedServer.providesDocument(file))) {
                 return startedServer;
             }
         }
@@ -677,10 +677,10 @@ public class LanguageServiceAccessor implements Disposable {
                                        @NotNull InstanceChoice choice,
                                        @NotNull Set<LanguageServerWrapper> matchedServers,
                                        @Nullable Predicate<LSPClientFeatures> beforeStartingServerFilter) {
-        var instance = choice.connected() != null ? choice.connected() : findInstance(serverDefinition, choice.folder());
+        var instance = choice.connected() != null ? choice.connected() : findInstance(serverDefinition, choice.root());
         boolean created = instance == null;
         if (created) {
-            instance = LanguageServerWrapper.forInstanceFolder(project, serverDefinition, choice.folder());
+            instance = LanguageServerWrapper.forInstanceRoot(project, serverDefinition, choice.root());
         }
         if (beforeStartingServerFilter == null || beforeStartingServerFilter.test(instance.getClientFeatures())) {
             if (created) {
@@ -693,8 +693,8 @@ public class LanguageServiceAccessor implements Disposable {
     }
 
     /**
-     * Adds all started language server instances of a definition with one instance per folder. Without a file, nothing
-     * tells which folder to start an instance for.
+     * Adds all started language server instances of a definition with several instances. Without a file, nothing tells
+     * which instance to start.
      */
     private void collectStartedInstances(@NotNull LanguageServerDefinition serverDefinition,
                                          @NotNull Set<LanguageServerWrapper> matchedServers,
@@ -708,11 +708,11 @@ public class LanguageServiceAccessor implements Disposable {
     }
 
     private @Nullable LanguageServerWrapper findInstance(@NotNull LanguageServerDefinition serverDefinition,
-                                                         @NotNull WorkspaceFolder instanceFolder) {
+                                                         @NotNull WorkspaceFolder instanceRoot) {
         for (var startedServer : startedServers) {
-            var folder = startedServer.getInstanceFolder();
+            var root = startedServer.getInstanceRoot();
             if (startedServer.getServerDefinition().equals(serverDefinition)
-                    && folder != null && instanceFolder.getUri().equals(folder.getUri())) {
+                    && root != null && instanceRoot.getUri().equals(root.getUri())) {
                 return startedServer;
             }
         }

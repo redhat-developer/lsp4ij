@@ -13,6 +13,7 @@
  *******************************************************************************/
 package com.redhat.devtools.lsp4ij.client.features;
 
+import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.redhat.devtools.lsp4ij.features.workspaceFolder.ConfigurableWorkspaceFolderStrategy;
@@ -22,6 +23,8 @@ import org.eclipse.lsp4j.WorkspaceFolder;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -37,6 +40,8 @@ import java.util.concurrent.ConcurrentHashMap;
 public class LSPWorkspaceFolderFeature {
 
     private LSPClientFeatures clientFeatures;
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(LSPWorkspaceFolderFeature.class);
 
     protected WorkspaceFolderStrategy strategy;
 
@@ -94,14 +99,12 @@ public class LSPWorkspaceFolderFeature {
      */
     @NotNull
     public List<WorkspaceFolder> getInitialWorkspaceFolders(@NotNull Project project) {
-        var languageServer = getClientFeatures().getServerWrapper();
-        var instanceFolder = languageServer != null ? languageServer.getInstanceFolder() : null;
-        if (instanceFolder != null) {
-            // An instance for one workspace folder has only this one
-            return List.of(instanceFolder);
-        }
-
         List<WorkspaceFolder> folders = getStrategy().getInitialWorkspaceFolders(project, getClientFeatures());
+
+        var instanceRoot = getInstanceRoot();
+        if (instanceRoot != null) {
+            folders = getFoldersOfInstance(folders, instanceRoot, project);
+        }
 
         // Track folders that were sent during initialization
         for (WorkspaceFolder folder : folders) {
@@ -109,6 +112,36 @@ public class LSPWorkspaceFolderFeature {
         }
 
         return folders;
+    }
+
+    private @Nullable WorkspaceFolder getInstanceRoot() {
+        var languageServer = getClientFeatures().getServerWrapper();
+        return languageServer != null ? languageServer.getInstanceRoot() : null;
+    }
+
+    private boolean belongsToInstance(@NotNull WorkspaceFolder folder,
+                                      @NotNull WorkspaceFolder instanceRoot,
+                                      @NotNull Project project) {
+        try {
+            return getStrategy().belongsToServerInstance(folder, instanceRoot, project, getClientFeatures());
+        } catch (ProcessCanceledException e) {
+            throw e;
+        } catch (Exception e) {
+            // A failing strategy must not stop the language server: the folder just doesn't reach it
+            LOGGER.warn("Cannot tell whether the workspace folder '" + folder.getUri() + "' belongs to the language server instance '" + instanceRoot.getUri() + "'", e);
+            return false;
+        }
+    }
+
+    private @NotNull List<WorkspaceFolder> getFoldersOfInstance(@NotNull List<WorkspaceFolder> folders,
+                                                                @NotNull WorkspaceFolder instanceRoot,
+                                                                @NotNull Project project) {
+        var strategy = getStrategy();
+        var foldersOfInstance = folders.stream()
+                .filter(folder -> belongsToInstance(folder, instanceRoot, project))
+                .toList();
+        return foldersOfInstance.isEmpty() && strategy.sendAllFoldersOnInitialization() ?
+                List.of(instanceRoot) : foldersOfInstance;
     }
 
     /**
@@ -120,13 +153,19 @@ public class LSPWorkspaceFolderFeature {
      */
     @Nullable
     public WorkspaceFolder computeWorkspaceFolderToNotify(@NotNull VirtualFile file) {
-        if (getStrategy().sendAllFoldersOnInitialization() || getStrategy().isServerInstancePerFolder()) {
-            // Strategy sends all folders at initialization, or the instance has only its own: no dynamic notification needed
+        if (getStrategy().sendAllFoldersOnInitialization()) {
+            // Strategy sends all folders at initialization, no dynamic notification needed
             return null;
         }
 
         Project project = getClientFeatures().getProject();
         WorkspaceFolder folder = getStrategy().getWorkspaceFolderForFile(file, project, getClientFeatures());
+
+        var instanceRoot = getInstanceRoot();
+        if (folder != null && instanceRoot != null && !belongsToInstance(folder, instanceRoot, project)) {
+            // A folder that belongs to no instance or to another one doesn't reach this one
+            folder = instanceRoot;
+        }
 
         if (folder != null && !notifiedWorkspaceFolders.contains(folder.getUri())) {
             return folder;

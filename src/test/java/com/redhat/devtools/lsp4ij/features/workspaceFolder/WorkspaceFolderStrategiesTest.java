@@ -36,10 +36,10 @@ public class WorkspaceFolderStrategiesTest extends BasePlatformTestCase {
     private static final String MARKER = "lsp4ij-test-marker";
 
     public void testBuiltInStrategiesKeepOneInstancePerProject() {
-        assertFalse(new ProjectWorkspaceFolderStrategy().isServerInstancePerFolder());
-        assertFalse(new SourceRootsWorkspaceFolderStrategy().isServerInstancePerFolder());
-        assertFalse(new MarkersWorkspaceFolderStrategy(MARKER).isServerInstancePerFolder());
-        assertFalse(new ConfigurableWorkspaceFolderStrategy().isServerInstancePerFolder());
+        assertFalse(new ProjectWorkspaceFolderStrategy().hasServerInstances());
+        assertFalse(new SourceRootsWorkspaceFolderStrategy().hasServerInstances());
+        assertFalse(new MarkersWorkspaceFolderStrategy(MARKER).hasServerInstances());
+        assertFalse(new ConfigurableWorkspaceFolderStrategy().hasServerInstances());
     }
 
     public void testProjectStrategyGivesTheContentRootOfAFile() {
@@ -210,6 +210,76 @@ public class WorkspaceFolderStrategiesTest extends BasePlatformTestCase {
         assertEquals(RootType.PROJECT_BASE, strategy.getRootType());
     }
 
+    public void testWithInstancesADirectoryWithAMarkerIsItsOwnWorkspaceFolder() throws IOException {
+        var root = localDirectory();
+        localFile(root, MARKER);
+
+        assertFolder(root, folderOf(markersWithInstances(), root));
+    }
+
+    public void testWithoutInstancesADirectoryLooksForAMarkerAboveIt() throws IOException {
+        var root = localDirectory();
+        localFile(root, MARKER);
+
+        assertNull(folderOf(new MarkersWorkspaceFolderStrategy(MARKER), root));
+    }
+
+    public void testWithInstancesADirectoryWithAMarkerIsItsOwnWorkspaceFolderInANonLocalFileSystem() {
+        var directory = MockVirtualFile.dir("directory", MockVirtualFile.file(MARKER));
+
+        var folder = folderOf(markersWithInstances(), directory);
+
+        assertNotNull(folder);
+        assertEquals("directory", folder.getName());
+    }
+
+    public void testWithInstancesADirectoryThatIsARootIsItsOwnWorkspaceFolderInANonLocalFileSystem() {
+        var directory = MockVirtualFile.dir("directory");
+        var strategy = new ProjectWorkspaceFolderStrategy() {
+            @Override
+            public boolean hasServerInstances() {
+                return true;
+            }
+
+            @Override
+            public @NotNull List<VirtualFile> getRoots(@NotNull Project project) {
+                return List.of(directory);
+            }
+        };
+
+        var folder = folderOf(strategy, directory);
+
+        assertNotNull(folder);
+        assertEquals("directory", folder.getName());
+    }
+
+    public void testRootTypeNoneSendsNothingAtInitialization() {
+        var strategy = new ConfigurableWorkspaceFolderStrategy();
+
+        strategy.configure("{\"rootType\": \"NONE\"}");
+
+        assertEmpty(strategy.getInitialWorkspaceFolders(getProject(), FileUriSupport.DEFAULT));
+    }
+
+    public void testRootTypeNoneWithOwnRootsSendsThemAtInitialization() {
+        var root = myFixture.addFileToProject("own/one.txt", "").getVirtualFile().getParent();
+        var strategy = new BaseWorkspaceFolderStrategy() {
+            {
+                setRootType(RootType.NONE);
+            }
+
+            @Override
+            public @NotNull List<VirtualFile> getRoots(@NotNull Project project) {
+                return List.of(root);
+            }
+        };
+
+        var folders = strategy.getInitialWorkspaceFolders(getProject(), FileUriSupport.DEFAULT);
+
+        assertEquals(1, folders.size());
+        assertEquals("own", folders.get(0).getName());
+    }
+
     public void testLazyStrategiesSendNoFoldersOnInitialization() {
         var eager = new ProjectWorkspaceFolderStrategy();
         var lazy = new ProjectWorkspaceFolderStrategy(true);
@@ -223,6 +293,15 @@ public class WorkspaceFolderStrategiesTest extends BasePlatformTestCase {
 
     private @Nullable WorkspaceFolder folderOf(@NotNull WorkspaceFolderStrategy strategy, @NotNull VirtualFile file) {
         return strategy.getWorkspaceFolderForFile(file, getProject(), FileUriSupport.DEFAULT);
+    }
+
+    private static @NotNull MarkersWorkspaceFolderStrategy markersWithInstances() {
+        return new MarkersWorkspaceFolderStrategy(MARKER) {
+            @Override
+            public boolean hasServerInstances() {
+                return true;
+            }
+        };
     }
 
     private static void assertFolder(@Nullable VirtualFile expected, @Nullable WorkspaceFolder folder) {

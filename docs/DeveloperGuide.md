@@ -1285,9 +1285,9 @@ public class MyWorkspaceFolderFeature extends LSPWorkspaceFolderFeature {
 }
 ```
 
-## One Language Server Instance per Folder
+## Several Language Server Instances
 
-By default, one language server instance serves all workspace folders of a project. If each folder needs a server process of its own, for example because each one has its own environment, a strategy can ask for one instance per folder:
+By default, one language server instance serves all workspace folders of a project. If parts of a project need a server process of their own, for example because each one has its own environment, a strategy can spread the files over several instances:
 
 ```java
 package my.language.server;
@@ -1297,7 +1297,7 @@ import com.redhat.devtools.lsp4ij.features.workspaceFolder.ProjectWorkspaceFolde
 public class MyWorkspaceFolderStrategy extends ProjectWorkspaceFolderStrategy {
 
     @Override
-    public boolean isServerInstancePerFolder() {
+    public boolean hasServerInstances() {
         return true;
     }
 }
@@ -1305,12 +1305,13 @@ public class MyWorkspaceFolderStrategy extends ProjectWorkspaceFolderStrategy {
 
 Set this strategy with a workspace folder feature as described above. Then:
 
- * `getWorkspaceFolderForFile` decides which instance serves a file, and files with the same folder share an instance.
- * A file without a folder gets no instance, so this language server provides no features for it.
- * An instance starts when the first file of its folder is opened.
- * An instance is initialized with its folder as `rootUri` and as its only workspace folder, and it gets no `workspace/didChangeWorkspaceFolders`. So lazy loading has no meaning here.
- * File events and file operations aren't limited to the folder: each instance gets what it registered, as with a language server client per folder in VS Code.
- * The Language Servers view shows each instance as a process of its own, with the name of its folder.
+ * `getServerInstanceRoot` decides which instance serves a file, and files with the same root share an instance. By default, the root is the workspace folder of the file, so each workspace folder gets an instance of its own. Override it to separate the instances from the workspace folders, for example to give all content roots of a module one instance. It's also asked about the directories of workspace folders, so a directory that is a root has to give itself.
+ * A file without a root gets no instance, so this language server provides no features for it.
+ * An instance starts when the first of its files is opened. It's initialized with its root as `rootUri`.
+ * The workspace folders work for an instance as they work for a language server without instances, with the folders that belong to it: a workspace folder belongs to the instance that its own directory has as root (`belongsToServerInstance`). If none does and the strategy sends its folders at initialization, the instance gets its root.
+ * With lazy loading, an instance gets its folders through `workspace/didChangeWorkspaceFolders` as their files are opened. A folder that belongs to another instance, or that contains several, doesn't reach it: its root takes that folder's place.
+ * File events and file operations aren't limited to the workspace folders of an instance: each instance gets what it registered, as with a language server client per folder in VS Code.
+ * The Language Servers view shows each instance as a process of its own, with the name of its root.
 
 ## User-Defined Language Server Configuration
 

@@ -100,7 +100,9 @@ public abstract class BaseWorkspaceFolderStrategy implements WorkspaceFolderStra
 
     @Override
     public final boolean sendAllFoldersOnInitialization() {
-        return !isLazy() && (getMarkers() == null || getMarkers().isEmpty());
+        // An instance gets its root if it has no folder to send, which NONE doesn't ask for
+        boolean sendsRootOfInstance = getRootType() == RootType.NONE && hasServerInstances();
+        return !isLazy() && !sendsRootOfInstance && (getMarkers() == null || getMarkers().isEmpty());
     }
 
     @NotNull
@@ -135,7 +137,7 @@ public abstract class BaseWorkspaceFolderStrategy implements WorkspaceFolderStra
                 // Marker-based discovery: walk up the directory tree looking for marker files
                 // Use NIO Path for better performance instead of VirtualFile.findChild()
                 Path filePath = Paths.get(file.getPath());
-                Path parentPath = filePath.getParent();
+                Path parentPath = startsAtItself(file) ? filePath : filePath.getParent();
 
                 while (parentPath != null) {
                     for (String marker : markers) {
@@ -154,7 +156,7 @@ public abstract class BaseWorkspaceFolderStrategy implements WorkspaceFolderStra
                 }
             } else {
                 // Fallback to VirtualFile API for non-local files
-                VirtualFile parent = file.getParent();
+                VirtualFile parent = startsAtItself(file) ? file : file.getParent();
                 while (parent != null) {
                     for (String marker : markers) {
                         VirtualFile markerFile = parent.findChild(marker);
@@ -197,7 +199,7 @@ public abstract class BaseWorkspaceFolderStrategy implements WorkspaceFolderStra
                 // Fallback to VirtualFile API for non-local files
                 // Convert to Set for O(1) lookup
                 Set<VirtualFile> roots = new HashSet<>(rootsList);
-                VirtualFile parent = file.getParent();
+                VirtualFile parent = startsAtItself(file) ? file : file.getParent();
                 while (parent != null) {
                     if (roots.contains(parent)) {
                         return createWorkspaceFolder(parent, fileUriSupport);
@@ -208,6 +210,21 @@ public abstract class BaseWorkspaceFolderStrategy implements WorkspaceFolderStra
         }
 
         return null;
+    }
+
+    private boolean startsAtItself(@NotNull VirtualFile file) {
+        return file.isDirectory() && isDirectoryItsOwnFolder();
+    }
+
+    /**
+     * Returns true if a directory can be its own workspace folder in {@link #getWorkspaceFolderForFile}. With language
+     * server instances it has to, because the strategy is also asked about the directories of workspace folders, to
+     * tell which instance they belong to.
+     *
+     * @return true if a directory can be its own workspace folder
+     */
+    protected boolean isDirectoryItsOwnFolder() {
+        return hasServerInstances();
     }
 
     @Nullable

@@ -37,6 +37,7 @@ import com.redhat.devtools.lsp4ij.client.features.FileUriSupport;
 import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
 import com.redhat.devtools.lsp4ij.console.explorer.TracingMessageConsumer;
 import com.redhat.devtools.lsp4ij.features.diagnostics.LSPDiagnosticUtils;
+import com.redhat.devtools.lsp4ij.features.documentContent.DocumentContentFile;
 import com.redhat.devtools.lsp4ij.features.files.AbstractLSPFileListener;
 import com.redhat.devtools.lsp4ij.features.files.operations.FileOperationsManager;
 import com.redhat.devtools.lsp4ij.installation.ServerInstallationContext;
@@ -130,7 +131,7 @@ public class LanguageServerWrapper implements Disposable {
     }
     @Nullable
     protected final URI initialPath;
-    private final @Nullable WorkspaceFolder instanceFolder;
+    private final @Nullable WorkspaceFolder instanceRoot;
     protected final InitializeParams initParams = new InitializeParams();
     @NotNull
     private final LanguageServerDefinition serverDefinition;
@@ -189,19 +190,19 @@ public class LanguageServerWrapper implements Disposable {
     }
 
     /**
-     * Creates the language server instance of the given workspace folder.
+     * Creates the language server instance with the given root.
      *
      * @param project          the project.
      * @param serverDefinition the language server definition.
-     * @param instanceFolder   the workspace folder that this instance serves.
-     * @return the language server instance of the given workspace folder.
-     * @see com.redhat.devtools.lsp4ij.features.workspaceFolder.WorkspaceFolderStrategy#isServerInstancePerFolder()
+     * @param instanceRoot     the root of this instance.
+     * @return the language server instance with the given root.
+     * @see com.redhat.devtools.lsp4ij.features.workspaceFolder.WorkspaceFolderStrategy#hasServerInstances()
      */
     @ApiStatus.Internal
-    public static @NotNull LanguageServerWrapper forInstanceFolder(@NotNull Project project,
-                                                                   @NotNull LanguageServerDefinition serverDefinition,
-                                                                   @NotNull WorkspaceFolder instanceFolder) {
-        return new LanguageServerWrapper(project, serverDefinition, null, instanceFolder);
+    public static @NotNull LanguageServerWrapper forInstanceRoot(@NotNull Project project,
+                                                                 @NotNull LanguageServerDefinition serverDefinition,
+                                                                 @NotNull WorkspaceFolder instanceRoot) {
+        return new LanguageServerWrapper(project, serverDefinition, null, instanceRoot);
     }
 
     /**
@@ -210,10 +211,10 @@ public class LanguageServerWrapper implements Disposable {
     private LanguageServerWrapper(@NotNull Project project,
                                   @NotNull LanguageServerDefinition serverDefinition,
                                   @Nullable URI initialPath,
-                                  @Nullable WorkspaceFolder instanceFolder) {
+                                  @Nullable WorkspaceFolder instanceRoot) {
         this.initialProject = project;
         this.initialPath = initialPath;
-        this.instanceFolder = instanceFolder;
+        this.instanceRoot = instanceRoot;
         this.serverDefinition = serverDefinition;
         this.openedDocuments = new ConcurrentHashMap<>();
         this.closedDocuments = new ConcurrentHashMap<>();
@@ -221,8 +222,8 @@ public class LanguageServerWrapper implements Disposable {
         VirtualFileManager.getInstance().addAsyncFileListener(fileListener, this);
 
         String projectName = sanitize(!serverDefinition.isSingleton() ? ("@" + project.getName()) : "");  //$NON-NLS-1$//$NON-NLS-2$
-        if (instanceFolder != null) {
-            projectName += sanitize("@" + instanceFolder.getName());
+        if (instanceRoot != null) {
+            projectName += sanitize("@" + instanceRoot.getName());
         }
 
         // Worker threads must not inherit the plugin classloader, or they pin it and block dynamic unload.
@@ -769,8 +770,8 @@ public class LanguageServerWrapper implements Disposable {
 
     @Nullable
     private VirtualFile getRootURI() {
-        if (instanceFolder != null) {
-            return FileUriSupport.findFileByUri(instanceFolder.getUri(), getClientFeatures());
+        if (instanceRoot != null) {
+            return FileUriSupport.findFileByUri(instanceRoot.getUri(), getClientFeatures());
         }
         var roots = LSPIJUtils.getRoots(getProject());
         if (roots.size() == 1) {
@@ -1701,14 +1702,12 @@ public class LanguageServerWrapper implements Disposable {
     }
 
     /**
-     * Returns the workspace folder that this language server instance serves, and null if one instance serves the
-     * whole project.
+     * Returns the root of this language server instance, and null if one instance serves the whole project.
      *
-     * @return the workspace folder that this language server instance serves, and null if one instance serves the
-     * whole project.
+     * @return the root of this language server instance, and null if one instance serves the whole project.
      */
-    public @Nullable WorkspaceFolder getInstanceFolder() {
-        return instanceFolder;
+    public @Nullable WorkspaceFolder getInstanceRoot() {
+        return instanceRoot;
     }
 
     /**
@@ -1724,6 +1723,19 @@ public class LanguageServerWrapper implements Disposable {
         var fileUri = toUri(file);
         var openedDocument = fileUri != null ? openedDocuments.get(fileUri) : null;
         return openedDocument != null && openedDocument.getSynchronizer() != null;
+    }
+
+    /**
+     * Returns true if the language server provides the given document through workspace/textDocumentContent. Such a
+     * document isn't part of a folder, so no workspace folder strategy can tell which instance it belongs to.
+     *
+     * @param file the file.
+     * @return true if the language server provides the given document.
+     */
+    @ApiStatus.Internal
+    public boolean providesDocument(@NotNull VirtualFile file) {
+        return file instanceof DocumentContentFile document
+                && getClientFeatures().findFileByUri(document.getUri().toString()) == file;
     }
 
     public boolean canOperate(@NotNull VirtualFile file) {

@@ -73,9 +73,9 @@ public class LanguageServerProcessTreeNode extends DefaultMutableTreeNode {
     }
 
     private String getDisplayName(@NotNull ServerStatus serverStatus) {
-        var instanceFolder = languageServer.getInstanceFolder();
+        var instanceRoot = languageServer.getInstanceRoot();
         String statusName = getStatusName(serverStatus);
-        return instanceFolder != null ? instanceFolder.getName() + ": " + statusName : statusName;
+        return instanceRoot != null ? instanceRoot.getName() + ": " + statusName : statusName;
     }
 
     private String getStatusName(@NotNull ServerStatus serverStatus) {

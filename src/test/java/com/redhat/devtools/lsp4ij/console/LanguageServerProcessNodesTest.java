@@ -152,7 +152,7 @@ public class LanguageServerProcessNodesTest extends LSPCodeInsightFixtureTestCas
     }
 
     public void testAProcessNodeShowsTheFolderOfItsInstance() {
-        var instance = LanguageServerWrapper.forInstanceFolder(project, definition, new WorkspaceFolder("file:///web-tests", "web-tests"));
+        var instance = LanguageServerWrapper.forInstanceRoot(project, definition, new WorkspaceFolder("file:///web-tests", "web-tests"));
         Disposer.register(getTestRootDisposable(), instance);
 
         instance.updateStatus(ServerStatus.starting);
@@ -277,7 +277,7 @@ public class LanguageServerProcessNodesTest extends LSPCodeInsightFixtureTestCas
         var languageServer = new LanguageServerWrapper(project, definition, null);
         Disposer.register(getTestRootDisposable(), languageServer);
 
-        assertNull(languageServer.getInstanceFolder());
+        assertNull(languageServer.getInstanceRoot());
     }
 
     public void testTheLogOfADefinitionGoesToItsFirstProcessNode() {

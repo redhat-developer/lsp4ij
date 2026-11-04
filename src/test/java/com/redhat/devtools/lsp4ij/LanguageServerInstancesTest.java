@@ -7,15 +7,19 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij;
 
+import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.application.impl.NonBlockingReadActionImpl;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.util.Disposer;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiFile;
+import com.intellij.psi.PsiManager;
 import com.intellij.testFramework.IndexingTestUtil;
 import com.intellij.testFramework.PlatformTestUtil;
 import com.redhat.devtools.lsp4ij.client.features.FileUriSupport;
 import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
 import com.redhat.devtools.lsp4ij.client.features.LSPWorkspaceFolderFeature;
+import com.redhat.devtools.lsp4ij.features.documentContent.DocumentContentProvider;
 import com.redhat.devtools.lsp4ij.features.workspaceFolder.MarkersWorkspaceFolderStrategy;
 import com.redhat.devtools.lsp4ij.features.workspaceFolder.WorkspaceFolderStrategy;
 import com.redhat.devtools.lsp4ij.fixtures.LSPCodeInsightFixtureTestCase;
@@ -36,19 +40,22 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
- * Tests a language server definition whose workspace folder strategy asks for one instance per folder. The folders of
- * the tests are "a" and "b". A file in any other folder has none.
+ * Tests a language server definition whose workspace folder strategy spreads the files over several instances. By
+ * default, each workspace folder has an instance. The folders of these tests are "a" and "b", and a file in any other
+ * folder has none. {@link TwoLevelStrategy} separates the instances from the folders.
  */
-public class LanguageServerInstancePerFolderTest extends LSPCodeInsightFixtureTestCase {
+public class LanguageServerInstancesTest extends LSPCodeInsightFixtureTestCase {
 
     private PerFolderDefinition definition;
     private LanguageServiceAccessor accessor;
 
-    public LanguageServerInstancePerFolderTest() {
+    public LanguageServerInstancesTest() {
         super("*.ts");
     }
 
@@ -88,8 +95,8 @@ public class LanguageServerInstancePerFolderTest extends LSPCodeInsightFixtureTe
         var b = instanceOf(file("b/one.per-folder"));
 
         assertNotSame(a, b);
-        assertEquals("a", a.getInstanceFolder().getName());
-        assertEquals("b", b.getInstanceFolder().getName());
+        assertEquals("a", a.getInstanceRoot().getName());
+        assertEquals("b", b.getInstanceRoot().getName());
         assertEquals(2, definition.servers.size());
     }
 
@@ -208,7 +215,7 @@ public class LanguageServerInstancePerFolderTest extends LSPCodeInsightFixtureTe
             }
         };
 
-        assertFalse(failing.isServerInstancePerFolder());
+        assertFalse(failing.hasServerInstances());
     }
 
     public void testADefinitionWithoutTheOptionKeepsOneInstance() throws Exception {
@@ -218,14 +225,14 @@ public class LanguageServerInstancePerFolderTest extends LSPCodeInsightFixtureTe
         var two = instanceOf(file("b/one.per-folder"));
 
         assertSame(one, two);
-        assertNull(one.getInstanceFolder());
+        assertNull(one.getInstanceRoot());
         assertEquals(1, instances().size());
     }
 
     public void testABuiltInStrategyCanAskForOneInstancePerFolder() throws Exception {
         definition.activeStrategy = new MarkersWorkspaceFolderStrategy("marker") {
             @Override
-            public boolean isServerInstancePerFolder() {
+            public boolean hasServerInstances() {
                 return true;
             }
         };
@@ -238,8 +245,8 @@ public class LanguageServerInstancePerFolderTest extends LSPCodeInsightFixtureTe
 
         assertSame(a, otherOfA);
         assertNotSame(a, b);
-        assertEquals("a", a.getInstanceFolder().getName());
-        assertEquals("b", b.getInstanceFolder().getName());
+        assertEquals("a", a.getInstanceRoot().getName());
+        assertEquals("b", b.getInstanceRoot().getName());
         assertEmpty(serversOf(file("other/one.per-folder")));
     }
 
@@ -249,7 +256,7 @@ public class LanguageServerInstancePerFolderTest extends LSPCodeInsightFixtureTe
 
         var params = definition.servers.get(0).getInitializeParams();
 
-        assertEquals(List.of(instance.getInstanceFolder()), params.getWorkspaceFolders());
+        assertEquals(List.of(instance.getInstanceRoot()), params.getWorkspaceFolders());
         assertEquals(instance.toUriString(file.getVirtualFile().getParent()), params.getRootUri());
     }
 
@@ -259,14 +266,150 @@ public class LanguageServerInstancePerFolderTest extends LSPCodeInsightFixtureTe
         var client = MockLanguageServerDefinition.getLastLanguageClient();
         assertNotNull(client);
 
-        assertEquals(List.of(instance.getInstanceFolder()), client.workspaceFolders().get());
+        assertEquals(List.of(instance.getInstanceRoot()), client.workspaceFolders().get());
     }
 
-    public void testAnInstanceGetsNoWorkspaceFolderChanges() throws Exception {
+    public void testAnInstanceThatGetsItsFoldersAtInitializationGetsNoChanges() throws Exception {
         instanceOf(file("a/one.per-folder"));
         instanceOf(file("a/two.per-folder"));
 
         assertEmpty(definition.servers.get(0).getWorkspaceService().getWorkspaceFoldersEvents());
+    }
+
+    public void testAnInstanceGetsTheWorkspaceFoldersThatBelongToIt() throws Exception {
+        var file = file("a/one/file.per-folder");
+        file("a/two/file.per-folder");
+        file("b/one/file.per-folder");
+        useTwoLevels(true, "a/one", "a/two", "b/one");
+
+        var instance = instanceOf(file);
+
+        var params = definition.servers.get(0).getInitializeParams();
+        assertEquals(List.of("one", "two"), namesOf(params.getWorkspaceFolders()));
+        assertEquals("a", instance.getInstanceRoot().getName());
+        assertEquals(instance.toUriString(file.getVirtualFile().getParent().getParent()), params.getRootUri());
+        var client = MockLanguageServerDefinition.getLastLanguageClient();
+        assertNotNull(client);
+        assertEquals(List.of("one", "two"), namesOf(client.workspaceFolders().get()));
+        assertEmpty(definition.servers.get(0).getWorkspaceService().getWorkspaceFoldersEvents());
+    }
+
+    public void testFilesOfTwoFoldersOfOneInstanceShareIt() throws Exception {
+        useTwoLevels(true);
+
+        var one = instanceOf(file("a/one/file.per-folder"));
+        var two = instanceOf(file("a/two/file.per-folder"));
+        var other = instanceOf(file("b/one/file.per-folder"));
+
+        assertSame(one, two);
+        assertNotSame(one, other);
+        assertEquals(2, definition.servers.size());
+    }
+
+    public void testAnInstanceGetsItsRootIfNoFolderBelongsToIt() throws Exception {
+        file("b/one/file.per-folder");
+        useTwoLevels(true, "b/one");
+
+        var instance = instanceOf(file("a/one/file.per-folder"));
+
+        assertEquals(List.of(instance.getInstanceRoot()), definition.servers.get(0).getInitializeParams().getWorkspaceFolders());
+    }
+
+    public void testALazyInstanceGetsItsFoldersWhenTheirFilesAreOpened() throws Exception {
+        useTwoLevels(false);
+
+        instanceOf(file("a/one/file.per-folder"));
+        var serverOfA = definition.servers.get(0);
+        assertEmpty(serverOfA.getInitializeParams().getWorkspaceFolders());
+        waitForAddedFolders(serverOfA, "one");
+
+        instanceOf(file("a/one/other.per-folder"));
+        instanceOf(file("a/two/file.per-folder"));
+        waitForAddedFolders(serverOfA, "one", "two");
+
+        instanceOf(file("b/three/file.per-folder"));
+        waitForAddedFolders(definition.servers.get(1), "three");
+        assertEquals(List.of("one", "two"), addedFolders(serverOfA));
+    }
+
+    public void testALazyInstanceSendsNothingForAFileWithoutAFolder() throws Exception {
+        useTwoLevels(false);
+
+        instanceOf(file("a/file.per-folder"));
+        instanceOf(file("a/one/file.per-folder"));
+
+        waitForAddedFolders(definition.servers.get(0), "one");
+    }
+
+    public void testAFolderThatSpansInstancesGivesTheRoot() throws Exception {
+        var strategy = useTwoLevels(true);
+        strategy.folders.add(strategy.base);
+        strategy.folderOfEachFile = strategy.base;
+
+        var instance = instanceOf(file("a/two/file.per-folder"));
+
+        assertEquals(List.of(instance.getInstanceRoot()), definition.servers.get(0).getInitializeParams().getWorkspaceFolders());
+    }
+
+    public void testALazyInstanceGetsItsRootForAFolderThatSpansInstances() throws Exception {
+        var strategy = useTwoLevels(false);
+        strategy.folderOfEachFile = strategy.base;
+
+        instanceOf(file("a/two/file.per-folder"));
+
+        waitForAddedFolders(definition.servers.get(0), "a");
+    }
+
+    public void testAnInstanceCanHaveFoldersThatAreNotNested() throws Exception {
+        var file = file("a/one/file.per-folder");
+        var otherFile = file("c/two/file.per-folder");
+        var strategy = useTwoLevels(true, "a/one", "c/two");
+        strategy.rootOfDirectories.put("c", "a");
+
+        var instance = instanceOf(file);
+
+        assertSame(instance, instanceOf(otherFile));
+        assertEquals(List.of("one", "two"), namesOf(definition.servers.get(0).getInitializeParams().getWorkspaceFolders()));
+    }
+
+    public void testAStrategyThatFailsForADirectoryDoesNotStopAnInstance() throws Exception {
+        var file = file("a/one/file.per-folder");
+        var strategy = useTwoLevels(true, "a/one");
+        strategy.failingForDirectories = true;
+
+        var instance = instanceOf(file);
+
+        assertEquals(List.of(instance.getInstanceRoot()), definition.servers.get(0).getInitializeParams().getWorkspaceFolders());
+    }
+
+    public void testADocumentOfTheServerBelongsToItsInstance() throws Exception {
+        var instance = instanceOf(file("a/one.per-folder"));
+        var other = instanceOf(file("b/one.per-folder"));
+        var server = definition.servers.get(0);
+        var provider = new DocumentContentProvider(myFixture.getProject(), server, () -> List.of("lsp-source"));
+        Disposer.register(getTestRootDisposable(), provider);
+        instance.getClientFeatures().installDocumentContentProvider(provider);
+        server.getWorkspaceService().setDocumentContent("lsp-source:///library.per-folder", "text");
+
+        var document = waitFor(provider.resolve("lsp-source:///library.per-folder"));
+
+        assertNotNull(document);
+        var psiFile = ReadAction.compute(() -> PsiManager.getInstance(myFixture.getProject()).findFile(document));
+        assertTrue(accessor.hasAny(psiFile, candidate -> candidate == instance));
+        assertFalse(accessor.hasAny(psiFile, candidate -> candidate == other));
+        assertSame(instance, instanceOf(psiFile));
+    }
+
+    public void testALazyLanguageServerWithoutInstancesGetsAllItsFolders() throws Exception {
+        var strategy = useTwoLevels(false);
+        strategy.instances = false;
+        definition.resetWorkspaceFolderStrategy();
+
+        instanceOf(file("a/one/file.per-folder"));
+        instanceOf(file("b/two/file.per-folder"));
+
+        assertEquals(1, definition.servers.size());
+        waitForAddedFolders(definition.servers.get(0), "one", "two");
     }
 
     public void testAReportOfAnotherInstanceDoesNotTakeAFile() throws Exception {
@@ -283,7 +426,7 @@ public class LanguageServerInstancePerFolderTest extends LSPCodeInsightFixtureTe
         assertTrue(other.isConnectedTo(other.toUri(file.getVirtualFile())));
         assertFalse(other.isSynchronizing(file.getVirtualFile()));
         var instance = instanceOf(file);
-        assertEquals("a", instance.getInstanceFolder().getName());
+        assertEquals("a", instance.getInstanceRoot().getName());
         assertFalse(accessor.hasAny(file, server -> server == other));
     }
 
@@ -342,6 +485,49 @@ public class LanguageServerInstancePerFolderTest extends LSPCodeInsightFixtureTe
         accessor.processLanguageServers(file, server -> assertSame(instance, server));
         accessor.getModificationTrackers(file);
         assertEquals(0, askedFor(file.getVirtualFile()));
+    }
+
+    public void testAConnectedFileBelongsOnlyToItsInstance() throws Exception {
+        myFixture.addFileToProject("a/src/one.per-folder", "text");
+        var strategy = useTwoLevels(false);
+        var file = file("a/src/two.per-folder");
+        var a = instanceOf(file);
+        var b = instanceOf(file("b/src/one.per-folder"));
+
+        strategy.rootOfDirectories.put("a", "b");
+
+        assertTrue(accessor.hasAny(file, server -> server == a));
+        assertFalse(accessor.hasAny(file, server -> server == b));
+        var trackers = accessor.getModificationTrackers(file);
+        assertTrue(trackers.contains(a.getModificationTracker()));
+        assertFalse(trackers.contains(b.getModificationTracker()));
+    }
+
+    private @NotNull TwoLevelStrategy useTwoLevels(boolean sendAll, @NotNull String... folders) {
+        var strategy = new TwoLevelStrategy(file("base.txt").getVirtualFile().getParent(), sendAll);
+        for (var folder : folders) {
+            strategy.folders.add(myFixture.findFileInTempDir(folder));
+        }
+        definition.activeStrategy = strategy;
+        definition.resetWorkspaceFolderStrategy();
+        return strategy;
+    }
+
+    private static @NotNull List<String> namesOf(@NotNull List<WorkspaceFolder> folders) {
+        return folders.stream().map(WorkspaceFolder::getName).toList();
+    }
+
+    private static @NotNull List<String> addedFolders(@NotNull MockLanguageServer server) {
+        return server.getWorkspaceService().getWorkspaceFoldersEvents().stream()
+                .flatMap(params -> params.getEvent().getAdded().stream())
+                .map(WorkspaceFolder::getName)
+                .toList();
+    }
+
+    private static void waitForAddedFolders(@NotNull MockLanguageServer server, @NotNull String... names) {
+        PlatformTestUtil.waitWithEventsDispatching("The language server must hear about the folders",
+                () -> addedFolders(server).size() >= names.length, 10);
+        assertEquals(List.of(names), addedFolders(server));
     }
 
     private static List<LanguageServerWrapper> wrappersOf(List<LanguageServerItem> servers) {
@@ -410,13 +596,13 @@ public class LanguageServerInstancePerFolderTest extends LSPCodeInsightFixtureTe
         final List<VirtualFile> askedFiles = new CopyOnWriteArrayList<>();
 
         @Override
-        public boolean isServerInstancePerFolder() {
+        public boolean hasServerInstances() {
             return perFolder;
         }
 
         @Override
         public boolean sendAllFoldersOnInitialization() {
-            return false;
+            return true;
         }
 
         @Override
@@ -438,6 +624,79 @@ public class LanguageServerInstancePerFolderTest extends LSPCodeInsightFixtureTe
                 return null;
             }
             return new WorkspaceFolder(FileUriSupport.toString(parent, fileUriSupport), parent.getName());
+        }
+    }
+
+    /**
+     * The first directory of a path is the root of an instance, and the directory in it a workspace folder.
+     */
+    private static final class TwoLevelStrategy implements WorkspaceFolderStrategy {
+
+        final VirtualFile base;
+        final boolean sendAll;
+        final List<VirtualFile> folders = new CopyOnWriteArrayList<>();
+        final Map<String, String> rootOfDirectories = new ConcurrentHashMap<>();
+        volatile @Nullable VirtualFile folderOfEachFile;
+        volatile boolean failingForDirectories = false;
+        volatile boolean instances = true;
+
+        TwoLevelStrategy(@NotNull VirtualFile base, boolean sendAll) {
+            this.base = base;
+            this.sendAll = sendAll;
+        }
+
+        @Override
+        public boolean hasServerInstances() {
+            return instances;
+        }
+
+        @Override
+        public boolean sendAllFoldersOnInitialization() {
+            return sendAll;
+        }
+
+        @Override
+        public @NotNull List<WorkspaceFolder> getWorkspaceFolders(@NotNull Project project,
+                                                                  @NotNull FileUriSupport fileUriSupport) {
+            return folders.stream().map(folder -> toFolder(folder, fileUriSupport)).toList();
+        }
+
+        @Override
+        public @Nullable WorkspaceFolder getServerInstanceRoot(@NotNull VirtualFile file,
+                                                               @NotNull Project project,
+                                                               @NotNull FileUriSupport fileUriSupport) {
+            if (failingForDirectories && file.isDirectory()) {
+                throw new IllegalStateException("No directories");
+            }
+            var directory = directoryAt(file, 0);
+            if (directory == null) {
+                return null;
+            }
+            var root = rootOfDirectories.get(directory.getName());
+            return toFolder(root != null ? directory.getParent().findChild(root) : directory, fileUriSupport);
+        }
+
+        @Override
+        public @Nullable WorkspaceFolder getWorkspaceFolderForFile(@NotNull VirtualFile file,
+                                                                   @NotNull Project project,
+                                                                   @NotNull FileUriSupport fileUriSupport) {
+            var folder = folderOfEachFile != null ? folderOfEachFile : directoryAt(file, 1);
+            return folder != null ? toFolder(folder, fileUriSupport) : null;
+        }
+
+        private static @NotNull WorkspaceFolder toFolder(@NotNull VirtualFile directory, @NotNull FileUriSupport fileUriSupport) {
+            return new WorkspaceFolder(FileUriSupport.toString(directory, fileUriSupport), directory.getName());
+        }
+
+        /**
+         * Returns the directory on the given level below the base directory.
+         */
+        private @Nullable VirtualFile directoryAt(@NotNull VirtualFile file, int level) {
+            var path = new ArrayList<VirtualFile>();
+            for (var current = file; current != null && !base.equals(current); current = current.getParent()) {
+                path.add(0, current);
+            }
+            return level < path.size() && path.get(level).isDirectory() ? path.get(level) : null;
         }
     }
 

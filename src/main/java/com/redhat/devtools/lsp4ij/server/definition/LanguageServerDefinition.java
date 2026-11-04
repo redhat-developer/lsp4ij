@@ -159,38 +159,46 @@ public abstract class LanguageServerDefinition implements LanguageServerFactory,
     }
 
     /**
-     * Returns true if each workspace folder of the workspace folder strategy gets a language server instance of its own.
+     * Returns true if the workspace folder strategy spreads the files of a project over several language server instances.
      *
-     * @return true if each workspace folder of the workspace folder strategy gets a language server instance of its own.
-     * @see WorkspaceFolderStrategy#isServerInstancePerFolder()
+     * @return true if the workspace folder strategy spreads the files of a project over several language server instances.
+     * @see WorkspaceFolderStrategy#hasServerInstances()
      */
     @ApiStatus.Internal
-    public boolean isServerInstancePerFolder() {
-        return getWorkspaceFolderStrategy().isServerInstancePerFolder();
+    public boolean hasServerInstances() {
+        return getWorkspaceFolderStrategy().hasServerInstances();
     }
 
     /**
-     * Returns the workspace folder of the language server instance that serves the given file, and null if no
-     * instance serves it. A strategy can do I/O here, so don't call this method in a synchronized block.
+     * Returns the root of the language server instance that serves the given file, and null if no instance serves it.
+     * A strategy can do I/O here, so don't call this method in a synchronized block.
      *
      * @param file    the file.
      * @param project the project.
-     * @return the workspace folder of the language server instance that serves the given file, and null if no
-     * instance serves it.
+     * @return the root of the language server instance that serves the given file, and null if no instance serves it.
      */
     @ApiStatus.Internal
-    public @Nullable WorkspaceFolder getServerInstanceFolder(@NotNull VirtualFile file,
-                                                             @NotNull Project project) {
+    public @Nullable WorkspaceFolder getServerInstanceRoot(@NotNull VirtualFile file,
+                                                           @NotNull Project project) {
         var strategy = getWorkspaceFolderStrategy();
         try {
-            return strategy.getWorkspaceFolderForFile(file, project, Objects.requireNonNullElse(workspaceFolderUriSupport, FileUriSupport.DEFAULT));
+            return strategy.getServerInstanceRoot(file, project, Objects.requireNonNullElse(workspaceFolderUriSupport, FileUriSupport.DEFAULT));
         } catch (ProcessCanceledException e) {
             throw e;
         } catch (Exception e) {
             // A failing strategy must not stop the other language servers of the file
-            LOGGER.warn("Cannot get the workspace folder of '" + file.getUrl() + "' for the language server '" + id + "'", e);
+            LOGGER.warn("Cannot get the language server instance of '" + file.getUrl() + "' for the language server '" + id + "'", e);
             return null;
         }
+    }
+
+    /**
+     * Drops the workspace folder strategy, for a definition whose strategy has changed.
+     */
+    @ApiStatus.Internal
+    public void resetWorkspaceFolderStrategy() {
+        workspaceFolderStrategy = null;
+        workspaceFolderUriSupport = null;
     }
 
     /**
