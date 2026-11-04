@@ -1050,6 +1050,8 @@ public class LanguageServersRegistry implements Disposable {
         settings.setInstallerConfigurationContent(request.installerConfigurationContent());
         settings.setWorkspaceFolderStrategyConfiguration(request.workspaceFolderStrategyConfiguration());
         settings.setMappings(request.mappings());
+        // The strategy reads its configuration from the settings
+        serverDefinition.resetWorkspaceFolderStrategy();
 
         if (nameChanged || commandChanged || workingDirChanged || userEnvironmentVariablesChanged ||
                 includeSystemEnvironmentVariablesChanged ||

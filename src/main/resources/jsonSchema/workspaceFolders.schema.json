@@ -18,6 +18,29 @@
       "description": "Enable lazy loading of workspace folders (discover as files are opened)",
       "default": false
     },
+    "serverInstances": {
+      "type": "object",
+      "title": "Language server instances",
+      "description": "Start several language server instances, and say which one serves a file: files with the same root share an instance, and a file without a root gets none. Without rootType and markers next to this property, the root is the only workspace folder of an instance.",
+      "additionalProperties": false,
+      "properties": {
+        "rootType": {
+          "type": "string",
+          "title": "Root type",
+          "description": "Type of roots to use as the roots of the instances",
+          "enum": ["PROJECT_BASE", "SOURCE_ROOTS", "NONE"],
+          "default": "PROJECT_BASE"
+        },
+        "markers": {
+          "type": "array",
+          "title": "Root markers",
+          "description": "Marker files/folders to search for when looking for the root of an instance (e.g., .git, pyproject.toml)",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
     "markers": {
       "type": "array",
       "title": "Root markers",

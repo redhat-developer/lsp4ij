@@ -20,6 +20,7 @@ import com.redhat.devtools.lsp4ij.client.features.FileUriSupport;
 import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
 import com.redhat.devtools.lsp4ij.client.features.LSPWorkspaceFolderFeature;
 import com.redhat.devtools.lsp4ij.features.documentContent.DocumentContentProvider;
+import com.redhat.devtools.lsp4ij.features.workspaceFolder.ConfigurableWorkspaceFolderStrategy;
 import com.redhat.devtools.lsp4ij.features.workspaceFolder.MarkersWorkspaceFolderStrategy;
 import com.redhat.devtools.lsp4ij.features.workspaceFolder.WorkspaceFolderStrategy;
 import com.redhat.devtools.lsp4ij.fixtures.LSPCodeInsightFixtureTestCase;
@@ -412,6 +413,28 @@ public class LanguageServerInstancesTest extends LSPCodeInsightFixtureTestCase {
         waitForAddedFolders(definition.servers.get(0), "one", "two");
     }
 
+    public void testAConfiguredStrategyGivesAnInstanceItsRoot() throws Exception {
+        file("a/marker");
+        useConfiguredStrategy("{\"serverInstances\": {\"markers\": [\"marker\"]}}");
+
+        var instance = instanceOf(file("a/src/one.per-folder"));
+
+        assertEquals("a", instance.getInstanceRoot().getName());
+        assertEquals(List.of(instance.getInstanceRoot()), definition.servers.get(0).getInitializeParams().getWorkspaceFolders());
+    }
+
+    public void testRootTypeNoneGivesAnInstanceNoFolder() throws Exception {
+        file("a/marker");
+        useConfiguredStrategy("{\"serverInstances\": {\"markers\": [\"marker\"]}, \"rootType\": \"NONE\"}");
+
+        instanceOf(file("a/src/one.per-folder"));
+        instanceOf(file("a/src/two.per-folder"));
+
+        var server = definition.servers.get(0);
+        assertEmpty(server.getInitializeParams().getWorkspaceFolders());
+        assertEmpty(server.getWorkspaceService().getWorkspaceFoldersEvents());
+    }
+
     public void testAReportOfAnotherInstanceDoesNotTakeAFile() throws Exception {
         var other = instanceOf(file("b/one.per-folder"));
         var file = file("a/one.per-folder");
@@ -501,6 +524,13 @@ public class LanguageServerInstancesTest extends LSPCodeInsightFixtureTestCase {
         var trackers = accessor.getModificationTrackers(file);
         assertTrue(trackers.contains(a.getModificationTracker()));
         assertFalse(trackers.contains(b.getModificationTracker()));
+    }
+
+    private void useConfiguredStrategy(@NotNull String json) {
+        var strategy = new ConfigurableWorkspaceFolderStrategy();
+        strategy.configure(json);
+        definition.activeStrategy = strategy;
+        definition.resetWorkspaceFolderStrategy();
     }
 
     private @NotNull TwoLevelStrategy useTwoLevels(boolean sendAll, @NotNull String... folders) {

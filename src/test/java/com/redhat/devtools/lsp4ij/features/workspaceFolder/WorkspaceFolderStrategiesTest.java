@@ -34,6 +34,7 @@ import java.util.List;
 public class WorkspaceFolderStrategiesTest extends BasePlatformTestCase {
 
     private static final String MARKER = "lsp4ij-test-marker";
+    private static final String FOLDER_MARKER = "lsp4ij-test-folder-marker";
 
     public void testBuiltInStrategiesKeepOneInstancePerProject() {
         assertFalse(new ProjectWorkspaceFolderStrategy().hasServerInstances());
@@ -210,6 +211,104 @@ public class WorkspaceFolderStrategiesTest extends BasePlatformTestCase {
         assertEquals(RootType.PROJECT_BASE, strategy.getRootType());
     }
 
+    public void testConfigurableStrategyCanAskForServerInstances() throws IOException {
+        var root = localDirectory();
+        localFile(root, MARKER);
+        var file = localFile(root, "src/one.txt");
+        var strategy = new ConfigurableWorkspaceFolderStrategy();
+
+        strategy.configure("{\"serverInstances\": {\"markers\": [\"" + MARKER + "\"]}}");
+
+        assertTrue(strategy.hasServerInstances());
+        assertFolder(root, rootOf(strategy, file));
+        assertFolder(root, folderOf(strategy, file));
+        assertTrue(strategy.sendAllFoldersOnInitialization());
+    }
+
+    public void testConfigurableStrategyDescribesTheFoldersInsideAnInstance() throws IOException {
+        var root = localDirectory();
+        localFile(root, MARKER);
+        localFile(root, "src/" + FOLDER_MARKER);
+        var file = localFile(root, "src/one.txt");
+        var strategy = new ConfigurableWorkspaceFolderStrategy();
+
+        strategy.configure("{\"serverInstances\": {\"markers\": [\"" + MARKER + "\"]}, \"markers\": [\"" + FOLDER_MARKER + "\"]}");
+
+        assertFolder(root, rootOf(strategy, file));
+        assertFolder(file.getParent(), folderOf(strategy, file));
+        assertFalse(strategy.sendAllFoldersOnInitialization());
+    }
+
+    public void testConfigurableStrategyTakesTheRootsOfInstancesFromARootType() {
+        var root = sourceRoot();
+        var file = myFixture.addFileToProject("one.txt", "").getVirtualFile();
+        var strategy = new ConfigurableWorkspaceFolderStrategy();
+
+        strategy.configure("{\"serverInstances\": {\"rootType\": \"SOURCE_ROOTS\"}}");
+
+        assertFolder(root, rootOf(strategy, file));
+        assertFolder(root, folderOf(strategy, file));
+        assertEquals(1, strategy.getWorkspaceFolders(getProject(), FileUriSupport.DEFAULT).size());
+    }
+
+    public void testWithoutOwnFoldersTheWorkspaceFoldersAreTheRootsOfTheInstances() {
+        var inner = myFixture.addFileToProject("inner/one.txt", "").getVirtualFile().getParent();
+        PsiTestUtil.addSourceRoot(getModule(), inner);
+        try {
+            var strategy = new ConfigurableWorkspaceFolderStrategy();
+
+            strategy.configure("{\"serverInstances\": {\"rootType\": \"SOURCE_ROOTS\"}}");
+
+            var names = strategy.getWorkspaceFolders(getProject(), FileUriSupport.DEFAULT).stream().map(WorkspaceFolder::getName).toList();
+            assertContainsElements(names, "inner");
+        } finally {
+            PsiTestUtil.removeSourceRoot(getModule(), inner);
+        }
+    }
+
+    public void testConfigurableStrategyKeepsServerInstancesInItsJson() {
+        for (var json : List.of(
+                "{\"serverInstances\":{\"markers\":[\"" + MARKER + "\"]}}",
+                "{\"serverInstances\":{\"rootType\":\"SOURCE_ROOTS\"}}",
+                "{\"rootType\":\"SOURCE_ROOTS\",\"lazy\":true,\"serverInstances\":{}}",
+                "{\"rootType\":\"PROJECT_BASE\",\"serverInstances\":{}}",
+                "{\"markers\":[\"" + MARKER + "\"],\"serverInstances\":{}}")) {
+            var strategy = new ConfigurableWorkspaceFolderStrategy();
+
+            strategy.configure(json);
+
+            assertEquals(json, strategy.getJsonConfiguration());
+        }
+    }
+
+    public void testConfigurableStrategyOnlyTakesAnObjectForServerInstances() {
+        var strategy = new ConfigurableWorkspaceFolderStrategy();
+        for (var value : List.of("null", "[]", "true", "\"true\"", "1", "{\"markers\": \"x\"}", "{\"markers\": [{}]}", "{\"rootType\": {}}")) {
+            strategy.configure("{\"serverInstances\": {}}");
+
+            strategy.configure("{\"serverInstances\": " + value + "}");
+
+            assertFalse(value, strategy.hasServerInstances());
+        }
+    }
+
+    public void testConfigurableStrategyTurnsServerInstancesOffAgain() {
+        var strategy = new ConfigurableWorkspaceFolderStrategy();
+        strategy.configure("{\"serverInstances\": {}}");
+        assertTrue(strategy.hasServerInstances());
+
+        strategy.configure("{not json");
+        assertTrue(strategy.hasServerInstances());
+
+        strategy.configure("{}");
+        assertFalse(strategy.hasServerInstances());
+        assertEquals("{}", strategy.getJsonConfiguration());
+
+        strategy.configure("{\"serverInstances\": {}}");
+        strategy.configure(null);
+        assertFalse(strategy.hasServerInstances());
+    }
+
     public void testWithInstancesADirectoryWithAMarkerIsItsOwnWorkspaceFolder() throws IOException {
         var root = localDirectory();
         localFile(root, MARKER);
@@ -261,6 +360,14 @@ public class WorkspaceFolderStrategiesTest extends BasePlatformTestCase {
         assertEmpty(strategy.getInitialWorkspaceFolders(getProject(), FileUriSupport.DEFAULT));
     }
 
+    public void testRootTypeNoneOfInstancesDoesNotAskForTheirRoots() {
+        var strategy = new ConfigurableWorkspaceFolderStrategy();
+
+        strategy.configure("{\"serverInstances\": {\"markers\": [\"" + MARKER + "\"]}, \"rootType\": \"NONE\"}");
+
+        assertFalse(strategy.sendAllFoldersOnInitialization());
+    }
+
     public void testRootTypeNoneWithOwnRootsSendsThemAtInitialization() {
         var root = myFixture.addFileToProject("own/one.txt", "").getVirtualFile().getParent();
         var strategy = new BaseWorkspaceFolderStrategy() {
@@ -278,6 +385,22 @@ public class WorkspaceFolderStrategiesTest extends BasePlatformTestCase {
 
         assertEquals(1, folders.size());
         assertEquals("own", folders.get(0).getName());
+    }
+
+    public void testAWorkspaceFolderBelongsToTheInstanceThatItsDirectoryHas() throws IOException {
+        var parent = localDirectory();
+        localFile(parent, "instance/" + MARKER);
+        localFile(parent, "instance/src/" + FOLDER_MARKER);
+        localFile(parent, "instance/nested/" + MARKER);
+        localFile(parent, "instance/nested/src/" + FOLDER_MARKER);
+        var instance = parent.findChild("instance");
+        var strategy = new ConfigurableWorkspaceFolderStrategy();
+        strategy.configure("{\"serverInstances\": {\"markers\": [\"" + MARKER + "\"]}, \"markers\": [\"" + FOLDER_MARKER + "\"]}");
+
+        assertTrue(belongs(strategy, instance, instance));
+        assertTrue(belongs(strategy, instance.findChild("src"), instance));
+        assertFalse(belongs(strategy, instance.findChild("nested").findChild("src"), instance));
+        assertFalse(belongs(strategy, parent, instance));
     }
 
     public void testLazyStrategiesSendNoFoldersOnInitialization() {
@@ -302,6 +425,18 @@ public class WorkspaceFolderStrategiesTest extends BasePlatformTestCase {
                 return true;
             }
         };
+    }
+
+    private @Nullable WorkspaceFolder rootOf(@NotNull WorkspaceFolderStrategy strategy, @NotNull VirtualFile file) {
+        return strategy.getServerInstanceRoot(file, getProject(), FileUriSupport.DEFAULT);
+    }
+
+    private boolean belongs(@NotNull WorkspaceFolderStrategy strategy, @NotNull VirtualFile folder, @NotNull VirtualFile instanceRoot) {
+        return strategy.belongsToServerInstance(folderOf(folder), folderOf(instanceRoot), getProject(), FileUriSupport.DEFAULT);
+    }
+
+    private static @NotNull WorkspaceFolder folderOf(@NotNull VirtualFile directory) {
+        return new WorkspaceFolder(FileUriSupport.DEFAULT.toString(directory), directory.getName());
     }
 
     private static void assertFolder(@Nullable VirtualFile expected, @Nullable WorkspaceFolder folder) {

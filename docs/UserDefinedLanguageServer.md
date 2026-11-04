@@ -300,6 +300,38 @@ You can see this behavior with the following configuration:
   }
   ```
 
+#### Several language server instances
+
+By default, one language server instance serves all workspace folders of a project. If parts of a project need a server process of their own, for example because each one has its own environment, `serverInstances` says which instance serves a file. It takes `rootType` or `markers`, as described above:
+
+```json
+{
+    "serverInstances": {
+        "markers": ["pyproject.toml"]
+    }
+}
+```
+
+Files with the same root share an instance:
+
+ * An instance starts when the first of its files is opened. The Language Servers view shows it as a process of its own, with the name of its root.
+ * It's initialized with its root as `rootUri`.
+ * A file without a root gets no instance, so this language server provides no features for it. With `"rootType": "NONE"` in `serverInstances`, no file has a root, so no instance starts.
+ * With markers, the search doesn't stop at the project: a marker above the project's folder can make that folder the root.
+
+Without `rootType` and `markers` next to `serverInstances`, the root is the only workspace folder of an instance. With them, they describe the workspace folders inside an instance:
+
+```json
+{
+    "serverInstances": {
+        "markers": ["pyproject.toml"]
+    },
+    "rootType": "SOURCE_ROOTS"
+}
+```
+
+Here, each folder with a `pyproject.toml` has an instance, and that instance gets the source roots inside it. With `"lazy": true`, it gets them through `workspace/didChangeWorkspaceFolders` as their files are opened. A workspace folder that belongs to another instance, or that contains several, doesn't reach an instance. An instance that would be left without a folder gets its root, unless `rootType` next to `serverInstances` is `NONE`.
+
 #### Testing your configuration
 
 The **preview panel** on the right shows how workspace folders will be sent based on your configuration.

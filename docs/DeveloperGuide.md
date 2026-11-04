@@ -1138,6 +1138,16 @@ Determines how workspace folders are discovered:
 }
 ```
 
+#### Server Instances
+
+Spreads the files of a project over several language server instances, see [Several Language Server Instances](#several-language-server-instances):
+
+```json
+{
+  "serverInstances": { "markers": ["pyproject.toml"] }
+}
+```
+
 #### Marker-based Discovery
 
 When `markers` is specified, LSP4IJ walks up the directory tree from each opened file looking for the specified marker files:
