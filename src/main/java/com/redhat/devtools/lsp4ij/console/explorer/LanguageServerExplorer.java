@@ -382,10 +382,14 @@ public class LanguageServerExplorer extends SimpleToolWindowPanel implements Dis
 
             // Hide loading spinner immediately after tree is updated
             loadingDecorator.stopLoading();
+
+            // Step 2: The state of the started servers needs the nodes of their definitions
+            loadStartedServersAsync();
         })
         .submit(AppExecutorUtil.getAppExecutorService());
+    }
 
-        // Step 2: Load started servers state in parallel (independent, no spinner)
+    private void loadStartedServersAsync() {
         ReadAction.nonBlocking(() -> {
             return LanguageServiceAccessor
                     .getInstance(getProject())

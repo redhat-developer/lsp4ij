@@ -52,6 +52,7 @@ import org.eclipse.lsp4j.MessageParams;
 import org.eclipse.lsp4j.MessageType;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.jetbrains.annotations.TestOnly;
 
 import javax.swing.*;
 import javax.swing.tree.DefaultMutableTreeNode;
@@ -238,6 +239,16 @@ public class LSPConsoleToolWindowPanel extends SimpleToolWindowPanel implements 
 
         // Load language server definitions and started servers asynchronously
         explorer.loadAsync();
+    }
+
+    /**
+     * Returns the language server explorer of the panel.
+     *
+     * @return the language server explorer of the panel.
+     */
+    @TestOnly
+    LanguageServerExplorer getExplorer() {
+        return explorer;
     }
 
     public Project getProject() {
