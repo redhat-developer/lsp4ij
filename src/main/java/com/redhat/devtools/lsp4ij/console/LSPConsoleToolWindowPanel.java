@@ -208,6 +208,18 @@ public class LSPConsoleToolWindowPanel extends SimpleToolWindowPanel implements 
     }
 
     /**
+     * Returns the view of the tab "Traces" of the given process node.
+     *
+     * @param processTreeNode the process node.
+     * @return the view of the tab "Traces" of the given process node.
+     */
+    @TestOnly
+    @Nullable ConsoleView getTracesConsoleView(@NotNull LanguageServerProcessTreeNode processTreeNode) {
+        var consoleOrErrorPanel = consoles.getValue(processTreeNode, true);
+        return consoleOrErrorPanel != null ? consoleOrErrorPanel.tracesConsoleView : null;
+    }
+
+    /**
      * Configure console toolbar on the right of the console to provide some action like "Scroll to End", "Clean", etc
      *
      * @param consoleView the console view.

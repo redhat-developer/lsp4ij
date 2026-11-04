@@ -112,16 +112,22 @@ public class LanguageServerExplorerLifecycleListener implements LanguageServerLi
             // Should never occur.
             return null;
         }
-        var processTreeNode = serverNode.getActiveProcessTreeNode();
-        if (processTreeNode == null) {
-            var treeModel = explorer.getTreeModel();
-            processTreeNode = new LanguageServerProcessTreeNode(languageServer, treeModel);
-            if (serverStatus == null) {
-                // compute the server status
-                serverStatus = languageServer.getServerStatus();
+        LanguageServerProcessTreeNode processTreeNode;
+        boolean created = false;
+        // Instances of one definition can start at the same time
+        synchronized (serverNode) {
+            processTreeNode = serverNode.getProcessTreeNode(languageServer);
+            if (processTreeNode == null) {
+                var treeModel = explorer.getTreeModel();
+                processTreeNode = new LanguageServerProcessTreeNode(languageServer, treeModel);
+                if (serverStatus == null) {
+                    // compute the server status
+                    serverStatus = languageServer.getServerStatus();
+                }
+                selectProcess = true;
+                serverNode.add(processTreeNode);
+                created = true;
             }
-            selectProcess = true;
-            serverNode.add(processTreeNode);
         }
         boolean serverStatusChanged = serverStatus != null && serverStatus != processTreeNode.getServerStatus();
         boolean updateUI = serverStatusChanged || selectProcess;
@@ -129,9 +135,15 @@ public class LanguageServerExplorerLifecycleListener implements LanguageServerLi
             final var node = processTreeNode;
             final var status = serverStatus;
             final var select = selectProcess;
+            final var inserted = created;
             invokeLaterIfNeeded(() -> {
                 if (explorer.isDisposed()) {
                     return;
+                }
+                if (inserted) {
+                    // An expanded language server node shows the new process node only after this. The tree reads the
+                    // children again: another thread can have added a node, and an insert event would show it twice.
+                    explorer.getTreeModel().nodeStructureChanged(serverNode);
                 }
                 if (serverStatusChanged) {
                     node.setServerStatus(status);

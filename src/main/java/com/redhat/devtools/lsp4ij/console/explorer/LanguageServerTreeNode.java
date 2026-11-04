@@ -13,7 +13,10 @@
  *******************************************************************************/
 package com.redhat.devtools.lsp4ij.console.explorer;
 
+import com.redhat.devtools.lsp4ij.LanguageServerWrapper;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import javax.swing.*;
 import javax.swing.tree.DefaultMutableTreeNode;
@@ -35,6 +38,22 @@ public class LanguageServerTreeNode extends DefaultMutableTreeNode {
 
     public LanguageServerProcessTreeNode getActiveProcessTreeNode() {
         return super.getChildCount() > 0 ? (LanguageServerProcessTreeNode) super.getChildAt(0) : null;
+    }
+
+    /**
+     * Returns the process node of the given language server and null if it has none yet.
+     *
+     * @param languageServer the language server.
+     * @return the process node of the given language server and null if it has none yet.
+     */
+    public @Nullable LanguageServerProcessTreeNode getProcessTreeNode(@NotNull LanguageServerWrapper languageServer) {
+        for (int i = 0; i < super.getChildCount(); i++) {
+            if (super.getChildAt(i) instanceof LanguageServerProcessTreeNode processTreeNode
+                    && processTreeNode.getLanguageServer() == languageServer) {
+                return processTreeNode;
+            }
+        }
+        return null;
     }
 
     public Icon getIcon() {
