@@ -161,6 +161,10 @@ public class DAPDebugProcess extends XDebugProcess implements Disposable {
     // Smart Step Into
     private DAPSmartStepIntoHandler smartStepIntoHandler;
 
+    // Debug console: whether what it printed last ends its line, so that a message of LSP4IJ's own starts a line
+    private final Object consoleLock = new Object();
+    private boolean consoleLineEnded = true;
+
     // Reset Frame
     private final @NotNull DAPDropFrameHandler dropFrameHandler;
 
@@ -459,14 +463,60 @@ public class DAPDebugProcess extends XDebugProcess implements Disposable {
         return streamsSupplier;
     }
 
+    /**
+     * Prints a message of LSP4IJ's own to the debug console, on a line of its own.
+     *
+     * @param message the message.
+     * @param type    the console content type.
+     */
     public void print(@Nullable String message, @NotNull ConsoleViewContentType type) {
+        printText(message, type, true);
+    }
+
+    /**
+     * Prints the output of a DAP 'output' event to the debug console as the debug adapter sent it. An output event
+     * can carry part of a line, such as a prompt that the program then waits on, or a line that the program writes
+     * in pieces, so no line end is added to it.
+     *
+     * @param output the output.
+     * @param type   the console content type.
+     */
+    public void printOutput(@Nullable String output, @NotNull ConsoleViewContentType type) {
+        printText(output, type, false);
+    }
+
+    /**
+     * Returns the text that the debug console prints for the given message, or null to print nothing.
+     *
+     * @param message    the message.
+     * @param ownMessage true for a message of LSP4IJ's own, which goes on a line of its own, and false for a debug
+     *                   adapter's output, which is printed as it was sent.
+     * @param lineEnded  true if what the console printed last ends its line.
+     * @return the text to print, or null for an empty message.
+     */
+    static @Nullable String getConsoleText(@Nullable String message, boolean ownMessage, boolean lineEnded) {
         if (StringUtils.isEmpty(message)) {
-            return;
+            return null;
         }
-        if (message.charAt(message.length() - 1) != '\n') {
-            message += "\n";
+        if (!ownMessage) {
+            return message;
         }
-        final String text = message;
+        String text = lineEnded ? message : "\n" + message;
+        return text.charAt(text.length() - 1) == '\n' ? text : text + "\n";
+    }
+
+    private void printText(@Nullable String message, @NotNull ConsoleViewContentType type, boolean ownMessage) {
+        synchronized (consoleLock) {
+            final String text = getConsoleText(message, ownMessage, consoleLineEnded);
+            if (text == null) {
+                return;
+            }
+            consoleLineEnded = text.charAt(text.length() - 1) == '\n';
+            printOnEdt(text, type);
+        }
+    }
+
+    private void printOnEdt(@NotNull String text, @NotNull ConsoleViewContentType type) {
         AppUIUtil.invokeOnEdt(() -> {
             var consoleView = getSession().getConsoleView();
             if (consoleView == null) {
