@@ -122,12 +122,14 @@ Here are configuration sample with the [typescript-language-server](https://gith
 A property set to `null` in `Configuration` or `Initialization Options` reaches the language server as `null`, so that
 it can reset that setting to its default.
 
-The JSON fields must be valid JSON: `Configuration`, `Initialization Options` and `Experimental` in the `Server` tab of
-the `Configuration` tab, the configuration in its `Client` tab, and the JSON of the `Installer` and `Workspace Folders`
-tabs. `Configuration`, `Initialization Options` and `Experimental` must stay valid once their macros,
-such as `$PROJECT_DIR$`, are expanded, which a Windows path in a string may not. A language server with an invalid
-field is not saved: the `New Language Server` dialog lists the errors and disables `OK`, and the settings page and the
-`Apply` action of the LSP console show the error.
+LSP4IJ must be able to read the JSON fields: `Configuration`, `Initialization Options` and `Experimental` in the
+`Server` tab of the `Configuration` tab, the configuration in its `Client` tab, and the JSON of the `Installer` and
+`Workspace Folders` tabs. It reads them leniently, so comments (`//`, `/* */` and `#`), unquoted names and
+single-quoted strings are accepted, but a missing brace or a trailing comma is not. `Configuration`,
+`Initialization Options` and `Experimental` must stay readable once their macros, such as `$PROJECT_DIR$`, are
+expanded, which a Windows path in a string may not. A language server with a field that can't be read is not saved:
+the `New Language Server` dialog lists the errors and disables `OK`, and the settings page and the `Apply` action of
+the LSP console show the error.
 
 ### Debug tab
 
