@@ -660,7 +660,8 @@ implement specific behavior based on whether an element is a declaration or refe
 comment, etc., based on the reported semantic tokens. This is implemented via a custom `FileViewProviderFactory` and
 `FileViewProvider`. LSP4IJ includes default implementations of these for TextMate files and plain text files associated
 with abstract files types which otherwise lack PSI element structure, and it provides a simple way for other file types
-to gain access to the same features.
+to gain access to the same features. A file type without a language that a plugin maps to a language server gets the
+default implementation too, unless the plugin registers a `FileViewProviderFactory` for it.
 
 #### LSPSemanticTokensFileViewProviderFactory
 

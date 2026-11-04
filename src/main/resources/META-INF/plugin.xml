@@ -729,7 +729,7 @@
                 language=""
                 implementationClass="com.redhat.devtools.lsp4ij.features.semanticTokens.viewProvider.LSPSemanticTokenDocumentationProvider"/>
 
-        <!-- We cannot register one for plain text abstract file types, so we have to do that dynamically. Do so when a project is opened. -->
+        <!-- We cannot register one for plain text files of a file type without a language, so we have to do that dynamically. Do so when a project is opened. -->
         <postStartupActivity
                 implementation="com.redhat.devtools.lsp4ij.features.semanticTokens.viewProvider.LSPSemanticTokensStructurelessFileViewProviderRegistrar$ProjectOpenedListener"/>
     </extensions>
