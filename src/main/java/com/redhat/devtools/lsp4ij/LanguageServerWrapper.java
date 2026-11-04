@@ -2269,7 +2269,10 @@ public class LanguageServerWrapper implements Disposable {
         }
         this.disposed = true;
         fileListener.disposeFileSystemWatchers();
-        stopAndRefreshEditorFeature(refreshEditorFeature, false);
+        // A language server that never started has nothing to stop, and no status to report
+        if (getServerStatus() != ServerStatus.none) {
+            stopAndRefreshEditorFeature(refreshEditorFeature, false);
+        }
         stopDispatcher();
         if (clientFeatures != null) {
             clientFeatures.dispose();
