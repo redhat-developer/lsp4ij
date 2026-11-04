@@ -69,7 +69,8 @@ public class SettingsLanguageListener implements LanguageServerSettingsListener 
         LanguageServiceAccessor.getInstance(project)
                 .getStartedServers()
                 .forEach(ls -> {
-                    if (ls.getServerDefinition() == client.getServerDefinition()) {
+                    // Each language server has this listener, and restarts only itself
+                    if (ls == client.getServerWrapper()) {
                         ls.restart();
                     }
                 });

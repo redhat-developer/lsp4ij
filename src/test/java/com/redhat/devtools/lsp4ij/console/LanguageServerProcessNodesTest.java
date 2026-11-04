@@ -260,6 +260,13 @@ public class LanguageServerProcessNodesTest extends LSPCodeInsightFixtureTestCas
         assertSame(processNode(first), selectedNode());
     }
 
+    public void testALanguageServerCanStillBeCreatedWithANullInitialPath() {
+        var languageServer = new LanguageServerWrapper(project, definition, null);
+        Disposer.register(getTestRootDisposable(), languageServer);
+
+        assertNull(languageServer.getInstanceFolder());
+    }
+
     public void testTheLogOfADefinitionGoesToItsFirstProcessNode() {
         startBoth();
 

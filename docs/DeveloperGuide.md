@@ -1285,6 +1285,33 @@ public class MyWorkspaceFolderFeature extends LSPWorkspaceFolderFeature {
 }
 ```
 
+## One Language Server Instance per Folder
+
+By default, one language server instance serves all workspace folders of a project. If each folder needs a server process of its own, for example because each one has its own environment, a strategy can ask for one instance per folder:
+
+```java
+package my.language.server;
+
+import com.redhat.devtools.lsp4ij.features.workspaceFolder.ProjectWorkspaceFolderStrategy;
+
+public class MyWorkspaceFolderStrategy extends ProjectWorkspaceFolderStrategy {
+
+    @Override
+    public boolean isServerInstancePerFolder() {
+        return true;
+    }
+}
+```
+
+Set this strategy with a workspace folder feature as described above. Then:
+
+ * `getWorkspaceFolderForFile` decides which instance serves a file, and files with the same folder share an instance.
+ * A file without a folder gets no instance, so this language server provides no features for it.
+ * An instance starts when the first file of its folder is opened.
+ * An instance is initialized with its folder as `rootUri` and as its only workspace folder, and it gets no `workspace/didChangeWorkspaceFolders`. So lazy loading has no meaning here.
+ * File events and file operations aren't limited to the folder: each instance gets what it registered, as with a language server client per folder in VS Code.
+ * The Language Servers view shows each instance as a process of its own, with the name of its folder.
+
 ## User-Defined Language Server Configuration
 
 For user-defined language servers, workspace folder configuration can be specified in the `workspaceFolderSettings.json` template file or configured in the UI:

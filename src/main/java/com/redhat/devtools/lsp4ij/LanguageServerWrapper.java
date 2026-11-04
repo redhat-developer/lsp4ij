@@ -130,6 +130,7 @@ public class LanguageServerWrapper implements Disposable {
     }
     @Nullable
     protected final URI initialPath;
+    private final @Nullable WorkspaceFolder instanceFolder;
     protected final InitializeParams initParams = new InitializeParams();
     @NotNull
     private final LanguageServerDefinition serverDefinition;
@@ -181,14 +182,38 @@ public class LanguageServerWrapper implements Disposable {
         this(project, serverDefinition, null);
     }
 
-    /**
-     * Unified private constructor to set sensible defaults in all cases
-     */
     public LanguageServerWrapper(@NotNull Project project,
                                  @NotNull LanguageServerDefinition serverDefinition,
                                  @Nullable URI initialPath) {
+        this(project, serverDefinition, initialPath, null);
+    }
+
+    /**
+     * Creates the language server instance of the given workspace folder.
+     *
+     * @param project          the project.
+     * @param serverDefinition the language server definition.
+     * @param instanceFolder   the workspace folder that this instance serves.
+     * @return the language server instance of the given workspace folder.
+     * @see com.redhat.devtools.lsp4ij.features.workspaceFolder.WorkspaceFolderStrategy#isServerInstancePerFolder()
+     */
+    @ApiStatus.Internal
+    public static @NotNull LanguageServerWrapper forInstanceFolder(@NotNull Project project,
+                                                                   @NotNull LanguageServerDefinition serverDefinition,
+                                                                   @NotNull WorkspaceFolder instanceFolder) {
+        return new LanguageServerWrapper(project, serverDefinition, null, instanceFolder);
+    }
+
+    /**
+     * Unified private constructor to set sensible defaults in all cases
+     */
+    private LanguageServerWrapper(@NotNull Project project,
+                                  @NotNull LanguageServerDefinition serverDefinition,
+                                  @Nullable URI initialPath,
+                                  @Nullable WorkspaceFolder instanceFolder) {
         this.initialProject = project;
         this.initialPath = initialPath;
+        this.instanceFolder = instanceFolder;
         this.serverDefinition = serverDefinition;
         this.openedDocuments = new ConcurrentHashMap<>();
         this.closedDocuments = new ConcurrentHashMap<>();
@@ -1667,6 +1692,32 @@ public class LanguageServerWrapper implements Disposable {
         }
         // Outside this monitor: retiring reads the schemes, and closes editors later on the EDT
         getClientFeatures().retireUnprovidedDocumentContent();
+    }
+
+    /**
+     * Returns the workspace folder that this language server instance serves, and null if one instance serves the
+     * whole project.
+     *
+     * @return the workspace folder that this language server instance serves, and null if one instance serves the
+     * whole project.
+     */
+    public @Nullable WorkspaceFolder getInstanceFolder() {
+        return instanceFolder;
+    }
+
+    /**
+     * Returns true if the language server got the given file with didOpen and follows its changes. Unlike
+     * {@link #isConnectedTo(URI)}, this doesn't count an entry that only keeps what the language server reported about
+     * a file that is open in the editor.
+     *
+     * @param file the file.
+     * @return true if the language server got the given file with didOpen.
+     */
+    @ApiStatus.Internal
+    public boolean isSynchronizing(@NotNull VirtualFile file) {
+        var fileUri = toUri(file);
+        var openedDocument = fileUri != null ? openedDocuments.get(fileUri) : null;
+        return openedDocument != null && openedDocument.getSynchronizer() != null;
     }
 
     public boolean canOperate(@NotNull VirtualFile file) {

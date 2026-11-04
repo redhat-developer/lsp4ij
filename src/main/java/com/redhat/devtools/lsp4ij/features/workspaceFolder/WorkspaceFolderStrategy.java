@@ -59,6 +59,21 @@ public interface WorkspaceFolderStrategy {
     boolean sendAllFoldersOnInitialization();
 
     /**
+     * Returns true if each workspace folder gets a language server instance of its own, and false if one
+     * instance serves all workspace folders of the project.
+     *
+     * <p>With one instance per folder, {@link #getWorkspaceFolderForFile} decides which instance serves a file:
+     * files with the same folder share an instance, and a file without a folder gets none. An instance is
+     * initialized with its folder as its only workspace folder, so {@link #sendAllFoldersOnInitialization()}
+     * has no meaning then.</p>
+     *
+     * @return true if each workspace folder gets a language server instance of its own
+     */
+    default boolean isServerInstancePerFolder() {
+        return false;
+    }
+
+    /**
      * Returns the list of workspace folders for the given project.
      * This represents all potential workspace folders, regardless of lazy loading.
      * Used for UI display.

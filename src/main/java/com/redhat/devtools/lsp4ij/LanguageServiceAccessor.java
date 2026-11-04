@@ -32,6 +32,7 @@ import com.redhat.devtools.lsp4ij.internal.PsiFileCancelChecker;
 import com.redhat.devtools.lsp4ij.internal.editor.EditorFeatureManager;
 import com.redhat.devtools.lsp4ij.internal.editor.EditorFeatureType;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
+import org.eclipse.lsp4j.WorkspaceFolder;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinitionListener;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerFileAssociation;
 import org.jetbrains.annotations.ApiStatus;
@@ -46,6 +47,7 @@ import static com.redhat.devtools.lsp4ij.internal.ApplicationUtils.runCancellabl
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
@@ -64,7 +66,8 @@ public class LanguageServiceAccessor implements Disposable {
 
     private final Project project;
     private final SimpleModificationTracker modificationTracker = new SimpleModificationTracker();
-    private final Set<LanguageServerWrapper> startedServers = new HashSet<>();
+    // Instances of a definition can start at any time, while other threads go through the started servers
+    private final Set<LanguageServerWrapper> startedServers = ConcurrentHashMap.newKeySet();
     private final LanguageServerDefinitionListener serverDefinitionListener = new LanguageServerDefinitionListener() {
 
         @Override
@@ -295,8 +298,9 @@ public class LanguageServiceAccessor implements Disposable {
             return false;
         }
         var matched = mappings.getMatched();
+        var instanceFilter = filter.and(instancesOf(file.getVirtualFile()));
         for (var startedServer : startedServers) {
-            if (isMatchingStartedServer(file, startedServer, matched, filter)) {
+            if (isMatchingStartedServer(file, startedServer, matched, instanceFilter)) {
                 return true;
             }
         }
@@ -322,8 +326,9 @@ public class LanguageServiceAccessor implements Disposable {
         }
 
         Set<LanguageServerDefinition> matchedServerDefinitions = mappings.getMatched();
+        var instanceFilter = instancesOf(file.getVirtualFile());
         for (var startedServer : startedServers) {
-            if (isMatchingStartedServer(file, startedServer, matchedServerDefinitions, ACCEPT_ALL_SERVERS)) {
+            if (isMatchingStartedServer(file, startedServer, matchedServerDefinitions, instanceFilter)) {
                 processor.accept(startedServer);
             }
         }
@@ -549,8 +554,19 @@ public class LanguageServiceAccessor implements Disposable {
                                                       @NotNull Set<LanguageServerDefinition> serverDefinitions,
                                                       @NotNull Set<LanguageServerWrapper> matchedServers,
                                                       @Nullable Predicate<LSPClientFeatures> beforeStartingServerFilter) {
+        var file = psiFile != null ? psiFile.getVirtualFile() : null;
+        // A workspace folder strategy can do I/O, so ask it before entering the monitor
+        var instanceChoices = file != null ? chooseInstances(file, serverDefinitions) : Map.<LanguageServerDefinition, InstanceChoice>of();
         synchronized (startedServers) {
             for (var serverDefinition : serverDefinitions) {
+                if (serverDefinition.isServerInstancePerFolder()) {
+                    if (file == null) {
+                        collectStartedInstances(serverDefinition, matchedServers, beforeStartingServerFilter);
+                    } else if (instanceChoices.containsKey(serverDefinition)) {
+                        collectInstanceOfFile(serverDefinition, instanceChoices.get(serverDefinition), matchedServers, beforeStartingServerFilter);
+                    }
+                    continue;
+                }
                 boolean useExistingServer = false;
                 // Loop for started language servers
                 for (var startedServer : startedServers) {
@@ -581,6 +597,126 @@ public class LanguageServiceAccessor implements Disposable {
                 }
             }
         }
+    }
+
+    /**
+     * The language server instance of a file for a definition with one instance per folder: the instance that has the
+     * file connected, which keeps it, or the workspace folder of the instance that serves it.
+     */
+    private record InstanceChoice(@Nullable LanguageServerWrapper connected, @Nullable WorkspaceFolder folder) {
+
+        boolean isFor(@NotNull LanguageServerWrapper instance) {
+            if (connected != null) {
+                return connected == instance;
+            }
+            var instanceFolder = instance.getInstanceFolder();
+            return folder != null && instanceFolder != null && folder.getUri().equals(instanceFolder.getUri());
+        }
+    }
+
+    /**
+     * Chooses the language server instances of the given file for the definitions with one instance per folder. A
+     * definition has no entry if no instance serves the file.
+     */
+    private @NotNull Map<LanguageServerDefinition, InstanceChoice> chooseInstances(@NotNull VirtualFile file,
+                                                                                   @NotNull Set<LanguageServerDefinition> serverDefinitions) {
+        Map<LanguageServerDefinition, InstanceChoice> choices = new HashMap<>();
+        for (var serverDefinition : serverDefinitions) {
+            if (!serverDefinition.isServerInstancePerFolder()) {
+                continue;
+            }
+            var choice = chooseInstance(file, serverDefinition);
+            if (choice.connected() != null || choice.folder() != null) {
+                choices.put(serverDefinition, choice);
+            }
+        }
+        return choices;
+    }
+
+    private @NotNull InstanceChoice chooseInstance(@NotNull VirtualFile file,
+                                                   @NotNull LanguageServerDefinition serverDefinition) {
+        var connected = findInstanceConnectedTo(file, serverDefinition);
+        return connected != null
+                ? new InstanceChoice(connected, null)
+                : new InstanceChoice(null, serverDefinition.getServerInstanceFolder(file, project));
+    }
+
+    /**
+     * Returns a filter for one pass over the started language servers that keeps those that serve the given file. It
+     * asks a workspace folder strategy at most once per definition, as the strategy can do I/O, and not at all if an
+     * instance has the file.
+     *
+     * @param file the file, without a file, all language servers are kept.
+     * @return the filter.
+     */
+    private @NotNull Predicate<LanguageServerWrapper> instancesOf(@Nullable VirtualFile file) {
+        if (file == null) {
+            return ACCEPT_ALL_SERVERS;
+        }
+        Map<LanguageServerDefinition, InstanceChoice> choices = new HashMap<>();
+        return server -> server.getInstanceFolder() == null
+                || choices.computeIfAbsent(server.getServerDefinition(), serverDefinition -> chooseInstance(file, serverDefinition))
+                .isFor(server);
+    }
+
+    private @Nullable LanguageServerWrapper findInstanceConnectedTo(@NotNull VirtualFile file,
+                                                                    @NotNull LanguageServerDefinition serverDefinition) {
+        for (var startedServer : startedServers) {
+            if (startedServer.getServerDefinition().equals(serverDefinition)
+                    && startedServer.isSynchronizing(file)) {
+                return startedServer;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Adds the language server instance that serves a file, and creates it if needed.
+     */
+    private void collectInstanceOfFile(@NotNull LanguageServerDefinition serverDefinition,
+                                       @NotNull InstanceChoice choice,
+                                       @NotNull Set<LanguageServerWrapper> matchedServers,
+                                       @Nullable Predicate<LSPClientFeatures> beforeStartingServerFilter) {
+        var instance = choice.connected() != null ? choice.connected() : findInstance(serverDefinition, choice.folder());
+        boolean created = instance == null;
+        if (created) {
+            instance = LanguageServerWrapper.forInstanceFolder(project, serverDefinition, choice.folder());
+        }
+        if (beforeStartingServerFilter == null || beforeStartingServerFilter.test(instance.getClientFeatures())) {
+            if (created) {
+                startedServers.add(instance);
+            }
+            matchedServers.add(instance);
+        } else if (created) {
+            Disposer.dispose(instance);
+        }
+    }
+
+    /**
+     * Adds all started language server instances of a definition with one instance per folder. Without a file, nothing
+     * tells which folder to start an instance for.
+     */
+    private void collectStartedInstances(@NotNull LanguageServerDefinition serverDefinition,
+                                         @NotNull Set<LanguageServerWrapper> matchedServers,
+                                         @Nullable Predicate<LSPClientFeatures> beforeStartingServerFilter) {
+        for (var startedServer : startedServers) {
+            if (startedServer.getServerDefinition().equals(serverDefinition)
+                    && (beforeStartingServerFilter == null || beforeStartingServerFilter.test(startedServer.getClientFeatures()))) {
+                matchedServers.add(startedServer);
+            }
+        }
+    }
+
+    private @Nullable LanguageServerWrapper findInstance(@NotNull LanguageServerDefinition serverDefinition,
+                                                         @NotNull WorkspaceFolder instanceFolder) {
+        for (var startedServer : startedServers) {
+            var folder = startedServer.getInstanceFolder();
+            if (startedServer.getServerDefinition().equals(serverDefinition)
+                    && folder != null && instanceFolder.getUri().equals(folder.getUri())) {
+                return startedServer;
+            }
+        }
+        return null;
     }
 
     public LanguageServerWrapper forceCreateServer(@NotNull LanguageServerDefinition serverDefinition) {
@@ -803,9 +939,11 @@ public class LanguageServiceAccessor implements Disposable {
         MatchedLanguageServerDefinitions mappings = getMatchedLanguageServerDefinitions(file, true);
         if (mappings != MatchedLanguageServerDefinitions.NO_MATCH) {
             Set<LanguageServerDefinition> languageServerDefinitions = mappings.getMatched();
+            var instanceFilter = instancesOf(file.getVirtualFile());
             Set<LanguageServerWrapper> languageServerWrappers = new HashSet<>(getStartedServers())
                     .stream()
-                    .filter(languageServerWrapper -> languageServerDefinitions.contains(languageServerWrapper.getServerDefinition()))
+                    .filter(languageServerWrapper -> languageServerDefinitions.contains(languageServerWrapper.getServerDefinition())
+                            && instanceFilter.test(languageServerWrapper))
                     .collect(Collectors.toSet());
             for (LanguageServerWrapper languageServerWrapper : languageServerWrappers) {
                 if (languageServerDefinitions.contains(languageServerWrapper.getServerDefinition())) {

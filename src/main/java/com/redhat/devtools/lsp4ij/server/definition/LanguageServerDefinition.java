@@ -19,6 +19,7 @@ import com.intellij.lang.Language;
 import com.intellij.openapi.fileTypes.FileNameMatcher;
 import com.intellij.openapi.fileTypes.FileType;
 import com.intellij.openapi.fileTypes.FileTypes;
+import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.Pair;
 import com.intellij.openapi.vfs.VirtualFile;
@@ -26,22 +27,28 @@ import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LanguageServerEnablementSupport;
 import com.redhat.devtools.lsp4ij.LanguageServerFactory;
+import com.redhat.devtools.lsp4ij.client.features.FileUriSupport;
 import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
+import com.redhat.devtools.lsp4ij.features.workspaceFolder.WorkspaceFolderStrategy;
 import com.redhat.devtools.lsp4ij.features.semanticTokens.DefaultSemanticTokensColorsProvider;
 import com.redhat.devtools.lsp4ij.features.semanticTokens.SemanticTokensColorsProvider;
 import com.redhat.devtools.lsp4ij.installation.ServerInstaller;
 import com.redhat.devtools.lsp4ij.server.DefaultLauncherBuilder;
 import com.redhat.devtools.lsp4ij.settings.contributors.LanguageServerSettingsContributor;
+import org.eclipse.lsp4j.WorkspaceFolder;
 import org.eclipse.lsp4j.jsonrpc.Launcher;
 import org.eclipse.lsp4j.services.LanguageServer;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.swing.Icon;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -50,6 +57,8 @@ import java.util.concurrent.CopyOnWriteArrayList;
  * Base class for Language server definition.
  */
 public abstract class LanguageServerDefinition implements LanguageServerFactory, LanguageServerEnablementSupport {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(LanguageServerDefinition.class);
 
     private static final int DEFAULT_LAST_DOCUMENTED_DISCONNECTED_TIMEOUT = 5;
 
@@ -68,6 +77,8 @@ public abstract class LanguageServerDefinition implements LanguageServerFactory,
     Map<FileType, String> languageIdFileTypeMappings;
     private final List<Pair<List<FileNameMatcher>, String>> languageIdFileNameMatcherMappings;
     private boolean enabled;
+    private volatile @Nullable WorkspaceFolderStrategy workspaceFolderStrategy;
+    private volatile @Nullable FileUriSupport workspaceFolderUriSupport;
     private SemanticTokensColorsProvider semanticTokensColorsProvider;
 
     private boolean serverInstallerCreated;
@@ -145,6 +156,65 @@ public abstract class LanguageServerDefinition implements LanguageServerFactory,
      */
     public boolean isSingleton() {
         return isSingleton;
+    }
+
+    /**
+     * Returns true if each workspace folder of the workspace folder strategy gets a language server instance of its own.
+     *
+     * @return true if each workspace folder of the workspace folder strategy gets a language server instance of its own.
+     * @see WorkspaceFolderStrategy#isServerInstancePerFolder()
+     */
+    @ApiStatus.Internal
+    public boolean isServerInstancePerFolder() {
+        return getWorkspaceFolderStrategy().isServerInstancePerFolder();
+    }
+
+    /**
+     * Returns the workspace folder of the language server instance that serves the given file, and null if no
+     * instance serves it. A strategy can do I/O here, so don't call this method in a synchronized block.
+     *
+     * @param file    the file.
+     * @param project the project.
+     * @return the workspace folder of the language server instance that serves the given file, and null if no
+     * instance serves it.
+     */
+    @ApiStatus.Internal
+    public @Nullable WorkspaceFolder getServerInstanceFolder(@NotNull VirtualFile file,
+                                                             @NotNull Project project) {
+        var strategy = getWorkspaceFolderStrategy();
+        try {
+            return strategy.getWorkspaceFolderForFile(file, project, Objects.requireNonNullElse(workspaceFolderUriSupport, FileUriSupport.DEFAULT));
+        } catch (ProcessCanceledException e) {
+            throw e;
+        } catch (Exception e) {
+            // A failing strategy must not stop the other language servers of the file
+            LOGGER.warn("Cannot get the workspace folder of '" + file.getUrl() + "' for the language server '" + id + "'", e);
+            return null;
+        }
+    }
+
+    /**
+     * Returns the workspace folder strategy, which decides about the language server instance before there is one,
+     * so without client features of a language server.
+     */
+    private @NotNull WorkspaceFolderStrategy getWorkspaceFolderStrategy() {
+        var strategy = workspaceFolderStrategy;
+        if (strategy == null) {
+            try {
+                var clientFeatures = createClientFeatures();
+                clientFeatures.setServerDefinition(this);
+                strategy = clientFeatures.getWorkspaceFolderFeature().getStrategy();
+                workspaceFolderUriSupport = clientFeatures;
+            } catch (ProcessCanceledException e) {
+                throw e;
+            } catch (Exception e) {
+                // A strategy can need the language server: one instance per project works without it
+                LOGGER.warn("Cannot get the workspace folder strategy of the language server '" + id + "'", e);
+                strategy = WorkspaceFolderStrategy.getDefault();
+            }
+            workspaceFolderStrategy = strategy;
+        }
+        return strategy;
     }
 
     public int getLastDocumentDisconnectedTimeout() {

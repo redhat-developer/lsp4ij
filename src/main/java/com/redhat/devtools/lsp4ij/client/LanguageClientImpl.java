@@ -91,6 +91,10 @@ public class LanguageClientImpl implements LanguageClient, Disposable {
         this.wrapper = wrapper;
     }
 
+    @NotNull LanguageServerWrapper getServerWrapper() {
+        return wrapper;
+    }
+
     public @NotNull LanguageServerDefinition getServerDefinition() {
         return wrapper.getServerDefinition();
     }

@@ -35,6 +35,13 @@ public class WorkspaceFolderStrategiesTest extends BasePlatformTestCase {
 
     private static final String MARKER = "lsp4ij-test-marker";
 
+    public void testBuiltInStrategiesKeepOneInstancePerProject() {
+        assertFalse(new ProjectWorkspaceFolderStrategy().isServerInstancePerFolder());
+        assertFalse(new SourceRootsWorkspaceFolderStrategy().isServerInstancePerFolder());
+        assertFalse(new MarkersWorkspaceFolderStrategy(MARKER).isServerInstancePerFolder());
+        assertFalse(new ConfigurableWorkspaceFolderStrategy().isServerInstancePerFolder());
+    }
+
     public void testProjectStrategyGivesTheContentRootOfAFile() {
         var file = myFixture.addFileToProject("a/one.txt", "").getVirtualFile();
 
