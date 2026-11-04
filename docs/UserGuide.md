@@ -87,6 +87,10 @@ Hide specific symbol types (e.g., constants):
 
 The LSP formatting support can be done with the standard `Reformat Code` and `Reformat File` actions.
 
+A language server doesn't format a file which matches a `Do not format` pattern of
+`Settings | Editor | Code Style | Formatter`, also when `Reformat code` runs before a commit. Server-side on-type
+formatting doesn't check these patterns.
+
 ### Find Usages
 
 The following LSP features are integrated with the standard `Find Usages` menu (provided they're supported by the underlying language server): 

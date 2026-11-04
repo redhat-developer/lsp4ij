@@ -79,7 +79,7 @@ Current state of [Language Features]( https://microsoft.github.io/language-serve
 
 Current state of [Workspace Features]( https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspaceFeatures) support:
 
- * ✅ [workspace/didChangeWatchedFiles](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_didChangeWatchedFiles).
+ * ✅ [workspace/didChangeWatchedFiles](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_didChangeWatchedFiles) (see [implementation details](#did-change-watched-files)).
  * ✅ [workspace/executeCommand](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_executeCommand).
  * ✅ [workspace/applyEdit](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_applyEdit).
  * ✅ [workspace/symbol](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_symbol) (see [implementation details](#workspace-symbol))
@@ -396,6 +396,14 @@ which integrates with IntelliJ's inline completion API to provide AI-assisted co
 
 The provider uses debounced requests (300ms delay) to avoid excessive server calls during rapid typing, with immediate response for manual triggers.
 
+The `context` of a request says how it was triggered:
+
+ * `triggerKind` is `Invoked` when inline completion is called explicitly, and `Automatic` while typing.
+ * While the completion popup shows a selected item, `selectedCompletionInfo` gives the range and the text that the
+   item would insert, and the language servers are asked again when the selection changes. As LSP specifies, only the
+   inline completions which replace the same range and start with that text are shown. A snippet item is not
+   described, since inserting it can change its text.
+
 Here is an example with the [Perl Language Server](./user-defined-ls/perl-lsp.md) showing inline completion:
 
 ![textDocument/inlineCompletion](./images/lsp-support/textDocument_inlineCompletion.gif)
@@ -430,6 +438,16 @@ you can use `order="first"` to gain priority:
         order="first"
         implementationClass="com.redhat.devtools.lsp4ij.features.signatureHelp.LSPParameterInfoHandler"/>
 ```
+
+While the popup is shown, a change of the text or of the caret asks the language servers again, as a retrigger
+(`isRetrigger`, with the last reply as `activeSignatureHelp`), and the popup shows the signatures as the last reply
+describes them:
+
+ * The highlighted parameter of a signature is its own `activeParameter` (LSP4IJ declares `activeParameterSupport`),
+   or else the `activeParameter` of the signature help, or else the first parameter. A value outside the signature's
+   parameters highlights the first one too.
+ * A signature without `parameters` shows its label, with no parameter highlighted.
+ * A reply with other signatures replaces those of the popup, and a reply without signatures closes it.
 
 Here is an example with the [TypeScript Language Server](./user-defined-ls/typescript-language-server.md) showing signature help:
 
@@ -517,7 +535,11 @@ Here is an example with the [Qute language server](https://github.com/redhat-dev
 is consumed after a [textDocument/didOpen](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_didOpen) and [textDocument/didChange](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_didChange)
 with debounce and refresh the LSP diagnostics  `externalAnnotator`.
 
-It doesn't support the related documents.
+ * Each request sends the result ID of the last report as `previousResultId`, so that the language server can answer
+   with an `unchanged` report when the diagnostics it gave are still accurate. An `unchanged` report keeps them.
+ * The `relatedDocuments` of a report of either kind update the diagnostics of those documents, for a language where
+   code in one file can produce diagnostics in a file it depends on. A related document with an `unchanged` report
+   keeps its diagnostics.
 
 ### Workspace Diagnostics
 
@@ -596,6 +618,10 @@ server which supports it in `Settings | Editor | General | Smart Keys`, under `L
 When IntelliJ formats several ranges of a file at once, as **Reformat Code** does with **Only VCS changed text**, a language server
 which supports `textDocument/rangesFormatting` (LSP 3.18) formats them all with one request. Any other language server formats them
 one after the other with `textDocument/rangeFormatting`, and two ranges whose edits overlap are formatted again as one range.
+
+A file without an open editor, as when **Reformat Code** runs on a directory, is opened on the language servers which
+can format it for the time of the request (`textDocument/didOpen`, then `textDocument/didClose`), and formatted as an
+open one. A reply which comes after the document changed, or after the request was cancelled, is ignored.
 
 ### On-Type Formatting
 
@@ -902,6 +928,26 @@ If you use another language, you will have to declare `typeHierarchyProvider` wi
 ```
 
 After setting the cursor position in a file, you can view the Type Hierarchy using the `Navigate / Type Hierarchy` menu (or `Ctrl+H`).
+
+### Did Change Watched Files
+
+[workspace/didChangeWatchedFiles](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_didChangeWatchedFiles)
+reports the changes to the files which match the file system watchers that a language server registers with
+`client/registerCapability`, as the IntelliJ VFS reports them.
+
+IntelliJ watches the files of the project. When a watcher names a directory outside the project, with the base of a
+`RelativePattern` or the fixed start of an absolute glob pattern such as `/opt/sdk/lib/**/*.jar`, LSP4IJ watches that
+directory too, so that the changes which other processes make there are reported:
+
+ * IntelliJ's native file watcher watches the directory, with its subdirectories when the pattern descends into them,
+   and the directory is loaded into the VFS.
+ * The directory is refreshed every 2 seconds, and all of it is listed every 30 seconds, for the changes that the native
+   file watcher misses.
+ * A directory which doesn't exist yet is watched from its nearest existing parent until it is created.
+ * A directory which is a symbolic link is not watched, and the symbolic links under a watched directory are not followed.
+
+A watcher whose pattern names no directory, such as `**/*.java`, or names a directory in the project, needs nothing more.
+The watchers of a language server are dropped when it stops, and a restarted language server registers its own.
 
 ### Workspace Symbol
 

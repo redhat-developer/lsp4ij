@@ -119,6 +119,16 @@ Here are configuration sample with the [typescript-language-server](https://gith
 
 ![Configuration with TypeScript](images/user-defined-ls/typescript-language-server/TypeScriptServerDialog_Configuration.png)
 
+A property set to `null` in `Configuration` or `Initialization Options` reaches the language server as `null`, so that
+it can reset that setting to its default.
+
+The JSON fields must be valid JSON: `Configuration`, `Initialization Options` and `Experimental` in the `Server` tab of
+the `Configuration` tab, the configuration in its `Client` tab, and the JSON of the `Installer` and `Workspace Folders`
+tabs. `Configuration`, `Initialization Options` and `Experimental` must stay valid once their macros,
+such as `$PROJECT_DIR$`, are expanded, which a Windows path in a string may not. A language server with an invalid
+field is not saved: the `New Language Server` dialog lists the errors and disables `OK`, and the settings page and the
+`Apply` action of the LSP console show the error.
+
 ### Debug tab
 
 The `Debug tab` is available when you have created the language server definition. It allows to customize the 
