@@ -11,6 +11,7 @@
 
 package com.redhat.devtools.lsp4ij.features.semanticTokens.viewProvider;
 
+import com.intellij.openapi.fileTypes.ExactFileNameMatcher;
 import com.intellij.openapi.fileTypes.FileNameMatcher;
 import com.intellij.openapi.fileTypes.FileType;
 import com.intellij.openapi.fileTypes.FileTypeEvent;
@@ -66,7 +67,8 @@ public class LSPSemanticTokensStructurelessFileViewProviderRegistrar {
                     registerFileTypes.add(fileType);
                 } else {
                     List<FileNameMatcher> filenameMatchers = FileTypeManager.getInstance().getAssociations(fileType);
-                    if (ContainerUtil.intersects(lspFilenameMatchers, filenameMatchers)) {
+                    if (ContainerUtil.exists(lspFilenameMatchers, lspFilenameMatcher ->
+                            ContainerUtil.exists(filenameMatchers, filenameMatcher -> overlap(lspFilenameMatcher, filenameMatcher)))) {
                         registerFileTypes.add(fileType);
                     }
                 }
@@ -120,6 +122,24 @@ public class LSPSemanticTokensStructurelessFileViewProviderRegistrar {
         }
         return ContainerUtil.and(FileTypeFileViewProviders.INSTANCE.allForFileType(fileType),
                 factory -> factory instanceof LSPSemanticTokensStructurelessFileViewProviderFactory);
+    }
+
+    /**
+     * Whether a file name can match both filename matchers, as far as that can be told: when they are equal, or when
+     * one of them is an exact file name that the other accepts, such as a language server mapped to
+     * {@code build.myext} and a file type associated with {@code *.myext}.
+     *
+     * @param matcher a filename matcher
+     * @param other   another filename matcher
+     * @return true if a file name can match both filename matchers; otherwise false
+     */
+    private static boolean overlap(@NotNull FileNameMatcher matcher, @NotNull FileNameMatcher other) {
+        return matcher.equals(other) || acceptsExactFileName(matcher, other) || acceptsExactFileName(other, matcher);
+    }
+
+    private static boolean acceptsExactFileName(@NotNull FileNameMatcher matcher, @NotNull FileNameMatcher exact) {
+        return exact instanceof ExactFileNameMatcher exactFileNameMatcher
+                && matcher.acceptsCharSequence(exactFileNameMatcher.getFileName());
     }
 
     // LISTENERS

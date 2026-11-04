@@ -34,7 +34,8 @@ import java.util.concurrent.TimeUnit;
 
 /**
  * Tests the semantic tokens-based file view provider for files of a file type that a client plugin defines without a
- * language, which the platform otherwise parses as a single plain text element.
+ * language, which the platform otherwise parses as a single plain text element. The file type is associated with an
+ * extension, and the language server is mapped to a narrower pattern, an exact file name.
  */
 public class PluginFileTypeSemanticTokensFileViewProviderTest extends LSPSemanticTokensFileViewProviderFixtureTestCase {
 
@@ -66,7 +67,7 @@ public class PluginFileTypeSemanticTokensFileViewProviderTest extends LSPSemanti
             """;
 
     public PluginFileTypeSemanticTokensFileViewProviderTest() {
-        super("*." + EXTENSION, "plugintype");
+        super(TEST_FILE_NAME, "plugintype");
     }
 
     @Override
