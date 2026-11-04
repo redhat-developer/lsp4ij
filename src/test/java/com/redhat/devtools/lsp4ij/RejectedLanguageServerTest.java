@@ -68,7 +68,7 @@ public class RejectedLanguageServerTest extends LSPCodeInsightFixtureTestCase {
 
         assertEmpty(servers);
         assertEquals(1, rejected.size());
-        assertTrue(rejected.get(0).isDisposed());
+        assertDisposedWithWhatItRegistered(rejected.get(0));
         assertDoesntContain(accessor.getStartedServers(), rejected.get(0));
     }
 
@@ -85,7 +85,7 @@ public class RejectedLanguageServerTest extends LSPCodeInsightFixtureTestCase {
         }
 
         assertEquals(1, rejected.size());
-        assertTrue(rejected.get(0).isDisposed());
+        assertDisposedWithWhatItRegistered(rejected.get(0));
         assertDoesntContain(accessor.getStartedServers(), rejected.get(0));
     }
 
@@ -164,6 +164,19 @@ public class RejectedLanguageServerTest extends LSPCodeInsightFixtureTestCase {
         assertFalse(languageServer.isDisposed());
         assertEquals(ServerStatus.started, languageServer.getServerStatus());
         assertContainsElements(accessor.getStartedServers(), languageServer);
+    }
+
+    /**
+     * Only disposing through the Disposer also removes what the language server registered, like its file listener.
+     */
+    private static void assertDisposedWithWhatItRegistered(@NotNull LanguageServerWrapper languageServer) {
+        assertTrue(languageServer.isDisposed());
+        var child = Disposer.newDisposable();
+        try {
+            assertFalse(Disposer.tryRegister(languageServer, child));
+        } finally {
+            Disposer.dispose(child);
+        }
     }
 
     private @NotNull PsiFile file() {
