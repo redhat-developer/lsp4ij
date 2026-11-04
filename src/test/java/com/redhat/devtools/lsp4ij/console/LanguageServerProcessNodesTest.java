@@ -9,23 +9,34 @@ package com.redhat.devtools.lsp4ij.console;
 
 import com.intellij.execution.impl.ConsoleViewImpl;
 import com.intellij.execution.ui.ConsoleView;
+import com.intellij.openapi.actionSystem.DataContext;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.Disposer;
+import com.intellij.openapi.wm.RegisterToolWindowTask;
+import com.intellij.openapi.wm.ToolWindowManager;
 import com.intellij.testFramework.PlatformTestUtil;
+import com.intellij.testFramework.TestActionEvent;
+import com.intellij.ui.content.ContentFactory;
+import com.intellij.util.containers.ContainerUtil;
 import com.redhat.devtools.lsp4ij.LanguageServerWrapper;
 import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
 import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
+import com.redhat.devtools.lsp4ij.ServerMessageHandler;
 import com.redhat.devtools.lsp4ij.ServerStatus;
 import com.redhat.devtools.lsp4ij.console.explorer.LanguageServerExplorer;
 import com.redhat.devtools.lsp4ij.console.explorer.LanguageServerProcessTreeNode;
 import com.redhat.devtools.lsp4ij.fixtures.LSPCodeInsightFixtureTestCase;
+import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
 import com.redhat.devtools.lsp4ij.lifecycle.LanguageServerLifecycleManager;
 import com.redhat.devtools.lsp4ij.mock.MockLanguageServerDefinition;
 import com.redhat.devtools.lsp4ij.settings.LanguageServerSettings;
 import com.redhat.devtools.lsp4ij.settings.ProjectLanguageServerSettings;
 import com.redhat.devtools.lsp4ij.settings.ServerTrace;
+import com.redhat.devtools.lsp4ij.settings.actions.ShowErrorLogAction;
 import com.redhat.devtools.lsp4ij.templates.ServerMappingSettings;
+import org.eclipse.lsp4j.MessageParams;
+import org.eclipse.lsp4j.MessageType;
 import org.eclipse.lsp4j.jsonrpc.json.MessageJsonHandler;
 import org.eclipse.lsp4j.jsonrpc.json.StreamMessageConsumer;
 import org.eclipse.lsp4j.jsonrpc.messages.NotificationMessage;
@@ -35,6 +46,8 @@ import javax.swing.tree.TreePath;
 import java.io.ByteArrayOutputStream;
 import java.util.List;
 import java.util.Map;
+
+import static com.redhat.devtools.lsp4ij.console.LSPConsoleToolWindowPanel.LANGUAGE_SERVERS_TOOL_WINDOW_ID;
 
 /**
  * Tests the process nodes of the Language Servers view when one definition has several language servers.
@@ -63,6 +76,10 @@ public class LanguageServerProcessNodesTest extends LSPCodeInsightFixtureTestCas
         explorer = panel.getExplorer();
         PlatformTestUtil.waitWithEventsDispatching("The view must show the language server",
                 () -> explorer.findNodeForServer(definition) != null, 10);
+        // The static methods of the panel find it through the tool window
+        var toolWindow = ToolWindowManager.getInstance(project)
+                .registerToolWindow(RegisterToolWindowTask.notClosable(LANGUAGE_SERVERS_TOOL_WINDOW_ID));
+        toolWindow.getContentManager().addContent(ContentFactory.getInstance().createContent(panel, "", false));
         var accessor = LanguageServiceAccessor.getInstance(project);
         first = accessor.forceCreateServer(definition);
         second = accessor.forceCreateServer(definition);
@@ -71,6 +88,7 @@ public class LanguageServerProcessNodesTest extends LSPCodeInsightFixtureTestCas
     @Override
     protected void tearDown() throws Exception {
         try {
+            ToolWindowManager.getInstance(project).unregisterToolWindow(LANGUAGE_SERVERS_TOOL_WINDOW_ID);
             Disposer.dispose(panel);
             LanguageServersRegistry.getInstance().removeServerDefinition(project, definition);
         } finally {
@@ -182,10 +200,92 @@ public class LanguageServerProcessNodesTest extends LSPCodeInsightFixtureTestCas
         assertEquals("", textOf(panel.getTracesConsoleView(processNode(first))));
     }
 
+    public void testALogGoesToTheProcessNodeOfItsLanguageServer() {
+        startBoth();
+
+        ServerMessageHandler.logMessage(second, new MessageParams(MessageType.Info, "Log of the second"));
+        PlatformTestUtil.dispatchAllEventsInIdeEventQueue();
+
+        assertEquals("", logOf(first));
+        assertEquals("Log of the second\n", logOf(second));
+    }
+
+    public void testALanguageClientLogsToTheProcessNodeOfItsLanguageServer() {
+        startBoth();
+        var client = definition.createLanguageClient(project);
+        try {
+            client.setServerWrapper(second);
+
+            client.logMessage(new MessageParams(MessageType.Info, "Log of the second"));
+
+            PlatformTestUtil.waitWithEventsDispatching("The log must reach the second language server",
+                    () -> logOf(second).contains("Log of the second"), 5);
+            assertEquals("", logOf(first));
+        } finally {
+            client.dispose();
+        }
+    }
+
+    public void testTheLogTabOfALanguageServerSelectsItsProcessNode() {
+        startBoth();
+
+        LSPConsoleToolWindowPanel.selectLogTab(first);
+        assertSame(processNode(first), selectedNode());
+
+        LSPConsoleToolWindowPanel.selectLogTab(second);
+        assertSame(processNode(second), selectedNode());
+    }
+
+    public void testShowLogsInAnErrorNotificationSelectsTheProcessNodeOfItsLanguageServer() {
+        startBoth();
+        var notification = CancellationSupport.showNotificationError(second, "Test", new Exception("Error of the second"));
+        try {
+            var action = ContainerUtil.find(notification.getActions(), a -> a instanceof ShowErrorLogAction);
+            assertNotNull(action);
+
+            action.actionPerformed(TestActionEvent.createTestEvent(action, DataContext.EMPTY_CONTEXT));
+
+            assertSame(processNode(second), selectedNode());
+        } finally {
+            notification.expire();
+        }
+    }
+
+    public void testShowLogsForADefinitionSelectsItsFirstProcessNode() {
+        startBoth();
+        var action = new ShowErrorLogAction(definition, project);
+
+        action.actionPerformed(TestActionEvent.createTestEvent(action, DataContext.EMPTY_CONTEXT));
+
+        assertSame(processNode(first), selectedNode());
+    }
+
+    public void testTheLogOfADefinitionGoesToItsFirstProcessNode() {
+        startBoth();
+
+        ServerMessageHandler.logMessage(definition, new MessageParams(MessageType.Info, "Log of the definition"), project);
+        PlatformTestUtil.dispatchAllEventsInIdeEventQueue();
+
+        assertEquals("Log of the definition\n", logOf(first));
+        assertEquals("", logOf(second));
+    }
+
+    public void testTheLogTabOfADefinitionSelectsItsFirstProcessNode() {
+        startBoth();
+
+        LSPConsoleToolWindowPanel.selectLogTab(definition, project);
+
+        assertSame(processNode(first), selectedNode());
+    }
+
     private void startBoth() {
         first.updateStatus(ServerStatus.starting);
         second.updateStatus(ServerStatus.starting);
         PlatformTestUtil.dispatchAllEventsInIdeEventQueue();
+    }
+
+    private @NotNull String logOf(@NotNull LanguageServerWrapper languageServer) {
+        return textOf(panel.getLogsConsoleView(processNode(languageServer)));
     }
 
     private static @NotNull String textOf(ConsoleView view) {
@@ -204,6 +304,10 @@ public class LanguageServerProcessNodesTest extends LSPCodeInsightFixtureTestCas
             }
         }
         return rows;
+    }
+
+    private Object selectedNode() {
+        return explorer.getTree().getSelectionPath().getLastPathComponent();
     }
 
     private @NotNull LanguageServerProcessTreeNode processNode(@NotNull LanguageServerWrapper languageServer) {

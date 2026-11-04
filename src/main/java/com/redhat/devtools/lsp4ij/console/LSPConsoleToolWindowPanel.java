@@ -35,6 +35,7 @@ import com.intellij.ui.components.JBTabbedPane;
 import com.intellij.util.concurrency.AppExecutorUtil;
 import com.intellij.util.ui.JBUI;
 import com.redhat.devtools.lsp4ij.LanguageServerBundle;
+import com.redhat.devtools.lsp4ij.LanguageServerWrapper;
 import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
 import com.redhat.devtools.lsp4ij.console.actions.ApplyLanguageServerSettingsAction;
 import com.redhat.devtools.lsp4ij.console.actions.ResetLanguageServerSettingsAction;
@@ -61,6 +62,7 @@ import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.function.Consumer;
 
 import static com.redhat.devtools.lsp4ij.internal.ApplicationUtils.invokeLaterIfNeeded;
 
@@ -167,20 +169,18 @@ public class LSPConsoleToolWindowPanel extends SimpleToolWindowPanel implements 
     public static void showLog(@NotNull LanguageServerDefinition serverDefinition,
                                @NotNull MessageParams params,
                                @NotNull Project project) {
-        // Get the LSP tool window
-        var toolWindow = ToolWindowManager.getInstance(project).getToolWindow(LANGUAGE_SERVERS_TOOL_WINDOW_ID);
-        if (toolWindow == null) {
-            return;
-        }
-        invokeLaterIfNeeded(() -> {
-            // Get the panel of the LSP tool window
-            var contentManager = toolWindow.getContentManager();
-            var content = contentManager.getContent(0);
-            if (content != null && content.getComponent() instanceof LSPConsoleToolWindowPanel panel) {
-                // Show log...
-                panel.showLog(params, serverDefinition);
-            }
-        });
+        invokeOnPanel(project, panel -> panel.showLog(params, serverDefinition));
+    }
+
+    /**
+     * Show the given message parameters in the tab "Logs" of the LSP console of the given language server.
+     *
+     * @param languageServer the language server.
+     * @param params         the message parameters.
+     */
+    public static void showLog(@NotNull LanguageServerWrapper languageServer,
+                               @NotNull MessageParams params) {
+        invokeOnPanel(languageServer.getProject(), panel -> panel.showLog(params, languageServer));
     }
 
     /**
@@ -191,6 +191,20 @@ public class LSPConsoleToolWindowPanel extends SimpleToolWindowPanel implements 
      */
     public static void selectLogTab(@NotNull LanguageServerDefinition serverDefinition,
                                     @NotNull Project project) {
+        invokeOnPanel(project, panel -> panel.selectLogTab(serverDefinition));
+    }
+
+    /**
+     * Select the "Log tab" of the LSP console of the given language server.
+     *
+     * @param languageServer the language server.
+     */
+    public static void selectLogTab(@NotNull LanguageServerWrapper languageServer) {
+        invokeOnPanel(languageServer.getProject(), panel -> panel.selectLogTabOf(languageServer));
+    }
+
+    private static void invokeOnPanel(@NotNull Project project,
+                                      @NotNull Consumer<LSPConsoleToolWindowPanel> action) {
         // Get the LSP tool window
         var toolWindow = ToolWindowManager.getInstance(project).getToolWindow(LANGUAGE_SERVERS_TOOL_WINDOW_ID);
         if (toolWindow == null) {
@@ -201,8 +215,7 @@ public class LSPConsoleToolWindowPanel extends SimpleToolWindowPanel implements 
             var contentManager = toolWindow.getContentManager();
             var content = contentManager.getContent(0);
             if (content != null && content.getComponent() instanceof LSPConsoleToolWindowPanel panel) {
-                // Show log...
-                panel.selectLogTab(serverDefinition);
+                action.accept(panel);
             }
         });
     }
@@ -217,6 +230,18 @@ public class LSPConsoleToolWindowPanel extends SimpleToolWindowPanel implements 
     @Nullable ConsoleView getTracesConsoleView(@NotNull LanguageServerProcessTreeNode processTreeNode) {
         var consoleOrErrorPanel = consoles.getValue(processTreeNode, true);
         return consoleOrErrorPanel != null ? consoleOrErrorPanel.tracesConsoleView : null;
+    }
+
+    /**
+     * Returns the view of the tab "Logs" of the given process node.
+     *
+     * @param processTreeNode the process node.
+     * @return the view of the tab "Logs" of the given process node.
+     */
+    @TestOnly
+    @Nullable ConsoleView getLogsConsoleView(@NotNull LanguageServerProcessTreeNode processTreeNode) {
+        var consoleOrErrorPanel = consoles.getValue(processTreeNode, true);
+        return consoleOrErrorPanel != null ? consoleOrErrorPanel.logsConsoleView : null;
     }
 
     /**
@@ -454,7 +479,23 @@ public class LSPConsoleToolWindowPanel extends SimpleToolWindowPanel implements 
         if (serverNode == null) {
             return;
         }
-        var processTreeNode = serverNode.getActiveProcessTreeNode();
+        showLog(params, serverNode.getActiveProcessTreeNode());
+    }
+
+    private void showLog(@NotNull MessageParams params,
+                         @NotNull LanguageServerWrapper languageServer) {
+        if (isDisposed()) {
+            return;
+        }
+        LanguageServerTreeNode serverNode = explorer.findNodeForServer(languageServer.getServerDefinition());
+        if (serverNode == null) {
+            return;
+        }
+        showLog(params, serverNode.getProcessTreeNode(languageServer));
+    }
+
+    private void showLog(@NotNull MessageParams params,
+                         @Nullable LanguageServerProcessTreeNode processTreeNode) {
         if (processTreeNode == null) {
             return;
         }
@@ -477,7 +518,26 @@ public class LSPConsoleToolWindowPanel extends SimpleToolWindowPanel implements 
         if (serverNode == null) {
             return;
         }
-        var processTreeNode = serverNode.getActiveProcessTreeNode();
+        selectLogTab(serverNode.getActiveProcessTreeNode());
+    }
+
+    /**
+     * Select "Log" tab for the given language server.
+     *
+     * @param languageServer the language server.
+     */
+    private void selectLogTabOf(@NotNull LanguageServerWrapper languageServer) {
+        if (isDisposed()) {
+            return;
+        }
+        LanguageServerTreeNode serverNode = explorer.findNodeForServer(languageServer.getServerDefinition());
+        if (serverNode == null) {
+            return;
+        }
+        selectLogTab(serverNode.getProcessTreeNode(languageServer));
+    }
+
+    private void selectLogTab(@Nullable LanguageServerProcessTreeNode processTreeNode) {
         if (processTreeNode == null) {
             return;
         }

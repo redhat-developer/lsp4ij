@@ -22,8 +22,8 @@ import com.intellij.util.ConcurrencyUtil;
 import com.intellij.util.ExceptionUtil;
 import com.redhat.devtools.lsp4ij.LSP4IJWebsiteUrlConstants;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
+import com.redhat.devtools.lsp4ij.LanguageServerWrapper;
 import com.redhat.devtools.lsp4ij.ServerMessageHandler;
-import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
 import com.redhat.devtools.lsp4ij.settings.ErrorReportingKind;
 import com.redhat.devtools.lsp4ij.settings.ProjectLanguageServerSettings;
 import com.redhat.devtools.lsp4ij.settings.actions.DisableLanguageServerErrorAction;
@@ -199,7 +199,7 @@ public class CancellationSupport implements CancelChecker {
         ErrorReportingKind errorReportingKind = getReportErrorKind(languageServer);
         switch (errorReportingKind) {
             case as_notification -> // Show LSP error (ResponseErrorException) in an IJ notification
-                    showNotificationError(languageServer.getServerDefinition(), featureName, error, languageServer.getProject());
+                    showNotificationError(languageServer.getServerWrapper(), featureName, error);
             case in_log -> {
                 // Show LSP error in the log
                 String languageServerName = languageServer.getServerDefinition().getDisplayName();
@@ -212,10 +212,11 @@ public class CancellationSupport implements CancelChecker {
     }
 
     @ApiStatus.Internal
-    public static Notification showNotificationError(@NotNull LanguageServerDefinition languageServerDefinition,
+    public static Notification showNotificationError(@NotNull LanguageServerWrapper languageServer,
                                                      @Nullable String subtitle,
-                                                     @NotNull Exception error,
-                                                     @NotNull Project project) {
+                                                     @NotNull Exception error) {
+        var languageServerDefinition = languageServer.getServerDefinition();
+        var project = languageServer.getProject();
         String languageServerName = languageServerDefinition.getDisplayName();
         String content = error.getMessage();
         Notification notification = new Notification(ServerMessageHandler.LSP_WINDOW_SHOW_MESSAGE_GROUP_ID,
@@ -223,7 +224,7 @@ public class CancellationSupport implements CancelChecker {
                 content,
                 NotificationType.ERROR);
         notification.setSubtitle(subtitle);
-        notification.addAction(new ShowErrorLogAction(languageServerDefinition, project));
+        notification.addAction(new ShowErrorLogAction(languageServer));
         notification.addAction(new DisableLanguageServerErrorAction(notification, languageServerDefinition, project));
         notification.addAction(new ReportErrorInLogAction(notification, languageServerDefinition, project));
         notification.addAction(new OpenUrlAction(LSP4IJWebsiteUrlConstants.FEEDBACK_URL));

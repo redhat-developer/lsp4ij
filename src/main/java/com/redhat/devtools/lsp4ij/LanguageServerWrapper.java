@@ -469,12 +469,12 @@ public class LanguageServerWrapper implements Disposable {
                         provider.addLogErrorHandler(new LanguageServerLogErrorHandler() {
                             @Override
                             public void logError(String error) {
-                                ServerMessageHandler.logMessage(getServerDefinition(), new MessageParams(MessageType.Error, error), getProject());
+                                ServerMessageHandler.logMessage(LanguageServerWrapper.this, new MessageParams(MessageType.Error, error));
                             }
 
                             @Override
                             public void logInfo(String message) {
-                                ServerMessageHandler.logMessage(getServerDefinition(), new MessageParams(MessageType.Info, message), getProject());
+                                ServerMessageHandler.logMessage(LanguageServerWrapper.this, new MessageParams(MessageType.Info, message));
                             }
                         });
                         provider.addUnexpectedServerStopHandler(() -> {
@@ -710,7 +710,7 @@ public class LanguageServerWrapper implements Disposable {
                 errorNotification.expire();
             }
             // Show start server error notification.
-            errorNotification = showNotificationError(this.getServerDefinition(), "Cannot start server", serverError, this.getProject());
+            errorNotification = showNotificationError(this, "Cannot start server", serverError);
         }
     }
 
