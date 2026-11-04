@@ -34,11 +34,9 @@ The `Mappings` tab to specify the files which can be debugged to allow adding/re
 
 The `Configuration` tab to specify the working directory and the file you want to run/debug:
 
+  ![DAP Configuration Type/Configuration](./images/DAP_config_type_configuration.png)
 
-![DAP Configuration Type/Configuration](./images/DAP_config_type_configuration.png)
-
-
-
+Specifying a working directory sets the working directory for the debug adapter server process. On supported IntelliJ Platform versions, it also allows directory-specific environment managers (such as [mise](https://mise.jdx.dev/), [direnv](https://direnv.net/), or other plugins integrating with IntelliJ's command-line environment customizers) to automatically configure environment variables for the DAP process based on directory-level configuration files (such as `.mise.toml` or `.envrc`).
 
 ### IntelliJ macro expansion
 
