@@ -11,6 +11,9 @@
 
 package com.redhat.devtools.lsp4ij.features.semanticTokens.viewProvider;
 
+import com.intellij.lang.Language;
+import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.fileEditor.FileEditorManager;
 import com.intellij.openapi.fileTypes.ExactFileNameMatcher;
 import com.intellij.openapi.fileTypes.FileNameMatcher;
 import com.intellij.openapi.fileTypes.FileType;
@@ -20,10 +23,14 @@ import com.intellij.openapi.fileTypes.FileTypeManager;
 import com.intellij.openapi.fileTypes.LanguageFileType;
 import com.intellij.openapi.fileTypes.impl.AbstractFileType;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.project.ProjectManager;
 import com.intellij.openapi.startup.ProjectActivity;
 import com.intellij.openapi.util.Pair;
+import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.FileTypeFileViewProviders;
 import com.intellij.psi.FileViewProviderFactory;
+import com.intellij.psi.PsiManager;
+import com.intellij.util.FileContentUtilCore;
 import com.intellij.util.containers.ContainerUtil;
 import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
@@ -101,6 +108,46 @@ public class LSPSemanticTokensStructurelessFileViewProviderRegistrar {
         // If changed, update our retained file type/factory associations
         if (!copyOfRegisteredFileTypes.equals(workingRegisteredFileTypes)) {
             registeredFileTypes = workingRegisteredFileTypes;
+        }
+
+        // Files already open keep their view provider, so recreate the ones that no longer match among the files of
+        // the file types we register or just unregistered
+        Set<FileType> checkedFileTypes = new HashSet<>(workingRegisteredFileTypes);
+        checkedFileTypes.addAll(unregisterFileTypes);
+        if (!checkedFileTypes.isEmpty()) {
+            ApplicationManager.getApplication().invokeLater(() -> reparseStaleOpenFiles(checkedFileTypes));
+        }
+    }
+
+    /**
+     * Reparses the open files of the given file types whose view provider is not the one the platform would create for
+     * them now. That is the case for a file opened before our view provider factory was registered for its file type,
+     * or before a language server was mapped to it, and the reverse.
+     *
+     * @param fileTypes the file types we register or just unregistered
+     */
+    private static void reparseStaleOpenFiles(@NotNull Set<FileType> fileTypes) {
+        Set<VirtualFile> staleFiles = new LinkedHashSet<>();
+        for (Project project : ProjectManager.getInstance().getOpenProjects()) {
+            if (project.isDisposed()) {
+                continue;
+            }
+            PsiManager psiManager = PsiManager.getInstance(project);
+            for (VirtualFile file : FileEditorManager.getInstance(project).getOpenFiles()) {
+                if (file.isValid() && fileTypes.contains(file.getFileType())) {
+                    // Our factory creates our view provider only for a file supported by a language server, and it is
+                    // given no language for these file types
+                    boolean expected = registeredFileTypes.contains(file.getFileType())
+                            && LanguageServersRegistry.getInstance().isFileSupported(file, (Language) null);
+                    boolean actual = psiManager.findViewProvider(file) instanceof LSPSemanticTokensStructurelessFileViewProvider;
+                    if (expected != actual) {
+                        staleFiles.add(file);
+                    }
+                }
+            }
+        }
+        if (!staleFiles.isEmpty()) {
+            FileContentUtilCore.reparseFiles(staleFiles);
         }
     }
 

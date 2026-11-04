@@ -18,10 +18,15 @@ import com.intellij.openapi.fileTypes.FileTypeManager;
 import com.intellij.openapi.fileTypes.impl.FileTypeManagerImpl;
 import com.intellij.openapi.util.TextRange;
 import com.intellij.psi.PsiFile;
+import com.intellij.psi.PsiManager;
+import com.intellij.testFramework.PlatformTestUtil;
 import com.intellij.util.concurrency.AppExecutorUtil;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
+import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
 import com.redhat.devtools.lsp4ij.fixtures.LSPSemanticTokensFileViewProviderFixtureTestCase;
 import com.redhat.devtools.lsp4ij.mock.MockLanguageServer;
+import com.redhat.devtools.lsp4ij.mock.MockLanguageServerDefinition;
+import com.redhat.devtools.lsp4ij.templates.ServerMappingSettings;
 import org.eclipse.lsp4j.Location;
 import org.eclipse.lsp4j.Position;
 import org.eclipse.lsp4j.Range;
@@ -42,6 +47,8 @@ public class PluginFileTypeSemanticTokensFileViewProviderTest extends LSPSemanti
     private static final String EXTENSION = "plugintype";
 
     private static final String TEST_FILE_NAME = "test." + EXTENSION;
+
+    private static final String OTHER_FILE_NAME = "other." + EXTENSION;
 
     private static final String TEST_FILE_BODY = """
             fun main
@@ -66,6 +73,8 @@ public class PluginFileTypeSemanticTokensFileViewProviderTest extends LSPSemanti
             }
             """;
 
+    private MockLanguageServerDefinition secondServer;
+
     public PluginFileTypeSemanticTokensFileViewProviderTest() {
         super(TEST_FILE_NAME, "plugintype");
     }
@@ -75,6 +84,18 @@ public class PluginFileTypeSemanticTokensFileViewProviderTest extends LSPSemanti
         super.setUp();
         ((FileTypeManagerImpl) FileTypeManager.getInstance()).registerFileType(new PluginFileType(),
                 List.of(new ExtensionFileNameMatcher(EXTENSION)), getTestRootDisposable(), new DefaultPluginDescriptor("plugin"));
+    }
+
+    @Override
+    protected void tearDown() throws Exception {
+        try {
+            if (secondServer != null) {
+                secondServer.getServer().waitBeforeTearDown();
+                LanguageServersRegistry.getInstance().removeServerDefinition(myFixture.getProject(), secondServer);
+            }
+        } finally {
+            super.tearDown();
+        }
     }
 
     public void testCtrlHoverUnderlinesTheReferenceInsteadOfTheWholeFile() throws Exception {
@@ -93,6 +114,22 @@ public class PluginFileTypeSemanticTokensFileViewProviderTest extends LSPSemanti
 
         assertNotNull(ctrlMouseData);
         assertEquals(List.of(new TextRange(reference, reference + "main".length())), ctrlMouseData.getRanges());
+    }
+
+    public void testOpenFileGetsTheViewProviderWhenALanguageServerIsMappedToIt() {
+        // No language server is mapped to the file yet, so it gets the platform's view provider
+        PsiFile file = myFixture.configureByText(OTHER_FILE_NAME, TEST_FILE_BODY);
+        assertInstanceOf(file.getFileType(), PluginFileType.class);
+        assertFalse(file.getViewProvider() instanceof LSPSemanticTokensFileViewProvider);
+
+        secondServer = new MockLanguageServerDefinition("second-server", false);
+        LanguageServersRegistry.getInstance().addServerDefinition(myFixture.getProject(), secondServer,
+                List.of(ServerMappingSettings.createFileNamePatternsMappingSettings(List.of(OTHER_FILE_NAME), "plugintype")));
+        PlatformTestUtil.dispatchAllEventsInIdeEventQueue();
+
+        PsiFile reparsedFile = PsiManager.getInstance(myFixture.getProject()).findFile(file.getVirtualFile());
+        assertNotNull(reparsedFile);
+        assertInstanceOf(reparsedFile.getViewProvider(), LSPSemanticTokensStructurelessFileViewProvider.class);
     }
 
     // Like the file type of a client plugin that highlights its files with TextMate: it has no language
