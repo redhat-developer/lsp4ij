@@ -123,7 +123,13 @@ public class LanguageServiceAccessor implements Disposable {
                     event.includeSystemEnvironmentVariablesChanged ||
                     event.mappingsChanged ||
                     event.workspaceFolderStrategyConfigurationChanged)) {
-                languageServerWrappers.forEach(LanguageServerWrapper::restart);
+                // Without language servers, there is nothing to restart, but the changed strategy can give open files one
+                if (usesServerInstances(event.serverDefinition, languageServerWrappers)
+                        || (event.workspaceFolderStrategyConfigurationChanged && languageServerWrappers.isEmpty())) {
+                    replaceServers(event.serverDefinition, languageServerWrappers);
+                } else {
+                    languageServerWrappers.forEach(LanguageServerWrapper::restart);
+                }
             }
         }
     };
@@ -597,6 +603,31 @@ public class LanguageServiceAccessor implements Disposable {
                 }
             }
         }
+    }
+
+    private static boolean usesServerInstances(@NotNull LanguageServerDefinition serverDefinition,
+                                               @NotNull List<LanguageServerWrapper> languageServers) {
+        return serverDefinition.hasServerInstances()
+                || languageServers.stream().anyMatch(languageServer -> languageServer.getInstanceRoot() != null);
+    }
+
+    /**
+     * Replaces the language servers of a changed definition with several instances, as a restart would also start the
+     * instances that stopped when idle. And if the workspace folder strategy has changed, the instances that run may no
+     * longer be the ones that it asks for, and open documents would stay with them.
+     */
+    private void replaceServers(@NotNull LanguageServerDefinition serverDefinition,
+                                @NotNull List<LanguageServerWrapper> languageServers) {
+        if (!languageServers.isEmpty()) {
+            // As a restart does: a stop or too many failed starts must not outlast a changed configuration
+            serverDefinition.setEnabled(true, project);
+        }
+        synchronized (startedServers) {
+            languageServers.forEach(startedServers::remove);
+        }
+        languageServers.forEach(languageServer ->
+                languageServer.stopAndDispose(!ApplicationManager.getApplication().isUnitTestMode()));
+        sendDidOpenAndRefreshEditorFeatureForOpenedFiles(serverDefinition, project);
     }
 
     /**

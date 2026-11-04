@@ -220,6 +220,7 @@ public class EditorFeatureManager implements Disposable {
                     }
                     return new RefreshEditorFeatureContext(pf, runnables, editors);
                 })
+                .expireWith(project)
                 .coalesceBy(file != null ? file : psiFile, featureType, clearLSPCache)
                 .finishOnUiThread(ModalityState.any(), context -> {
                     if (context == null) {

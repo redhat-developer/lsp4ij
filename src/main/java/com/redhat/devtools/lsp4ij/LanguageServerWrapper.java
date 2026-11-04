@@ -132,6 +132,9 @@ public class LanguageServerWrapper implements Disposable {
     @Nullable
     protected final URI initialPath;
     private final @Nullable WorkspaceFolder instanceRoot;
+
+    // The last stop that runs in the background, for a stop that comes while it is running
+    private CompletableFuture<Void> runningStop = CompletableFuture.completedFuture(null);
     protected final InitializeParams initParams = new InitializeParams();
     @NotNull
     private final LanguageServerDefinition serverDefinition;
@@ -335,7 +338,7 @@ public class LanguageServerWrapper implements Disposable {
      * remove IJ code vision, inlay hints, folding
      * for all opened editors which edit the files associated to the language server.
      */
-    private synchronized void stopAndRefreshEditorFeature(boolean refreshEditorFeature, boolean disable) {
+    private synchronized CompletableFuture<Void> stopAndRefreshEditorFeature(boolean refreshEditorFeature, boolean disable) {
         // Collect opened files before stopping the language server
         List<VirtualFile> openedFiles = refreshEditorFeature ?
                 new ArrayList<>(openedDocuments.values())
@@ -349,7 +352,7 @@ public class LanguageServerWrapper implements Disposable {
         }
 
         // Stop the language server
-        stop();
+        var stopped = stop();
 
         if (!openedFiles.isEmpty()) {
             // remove IJ code vision, inlay hints, folding
@@ -360,6 +363,23 @@ public class LanguageServerWrapper implements Disposable {
                         .refreshEditorFeature(file, EditorFeatureType.ALL, true, new VirtualFileCancelChecker(file));
             }
         }
+        return stopped;
+    }
+
+    /**
+     * Stops the language server and then disposes it, for a language server that goes while the project stays. Unlike
+     * {@link #dispose(boolean)}, the language server still gets shutdown and exit: a disposed language server no longer
+     * sends messages.
+     *
+     * @param refreshEditorFeature true to refresh the code vision, inlay hints and folding of the opened editors.
+     */
+    @ApiStatus.Internal
+    public void stopAndDispose(boolean refreshEditorFeature) {
+        // On the UI thread: while it processes a VFS event, the platform goes through a live view of the async file
+        // listeners, so removing the listener of this language server from another thread can make the event fail
+        stopAndRefreshEditorFeature(refreshEditorFeature, false)
+                .whenComplete((unused, error) -> ApplicationManager.getApplication()
+                        .invokeLater(() -> Disposer.dispose(this), ModalityState.any()));
     }
 
     /**
@@ -2286,7 +2306,7 @@ public class LanguageServerWrapper implements Disposable {
 
     private synchronized CompletableFuture<Void> stop(boolean alreadyStopping) {
         if (alreadyStopping && currentInitializingContext == null) {
-            return CompletableFuture.completedFuture(null);
+            return runningStop;
         }
         return stop(currentInitializingContext);
     }
@@ -2329,13 +2349,14 @@ public class LanguageServerWrapper implements Disposable {
                 // ForkJoinPool.helpAsyncBlocker() executing the blocking shutdown (up to 5 seconds)
                 // in the current thread when stop() is called from a ReadAction.
                 // See: https://github.com/redhat-developer/lsp4ij/issues/1672
-                return CompletableFuture.runAsync(() -> {
+                runningStop = CompletableFuture.runAsync(() -> {
                     shutdownAll(languageServer, lspStreamProvider, launcherFuture);
                     boolean delayedCurrent = currentInitializingContext == null || currentInitializingContext.equals(initializingContext);
                     if (delayedCurrent) {
                         updateStatus(ServerStatus.stopped);
                     }
                 }, AppExecutorUtil.getAppExecutorService());
+                return runningStop;
             }
         } finally {
             if (current) {
@@ -2480,6 +2501,7 @@ public class LanguageServerWrapper implements Disposable {
                 clientFeatures = null;
             }
         }
+        getLanguageServerLifecycleManager().onDisposed(this);
     }
 
     public boolean isDisposed() {

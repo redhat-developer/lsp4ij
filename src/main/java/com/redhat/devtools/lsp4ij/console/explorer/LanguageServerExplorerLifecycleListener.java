@@ -104,6 +104,15 @@ public class LanguageServerExplorerLifecycleListener implements LanguageServerLi
         invokeLaterIfNeeded(() -> showError(processTreeNode, exception));
     }
 
+    @Override
+    public void handleDisposed(@NotNull LanguageServerWrapper languageServer) {
+        invokeLaterIfNeeded(() -> {
+            if (!explorer.isDisposed()) {
+                explorer.removeProcessNode(languageServer);
+            }
+        });
+    }
+
     private @Nullable LanguageServerProcessTreeNode updateServerStatus(@NotNull LanguageServerWrapper languageServer,
                                                                        @Nullable ServerStatus serverStatus,
                                                                        boolean selectProcess) {
@@ -118,6 +127,10 @@ public class LanguageServerExplorerLifecycleListener implements LanguageServerLi
         synchronized (serverNode) {
             processTreeNode = serverNode.getProcessTreeNode(languageServer);
             if (processTreeNode == null) {
+                if (languageServer.isDisposed()) {
+                    // Its node is gone, and a late status must not bring it back
+                    return null;
+                }
                 var treeModel = explorer.getTreeModel();
                 processTreeNode = new LanguageServerProcessTreeNode(languageServer, treeModel);
                 if (serverStatus == null) {
@@ -137,7 +150,8 @@ public class LanguageServerExplorerLifecycleListener implements LanguageServerLi
             final var select = selectProcess;
             final var inserted = created;
             invokeLaterIfNeeded(() -> {
-                if (explorer.isDisposed()) {
+                // The language server or its definition can have gone in the meantime, and the node with them
+                if (explorer.isDisposed() || node.getRoot() != explorer.getTreeModel().getRoot()) {
                     return;
                 }
                 if (inserted) {

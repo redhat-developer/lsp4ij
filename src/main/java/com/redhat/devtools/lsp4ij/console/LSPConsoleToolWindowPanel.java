@@ -220,6 +220,11 @@ public class LSPConsoleToolWindowPanel extends SimpleToolWindowPanel implements 
         });
     }
 
+    @TestOnly
+    boolean hasConsolePanel(@NotNull DefaultMutableTreeNode node) {
+        return consoles != null && consoles.getValue(node, false) != null;
+    }
+
     /**
      * Returns the view of the tab "Traces" of the given process node.
      *
@@ -312,7 +317,7 @@ public class LSPConsoleToolWindowPanel extends SimpleToolWindowPanel implements 
         .expireWith(this)
         .finishOnUiThread(ModalityState.defaultModalityState(), (node) -> {
             try {
-                if (consoles != null && !isDisposed()) {
+                if (consoles != null && !isDisposed() && isInTree(node)) {
                     consoles.select(node, true);
                 }
             } finally {
@@ -368,7 +373,7 @@ public class LSPConsoleToolWindowPanel extends SimpleToolWindowPanel implements 
         .expireWith(this)
         .finishOnUiThread(ModalityState.defaultModalityState(), (node) -> {
             try {
-                if (consoles != null && !isDisposed()) {
+                if (consoles != null && !isDisposed() && isInTree(node)) {
                     consoles.select(node, true);
                 }
             } finally {
@@ -381,16 +386,34 @@ public class LSPConsoleToolWindowPanel extends SimpleToolWindowPanel implements 
         .submit(AppExecutorUtil.getAppExecutorService());
     }
 
+    private boolean isInTree(@NotNull DefaultMutableTreeNode node) {
+        // A node can be gone by the time its selection is shown, for example with its language server
+        return node.getRoot() == explorer.getTreeModel().getRoot();
+    }
+
     /**
      * Remove the detail, console panel of the given language server tree node.
      *
      * @param serverTreeNode the language server tree node.
      */
     public void removeConsolePanel(LanguageServerTreeNode serverTreeNode) {
+        removeConsolePanelOf(serverTreeNode);
+    }
+
+    /**
+     * Remove the console panel of the given language server process tree node.
+     *
+     * @param processTreeNode the language server process tree node.
+     */
+    public void removeConsolePanel(LanguageServerProcessTreeNode processTreeNode) {
+        removeConsolePanelOf(processTreeNode);
+    }
+
+    private void removeConsolePanelOf(DefaultMutableTreeNode treeNode) {
         if (consoles == null || isDisposed()) {
             return;
         }
-        consoles.dispose(serverTreeNode);
+        consoles.dispose(treeNode);
     }
 
     @Override
@@ -451,7 +474,8 @@ public class LSPConsoleToolWindowPanel extends SimpleToolWindowPanel implements 
 
     public void showTrace(@NotNull LanguageServerProcessTreeNode processTreeNode,
                           @NotNull String message) {
-        if (isDisposed()) {
+        // A late message must not bring back the panel of a node that is gone
+        if (isDisposed() || !isInTree(processTreeNode)) {
             return;
         }
         var consoleOrErrorPanel = consoles.getValue(processTreeNode, true);
@@ -461,7 +485,7 @@ public class LSPConsoleToolWindowPanel extends SimpleToolWindowPanel implements 
     }
 
     public void showError(@NotNull LanguageServerProcessTreeNode processTreeNode, Throwable exception) {
-        if (isDisposed()) {
+        if (isDisposed() || !isInTree(processTreeNode)) {
             return;
         }
         var consoleOrErrorPanel = consoles.getValue(processTreeNode, true);
@@ -588,8 +612,8 @@ public class LSPConsoleToolWindowPanel extends SimpleToolWindowPanel implements 
         public void dispose(@NotNull DefaultMutableTreeNode key) {
             var value = super.getValue(key, false);
             if (value != null) {
-                // Remove the detail panel of the language server
-                value.dispose();
+                // Remove the detail panel of the language server, which also disposes it
+                remove(value);
             }
             // Remove the console panel of the language server (processes)
             for (int i = 0; i < key.getChildCount(); i++) {

@@ -11,6 +11,7 @@ import com.intellij.execution.impl.ConsoleViewImpl;
 import com.intellij.execution.ui.ConsoleView;
 import com.intellij.openapi.actionSystem.DataContext;
 import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.application.impl.NonBlockingReadActionImpl;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.Disposer;
 import com.intellij.openapi.wm.RegisterToolWindowTask;
@@ -26,6 +27,7 @@ import com.redhat.devtools.lsp4ij.ServerMessageHandler;
 import com.redhat.devtools.lsp4ij.ServerStatus;
 import com.redhat.devtools.lsp4ij.console.explorer.LanguageServerExplorer;
 import com.redhat.devtools.lsp4ij.console.explorer.LanguageServerProcessTreeNode;
+import com.redhat.devtools.lsp4ij.console.explorer.LanguageServerTreeNode;
 import com.redhat.devtools.lsp4ij.fixtures.LSPCodeInsightFixtureTestCase;
 import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
 import com.redhat.devtools.lsp4ij.lifecycle.LanguageServerLifecycleManager;
@@ -163,6 +165,63 @@ public class LanguageServerProcessNodesTest extends LSPCodeInsightFixtureTestCas
         assertEquals("starting", processNode(first).getDisplayName());
     }
 
+    public void testTheProcessNodeOfADisposedLanguageServerGoes() {
+        startBoth();
+        waitForTheConsolePanels();
+        var serverNode = explorer.findNodeForServer(definition);
+        var node = processNode(second);
+        assertSame(node, selectedNode());
+        assertTrue(panel.hasConsolePanel(node));
+
+        Disposer.dispose(second);
+        waitForTheConsolePanels();
+
+        assertEquals(1, serverNode.getChildCount());
+        assertNull(serverNode.getProcessTreeNode(second));
+        assertSame(first, processNode(first).getLanguageServer());
+        assertSame(serverNode, selectedNode());
+        assertFalse(panel.hasConsolePanel(node));
+
+        panel.showTrace(node, "A late trace");
+        assertFalse(panel.hasConsolePanel(node));
+        panel.showError(node, new IllegalStateException("A late error"));
+        assertFalse(panel.hasConsolePanel(node));
+
+        second.updateStatus(ServerStatus.stopped);
+        PlatformTestUtil.dispatchAllEventsInIdeEventQueue();
+
+        assertNull(serverNode.getProcessTreeNode(second));
+    }
+
+    public void testARemovedDefinitionGetsNoConsolePanelAgain() {
+        startBoth();
+        waitForTheConsolePanels();
+        var serverNode = explorer.findNodeForServer(definition);
+        var node = processNode(second);
+        assertSame(node, selectedNode());
+
+        // In the IDE, the accessor hears about the removal first, because the view opens later: the language servers
+        // are disposed before the view removes the definition
+        Disposer.dispose(first);
+        Disposer.dispose(second);
+        LanguageServersRegistry.getInstance().removeServerDefinition(project, definition);
+        waitForTheConsolePanels();
+
+        assertNull(explorer.findNodeForServer(definition));
+        assertFalse(panel.hasConsolePanel(serverNode));
+        assertFalse(panel.hasConsolePanel(node));
+    }
+
+    public void testAStatusStillOnItsWayIgnoresTheNodeOfADisposedLanguageServer() throws Exception {
+        // From a background thread, the status reaches the tree later, on the UI thread
+        ApplicationManager.getApplication().executeOnPooledThread(() -> second.updateStatus(ServerStatus.starting)).get();
+
+        Disposer.dispose(second);
+        PlatformTestUtil.dispatchAllEventsInIdeEventQueue();
+
+        assertNull(explorer.findNodeForServer(definition).getProcessTreeNode(second));
+    }
+
     public void testTheViewShowsTheLanguageServersStartedBeforeItOpened() {
         first.updateStatus(ServerStatus.started);
         second.updateStatus(ServerStatus.stopped);
@@ -273,6 +332,11 @@ public class LanguageServerProcessNodesTest extends LSPCodeInsightFixtureTestCas
         assertSame(processNode(first), selectedNode());
     }
 
+    public void testABuiltPluginStillFindsRemoveConsolePanelForAServerNode() throws Exception {
+        assertNotNull(LanguageServerExplorer.class.getMethod("removeConsolePanel", LanguageServerTreeNode.class));
+        assertNotNull(LSPConsoleToolWindowPanel.class.getMethod("removeConsolePanel", LanguageServerTreeNode.class));
+    }
+
     public void testALanguageServerCanStillBeCreatedWithANullInitialPath() {
         var languageServer = new LanguageServerWrapper(project, definition, null);
         Disposer.register(getTestRootDisposable(), languageServer);
@@ -296,6 +360,12 @@ public class LanguageServerProcessNodesTest extends LSPCodeInsightFixtureTestCas
         LSPConsoleToolWindowPanel.selectLogTab(definition, project);
 
         assertSame(processNode(first), selectedNode());
+    }
+
+    private static void waitForTheConsolePanels() {
+        PlatformTestUtil.dispatchAllEventsInIdeEventQueue();
+        NonBlockingReadActionImpl.waitForAsyncTaskCompletion();
+        PlatformTestUtil.dispatchAllEventsInIdeEventQueue();
     }
 
     private void startBoth() {

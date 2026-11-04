@@ -81,6 +81,19 @@ public class LanguageServerLifecycleManager {
         }
     }
 
+    public void onDisposed(LanguageServerWrapper languageServer) {
+        if (isDisposed()) {
+            return;
+        }
+        for (LanguageServerLifecycleListener listener : this.listeners) {
+            try {
+                listener.handleDisposed(languageServer);
+            } catch (Exception e) {
+                LOGGER.error("Error while disposing the language server '{}'", languageServer.getServerDefinition().getId(), e);
+            }
+        }
+    }
+
     public void onError(LanguageServerWrapper languageServer, Throwable exception) {
         if (isDisposed()) {
             return;

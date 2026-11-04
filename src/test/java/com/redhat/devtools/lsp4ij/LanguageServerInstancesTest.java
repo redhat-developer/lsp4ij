@@ -7,6 +7,7 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij;
 
+import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.application.impl.NonBlockingReadActionImpl;
 import com.intellij.openapi.project.Project;
@@ -28,6 +29,7 @@ import com.redhat.devtools.lsp4ij.mock.MockConnectionProvider;
 import com.redhat.devtools.lsp4ij.mock.MockLanguageServer;
 import com.redhat.devtools.lsp4ij.mock.MockLanguageServerDefinition;
 import com.redhat.devtools.lsp4ij.server.StreamConnectionProvider;
+import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinitionListener;
 import com.redhat.devtools.lsp4ij.settings.LanguageServerSettings;
 import com.redhat.devtools.lsp4ij.settings.LanguageServerSettingsListener;
 import com.redhat.devtools.lsp4ij.settings.ProjectLanguageServerSettings;
@@ -45,6 +47,7 @@ import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Tests a language server definition whose workspace folder strategy spreads the files over several instances. By
@@ -219,6 +222,80 @@ public class LanguageServerInstancesTest extends LSPCodeInsightFixtureTestCase {
         assertFalse(failing.hasServerInstances());
     }
 
+    public void testAChangedStrategyReplacesTheInstances() throws Exception {
+        var instance = instanceOf(file("a/one.per-folder"));
+
+        definition.strategy.perFolder = false;
+        fireStrategyChanged();
+
+        assertEmpty(instances());
+        var replacement = instanceOf(file("a/two.per-folder"));
+        assertNull(replacement.getInstanceRoot());
+        waitUntilDisposed(instance);
+    }
+
+    public void testAReplacedInstanceGetsShutdown() throws Exception {
+        var instance = instanceOf(file("a/one.per-folder"));
+        var server = definition.servers.get(0);
+        assertTrue(server.isRunning());
+
+        fireStrategyChanged();
+        waitUntilDisposed(instance);
+
+        assertFalse(server.isRunning());
+    }
+
+    public void testAReplacedInstanceIsDisposedOnTheUiThread() throws Exception {
+        var instance = instanceOf(file("a/one.per-folder"));
+        var disposedOnTheUiThread = new AtomicBoolean();
+        Disposer.register(instance, () -> disposedOnTheUiThread.set(ApplicationManager.getApplication().isDispatchThread()));
+
+        fireStrategyChanged();
+        waitUntilDisposed(instance);
+
+        assertTrue(disposedOnTheUiThread.get());
+    }
+
+    public void testAChangedStrategyEnablesTheDefinitionAgain() throws Exception {
+        var instance = instanceOf(file("a/one.per-folder"));
+        instance.stopAndDisable();
+        assertFalse(definition.isEnabled(myFixture.getProject()));
+
+        fireStrategyChanged();
+
+        assertTrue(definition.isEnabled(myFixture.getProject()));
+        assertNotSame(instance, instanceOf(file("a/two.per-folder")));
+    }
+
+    public void testAChangedStrategyConnectsAnOpenFileToItsNewInstance() throws Exception {
+        definition.strategy.perFolder = false;
+        var file = file("a/one.per-folder");
+        myFixture.openFileInEditor(file.getVirtualFile());
+        var instancePerProject = instanceOf(file);
+        assertNull(instancePerProject.getInstanceRoot());
+
+        definition.strategy.perFolder = true;
+        fireStrategyChanged();
+
+        waitUntilDisposed(instancePerProject);
+        PlatformTestUtil.waitWithEventsDispatching("The open file must get an instance of its folder", () -> {
+            var instances = instances();
+            return instances.size() == 1 && instances.get(0).getInstanceRoot() != null
+                    && instances.get(0).isConnectedTo(instances.get(0).toUri(file.getVirtualFile()));
+        }, 10);
+        assertEquals("a", instances().get(0).getInstanceRoot().getName());
+    }
+
+    public void testAChangedStrategyRestartsOneInstancePerProject() throws Exception {
+        definition.strategy.perFolder = false;
+        var instance = instanceOf(file("a/one.per-folder"));
+
+        fireStrategyChanged();
+
+        assertFalse(instance.isDisposed());
+        assertSameElements(instances(), instance);
+    }
+
     public void testADefinitionWithoutTheOptionKeepsOneInstance() throws Exception {
         definition.strategy.perFolder = false;
 
@@ -389,6 +466,34 @@ public class LanguageServerInstancesTest extends LSPCodeInsightFixtureTestCase {
         assertEquals(List.of(instance.getInstanceRoot()), definition.servers.get(0).getInitializeParams().getWorkspaceFolders());
     }
 
+    public void testAChangedStrategyConnectsAnOpenFileWithoutALanguageServer() throws Exception {
+        var file = file("other/one.per-folder");
+        myFixture.openFileInEditor(file.getVirtualFile());
+        assertEmpty(serversOf(file));
+        waitUntilOpeningTheFileIsDone();
+        assertEmpty(instances());
+
+        definition.strategy.perFolder = false;
+        fireStrategyChanged();
+
+        PlatformTestUtil.waitWithEventsDispatching("The open file must get a language server", () -> {
+            var instances = instances();
+            return instances.size() == 1 && instances.get(0).isConnectedTo(instances.get(0).toUri(file.getVirtualFile()));
+        }, 10);
+    }
+
+    public void testAStopWaitsForTheStopThatIsRunning() throws Exception {
+        var instance = instanceOf(file("a/one.per-folder"));
+        definition.servers.get(0).setTimeToProceedQueries(1000);
+
+        var running = instance.stop();
+        var second = instance.stop();
+
+        assertSame(running, second);
+        assertFalse(second.isDone());
+        waitFor(second);
+    }
+
     public void testADocumentOfTheServerBelongsToItsInstance() throws Exception {
         var instance = instanceOf(file("a/one.per-folder"));
         var other = instanceOf(file("b/one.per-folder"));
@@ -457,6 +562,44 @@ public class LanguageServerInstancesTest extends LSPCodeInsightFixtureTestCase {
         var instance = instanceOf(file);
         assertEquals("a", instance.getInstanceRoot().getName());
         assertFalse(accessor.hasAny(file, server -> server == other));
+    }
+
+    public void testAChangedCommandDoesNotStartAnInstanceThatStoppedWhenIdle() throws Exception {
+        var instance = instanceOf(file("a/one.per-folder"));
+        waitFor(instance.stop());
+
+        fireCommandChanged();
+
+        waitUntilDisposed(instance);
+        assertEmpty(instances());
+        assertEquals(1, definition.servers.size());
+    }
+
+    public void testAChangedCommandGivesAnOpenFileANewInstance() throws Exception {
+        var file = file("a/one.per-folder");
+        myFixture.openFileInEditor(file.getVirtualFile());
+        var instance = instanceOf(file);
+
+        fireCommandChanged();
+
+        waitUntilDisposed(instance);
+        PlatformTestUtil.waitWithEventsDispatching("The open file must get a new instance", () -> {
+            var instances = instances();
+            return instances.size() == 1 && instances.get(0).isSynchronizing(file.getVirtualFile());
+        }, 10);
+        assertEquals("a", instances().get(0).getInstanceRoot().getName());
+    }
+
+    public void testAChangedCommandRestartsOneInstancePerProject() throws Exception {
+        definition.strategy.perFolder = false;
+        var instance = instanceOf(file("a/one.per-folder"));
+
+        fireCommandChanged();
+
+        assertFalse(instance.isDisposed());
+        assertSameElements(instances(), instance);
+        PlatformTestUtil.waitWithEventsDispatching("The language server must start again",
+                () -> definition.servers.size() == 2, 10);
     }
 
     public void testChangedInitializationOptionsRestartEachInstanceOnce() throws Exception {
@@ -570,6 +713,10 @@ public class LanguageServerInstancesTest extends LSPCodeInsightFixtureTestCase {
         return servers.stream().map(LanguageServerItem::getServerWrapper).toList();
     }
 
+    private static void waitUntilDisposed(@NotNull LanguageServerWrapper instance) {
+        PlatformTestUtil.waitWithEventsDispatching("The replaced instance must be disposed", instance::isDisposed, 10);
+    }
+
     private void waitUntilStarted(@NotNull LanguageServerWrapper instance) {
         PlatformTestUtil.waitWithEventsDispatching("The instance must start again",
                 () -> instance.getServerStatus() == ServerStatus.started, 10);
@@ -590,11 +737,23 @@ public class LanguageServerInstancesTest extends LSPCodeInsightFixtureTestCase {
         return definition.strategy.askedFiles.stream().filter(file::equals).count();
     }
 
+    private void fireCommandChanged() {
+        LanguageServersRegistry.getInstance().handleChangeEvent(new LanguageServerDefinitionListener.LanguageServerChangedEvent(
+                LanguageServerDefinitionListener.LanguageServerDefinitionEvent.UpdatedBy.USER, myFixture.getProject(), definition,
+                false, true, false, false, false, false, false, false, false));
+    }
+
     private void fireInitializationOptionsChanged() {
         ProjectLanguageServerSettings.getInstance(myFixture.getProject()).handleChanged(
                 new LanguageServerSettingsListener.LanguageServerSettingsChangedEvent(definition.getId(),
                         new LanguageServerSettings.LanguageServerDefinitionSettings(),
                         false, false, false, true, false, false, false, false, false, false));
+    }
+
+    private void fireStrategyChanged() {
+        LanguageServersRegistry.getInstance().handleChangeEvent(new LanguageServerDefinitionListener.LanguageServerChangedEvent(
+                LanguageServerDefinitionListener.LanguageServerDefinitionEvent.UpdatedBy.USER, myFixture.getProject(), definition,
+                false, false, false, false, false, false, false, false, true));
     }
 
     private @NotNull PsiFile file(@NotNull String path) {
