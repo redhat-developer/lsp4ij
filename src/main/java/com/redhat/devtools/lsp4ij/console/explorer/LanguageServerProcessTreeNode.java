@@ -73,6 +73,12 @@ public class LanguageServerProcessTreeNode extends DefaultMutableTreeNode {
     }
 
     private String getDisplayName(@NotNull ServerStatus serverStatus) {
+        var instanceFolder = languageServer.getInstanceFolder();
+        String statusName = getStatusName(serverStatus);
+        return instanceFolder != null ? instanceFolder.getName() + ": " + statusName : statusName;
+    }
+
+    private String getStatusName(@NotNull ServerStatus serverStatus) {
         if (isInstallStatus(serverStatus)) {
             return serverStatus.name();
         }

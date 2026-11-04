@@ -37,6 +37,7 @@ import com.redhat.devtools.lsp4ij.settings.actions.ShowErrorLogAction;
 import com.redhat.devtools.lsp4ij.templates.ServerMappingSettings;
 import org.eclipse.lsp4j.MessageParams;
 import org.eclipse.lsp4j.MessageType;
+import org.eclipse.lsp4j.WorkspaceFolder;
 import org.eclipse.lsp4j.jsonrpc.json.MessageJsonHandler;
 import org.eclipse.lsp4j.jsonrpc.json.StreamMessageConsumer;
 import org.eclipse.lsp4j.jsonrpc.messages.NotificationMessage;
@@ -148,6 +149,18 @@ public class LanguageServerProcessNodesTest extends LSPCodeInsightFixtureTestCas
 
         assertEquals(1, rowsOf(processNode(first)));
         assertEquals(1, rowsOf(processNode(second)));
+    }
+
+    public void testAProcessNodeShowsTheFolderOfItsInstance() {
+        var instance = LanguageServerWrapper.forInstanceFolder(project, definition, new WorkspaceFolder("file:///web-tests", "web-tests"));
+        Disposer.register(getTestRootDisposable(), instance);
+
+        instance.updateStatus(ServerStatus.starting);
+        first.updateStatus(ServerStatus.starting);
+        PlatformTestUtil.dispatchAllEventsInIdeEventQueue();
+
+        assertEquals("web-tests: starting", processNode(instance).getDisplayName());
+        assertEquals("starting", processNode(first).getDisplayName());
     }
 
     public void testTheViewShowsTheLanguageServersStartedBeforeItOpened() {
