@@ -243,6 +243,32 @@ public class LanguageServerInstancePerFolderTest extends LSPCodeInsightFixtureTe
         assertEmpty(serversOf(file("other/one.per-folder")));
     }
 
+    public void testAnInstanceIsInitializedWithItsFolder() throws Exception {
+        var file = file("a/one.per-folder");
+        var instance = instanceOf(file);
+
+        var params = definition.servers.get(0).getInitializeParams();
+
+        assertEquals(List.of(instance.getInstanceFolder()), params.getWorkspaceFolders());
+        assertEquals(instance.toUriString(file.getVirtualFile().getParent()), params.getRootUri());
+    }
+
+    public void testAnInstanceAnswersWithItsFolder() throws Exception {
+        var instance = instanceOf(file("a/one.per-folder"));
+
+        var client = MockLanguageServerDefinition.getLastLanguageClient();
+        assertNotNull(client);
+
+        assertEquals(List.of(instance.getInstanceFolder()), client.workspaceFolders().get());
+    }
+
+    public void testAnInstanceGetsNoWorkspaceFolderChanges() throws Exception {
+        instanceOf(file("a/one.per-folder"));
+        instanceOf(file("a/two.per-folder"));
+
+        assertEmpty(definition.servers.get(0).getWorkspaceService().getWorkspaceFoldersEvents());
+    }
+
     public void testAReportOfAnotherInstanceDoesNotTakeAFile() throws Exception {
         var other = instanceOf(file("b/one.per-folder"));
         var file = file("a/one.per-folder");

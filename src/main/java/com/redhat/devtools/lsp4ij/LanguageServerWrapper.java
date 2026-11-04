@@ -221,6 +221,9 @@ public class LanguageServerWrapper implements Disposable {
         VirtualFileManager.getInstance().addAsyncFileListener(fileListener, this);
 
         String projectName = sanitize(!serverDefinition.isSingleton() ? ("@" + project.getName()) : "");  //$NON-NLS-1$//$NON-NLS-2$
+        if (instanceFolder != null) {
+            projectName += sanitize("@" + instanceFolder.getName());
+        }
 
         // Worker threads must not inherit the plugin classloader, or they pin it and block dynamic unload.
         var workerCtxClassLoader = ApplicationManager.class.getClassLoader();
@@ -766,6 +769,9 @@ public class LanguageServerWrapper implements Disposable {
 
     @Nullable
     private VirtualFile getRootURI() {
+        if (instanceFolder != null) {
+            return FileUriSupport.findFileByUri(instanceFolder.getUri(), getClientFeatures());
+        }
         var roots = LSPIJUtils.getRoots(getProject());
         if (roots.size() == 1) {
             return roots.iterator().next();

@@ -94,6 +94,13 @@ public class LSPWorkspaceFolderFeature {
      */
     @NotNull
     public List<WorkspaceFolder> getInitialWorkspaceFolders(@NotNull Project project) {
+        var languageServer = getClientFeatures().getServerWrapper();
+        var instanceFolder = languageServer != null ? languageServer.getInstanceFolder() : null;
+        if (instanceFolder != null) {
+            // An instance for one workspace folder has only this one
+            return List.of(instanceFolder);
+        }
+
         List<WorkspaceFolder> folders = getStrategy().getInitialWorkspaceFolders(project, getClientFeatures());
 
         // Track folders that were sent during initialization
@@ -113,8 +120,8 @@ public class LSPWorkspaceFolderFeature {
      */
     @Nullable
     public WorkspaceFolder computeWorkspaceFolderToNotify(@NotNull VirtualFile file) {
-        if (getStrategy().sendAllFoldersOnInitialization()) {
-            // Strategy sends all folders at initialization, no dynamic notification needed
+        if (getStrategy().sendAllFoldersOnInitialization() || getStrategy().isServerInstancePerFolder()) {
+            // Strategy sends all folders at initialization, or the instance has only its own: no dynamic notification needed
             return null;
         }
 
