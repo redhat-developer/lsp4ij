@@ -791,6 +791,9 @@ CommandExecutor.executeCommand(commandContext)
  * `LanguageClientImpl#createSettings()` which must return a Gson JsonObject of your configuration.
  * or `LanguageClientImpl#findSettings(String section)` if you don't want to work with GSon JsonObject.
 
+A member set to `null` in the `JsonObject` of `createSettings()` reaches the language server as `null`, in the reply
+to `workspace/configuration` and in `workspace/didChangeConfiguration`, so that it can reset that setting to its default.
+
 # Workspace Folders
 
 LSP4IJ provides support for [workspace/workspaceFolders](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_workspaceFolders) to control which directories are sent to the language server as workspace roots
