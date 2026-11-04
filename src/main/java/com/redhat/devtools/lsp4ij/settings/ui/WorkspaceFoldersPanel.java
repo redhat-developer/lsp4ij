@@ -46,6 +46,8 @@ import com.redhat.devtools.lsp4ij.settings.jsonSchema.LSPWorkspaceFoldersJsonSch
 import org.eclipse.lsp4j.WorkspaceFolder;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.jetbrains.annotations.TestOnly;
+import org.jetbrains.annotations.VisibleForTesting;
 
 import javax.swing.*;
 import javax.swing.tree.DefaultMutableTreeNode;
@@ -73,6 +75,7 @@ import java.util.List;
 public class WorkspaceFoldersPanel extends JPanel implements Disposable {
 
     private static final String NO_ROOT_NODE_KEY = "language.server.workspaceFolders.noRoot";
+    private static final String NO_INSTANCE_NODE_KEY = "language.server.workspaceFolders.noInstance";
 
     private final Project project;
     private final WorkspaceFolderStrategy strategy;
@@ -333,7 +336,7 @@ public class WorkspaceFoldersPanel extends JPanel implements Disposable {
                 }
 
                 DefaultMutableTreeNode node = (DefaultMutableTreeNode) path.getLastPathComponent();
-                if (node.getUserObject() instanceof FolderNodeData) {
+                if (hasLink(node)) {
                     FolderNodeData data = (FolderNodeData) node.getUserObject();
 
                     // Open LSP specification link
@@ -356,7 +359,7 @@ public class WorkspaceFoldersPanel extends JPanel implements Disposable {
                 TreePath path = workspaceFoldersTree.getPathForLocation(e.getX(), e.getY());
                 if (path != null) {
                     DefaultMutableTreeNode node = (DefaultMutableTreeNode) path.getLastPathComponent();
-                    if (node.getUserObject() instanceof FolderNodeData) {
+                    if (hasLink(node)) {
                         workspaceFoldersTree.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
                         return;
                     }
@@ -364,6 +367,11 @@ public class WorkspaceFoldersPanel extends JPanel implements Disposable {
                 workspaceFoldersTree.setCursor(Cursor.getDefaultCursor());
             }
         });
+    }
+
+    private static boolean hasLink(@NotNull DefaultMutableTreeNode node) {
+        // The row of a language server instance names no LSP message to link to
+        return node.getUserObject() instanceof FolderNodeData data && !data.serverInstance;
     }
 
     private void showContextMenu(MouseEvent e) {
@@ -384,7 +392,8 @@ public class WorkspaceFoldersPanel extends JPanel implements Disposable {
         }
     }
 
-    private void removeSelectedFile() {
+    @VisibleForTesting
+    void removeSelectedFile() {
         TreePath selectedPath = workspaceFoldersTree.getSelectionPath();
         if (selectedPath == null) {
             return;
@@ -404,6 +413,10 @@ public class WorkspaceFoldersPanel extends JPanel implements Disposable {
         DefaultMutableTreeNode parentNode = (DefaultMutableTreeNode) selectedNode.getParent();
         treeModel.removeNodeFromParent(selectedNode);
 
+        removeEmptyParent(parentNode);
+    }
+
+    private void removeEmptyParent(@Nullable DefaultMutableTreeNode parentNode) {
         // If parent folder is now empty and not in the config folders, remove it too
         if (parentNode != null && parentNode.getChildCount() == 0) {
             Object parentUserObject = parentNode.getUserObject();
@@ -411,12 +424,13 @@ public class WorkspaceFoldersPanel extends JPanel implements Disposable {
             if (parentUserObject instanceof FolderNodeData) {
                 FolderNodeData folderData = (FolderNodeData) parentUserObject;
                 String folderUri = FileUriSupport.toString(folderData.file, FileUriSupport.DEFAULT);
+                var grandParentNode = (DefaultMutableTreeNode) parentNode.getParent();
 
                 // Only remove folder node if it's not in the current config
                 boolean isConfigFolder = false;
                 List<WorkspaceFolder> configFolders;
 
-                boolean showInitFolders = sendAtInitCheckbox != null && sendAtInitCheckbox.isSelected();
+                boolean showInitFolders = isShowingInitFolders();
                 if (showInitFolders) {
                     configFolders = strategy.getInitialWorkspaceFolders(project, FileUriSupport.DEFAULT);
                 } else {
@@ -435,8 +449,10 @@ public class WorkspaceFoldersPanel extends JPanel implements Disposable {
                     if (folderUri != null) {
                         folderNodes.remove(folderUri);
                     }
+                    // The instance of a workspace folder can be empty now
+                    removeEmptyParent(grandParentNode);
                 }
-            } else if (NO_ROOT_NODE_KEY.equals(parentUserObject)) {
+            } else if (NO_ROOT_NODE_KEY.equals(parentUserObject) || NO_INSTANCE_NODE_KEY.equals(parentUserObject)) {
                 // Remove "No root" node if empty
                 treeModel.removeNodeFromParent(parentNode);
                 noRootNode = null;
@@ -452,50 +468,96 @@ public class WorkspaceFoldersPanel extends JPanel implements Disposable {
         }
     }
 
-    private void testFile(@NotNull VirtualFile file) {
+    @TestOnly
+    JTree getWorkspaceFoldersTree() {
+        return workspaceFoldersTree;
+    }
+
+    void testFile(@NotNull VirtualFile file) {
         // Always run slow operation in background thread
         ApplicationManager.getApplication().executeOnPooledThread(() -> {
-            WorkspaceFolder folder = strategy.getWorkspaceFolderForFile(file, project, FileUriSupport.DEFAULT);
+            var location = locate(file);
 
             // Update UI on EDT
             ApplicationManager.getApplication().invokeLater(() -> {
-                addTestedFile(file, folder);
+                addTestedFile(file, location);
             });
         });
     }
 
-    private void addTestedFile(@NotNull VirtualFile file, @Nullable WorkspaceFolder folder) {
+    private void addTestedFile(@NotNull VirtualFile file, @NotNull FileLocation location) {
         // Track opened file
         openedFiles.add(file);
 
-        if (folder != null) {
-            // Find or create the folder node
-            DefaultMutableTreeNode folderNode = folderNodes.get(folder.getUri());
-            if (folderNode == null) {
-                VirtualFile folderFile = LSPIJUtils.findResourceFor(folder.getUri());
-                if (folderFile != null) {
-                    folderNode = new DefaultMutableTreeNode(new FolderNodeData(folderFile, true));
-                    folderNodes.put(folder.getUri(), folderNode);
-                    treeModel.insertNodeInto(folderNode, rootNode, rootNode.getChildCount());
-                }
-            }
+        // Inside an instance, the row has to say how the folder really gets there
+        boolean sentAtInit = !strategy.hasServerInstances() || strategy.sendAllFoldersOnInitialization();
+        var parentNode = addFileNode(file, location, sentAtInit);
+        workspaceFoldersTree.expandPath(new TreePath(parentNode.getPath()));
+    }
 
-            if (folderNode != null) {
-                // Add file under folder
-                DefaultMutableTreeNode fileNode = new DefaultMutableTreeNode(new FileNodeData(file));
-                treeModel.insertNodeInto(fileNode, folderNode, folderNode.getChildCount());
-                workspaceFoldersTree.expandPath(new TreePath(folderNode.getPath()));
-            }
-        } else {
+    /**
+     * Where a file goes in the tree: the root of its language server instance, if there are instances, and its
+     * workspace folder inside that instance. The folder is null if the file has neither.
+     */
+    private record FileLocation(@Nullable WorkspaceFolder instanceRoot, @Nullable WorkspaceFolder folder) {
+    }
+
+    private @NotNull FileLocation locate(@NotNull VirtualFile file) {
+        var folder = strategy.getWorkspaceFolderForFile(file, project, FileUriSupport.DEFAULT);
+        if (!strategy.hasServerInstances()) {
+            return new FileLocation(null, folder);
+        }
+        var instanceRoot = strategy.getServerInstanceRoot(file, project, FileUriSupport.DEFAULT);
+        boolean inInstance = instanceRoot != null && folder != null
+                && strategy.belongsToServerInstance(folder, instanceRoot, project, FileUriSupport.DEFAULT);
+        return new FileLocation(instanceRoot, inInstance ? folder : instanceRoot);
+    }
+
+    private @NotNull DefaultMutableTreeNode addFileNode(@NotNull VirtualFile file,
+                                                        @NotNull FileLocation location,
+                                                        boolean sentAtInit) {
+        var parentNode = location.folder() != null ? getOrCreateFolderNode(location, sentAtInit) : null;
+        if (parentNode == null) {
             // Add to "No root" node
             if (noRootNode == null) {
-                noRootNode = new DefaultMutableTreeNode(NO_ROOT_NODE_KEY);
+                noRootNode = new DefaultMutableTreeNode(getNoRootNodeKey());
                 treeModel.insertNodeInto(noRootNode, rootNode, rootNode.getChildCount());
             }
-            DefaultMutableTreeNode fileNode = new DefaultMutableTreeNode(new FileNodeData(file));
-            treeModel.insertNodeInto(fileNode, noRootNode, noRootNode.getChildCount());
-            workspaceFoldersTree.expandPath(new TreePath(noRootNode.getPath()));
+            parentNode = noRootNode;
         }
+        treeModel.insertNodeInto(new DefaultMutableTreeNode(new FileNodeData(file)), parentNode, parentNode.getChildCount());
+        return parentNode;
+    }
+
+    /**
+     * Returns the node of a workspace folder, under the node of its instance if it has one. A folder that is the root
+     * of its instance shares that node.
+     */
+    private @Nullable DefaultMutableTreeNode getOrCreateFolderNode(@NotNull FileLocation location, boolean sentAtInit) {
+        var parentNode = rootNode;
+        if (location.instanceRoot() != null) {
+            parentNode = getOrCreateFolderNode(location.instanceRoot(), rootNode, sentAtInit, true);
+            if (parentNode == null || location.instanceRoot().getUri().equals(location.folder().getUri())) {
+                return parentNode;
+            }
+        }
+        return getOrCreateFolderNode(location.folder(), parentNode, sentAtInit, false);
+    }
+
+    private @Nullable DefaultMutableTreeNode getOrCreateFolderNode(@NotNull WorkspaceFolder folder,
+                                                                   @NotNull DefaultMutableTreeNode parentNode,
+                                                                   boolean sentAtInit,
+                                                                   boolean serverInstance) {
+        var node = folderNodes.get(folder.getUri());
+        if (node == null) {
+            VirtualFile file = LSPIJUtils.findResourceFor(folder.getUri());
+            if (file != null) {
+                node = new DefaultMutableTreeNode(new FolderNodeData(file, sentAtInit, serverInstance));
+                folderNodes.put(folder.getUri(), node);
+                treeModel.insertNodeInto(node, parentNode, parentNode.getChildCount());
+            }
+        }
+        return node;
     }
 
 
@@ -514,10 +576,13 @@ public class WorkspaceFoldersPanel extends JPanel implements Disposable {
 
             // Update empty text based on strategy type
             updateEmptyText();
+            if (sendAtInitCheckbox != null) {
+                sendAtInitCheckbox.setEnabled(!strategy.hasServerInstances());
+            }
 
             // Get folders based on checkbox state (for preview/testing)
             List<WorkspaceFolder> folders;
-            boolean showInitFolders = sendAtInitCheckbox != null && sendAtInitCheckbox.isSelected();
+            boolean showInitFolders = isShowingInitFolders();
 
             if (showInitFolders) {
                 // Show only what would be sent at initialization (respects lazy config)
@@ -529,44 +594,20 @@ public class WorkspaceFoldersPanel extends JPanel implements Disposable {
 
             // Add folders to tree
             for (WorkspaceFolder folder : folders) {
-                VirtualFile file = LSPIJUtils.findResourceFor(folder.getUri());
-                if (file != null) {
-                    DefaultMutableTreeNode node = new DefaultMutableTreeNode(new FolderNodeData(file, strategy.sendAllFoldersOnInitialization()));
-                    folderNodes.put(folder.getUri(), node);
-                    treeModel.insertNodeInto(node, rootNode, rootNode.getChildCount());
+                if (strategy.hasServerInstances()) {
+                    VirtualFile file = LSPIJUtils.findResourceFor(folder.getUri());
+                    var instanceRoot = file != null ? strategy.getServerInstanceRoot(file, project, FileUriSupport.DEFAULT) : null;
+                    if (instanceRoot != null) {
+                        getOrCreateFolderNode(new FileLocation(instanceRoot, folder), strategy.sendAllFoldersOnInitialization());
+                    }
+                } else {
+                    getOrCreateFolderNode(folder, rootNode, strategy.sendAllFoldersOnInitialization(), false);
                 }
             }
 
             // Re-test opened files with new configuration
             for (VirtualFile openedFile : openedFiles) {
-                WorkspaceFolder folder = strategy.getWorkspaceFolderForFile(openedFile, project, FileUriSupport.DEFAULT);
-
-                if (folder != null) {
-                    // Find or create folder node
-                    DefaultMutableTreeNode folderNode = folderNodes.get(folder.getUri());
-                    if (folderNode == null) {
-                        VirtualFile folderFile = LSPIJUtils.findResourceFor(folder.getUri());
-                        if (folderFile != null) {
-                            folderNode = new DefaultMutableTreeNode(new FolderNodeData(folderFile, strategy.sendAllFoldersOnInitialization()));
-                            folderNodes.put(folder.getUri(), folderNode);
-                            treeModel.insertNodeInto(folderNode, rootNode, rootNode.getChildCount());
-                        }
-                    }
-
-                    if (folderNode != null) {
-                        // Add file under folder
-                        DefaultMutableTreeNode fileNode = new DefaultMutableTreeNode(new FileNodeData(openedFile));
-                        treeModel.insertNodeInto(fileNode, folderNode, folderNode.getChildCount());
-                    }
-                } else {
-                    // File has no workspace folder, add to "No root"
-                    if (noRootNode == null) {
-                        noRootNode = new DefaultMutableTreeNode(NO_ROOT_NODE_KEY);
-                        treeModel.insertNodeInto(noRootNode, rootNode, rootNode.getChildCount());
-                    }
-                    DefaultMutableTreeNode fileNode = new DefaultMutableTreeNode(new FileNodeData(openedFile));
-                    treeModel.insertNodeInto(fileNode, noRootNode, noRootNode.getChildCount());
-                }
+                addFileNode(openedFile, locate(openedFile), strategy.sendAllFoldersOnInitialization());
             }
 
             treeModel.reload();
@@ -575,6 +616,15 @@ public class WorkspaceFoldersPanel extends JPanel implements Disposable {
             // On error, clear the tree
             treeModel.reload();
         }
+    }
+
+    private @NotNull String getNoRootNodeKey() {
+        return strategy.hasServerInstances() ? NO_INSTANCE_NODE_KEY : NO_ROOT_NODE_KEY;
+    }
+
+    private boolean isShowingInitFolders() {
+        // Which folders an instance gets at initialization is only known once there is a file of that instance
+        return !strategy.hasServerInstances() && sendAtInitCheckbox != null && sendAtInitCheckbox.isSelected();
     }
 
     private void updateEmptyText() {
@@ -607,7 +657,7 @@ public class WorkspaceFoldersPanel extends JPanel implements Disposable {
                 emptyText.appendText("Open a file", SimpleTextAttributes.LINK_PLAIN_ATTRIBUTES, e -> browseFile());
                 emptyText.appendText(" to test discovery.");
             }
-        } else if (isLazy) {
+        } else if (rootType != RootType.NONE && (isLazy || strategy.hasServerInstances())) {
             boolean hasOpenedFiles = !openedFiles.isEmpty();
             if (hasOpenedFiles) {
                 emptyText.setText("Workspace folders will be discovered dynamically as files are opened");
@@ -663,10 +713,12 @@ public class WorkspaceFoldersPanel extends JPanel implements Disposable {
     private static class FolderNodeData {
         final VirtualFile file;
         final boolean sentAtInit;
+        final boolean serverInstance;
 
-        FolderNodeData(VirtualFile file, boolean sentAtInit) {
+        FolderNodeData(VirtualFile file, boolean sentAtInit, boolean serverInstance) {
             this.file = file;
             this.sentAtInit = sentAtInit;
+            this.serverInstance = serverInstance;
         }
     }
 
@@ -691,7 +743,9 @@ public class WorkspaceFoldersPanel extends JPanel implements Disposable {
                 setIcon(AllIcons.Nodes.Folder);
                 append(data.file.getPath(), SimpleTextAttributes.REGULAR_ATTRIBUTES);
                 // Parse and render message with hyperlink
-                String message = data.sentAtInit ?
+                String message = data.serverInstance ?
+                        LanguageServerBundle.message("language.server.workspaceFolders.instance") :
+                        data.sentAtInit ?
                         LanguageServerBundle.message("language.server.workspaceFolders.sentAtInit") :
                         LanguageServerBundle.message("language.server.workspaceFolders.lazy");
                 appendTextWithHyperlink(" " + message);
@@ -700,10 +754,10 @@ public class WorkspaceFoldersPanel extends JPanel implements Disposable {
                 setIcon(data.file.getFileType().getIcon());
                 append(data.file.getName(), SimpleTextAttributes.REGULAR_ATTRIBUTES);
                 append(" - " + data.file.getPath(), SimpleTextAttributes.GRAYED_ATTRIBUTES);
-            } else if (userObject instanceof String && NO_ROOT_NODE_KEY.equals(userObject)) {
+            } else if (userObject instanceof String key && (NO_ROOT_NODE_KEY.equals(key) || NO_INSTANCE_NODE_KEY.equals(key))) {
                 // It's the NO_ROOT node
                 setIcon(AllIcons.General.Warning);
-                append(LanguageServerBundle.message(NO_ROOT_NODE_KEY), SimpleTextAttributes.ERROR_ATTRIBUTES);
+                append(LanguageServerBundle.message(key), SimpleTextAttributes.ERROR_ATTRIBUTES);
             }
         }
 

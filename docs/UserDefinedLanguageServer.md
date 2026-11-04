@@ -333,6 +333,10 @@ Without `rootType` and `markers` next to `serverInstances`, the root is the only
 
 Here, each folder with a `pyproject.toml` has an instance, and that instance gets the source roots inside it. With `"lazy": true`, it gets them through `workspace/didChangeWorkspaceFolders` as their files are opened. A workspace folder that belongs to another instance, or that contains several, doesn't reach an instance. An instance that would be left without a folder gets its root, unless `rootType` next to `serverInstances` is `NONE`.
 
+In this example, `backend` and `frontend` each contain a `pyproject.toml` and source roots, so each has its own instance. `scripts/tool.py` has no marker above it, so it gets none:
+
+![Several language server instances](./images/workspace-folders/ServerInstances.png)
+
 Changing this configuration, the command, the working directory, the environment variables or the mappings replaces the instances. Those with an open file start again, the others when one of their files is opened.
 
 #### Testing your configuration
@@ -350,6 +354,8 @@ The **preview panel** on the right shows how workspace folders will be sent base
 **Drag & drop or click "Open file..."** to simulate opening a file and see which workspace folder it belongs to:
 
 ![Root type - PROJECT_BASE - lazy](./images/workspace-folders/RootType_PROJECT_BASE_lazy_checkInit_openFile.png)
+
+With `serverInstances`, the preview shows each language server instance with its workspace folders below it, so a file you open shows which instance serves it.
 
 If a file is not included in any workspace folder, it will appear under a "(No root)" node:
 
