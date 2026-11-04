@@ -318,6 +318,7 @@ Files with the same root share an instance:
  * It's initialized with its root as `rootUri`.
  * A file without a root gets no instance, so this language server provides no features for it. With `"rootType": "NONE"` in `serverInstances`, no file has a root, so no instance starts.
  * With markers, the search doesn't stop at the project: a marker above the project's folder can make that folder the root.
+ * All instances use the same command. If no working directory is configured, an instance runs in its root.
 
 Without `rootType` and `markers` next to `serverInstances`, the root is the only workspace folder of an instance. With them, they describe the workspace folders inside an instance:
 

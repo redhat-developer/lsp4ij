@@ -261,6 +261,12 @@ public class LanguageServerInstancesTest extends LSPCodeInsightFixtureTestCase {
         assertEquals(instance.toUriString(file.getVirtualFile().getParent()), params.getRootUri());
     }
 
+    public void testAnInstanceStartsItsConnectionWithItsFolder() throws Exception {
+        var instance = instanceOf(file("a/one.per-folder"));
+
+        assertEquals(List.of(instance.getInstanceRoot()), definition.connectionFolders);
+    }
+
     public void testAnInstanceAnswersWithItsFolder() throws Exception {
         var instance = instanceOf(file("a/one.per-folder"));
 
@@ -735,6 +741,7 @@ public class LanguageServerInstancesTest extends LSPCodeInsightFixtureTestCase {
         final FolderStrategy strategy = new FolderStrategy();
         volatile WorkspaceFolderStrategy activeStrategy = strategy;
         final List<MockLanguageServer> servers = new CopyOnWriteArrayList<>();
+        final List<WorkspaceFolder> connectionFolders = new CopyOnWriteArrayList<>();
 
         PerFolderDefinition() {
             super("per-folder-server", false);
@@ -745,6 +752,13 @@ public class LanguageServerInstancesTest extends LSPCodeInsightFixtureTestCase {
             var server = new MockLanguageServer(PerFolderDefinition::capabilities);
             servers.add(server);
             return new MockConnectionProvider(server);
+        }
+
+        @Override
+        public @NotNull StreamConnectionProvider createConnectionProvider(@NotNull Project project,
+                                                                          @NotNull WorkspaceFolder instanceRoot) {
+            connectionFolders.add(instanceRoot);
+            return super.createConnectionProvider(project, instanceRoot);
         }
 
         @Override

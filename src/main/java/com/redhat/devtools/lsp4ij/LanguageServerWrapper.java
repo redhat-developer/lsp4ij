@@ -490,7 +490,9 @@ public class LanguageServerWrapper implements Disposable {
                             tracing = null;
                         }
 
-                        var provider = serverDefinition.createConnectionProvider(initialProject);
+                        var provider = instanceRoot != null ?
+                                serverDefinition.createConnectionProvider(initialProject, instanceRoot) :
+                                serverDefinition.createConnectionProvider(initialProject);
                         initializingContext.provider = provider;
                         initParams.setInitializationOptions(provider.getInitializationOptions(rootURI));
 

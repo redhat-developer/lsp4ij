@@ -9,20 +9,27 @@ package com.redhat.devtools.lsp4ij.server.definition.launching;
 
 import com.intellij.openapi.util.Disposer;
 import com.intellij.openapi.util.io.FileUtil;
+import com.intellij.openapi.vfs.JarFileSystem;
 import com.intellij.openapi.vfs.LocalFileSystem;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.openapi.vfs.newvfs.impl.VfsRootAccess;
 import com.intellij.testFramework.fixtures.BasePlatformTestCase;
 import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
+import com.redhat.devtools.lsp4ij.client.features.FileUriSupport;
+import com.redhat.devtools.lsp4ij.server.OSProcessStreamConnectionProvider;
 import com.redhat.devtools.lsp4ij.templates.ServerMappingSettings;
+import org.eclipse.lsp4j.WorkspaceFolder;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
 
 /**
  * Tests a user-defined language server whose workspace folder configuration asks for several instances.
@@ -79,6 +86,57 @@ public class UserDefinedServerInstancesTest extends BasePlatformTestCase {
 
         assertNotNull(folder);
         assertEquals(root.getName(), folder.getName());
+    }
+
+    public void testAnInstanceRunsInItsRootWithoutAWorkingDirectory() throws IOException {
+        var folder = localDirectory();
+        addDefinition(null, "{\"serverInstances\": {}}");
+
+        assertEquals(new File(folder.getPath()), workDirectoryOfInstance(folder));
+    }
+
+    public void testAnInstanceRunsInItsRootWithABlankWorkingDirectory() throws IOException {
+        var folder = localDirectory();
+        addDefinition(" ", "{\"serverInstances\": {}}");
+
+        assertEquals(new File(folder.getPath()), workDirectoryOfInstance(folder));
+    }
+
+    public void testAConfiguredWorkingDirectoryAppliesToAnInstance() throws IOException {
+        var folder = localDirectory();
+        var workingDirectory = localDirectory();
+        addDefinition(workingDirectory.getPath(), "{\"serverInstances\": {}}");
+
+        assertEquals(new File(workingDirectory.getPath()), workDirectoryOfInstance(folder));
+    }
+
+    public void testAnInstanceWithARootInAnArchiveGetsNoWorkingDirectory() throws IOException {
+        var jar = localDirectory().toNioPath().resolve("archive.jar");
+        try (var archive = new ZipOutputStream(Files.newOutputStream(jar))) {
+            archive.putNextEntry(new ZipEntry("one.user-defined"));
+            archive.closeEntry();
+        }
+        var localJar = LocalFileSystem.getInstance().refreshAndFindFileByNioFile(jar);
+        assertNotNull(localJar);
+        var folder = JarFileSystem.getInstance().getJarRootForLocalFile(localJar);
+        assertNotNull(folder);
+        addDefinition(null, "{\"serverInstances\": {}}");
+
+        assertNull(workDirectoryOfInstance(folder));
+    }
+
+    public void testOneInstancePerProjectGetsNoWorkingDirectoryOfItsOwn() {
+        addDefinition(null, null);
+
+        var provider = (OSProcessStreamConnectionProvider) definition.createConnectionProvider(getProject());
+
+        assertNull(provider.getCommandLine().getWorkDirectory());
+    }
+
+    private @Nullable File workDirectoryOfInstance(@NotNull VirtualFile folder) {
+        var instanceRoot = new WorkspaceFolder(FileUriSupport.DEFAULT.toString(folder), folder.getName());
+        var provider = (OSProcessStreamConnectionProvider) definition.createConnectionProvider(getProject(), instanceRoot);
+        return provider.getCommandLine().getWorkDirectory();
     }
 
     private void addDefinition(@Nullable String workingDir, @Nullable String configuration) {

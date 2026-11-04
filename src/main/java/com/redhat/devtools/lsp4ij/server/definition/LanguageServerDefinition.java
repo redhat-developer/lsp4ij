@@ -34,6 +34,7 @@ import com.redhat.devtools.lsp4ij.features.semanticTokens.DefaultSemanticTokensC
 import com.redhat.devtools.lsp4ij.features.semanticTokens.SemanticTokensColorsProvider;
 import com.redhat.devtools.lsp4ij.installation.ServerInstaller;
 import com.redhat.devtools.lsp4ij.server.DefaultLauncherBuilder;
+import com.redhat.devtools.lsp4ij.server.StreamConnectionProvider;
 import com.redhat.devtools.lsp4ij.settings.contributors.LanguageServerSettingsContributor;
 import org.eclipse.lsp4j.WorkspaceFolder;
 import org.eclipse.lsp4j.jsonrpc.Launcher;
@@ -190,6 +191,19 @@ public abstract class LanguageServerDefinition implements LanguageServerFactory,
             LOGGER.warn("Cannot get the language server instance of '" + file.getUrl() + "' for the language server '" + id + "'", e);
             return null;
         }
+    }
+
+    /**
+     * Returns the connection provider of the language server instance with the given root.
+     *
+     * @param project      the project.
+     * @param instanceRoot the root of the instance.
+     * @return the connection provider of the language server instance with the given root.
+     */
+    @ApiStatus.Internal
+    public @NotNull StreamConnectionProvider createConnectionProvider(@NotNull Project project,
+                                                                      @NotNull WorkspaceFolder instanceRoot) {
+        return createConnectionProvider(project);
     }
 
     /**
