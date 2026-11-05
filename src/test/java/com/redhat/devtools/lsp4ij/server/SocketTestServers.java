@@ -20,7 +20,8 @@ import java.util.concurrent.CompletableFuture;
 /**
  * The language servers of {@link SocketStreamConnectionProviderTest}, which run in Java processes of their own, with
  * the test classes only on their class path, so they use nothing but the JDK. Each takes the port as its argument and
- * echoes the lines of its connection until "bye", then ends.
+ * echoes the lines of its connection until "bye", then ends. They write their log to the standard output or error, as
+ * language servers do, with an empty line and a last line without a line feed, which the log leaves out and keeps.
  */
 public final class SocketTestServers {
 
@@ -34,7 +35,7 @@ public final class SocketTestServers {
         public static void main(String[] args) throws IOException {
             int port = Integer.parseInt(args[0]);
             try (var server = new ServerSocket(port, 1, InetAddress.getLoopbackAddress())) {
-                System.err.println("listening on " + port);
+                System.out.println("listening on " + port);
                 echo(server.accept());
             }
         }
@@ -46,8 +47,10 @@ public final class SocketTestServers {
     public static class ConnectingServer {
         public static void main(String[] args) throws IOException {
             int port = Integer.parseInt(args[0]);
+            System.err.println();
             System.err.println("connecting to " + port);
             echo(new Socket(InetAddress.getLoopbackAddress(), port));
+            System.err.print("ended");
         }
     }
 

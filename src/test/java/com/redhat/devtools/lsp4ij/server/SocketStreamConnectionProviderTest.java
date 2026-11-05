@@ -112,6 +112,7 @@ public class SocketStreamConnectionProviderTest extends LightPlatformTestCase {
                 provider.stop();
 
                 assertThrows(IOException.class, () -> provider.getInputStream().read());
+                assertThrows(IOException.class, () -> provider.getInputStream().read(new byte[8]));
                 assertEquals(0, stops.get());
             }
         }
@@ -159,13 +160,16 @@ public class SocketStreamConnectionProviderTest extends LightPlatformTestCase {
     public void testALanguageServerThatEndsOnceConnectedStopsUnexpectedly() throws Exception {
         var provider = SocketStreamConnectionProvider.startAndAccept(0, port -> java(ConnectingServer.class, port));
         var stops = countUnexpectedStops(provider);
+        var log = log(provider);
         try {
             provider.start();
             writeLine(provider.getOutputStream(), "bye");
 
             // it ends, which closes the connection
-            assertEquals(-1, provider.getInputStream().read());
+            assertEquals(-1, provider.getInputStream().read(new byte[8]));
             assertEquals(1, stops.get());
+            // its last line has no line feed
+            awaitLog(log, "ended");
             awaitExit(provider);
             assertFalse(provider.isAlive());
             assertEquals("reported once", 1, stops.get());
@@ -237,6 +241,33 @@ public class SocketStreamConnectionProviderTest extends LightPlatformTestCase {
         assertStopEndsTheStart(SocketStreamConnectionProvider.startAndAccept(0, port -> java(WaitingServer.class, port)));
     }
 
+    public void testCannotStartALanguageServerWhoseCommandCannotRun() {
+        var provider = SocketStreamConnectionProvider.startAndAccept(0,
+                port -> new GeneralCommandLine(Path.of("no", "such", "language-server").toString(), String.valueOf(port)));
+
+        assertThrows(CannotStartProcessException.class, provider::start);
+        assertNull(provider.getPid());
+        assertFalse(provider.isAlive());
+    }
+
+    public void testCannotStartOnceStopped() {
+        var provider = SocketStreamConnectionProvider.connectTo(HOST, 6005);
+        provider.stop();
+
+        assertThrows(CannotStartProcessException.class, provider::start);
+        assertFalse(provider.isAlive());
+        assertNull(provider.getInputStream());
+    }
+
+    public void testEachWayHasItsDirection() {
+        assertSame(SocketStreamConnectionProvider.Direction.CONNECT,
+                SocketStreamConnectionProvider.connectTo(HOST, 6005).getDirection());
+        assertSame(SocketStreamConnectionProvider.Direction.CONNECT,
+                SocketStreamConnectionProvider.startAndConnect(0, port -> java(ListeningServer.class, port)).getDirection());
+        assertSame(SocketStreamConnectionProvider.Direction.ACCEPT,
+                SocketStreamConnectionProvider.startAndAccept(0, port -> java(ConnectingServer.class, port)).getDirection());
+    }
+
     public void testStartsOnce() throws Exception {
         try (var server = new ServerSocket(0, 1, InetAddress.getLoopbackAddress())) {
             var provider = SocketStreamConnectionProvider.connectTo(HOST, server.getLocalPort());
@@ -253,6 +284,7 @@ public class SocketStreamConnectionProviderTest extends LightPlatformTestCase {
     public void testARunningLanguageServerNeedsItsPort() {
         assertThrows(IllegalArgumentException.class, () -> SocketStreamConnectionProvider.connectTo(HOST, 0));
         assertThrows(IllegalArgumentException.class, () -> SocketStreamConnectionProvider.connectTo(HOST, 65536));
+        assertThrows(IllegalArgumentException.class, () -> SocketStreamConnectionProvider.connectTo(HOST, -1));
     }
 
     /**
