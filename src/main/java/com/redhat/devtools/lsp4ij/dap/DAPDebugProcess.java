@@ -61,6 +61,7 @@ import com.redhat.devtools.lsp4ij.dap.client.files.DAPFileRegistry;
 import com.redhat.devtools.lsp4ij.dap.client.files.DAPSourceReferencePosition;
 import com.redhat.devtools.lsp4ij.dap.client.variables.DAPValueFormat;
 import com.redhat.devtools.lsp4ij.dap.configurations.DAPCommandLineState;
+import com.redhat.devtools.lsp4ij.dap.console.DAPConsoleView;
 import com.redhat.devtools.lsp4ij.dap.descriptors.DebugAdapterDescriptor;
 import com.redhat.devtools.lsp4ij.dap.disassembly.DAPAlternativeSourceHandler;
 import com.redhat.devtools.lsp4ij.dap.disassembly.DisassemblyFile;
@@ -92,6 +93,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Supplier;
@@ -161,6 +163,8 @@ public class DAPDebugProcess extends XDebugProcess implements Disposable {
     // Smart Step Into
     private DAPSmartStepIntoHandler smartStepIntoHandler;
 
+    // Debug console: the evaluations of the lines typed in it, one after the other, guarded by consoleLock
+    private @NotNull CompletableFuture<?> consoleEvaluations = CompletableFuture.completedFuture(null);
     // Debug console: whether what it printed last ends its line, so that a message of LSP4IJ's own starts a line
     private final Object consoleLock = new Object();
     private boolean consoleLineEnded = true;
@@ -353,7 +357,43 @@ public class DAPDebugProcess extends XDebugProcess implements Disposable {
     @Override
     public @NotNull ExecutionConsole createConsole() {
         // Override this method to avoid creating a new console and use the console from the execution result.
-        return executionResult.getExecutionConsole();
+        var console = executionResult.getExecutionConsole();
+        if (console instanceof DAPConsoleView dapConsole) {
+            // A line typed in the console is evaluated by the debug adapter, as VS Code's Debug Console does
+            dapConsole.setInputHandler(this::evaluateConsoleLine);
+        }
+        return console;
+    }
+
+    /**
+     * Sends a line typed in the debug console to the debug adapter as an evaluate request with the context repl, in
+     * the selected stack frame when the program is stopped, and prints its result, or the adapter's error, in the
+     * console. The lines are evaluated one after the other, so that the adapter gets them, and the console shows
+     * their results, in the order they were typed.
+     *
+     * @param line the typed line, without its line end.
+     */
+    private void evaluateConsoleLine(@NotNull String line) {
+        DAPStackFrame frame = getCurrentDapStackFrame();
+        DAPClient client = frame != null ? frame.getClient() : parentClient;
+        if (client == null) {
+            return;
+        }
+        Integer frameId = frame != null ? frame.getFrameId() : null;
+        synchronized (consoleLock) {
+            consoleEvaluations = consoleEvaluations
+                    .handle((ignored, previousError) -> null)
+                    .thenCompose(ignored -> client.evaluateConsoleLine(line, frameId))
+                    .whenComplete((result, error) -> {
+                        if (error != null) {
+                            Throwable cause = error instanceof CompletionException && error.getCause() != null ?
+                                    error.getCause() : error;
+                            print(cause.getMessage(), ConsoleViewContentType.ERROR_OUTPUT);
+                        } else if (result != null) {
+                            print(result, ConsoleViewContentType.NORMAL_OUTPUT);
+                        }
+                    });
+        }
     }
 
     @Override

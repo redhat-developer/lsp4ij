@@ -976,12 +976,46 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
         if (debugProtocolServer == null) {
             return CompletableFuture.completedFuture(null);
         }
+        return evaluate(debugProtocolServer, expression, frameId, context, getValueFormat());
+    }
+
+    private static CompletableFuture<EvaluateResponse> evaluate(@NotNull IDebugProtocolServer server,
+                                                                @NotNull String expression,
+                                                                @Nullable Integer frameId,
+                                                                @NotNull String context,
+                                                                @Nullable ValueFormat format) {
         EvaluateArguments args = new EvaluateArguments();
         args.setExpression(expression);
         args.setFrameId(frameId);
         args.setContext(context);
-        args.setFormat(getValueFormat());
-        return debugProtocolServer.evaluate(args);
+        args.setFormat(format);
+        return server.evaluate(args);
+    }
+
+    /**
+     * Evaluates a line typed in the debug console, as VS Code's Debug Console does: an evaluate request with the
+     * context repl, in the given stack frame when the program is stopped. A debug adapter which takes a running
+     * program's input over the debug connection can take the line as the program's input.
+     *
+     * @param line    the typed line, without its line end.
+     * @param frameId the selected stack frame, or null when the program runs.
+     * @return the text the console shows for the line: its result, or null when there is none, as when the program
+     * took the line as its input; it fails with the debug adapter's error.
+     */
+    public CompletableFuture<@Nullable String> evaluateConsoleLine(@NotNull String line, @Nullable Integer frameId) {
+        if (debugProtocolServer == null) {
+            return CompletableFuture.completedFuture(null);
+        }
+        return evaluateConsoleLine(debugProtocolServer, line, frameId, getValueFormat());
+    }
+
+    static CompletableFuture<@Nullable String> evaluateConsoleLine(@NotNull IDebugProtocolServer server,
+                                                                   @NotNull String line,
+                                                                   @Nullable Integer frameId,
+                                                                   @Nullable ValueFormat format) {
+        return evaluate(server, line, frameId, EvaluateArgumentsContext.REPL, format)
+                .thenApply(response -> response != null && !StringUtils.isBlank(response.getResult()) ?
+                        response.getResult() : null);
     }
 
     public CompletableFuture<CompletionsResponse> completion(@NotNull String text,
