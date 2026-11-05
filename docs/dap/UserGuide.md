@@ -249,6 +249,16 @@ Here's a demo with [Python Debugpy](./user-defined-dap/python-debugpy.md) which 
 
 ![DAP Smart Step Into](./images/DAP_SmartStepIntoDemo.gif)
 
+### Step only the current thread
+
+A step resumes every thread of the program while the stepping thread runs to its next stop. When the DAP server
+supports single thread execution requests (`supportsSingleThreadExecutionRequests`), the settings of the debug
+session's toolbar have `Step Only the Current Thread`, as the Java debugger's `Resume only the current thread`
+option. When it is selected, `Step Over`, `Step Into`, `Smart Step Into` and `Step Out` send
+[singleThread](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_Next), so the DAP server
+resumes only the thread that steps while the other threads stay stopped. `Resume Program` still resumes every thread.
+The choice holds for the debug session.
+
 ## Reset Frame
 
 When the DAP server supports the
