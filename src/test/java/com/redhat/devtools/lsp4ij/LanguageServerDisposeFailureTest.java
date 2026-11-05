@@ -10,6 +10,7 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij;
 
+import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.project.Project;
 import com.intellij.testFramework.PlatformTestUtil;
 import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
@@ -17,17 +18,20 @@ import com.redhat.devtools.lsp4ij.fixtures.LSPCodeInsightFixtureTestCase;
 import com.redhat.devtools.lsp4ij.mock.MockConnectionProvider;
 import com.redhat.devtools.lsp4ij.mock.MockLanguageServerDefinition;
 import com.redhat.devtools.lsp4ij.server.StreamConnectionProvider;
+import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
 import com.redhat.devtools.lsp4ij.templates.ServerMappingSettings;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * A language server whose connection fails to stop is still cleaned up as it is disposed, and neither keeps the other
  * language servers from being disposed nor stays among the started servers: when its server definition is removed,
- * and when the project closes.
+ * and when the project closes. A dispose that is canceled ends the disposing, and the language servers it did not reach
+ * stay started, for a later removal or close to dispose.
  */
 public class LanguageServerDisposeFailureTest extends LSPCodeInsightFixtureTestCase {
 
@@ -44,8 +48,7 @@ public class LanguageServerDisposeFailureTest extends LSPCodeInsightFixtureTestC
         super.setUp();
         project = myFixture.getProject();
         definition = new StopFailingServerDefinition();
-        LanguageServersRegistry.getInstance().addServerDefinition(project, definition,
-                List.of(ServerMappingSettings.createFileNamePatternsMappingSettings(List.of("*.failing"), "plaintext")));
+        register(definition, "*.failing");
         accessor = LanguageServiceAccessor.getInstance(project);
     }
 
@@ -82,6 +85,80 @@ public class LanguageServerDisposeFailureTest extends LSPCodeInsightFixtureTestC
         assertEquals("The dispose must clean up after the failed stop", 1, definition.disposedClientFeatures.get());
         assertTrue(other.isDisposed());
         assertEmpty(accessor.getStartedServers());
+    }
+
+    public void testALanguageServerThatACanceledDisposeDidNotReachStaysStartedUntilTheProjectClosesAgain()
+            throws Exception {
+        var canceling = new CancelingServerDefinition();
+        register(canceling, "*.canceling");
+        try {
+            var first = startAnother(canceling);
+            var second = startAnother(canceling);
+
+            assertThrows(ProcessCanceledException.class, () -> accessor.projectClosing(project));
+
+            assertEquals("The first connection asked to stop cancels", 1, canceling.stops.get());
+            var reached = first.isDisposed() ? first : second;
+            var unreached = reached == first ? second : first;
+            assertTrue(reached.isDisposed());
+            assertDoesntContain(accessor.getStartedServers(), reached);
+            assertFalse("The canceled dispose must not go on", unreached.isDisposed());
+            assertContainsElements(accessor.getStartedServers(), unreached);
+
+            accessor.projectClosing(project);
+
+            assertEquals(2, canceling.stops.get());
+            assertTrue("A later close must dispose the language server", unreached.isDisposed());
+            assertEmpty(accessor.getStartedServers());
+        } finally {
+            LanguageServersRegistry.getInstance().removeServerDefinition(project, canceling);
+        }
+    }
+
+    public void testALanguageServerThatACanceledDisposeDidNotReachStaysStartedUntilItsDefinitionIsRemovedAgain()
+            throws Exception {
+        var canceling = new CancelingServerDefinition();
+        var registry = LanguageServersRegistry.getInstance();
+        register(canceling, "*.canceling");
+        try {
+            var first = startAnother(canceling);
+            var second = startAnother(canceling);
+
+            // the registry logs what a listener throws, the cancellation too
+            registry.removeServerDefinition(project, canceling);
+
+            assertEquals("The first connection asked to stop cancels", 1, canceling.stops.get());
+            var reached = first.isDisposed() ? first : second;
+            var unreached = reached == first ? second : first;
+            assertTrue(reached.isDisposed());
+            assertDoesntContain(accessor.getStartedServers(), reached);
+            assertFalse("The canceled dispose must not go on", unreached.isDisposed());
+            assertContainsElements(accessor.getStartedServers(), unreached);
+
+            registry.removeServerDefinition(project, canceling);
+
+            assertEquals(2, canceling.stops.get());
+            assertTrue("A later removal must dispose the language server", unreached.isDisposed());
+            assertFalse(accessor.getStartedServers().stream()
+                    .anyMatch(server -> server.getServerDefinition() == canceling));
+        } finally {
+            registry.removeServerDefinition(project, canceling);
+        }
+    }
+
+    private void register(@NotNull LanguageServerDefinition serverDefinition, @NotNull String fileNamePattern) {
+        var mapping = ServerMappingSettings.createFileNamePatternsMappingSettings(List.of(fileNamePattern), "plaintext");
+        LanguageServersRegistry.getInstance().addServerDefinition(project, serverDefinition, List.of(mapping));
+    }
+
+    /**
+     * Starts another language server of the given definition, and returns it once it is initialized.
+     */
+    private @NotNull LanguageServerWrapper startAnother(@NotNull LanguageServerDefinition serverDefinition)
+            throws Exception {
+        var languageServer = accessor.forceCreateServer(serverDefinition);
+        assertNotNull(waitFor(languageServer.getInitializedServer()));
+        return languageServer;
     }
 
     /**
@@ -133,6 +210,33 @@ public class LanguageServerDisposeFailureTest extends LSPCodeInsightFixtureTestC
                     super.stop();
                     stops.incrementAndGet();
                     throw new IllegalStateException("The connection fails to stop");
+                }
+            };
+        }
+    }
+
+    /**
+     * Server definition whose connection that is stopped first cancels, once it has closed its streams.
+     */
+    private static class CancelingServerDefinition extends MockLanguageServerDefinition {
+
+        private final AtomicInteger stops = new AtomicInteger();
+        private final AtomicBoolean canceled = new AtomicBoolean();
+
+        CancelingServerDefinition() {
+            super("canceling-server", false);
+        }
+
+        @Override
+        public @NotNull StreamConnectionProvider createConnectionProvider(@NotNull Project project) {
+            return new MockConnectionProvider(getServer()) {
+                @Override
+                public synchronized void stop() {
+                    super.stop();
+                    stops.incrementAndGet();
+                    if (canceled.compareAndSet(false, true)) {
+                        throw new ProcessCanceledException();
+                    }
                 }
             };
         }

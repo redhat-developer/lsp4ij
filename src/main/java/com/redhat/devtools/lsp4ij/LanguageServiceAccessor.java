@@ -87,13 +87,16 @@ public class LanguageServiceAccessor implements Disposable {
                     .stream()
                     .filter(server -> event.serverDefinitions.contains(server.getServerDefinition()))
                     .toList();
-            try {
-                // dispose by removing code vision, inlay hints, folding from editors
-                serversToDispose.forEach(wrapper -> disposeLoggingFailure(wrapper, !ApplicationManager.getApplication().isUnitTestMode()));
-            } finally {
-                // Remove all servers which are removed from the cache
-                synchronized (startedServers) {
-                    serversToDispose.forEach(startedServers::remove);
+            for (var wrapper : serversToDispose) {
+                try {
+                    // dispose by removing code vision, inlay hints, folding from editors
+                    disposeLoggingFailure(wrapper, !ApplicationManager.getApplication().isUnitTestMode());
+                } finally {
+                    // Remove each server from the cache once it had its dispose: a cancellation ends the loop, and the
+                    // servers it never reached stay started, for a later removal or close to dispose
+                    synchronized (startedServers) {
+                        startedServers.remove(wrapper);
+                    }
                 }
             }
         }
@@ -728,14 +731,17 @@ public class LanguageServiceAccessor implements Disposable {
 
     private void disposeAllServers() {
         synchronized (startedServers) {
-            try {
-                startedServers.forEach(ls -> {
+            for (var servers = startedServers.iterator(); servers.hasNext(); ) {
+                var ls = servers.next();
+                try {
                     if (project.equals(ls.getProject())) {
                         disposeLoggingFailure(ls, false);
                     }
-                });
-            } finally {
-                startedServers.clear();
+                } finally {
+                    // Forget each server once it had its dispose: a cancellation ends the loop, and the servers it
+                    // never reached stay started, for a later close to dispose
+                    servers.remove();
+                }
             }
         }
     }
