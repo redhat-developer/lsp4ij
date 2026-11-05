@@ -20,6 +20,7 @@ import com.intellij.openapi.fileTypes.FileType;
 import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.project.ProjectManager;
+import com.intellij.openapi.util.Disposer;
 import com.intellij.openapi.util.ModificationTracker;
 import com.intellij.openapi.util.SimpleModificationTracker;
 import com.intellij.openapi.vfs.VirtualFile;
@@ -555,7 +556,15 @@ public class LanguageServiceAccessor implements Disposable {
                 if (!useExistingServer) {
                     // There are none started servers which matches the file, create and add it.
                     LanguageServerWrapper wrapper = new LanguageServerWrapper(project, serverDefinition);
-                    if (beforeStartingServerFilter == null || beforeStartingServerFilter.test(wrapper.getClientFeatures())) {
+                    boolean accepted = false;
+                    try {
+                        accepted = beforeStartingServerFilter == null || beforeStartingServerFilter.test(wrapper.getClientFeatures());
+                    } finally {
+                        if (!accepted) {
+                            Disposer.dispose(wrapper);
+                        }
+                    }
+                    if (accepted) {
                         startedServers.add(wrapper);
                         matchedServers.add(wrapper);
                     }
