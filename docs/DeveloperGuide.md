@@ -199,6 +199,9 @@ with the [QuteServer](https://github.com/redhat-developer/intellij-quarkus/blob/
 
 #### SocketStreamConnectionProvider
 
+[SocketStreamConnectionProvider](https://github.com/redhat-developer/lsp4ij/blob/main/src/main/java/com/redhat/devtools/lsp4ij/server/SocketStreamConnectionProvider.java)
+is experimental: its API may change in a future release.
+
 When the language server talks LSP over a TCP socket instead of its standard input and output, use
 [SocketStreamConnectionProvider](https://github.com/redhat-developer/lsp4ij/blob/main/src/main/java/com/redhat/devtools/lsp4ij/server/SocketStreamConnectionProvider.java).
 It covers the three ways a language server takes a socket connection:
@@ -223,6 +226,10 @@ only. The output of a language server which LSP4IJ starts goes to the `Log tab` 
 carries the protocol. A language server which ends, or closes the connection, is reported as stopped unexpectedly, as
 a language server process is. Stopping the language server closes the connection, and ends the process only if LSP4IJ
 started it: a language server which ran already keeps running.
+
+As with any TCP transport of LSP, which has no handshake to authenticate its peer, any local process can connect to a
+loopback port: on a machine shared with other users, prefer the standard input and output of the language server's
+process.
 
 ### LanguageClientImpl
 

@@ -20,6 +20,7 @@ import com.intellij.execution.process.ProcessOutputType;
 import com.intellij.openapi.util.Key;
 import com.intellij.util.io.BaseOutputReader;
 import com.intellij.util.net.NetUtils;
+import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -61,7 +62,15 @@ import java.util.stream.Stream;
  * which ends, or closes the connection, once connected, is reported as an unexpected stop, as a language server process
  * is. {@link #stop()} closes the connection, and stops the language server only if this provider started it. Each
  * provider makes at most one connection: create a new provider to connect again.
+ * <p>
+ * As with any TCP transport of LSP, which has no handshake to authenticate its peer, any local process can connect to
+ * a loopback port: on a machine shared with other users, one of their processes could connect to the port LSP4IJ
+ * listens on before the language server does, or listen on the port LSP4IJ connects to. Prefer the standard input and
+ * output of the language server's process there.
+ * <p>
+ * This API is experimental: it may change in a future release.
  */
+@ApiStatus.Experimental
 public class SocketStreamConnectionProvider implements StreamConnectionProvider, ProcessDataProvider {
 
     /**
@@ -234,6 +243,10 @@ public class SocketStreamConnectionProvider implements StreamConnectionProvider,
             install(connectOnce(port));
             return;
         }
+        if (this.port != 0) {
+            // A process which listens on the port already would take the connection meant for the language server
+            checkNothingListens(port);
+        }
         var handler = startProcess(commandLine.apply(port));
         // The language server listens once it has started: try until it accepts the connection, or ends
         long pause = FIRST_RETRY_PAUSE_MILLIS;
@@ -250,6 +263,15 @@ public class SocketStreamConnectionProvider implements StreamConnectionProvider,
                 pause = Math.min(pause * 2, MAX_RETRY_PAUSE_MILLIS);
             }
         }
+    }
+
+    private void checkNothingListens(int port) throws CannotStartProcessException {
+        try (var probe = new Socket()) {
+            probe.connect(new InetSocketAddress(host, port));
+        } catch (IOException nothingListens) {
+            return;
+        }
+        throw new CannotStartProcessException("A process listens on port " + port + " already: " + this);
     }
 
     private @NotNull Socket connectOnce(int port) throws IOException, CannotStartProcessException {

@@ -174,6 +174,37 @@ public class SocketStreamConnectionProviderTest extends LightPlatformTestCase {
         }
     }
 
+    public void testALanguageServerThatEndsOnceConnectedStopsUnexpectedlyWhenNothingReadsTheConnection() throws Exception {
+        var provider = SocketStreamConnectionProvider.startAndAccept(0, port -> java(ConnectingServer.class, port));
+        var stopped = new CompletableFuture<Void>();
+        provider.addUnexpectedServerStopHandler(() -> stopped.complete(null));
+        var stops = countUnexpectedStops(provider);
+        try {
+            provider.start();
+            writeLine(provider.getOutputStream(), "bye");
+
+            // nothing reads the connection's end, so the end of the process reports the stop
+            stopped.get(HANG_BOUND_HOURS, TimeUnit.HOURS);
+            awaitExit(provider);
+            assertEquals(1, stops.get());
+        } finally {
+            reap(provider);
+        }
+    }
+
+    public void testCannotStartALanguageServerOnAPortAnotherProcessListensOn() throws Exception {
+        try (var other = new ServerSocket(0, 1, InetAddress.getLoopbackAddress())) {
+            var provider = SocketStreamConnectionProvider.startAndConnect(other.getLocalPort(),
+                    port -> java(ListeningServer.class, port));
+            try {
+                assertThrows(CannotStartProcessException.class, provider::start);
+                assertNull("the language server is not started", provider.getPid());
+            } finally {
+                reap(provider);
+            }
+        }
+    }
+
     public void testCannotStartWhenTheLanguageServerEndsBeforeItAcceptsTheConnection() throws Exception {
         var provider = SocketStreamConnectionProvider.startAndConnect(0, port -> java(EndingServer.class, port));
         var stops = countUnexpectedStops(provider);
