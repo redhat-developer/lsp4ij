@@ -31,6 +31,10 @@ public class DAPStepOnlyCurrentThreadAction extends ToggleAction implements Dumb
 
     public static final @NotNull String ID = "DAP.StepOnlyCurrentThread";
 
+    /**
+     * Returns the DAP debug process of the event's debug session, or of the project's current one, and null when it
+     * is not a DAP debug session.
+     */
     private static @Nullable DAPDebugProcess getDebugProcess(@NotNull AnActionEvent e) {
         XDebugSession session = e.getDataContext().getData(XDebugSession.DATA_KEY);
         if (session == null) {

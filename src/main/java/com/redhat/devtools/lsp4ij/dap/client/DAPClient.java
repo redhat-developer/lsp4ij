@@ -124,6 +124,9 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
     // Whether the loaded sources and modules were asked for. They are asked for at the first stop, and then follow the
     // 'loadedSource' and 'module' events: asking at each stop would get all of them again at each step.
     private final AtomicBoolean loadedSourcesAndModulesAsked = new AtomicBoolean();
+    // Whether the last request that resumed the program was a step that resumed only its thread. A breakpoint which
+    // doesn't suspend then resumes only the stopped thread, so the threads the step kept stopped stay stopped.
+    private volatile boolean singleThreadResumed;
 
     public DAPClient(@NotNull DAPDebugProcess debugProcess,
                      @NotNull Map<String, Object> dapParameters,
@@ -445,7 +448,8 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
         var breakpointHandler = debugProcess.getBreakpointHandler();
         XBreakpoint<?> breakpoint = getStopBreakpoint(args, debugProcess::findBreakpointById, () -> breakpointHandler.findBreakpoint(topFrame));
         if (breakpoint != null) {
-            breakpointReached(getSession(), server, breakpoint, context, topFrame.getId(), stoppedThread.getId())
+            breakpointReached(getSession(), server, breakpoint, context, topFrame.getId(), stoppedThread.getId(),
+                    singleThreadResumed ? Boolean.TRUE : null)
                     .exceptionally(this::reportBreakpointFailure);
             if (breakpoint.getSuspendPolicy() != SuspendPolicy.NONE) {
                 showDataBreakpointHint(getProject(), context, args, DAPClient::showInformationHint);
@@ -680,12 +684,14 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
      * A breakpoint which doesn't suspend is sent as a logpoint, so a debug adapter which supports logpoints doesn't
      * stop at it; one which doesn't support them stops, and is resumed here once IntelliJ has logged.
      *
-     * @param session    the debug session.
-     * @param server     the debug adapter.
-     * @param breakpoint the IntelliJ breakpoint where the program stopped.
-     * @param context    the suspend context of the stop.
-     * @param frameId    the DAP frame where the program stopped.
-     * @param threadId   the DAP thread which stopped.
+     * @param session      the debug session.
+     * @param server       the debug adapter.
+     * @param breakpoint   the IntelliJ breakpoint where the program stopped.
+     * @param context      the suspend context of the stop.
+     * @param frameId      the DAP frame where the program stopped.
+     * @param threadId     the DAP thread which stopped.
+     * @param singleThread true to resume only the stopped thread, when a step resumed it alone, and null to resume
+     *                     every thread.
      * @return the future, completed once the session is told and the program resumed if it must be.
      */
     static CompletableFuture<@Nullable Void> breakpointReached(@NotNull XDebugSession session,
@@ -693,7 +699,8 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
                                                                @NotNull XBreakpoint<?> breakpoint,
                                                                @NotNull XSuspendContext context,
                                                                int frameId,
-                                                               int threadId) {
+                                                               int threadId,
+                                                               @Nullable Boolean singleThread) {
         return evaluateLogExpression(server, breakpoint, frameId)
                 .thenCompose(logged -> {
                     if (session.breakpointReached(breakpoint, logged, context)) {
@@ -702,6 +709,7 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
                     // The breakpoint doesn't suspend: resume the program
                     ContinueArguments args = new ContinueArguments();
                     args.setThreadId(threadId);
+                    args.setSingleThread(singleThread);
                     return server.continue_(args).thenAccept(response -> {
                     });
                 });
@@ -886,6 +894,7 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
         }
         ContinueArguments args = new ContinueArguments();
         args.setThreadId(threadId);
+        singleThreadResumed = false;
         return debugProtocolServer
                 .continue_(args);
     }
@@ -895,9 +904,19 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
         if (server == null) {
             return;
         }
-        next(server, threadId, granularity, singleThreadStep());
+        var singleThread = singleThreadStep();
+        singleThreadResumed = singleThread != null;
+        next(server, threadId, granularity, singleThread);
     }
 
+    /**
+     * Sends 'next', Step Over, for the given thread.
+     *
+     * @param server       the DAP server.
+     * @param threadId     the thread which steps.
+     * @param granularity  the granularity of the step, or null for the DAP server's default.
+     * @param singleThread true to resume only the thread which steps, and null to resume every thread.
+     */
     static void next(@NotNull IDebugProtocolServer server,
                      int threadId,
                      @Nullable SteppingGranularity granularity,
@@ -914,9 +933,19 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
         if (server == null) {
             return;
         }
-        stepOut(server, threadId, granularity, singleThreadStep());
+        var singleThread = singleThreadStep();
+        singleThreadResumed = singleThread != null;
+        stepOut(server, threadId, granularity, singleThread);
     }
 
+    /**
+     * Sends 'stepOut', Step Out, for the given thread.
+     *
+     * @param server       the DAP server.
+     * @param threadId     the thread which steps.
+     * @param granularity  the granularity of the step, or null for the DAP server's default.
+     * @param singleThread true to resume only the thread which steps, and null to resume every thread.
+     */
     static void stepOut(@NotNull IDebugProtocolServer server,
                         int threadId,
                         @Nullable SteppingGranularity granularity,
@@ -937,9 +966,20 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
         if (server == null) {
             return;
         }
-        stepIn(server, threadId, targetId, granularity, singleThreadStep());
+        var singleThread = singleThreadStep();
+        singleThreadResumed = singleThread != null;
+        stepIn(server, threadId, targetId, granularity, singleThread);
     }
 
+    /**
+     * Sends 'stepIn', Step Into, or Smart Step Into with a target, for the given thread.
+     *
+     * @param server       the DAP server.
+     * @param threadId     the thread which steps.
+     * @param targetId     the target to step into, from 'stepInTargets', or null.
+     * @param granularity  the granularity of the step, or null for the DAP server's default.
+     * @param singleThread true to resume only the thread which steps, and null to resume every thread.
+     */
     static void stepIn(@NotNull IDebugProtocolServer server,
                        int threadId,
                        @Nullable Integer targetId,
@@ -961,6 +1001,14 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
         return singleThreadStep(debugProcess.isStepOnlyCurrentThread(), getCapabilities());
     }
 
+    /**
+     * Returns the value of a step request's 'singleThread'.
+     *
+     * @param stepOnlyCurrentThread true if the user chose to step only the current thread.
+     * @param capabilities          the capabilities of the DAP server.
+     * @return true when the user chose to step only the current thread and the DAP server supports single thread
+     * execution requests, and null otherwise.
+     */
     static @Nullable Boolean singleThreadStep(boolean stepOnlyCurrentThread, @NotNull Capabilities capabilities) {
         return stepOnlyCurrentThread && Boolean.TRUE.equals(capabilities.getSupportsSingleThreadExecutionRequests())
                 ? Boolean.TRUE : null;
