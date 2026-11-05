@@ -376,6 +376,12 @@ public class LanguageServerWrapper implements Disposable {
      * @throws LanguageServerException thrown when the language server cannot be started
      */
     public synchronized void start() throws LanguageServerException {
+        if (isDisposed()) {
+            // A disposed language server is not enabled (isEnabled()) and never starts again: nothing would stop the
+            // connection it created, and no one would read what it answered. getInitializedServer() and connect()
+            // then give no language server, as for one that cannot start.
+            return;
+        }
         // Check for errors in LSP messages
         // launcherFuture manages request/reponse LSP messages from the server
         if (serverError == null) {
