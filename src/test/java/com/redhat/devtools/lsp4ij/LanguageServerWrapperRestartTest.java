@@ -18,13 +18,24 @@ import com.intellij.testFramework.UsefulTestCase;
 import com.intellij.testFramework.fixtures.IdeaProjectTestFixture;
 import com.intellij.testFramework.fixtures.IdeaTestFixtureFactory;
 import com.intellij.testFramework.fixtures.TestFixtureBuilder;
+import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
 import com.redhat.devtools.lsp4ij.fixtures.LSPCodeInsightTestFixture;
 import com.redhat.devtools.lsp4ij.fixtures.LSPTestFixtureFactory;
 import com.redhat.devtools.lsp4ij.mock.MockConnectionProvider;
+import com.redhat.devtools.lsp4ij.mock.MockLanguageServer;
 import com.redhat.devtools.lsp4ij.mock.MockLanguageServerDefinition;
 import com.redhat.devtools.lsp4ij.server.CannotStartProcessException;
 import com.redhat.devtools.lsp4ij.server.StreamConnectionProvider;
 import com.redhat.devtools.lsp4ij.templates.ServerMappingSettings;
+import org.eclipse.lsp4j.InitializeParams;
+import org.eclipse.lsp4j.InitializeResult;
+import org.eclipse.lsp4j.InitializedParams;
+import org.eclipse.lsp4j.ServerCapabilities;
+import org.eclipse.lsp4j.jsonrpc.Launcher;
+import org.eclipse.lsp4j.jsonrpc.RemoteEndpoint;
+import org.eclipse.lsp4j.services.LanguageServer;
+import org.eclipse.lsp4j.services.TextDocumentService;
+import org.eclipse.lsp4j.services.WorkspaceService;
 import org.jetbrains.annotations.NotNull;
 
 import java.lang.reflect.InvocationTargetException;
@@ -33,6 +44,8 @@ import java.lang.reflect.Proxy;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -103,6 +116,40 @@ public class LanguageServerWrapperRestartTest extends UsefulTestCase {
 
         wrapper.stop();
         waitUntil(() -> wrapper.getServerStatus() == ServerStatus.stopped, "the server should stop");
+    }
+
+    public void testAReplacedAttemptDoesNotInstallItsServerWhenItsInitializeReplyComes() {
+        var definition = new ScriptedServerDefinition();
+        var wrapper = new LanguageServerWrapper(myFixture.getProject(), definition);
+        Disposer.register(getTestRootDisposable(), wrapper);
+
+        // The start task runs in this thread, so the first attempt has sent initialize when start() returns
+        runPooledThreadTasksHere(() -> {
+            wrapper.start();
+            return null;
+        });
+        var first = definition.servers.get(0);
+        assertTrue(first.initializeSent);
+
+        // A stop replaces the first attempt, and a newer start sends the second attempt's initialize. The start chain's
+        // stages run in this thread as the test answers it.
+        wrapper.stop();
+        runPooledThreadTasksHere(() -> {
+            wrapper.start();
+            return null;
+        });
+        var second = definition.servers.get(1);
+        second.reply();
+        assertEquals(ServerStatus.started, wrapper.getServerStatus());
+        assertSame(second, wrapper.getLanguageServer());
+
+        // The first attempt's reply comes after the stop replaced it
+        first.reply();
+        assertSame("the replaced attempt must not install its server", second, wrapper.getLanguageServer());
+        assertEquals(ServerStatus.started, wrapper.getServerStatus());
+        assertFalse("the replaced attempt must not send its server initialized", first.initialized);
+
+        wrapper.stop();
     }
 
     /**
@@ -190,6 +237,96 @@ public class LanguageServerWrapperRestartTest extends UsefulTestCase {
                 };
             }
             return super.createConnectionProvider(project);
+        }
+    }
+
+    /**
+     * Server definition whose every connection is to a new {@link ScriptedServer}, in place of the process's server,
+     * so that the test answers each attempt's initialize.
+     */
+    private static class ScriptedServerDefinition extends MockLanguageServerDefinition {
+
+        private final List<ScriptedServer> servers = new CopyOnWriteArrayList<>();
+
+        ScriptedServerDefinition() {
+            super("test-server-scripted", false);
+        }
+
+        @Override
+        public @NotNull LSPClientFeatures createClientFeatures() {
+            return new LSPClientFeatures() {
+                @Override
+                public <S extends LanguageServer> @NotNull Launcher.Builder<S> createLauncherBuilder() {
+                    return new Launcher.Builder<>() {
+                        @Override
+                        @SuppressWarnings("unchecked")
+                        public Launcher<S> create() {
+                            var server = new ScriptedServer();
+                            servers.add(server);
+                            return new Launcher<>() {
+                                @Override
+                                public Future<Void> startListening() {
+                                    return new CompletableFuture<>();
+                                }
+
+                                @Override
+                                public S getRemoteProxy() {
+                                    return (S) server;
+                                }
+
+                                @Override
+                                public RemoteEndpoint getRemoteEndpoint() {
+                                    return null;
+                                }
+                            };
+                        }
+                    };
+                }
+            };
+        }
+    }
+
+    /**
+     * Language server whose initialize reply comes when the test calls {@link #reply()}, in the test's thread.
+     */
+    private static class ScriptedServer implements LanguageServer {
+
+        private final CompletableFuture<InitializeResult> initializeResult = new CompletableFuture<>();
+        private volatile boolean initializeSent;
+        private volatile boolean initialized;
+
+        void reply() {
+            initializeResult.complete(new InitializeResult(new ServerCapabilities()));
+        }
+
+        @Override
+        public CompletableFuture<InitializeResult> initialize(InitializeParams params) {
+            initializeSent = true;
+            return initializeResult;
+        }
+
+        @Override
+        public void initialized(InitializedParams params) {
+            initialized = true;
+        }
+
+        @Override
+        public CompletableFuture<Object> shutdown() {
+            return CompletableFuture.completedFuture(null);
+        }
+
+        @Override
+        public void exit() {
+        }
+
+        @Override
+        public TextDocumentService getTextDocumentService() {
+            return MockLanguageServer.INSTANCE.getTextDocumentService();
+        }
+
+        @Override
+        public WorkspaceService getWorkspaceService() {
+            return MockLanguageServer.INSTANCE.getWorkspaceService();
         }
     }
 

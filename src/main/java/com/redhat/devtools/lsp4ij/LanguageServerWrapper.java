@@ -570,17 +570,22 @@ public class LanguageServerWrapper implements Disposable {
                     })
                     .thenCompose(initializingContext -> initServer(rootURI, initializingContext))
                     .thenApply(initializingContext -> {
-                        serverError = null;
-                        if (errorNotification != null) {
-                            // Close the current error notification
-                            // displayed when server start fails.
-                            errorNotification.expire();
-                            errorNotification = null;
+                        synchronized (this) {
+                            // An attempt that a stop replaced while it initialized must not clear the error that the
+                            // current attempt restarts for, nor set the capabilities of its own server
+                            requireCurrent(initializingContext);
+                            serverError = null;
+                            if (errorNotification != null) {
+                                // Close the current error notification
+                                // displayed when server start fails.
+                                errorNotification.expire();
+                                errorNotification = null;
+                            }
+                            serverCapabilities = initializingContext.initializeResult.getCapabilities();
+                            syncOptions = createSyncOptions();
+                            getClientFeatures().setServerCapabilities(serverCapabilities);
+                            this.initiallySupportsWorkspaceFolders = supportsWorkspaceFolders(serverCapabilities);
                         }
-                        serverCapabilities = initializingContext.initializeResult.getCapabilities();
-                        syncOptions = createSyncOptions();
-                        getClientFeatures().setServerCapabilities(serverCapabilities);
-                        this.initiallySupportsWorkspaceFolders = supportsWorkspaceFolders(serverCapabilities);
                         return initializingContext;
                     })
                     .thenApply(initializingContext -> {
@@ -588,21 +593,26 @@ public class LanguageServerWrapper implements Disposable {
                         return initializingContext;
                     })
                     .thenApply(initializingContext -> {
-                        messageBusConnection = ApplicationManager.getApplication().getMessageBus().connect(this);
-                        messageBusConnection.subscribe(FileEditorManagerListener.FILE_EDITOR_MANAGER, fileListener);
+                        synchronized (this) {
+                            // An attempt that a stop replaced while it initialized must not install its connection, which
+                            // the stop is shutting down, over the current attempt's
+                            requireCurrent(initializingContext);
+                            messageBusConnection = ApplicationManager.getApplication().getMessageBus().connect(this);
+                            messageBusConnection.subscribe(FileEditorManagerListener.FILE_EDITOR_MANAGER, fileListener);
 
-                        fileOperationsManager = new FileOperationsManager(this);
-                        fileOperationsManager.setServerCapabilities(serverCapabilities);
+                            fileOperationsManager = new FileOperationsManager(this);
+                            fileOperationsManager.setServerCapabilities(serverCapabilities);
 
-                        workspaceFolderNotificationManager = new WorkspaceFolderNotificationManager(this);
+                            workspaceFolderNotificationManager = new WorkspaceFolderNotificationManager(this);
 
-                        this.lspStreamProvider = initializingContext.provider;
-                        this.languageClient = initializingContext.languageClient;
-                        this.languageServer = initializingContext.languageServer;
-                        this.launcherFuture = initializingContext.launcherFuture;
+                            this.lspStreamProvider = initializingContext.provider;
+                            this.languageClient = initializingContext.languageClient;
+                            this.languageServer = initializingContext.languageServer;
+                            this.launcherFuture = initializingContext.launcherFuture;
 
-                        updateStatus(ServerStatus.started);
-                        languageClient.updateWorkspaceDiagnosticProviders();
+                            updateStatus(ServerStatus.started);
+                        }
+                        initializingContext.languageClient.updateWorkspaceDiagnosticProviders();
                         return initializingContext;
                     })
                     .thenRun(() -> {
@@ -628,6 +638,20 @@ public class LanguageServerWrapper implements Disposable {
             // Submitted only now that initializeFuture is set: a start which fails at once runs the failure handler
             // above, which fails initializeFuture and then stops the server, clearing it
             ApplicationManager.getApplication().executeOnPooledThread(startTask);
+        }
+    }
+
+    /**
+     * Throws a {@link CancellationException} unless the given start attempt is still the current one. A stop, or a
+     * stop and a newer start, replaces an attempt, but cancels only the last stage of its start chain, so the stages
+     * before it still run when the attempt's initialize reply comes. The caller holds this wrapper's monitor, which
+     * stop() takes to replace the attempt.
+     *
+     * @param initializingContext the start attempt.
+     */
+    private void requireCurrent(@NotNull InitializingContext initializingContext) {
+        if (currentInitializingContext != initializingContext) {
+            throw new CancellationException("The start attempt was replaced by a stop or a newer start");
         }
     }
 
