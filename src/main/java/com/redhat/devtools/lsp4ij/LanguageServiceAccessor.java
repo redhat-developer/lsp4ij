@@ -47,7 +47,7 @@ import static com.redhat.devtools.lsp4ij.internal.ApplicationUtils.runCancellabl
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
@@ -66,8 +66,9 @@ public class LanguageServiceAccessor implements Disposable {
 
     private final Project project;
     private final SimpleModificationTracker modificationTracker = new SimpleModificationTracker();
-    // Instances of a definition can start at any time, while other threads go through the started servers
-    private final Set<LanguageServerWrapper> startedServers = ConcurrentHashMap.newKeySet();
+    // Instances of a definition can start at any time, while other threads go through the started servers. The set
+    // keeps the order in which the language servers were created, so that the first one of a definition is its oldest
+    private final Set<LanguageServerWrapper> startedServers = new CopyOnWriteArraySet<>();
     private final LanguageServerDefinitionListener serverDefinitionListener = new LanguageServerDefinitionListener() {
 
         @Override
@@ -152,7 +153,7 @@ public class LanguageServiceAccessor implements Disposable {
      * @return null if the exception is a normal cancellation, otherwise rethrows.
      */
     @Nullable
-    private static <T> T handleFutureException(@NotNull Throwable ex) {
+    static <T> T handleFutureException(@NotNull Throwable ex) {
         Throwable cause = ex instanceof CompletionException ? ex.getCause() : ex;
         if (cause instanceof CancellationException || cause instanceof ProcessCanceledException) {
             // A cancellation means the language server was stopped or restarted while
@@ -664,6 +665,38 @@ public class LanguageServiceAccessor implements Disposable {
         return choices;
     }
 
+    /**
+     * Returns the language server instance that serves the given file for a definition with several instances: the
+     * one that has the file connected or provides it, or the one of its root, created if there is none. Returns null if
+     * no instance serves the file. A strategy can do I/O, so don't call this method in a synchronized block.
+     */
+    @Nullable
+    LanguageServerWrapper getOrCreateInstanceOf(@NotNull VirtualFile file,
+                                                @NotNull LanguageServerDefinition serverDefinition) {
+        var choice = chooseInstance(file, serverDefinition);
+        if (choice.connected() != null) {
+            return choice.connected();
+        }
+        return choice.root() != null ? getOrCreateInstance(serverDefinition, choice.root()) : null;
+    }
+
+    /**
+     * Returns the language server instance with the given root of a definition with several instances, and creates it
+     * if there is none.
+     */
+    @NotNull
+    LanguageServerWrapper getOrCreateInstance(@NotNull LanguageServerDefinition serverDefinition,
+                                              @NotNull WorkspaceFolder instanceRoot) {
+        synchronized (startedServers) {
+            var instance = findInstance(serverDefinition, instanceRoot);
+            if (instance == null) {
+                instance = LanguageServerWrapper.forInstanceRoot(project, serverDefinition, instanceRoot);
+                startedServers.add(instance);
+            }
+            return instance;
+        }
+    }
+
     private @NotNull InstanceChoice chooseInstance(@NotNull VirtualFile file,
                                                    @NotNull LanguageServerDefinition serverDefinition) {
         var connected = findInstanceConnectedTo(file, serverDefinition);
@@ -738,8 +771,9 @@ public class LanguageServiceAccessor implements Disposable {
         }
     }
 
-    private @Nullable LanguageServerWrapper findInstance(@NotNull LanguageServerDefinition serverDefinition,
-                                                         @NotNull WorkspaceFolder instanceRoot) {
+    @Nullable
+    LanguageServerWrapper findInstance(@NotNull LanguageServerDefinition serverDefinition,
+                                       @NotNull WorkspaceFolder instanceRoot) {
         for (var startedServer : startedServers) {
             var root = startedServer.getInstanceRoot();
             if (startedServer.getServerDefinition().equals(serverDefinition)
@@ -901,8 +935,8 @@ public class LanguageServiceAccessor implements Disposable {
 
     private void disposeAllServers() {
         synchronized (startedServers) {
-            for (var servers = startedServers.iterator(); servers.hasNext(); ) {
-                var ls = servers.next();
+            // The iterator of the set is a snapshot, which can't remove a server
+            for (var ls : startedServers) {
                 try {
                     if (project.equals(ls.getProject())) {
                         disposeLoggingFailure(ls, false);
@@ -910,7 +944,7 @@ public class LanguageServiceAccessor implements Disposable {
                 } finally {
                     // Forget each server once it had its dispose: a cancellation ends the loop, and the servers it
                     // never reached stay started, for a later close to dispose
-                    servers.remove();
+                    startedServers.remove(ls);
                 }
             }
         }

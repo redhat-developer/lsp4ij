@@ -1321,6 +1321,7 @@ Set this strategy with a workspace folder feature as described above. Then:
  * The workspace folders work for an instance as they work for a language server without instances, with the folders that belong to it: a workspace folder belongs to the instance that its own directory has as root (`belongsToServerInstance`). If none does and the strategy sends its folders at initialization, the instance gets its root.
  * With lazy loading, an instance gets its folders through `workspace/didChangeWorkspaceFolders` as their files are opened. A folder that belongs to another instance, or that contains several, doesn't reach it: its root takes that folder's place.
  * File events and file operations aren't limited to the workspace folders of an instance: each instance gets what it registered, as with a language server client per folder in VS Code.
+ * Requests without a file, such as workspace symbols, go to all instances, and start those that stopped.
  * The Language Servers view shows each instance as a process of its own, with the name of its root.
 
 By default, all instances run the same way. If each one needs its own command, for example the interpreter of its module, override the methods of the factory that get the root of the instance:
@@ -1350,6 +1351,25 @@ public class MyLanguageServerFactory implements LanguageServerFactory {
 ```
 
 `createLanguageClient(project, instanceRoot)` does the same for the language client. By default, these methods call the ones without a root, which a language server without instances keeps using. Like those, they run on a background thread without a read action. `LSPIJUtils.findResourceFor(instanceRoot.getUri())` gives the directory of the root.
+
+The [Language Server Manager](#language-server-manager) reaches one instance with a file or a root:
+
+```java
+var manager = LanguageServerManager.getInstance(project);
+// The instance that serves the file, created and started if needed
+manager.getLanguageServer("myLanguageServerId", file)
+        .thenAccept(languageServerItem -> {
+            // ...
+        });
+// The instance with the given root
+manager.start("myLanguageServerId", instanceRoot, new LanguageServerManager.StartOptions().setForceStart(true));
+manager.stop("myLanguageServerId", instanceRoot, LanguageServerManager.StopOptions.DEFAULT);
+var status = manager.getServerStatus("myLanguageServerId", instanceRoot);
+// All instances, the oldest first
+manager.getLanguageServers("myLanguageServerId");
+```
+
+The methods that only take the id mean the oldest instance. With `forceStart`, `start("myLanguageServerId", options)` creates no instance, because without a file nothing tells which one: start each instance with its root instead. `install` runs the installer once for all instances.
 
 ## User-Defined Language Server Configuration
 

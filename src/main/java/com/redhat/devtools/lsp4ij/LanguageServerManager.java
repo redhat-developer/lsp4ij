@@ -10,14 +10,24 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij;
 
+import com.intellij.openapi.application.ReadAction;
+import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.vfs.VirtualFile;
+import com.intellij.util.concurrency.AppExecutorUtil;
 import com.redhat.devtools.lsp4ij.installation.ServerInstallationContext;
 import com.redhat.devtools.lsp4ij.server.LanguageServerException;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
+import org.eclipse.lsp4j.WorkspaceFolder;
+import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
 import java.util.Set;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 
 public class LanguageServerManager {
@@ -39,7 +49,9 @@ public class LanguageServerManager {
     }
 
     /**
-     * Returns the server status of the given language server id and null otherwise.
+     * Returns the server status of the given language server id and null otherwise. For a definition with several
+     * language server instances, this is the status of the oldest one; {@link #getServerStatus(String, WorkspaceFolder)}
+     * gives the status of the instance with a given root.
      *
      * @param languageServerId the language server id.
      * @return the server status of the given language server id and null otherwise.
@@ -61,12 +73,38 @@ public class LanguageServerManager {
      */
     @NotNull
     private ServerStatus getServerStatus(@NotNull LanguageServerDefinition serverDefinition) {
+        // The started servers keep the order in which they were created, so this is the oldest instance
         for (var ls : LanguageServiceAccessor.getInstance(project).getStartedServers()) {
             if (serverDefinition.equals(ls.getServerDefinition())) {
                 return ls.getServerStatus();
             }
         }
         return ServerStatus.none;
+    }
+
+    /**
+     * Returns the server status of the language server instance with the given root, for a definition with several
+     * instances, see {@link com.redhat.devtools.lsp4ij.features.workspaceFolder.WorkspaceFolderStrategy#hasServerInstances()}.
+     * For a definition without instances, this is {@link #getServerStatus(String)}.
+     *
+     * @param languageServerId the language server id.
+     * @param instanceRoot     the root of the language server instance.
+     * @return the server status of the instance, {@link ServerStatus#none} if there is none, and null if there is no
+     * language server with the given id.
+     */
+    @ApiStatus.Experimental
+    @Nullable
+    public ServerStatus getServerStatus(@NotNull String languageServerId,
+                                        @NotNull WorkspaceFolder instanceRoot) {
+        var serverDefinition = LanguageServersRegistry.getInstance().getServerDefinition(languageServerId);
+        if (serverDefinition == null) {
+            return null;
+        }
+        if (!serverDefinition.hasServerInstances()) {
+            return getServerStatus(serverDefinition);
+        }
+        var instance = LanguageServiceAccessor.getInstance(project).findInstance(serverDefinition, instanceRoot);
+        return instance != null ? instance.getServerStatus() : ServerStatus.none;
     }
 
     // --------------------- Server status
@@ -132,6 +170,47 @@ public class LanguageServerManager {
         LanguageServiceAccessor.getInstance(project).findAndStartLanguageServerIfNeeded(serverDefinition, options.isForceStart(), project);
     }
 
+    /**
+     * Starts the language server instance with the given root, for a definition with several instances, see
+     * {@link com.redhat.devtools.lsp4ij.features.workspaceFolder.WorkspaceFolderStrategy#hasServerInstances()}. The
+     * instance is restarted if it isn't started, or if {@link StartOptions#isForceRestart()} is set. If there is no
+     * instance with that root, {@link StartOptions#isForceStart()} creates and starts it; without it, the open files of
+     * the language server are connected, as {@link #start(String, StartOptions)} does. For a definition without
+     * instances, this is {@link #start(String, StartOptions)}.
+     *
+     * @param languageServerId the language server id.
+     * @param instanceRoot     the root of the language server instance.
+     * @param options          the start options.
+     */
+    @ApiStatus.Experimental
+    public void start(@NotNull String languageServerId,
+                      @NotNull WorkspaceFolder instanceRoot,
+                      @NotNull StartOptions options) {
+        var serverDefinition = LanguageServersRegistry.getInstance().getServerDefinition(languageServerId);
+        if (serverDefinition == null) {
+            return;
+        }
+        if (!serverDefinition.hasServerInstances()) {
+            start(serverDefinition, options);
+            return;
+        }
+        if (!serverDefinition.isEnabled(project) && !options.isWillEnable()) {
+            throw new LanguageServerException("Server definition '" + serverDefinition.getId() + "' cannot be forced to be enable.");
+        }
+        var accessor = LanguageServiceAccessor.getInstance(project);
+        var instance = options.isForceStart()
+                ? accessor.getOrCreateInstance(serverDefinition, instanceRoot)
+                : accessor.findInstance(serverDefinition, instanceRoot);
+        if (instance == null) {
+            // As without a root: the instance starts if one of its files is open
+            accessor.findAndStartLanguageServerIfNeeded(serverDefinition, false, project);
+            return;
+        }
+        if (options.isForceRestart() || instance.getServerStatus() != ServerStatus.started) {
+            instance.restart();
+        }
+    }
+
     // --------------------- Stop language server
 
     /**
@@ -182,6 +261,38 @@ public class LanguageServerManager {
         }
     }
 
+    /**
+     * Stops the language server instance with the given root, for a definition with several instances, see
+     * {@link com.redhat.devtools.lsp4ij.features.workspaceFolder.WorkspaceFolderStrategy#hasServerInstances()}. For a
+     * definition without instances, this is {@link #stop(String, StopOptions)}.
+     *
+     * @param languageServerId the language server id.
+     * @param instanceRoot     the root of the language server instance.
+     * @param options          the stop options.
+     */
+    @ApiStatus.Experimental
+    public void stop(@NotNull String languageServerId,
+                     @NotNull WorkspaceFolder instanceRoot,
+                     @NotNull StopOptions options) {
+        var serverDefinition = LanguageServersRegistry.getInstance().getServerDefinition(languageServerId);
+        if (serverDefinition == null) {
+            return;
+        }
+        if (!serverDefinition.hasServerInstances()) {
+            stop(serverDefinition, options);
+            return;
+        }
+        var instance = LanguageServiceAccessor.getInstance(project).findInstance(serverDefinition, instanceRoot);
+        if (instance == null) {
+            return;
+        }
+        if (options.isWillDisable()) {
+            instance.stopAndDisable();
+        } else {
+            instance.stop();
+        }
+    }
+
     // --------------------- Install language server
 
     /**
@@ -206,6 +317,10 @@ public class LanguageServerManager {
      */
     public void install(@NotNull LanguageServerDefinition serverDefinition,
                         @NotNull ServerInstallationContext context) {
+        if (serverDefinition.hasServerInstances()) {
+            installForInstances(serverDefinition, context);
+            return;
+        }
         boolean found = false;
         for (var ls : LanguageServiceAccessor.getInstance(project).getStartedServers()) {
             if (serverDefinition.equals(ls.getServerDefinition())) {
@@ -222,10 +337,52 @@ public class LanguageServerManager {
         }
     }
 
+    /**
+     * Installs a language server with several instances: the installer runs once, as it installs the language server
+     * for all of them. The instances that run are stopped for it, and started again once it is done, as a language
+     * server without instances is. Without an instance, a language server is created only for the installation: one
+     * without a root would serve every file of the definition.
+     */
+    private void installForInstances(@NotNull LanguageServerDefinition serverDefinition,
+                                     @NotNull ServerInstallationContext context) {
+        var instances = instancesOf(serverDefinition);
+        if (instances.isEmpty()) {
+            var installation = new LanguageServerWrapper(project, serverDefinition);
+            installation.install(context)
+                    .whenComplete((status, error) -> installation.stopAndDispose(false));
+            return;
+        }
+        List<LanguageServerWrapper> running = new ArrayList<>();
+        for (var instance : instances) {
+            if (instance.getServerStatus() == ServerStatus.starting || instance.getServerStatus() == ServerStatus.started) {
+                running.add(instance);
+            }
+        }
+        // The installing instance stops and starts again by itself
+        var installing = running.isEmpty() ? instances.get(0) : running.get(0);
+        var others = running.stream().filter(instance -> instance != installing).toList();
+        CompletableFuture.allOf(others.stream().map(LanguageServerWrapper::stop).toArray(CompletableFuture[]::new))
+                .thenCompose(unused -> installing.install(context))
+                .thenAccept(status -> others.forEach(LanguageServerWrapper::start));
+    }
+
+    /**
+     * Returns the language server instances of the given definition, the oldest first.
+     */
+    private @NotNull List<LanguageServerWrapper> instancesOf(@NotNull LanguageServerDefinition serverDefinition) {
+        return LanguageServiceAccessor.getInstance(project).getStartedServers()
+                .stream()
+                .filter(languageServer -> serverDefinition.equals(languageServer.getServerDefinition()))
+                .toList();
+    }
+
     // --------------------- Get language server
 
     /**
-     * Returns the initialized language server item from the given language server id and null otherwise.
+     * Returns the initialized language server item from the given language server id and null otherwise. For a
+     * definition with several language server instances, this is the oldest one, which is started if it stopped;
+     * {@link #getLanguageServer(String, VirtualFile)} gives the instance that serves a file, and
+     * {@link #getLanguageServers(String)} gives all of them.
      *
      * @param languageServerId the language server id.
      * @return the initialized language server item from the given language server id and null otherwise.
@@ -235,6 +392,11 @@ public class LanguageServerManager {
         if (serverDefinition == null) {
             return CompletableFuture.completedFuture(null);
         }
+        if (serverDefinition.hasServerInstances()) {
+            // Without a file, nothing tells which instance is meant: take the oldest one, and create none
+            var instances = instancesOf(serverDefinition);
+            return instances.isEmpty() ? CompletableFuture.completedFuture(null) : getInitializedServer(instances.get(0));
+        }
         return LanguageServiceAccessor.getInstance(project)
                 .getLanguageServers(Set.of(serverDefinition), null, null)
                 .thenApply(servers -> {
@@ -243,6 +405,81 @@ public class LanguageServerManager {
                     }
                     return servers.get(0);
                 });
+    }
+
+    /**
+     * Returns the initialized language server item that serves the given file, and null if there is none. For a
+     * definition with several language server instances, see
+     * {@link com.redhat.devtools.lsp4ij.features.workspaceFolder.WorkspaceFolderStrategy#hasServerInstances()}, this is
+     * the instance that has the file connected, or the instance of the file's root, which is created and started if
+     * needed. The file isn't connected to the language server. For a definition without instances, this is
+     * {@link #getLanguageServer(String)}.
+     *
+     * @param languageServerId the language server id.
+     * @param file             the file.
+     * @return the initialized language server item that serves the given file, and null if there is none.
+     */
+    @ApiStatus.Experimental
+    public CompletableFuture<@Nullable LanguageServerItem> getLanguageServer(@NotNull String languageServerId,
+                                                                            @NotNull VirtualFile file) {
+        var serverDefinition = LanguageServersRegistry.getInstance().getServerDefinition(languageServerId);
+        if (serverDefinition == null) {
+            return CompletableFuture.completedFuture(null);
+        }
+        if (!serverDefinition.hasServerInstances()) {
+            return getLanguageServer(languageServerId);
+        }
+        // A workspace folder strategy can need read access, and do I/O
+        CompletableFuture<LanguageServerWrapper> instance = new CompletableFuture<>();
+        ReadAction.nonBlocking(() -> LanguageServiceAccessor.getInstance(project).getOrCreateInstanceOf(file, serverDefinition))
+                .expireWith(project)
+                .submit(AppExecutorUtil.getAppExecutorService())
+                .onSuccess(instance::complete)
+                .onError(error -> {
+                    if (error instanceof CancellationException || error instanceof ProcessCanceledException) {
+                        instance.complete(null);
+                    } else {
+                        instance.completeExceptionally(error);
+                    }
+                });
+        return instance.thenCompose(languageServer -> languageServer != null
+                ? getInitializedServer(languageServer)
+                : CompletableFuture.completedFuture(null));
+    }
+
+    /**
+     * Returns the initialized language server items of the given language server id: all instances of a definition
+     * with several, the oldest first, and the one language server of a definition without instances. Instances that
+     * stopped are started again.
+     *
+     * @param languageServerId the language server id.
+     * @return the initialized language server items of the given language server id.
+     */
+    @ApiStatus.Experimental
+    public CompletableFuture<@NotNull List<LanguageServerItem>> getLanguageServers(@NotNull String languageServerId) {
+        var serverDefinition = LanguageServersRegistry.getInstance().getServerDefinition(languageServerId);
+        if (serverDefinition == null) {
+            return CompletableFuture.completedFuture(List.of());
+        }
+        var accessor = LanguageServiceAccessor.getInstance(project);
+        return accessor.getLanguageServers(Set.of(serverDefinition), null, null)
+                .thenApply(servers -> {
+                    // In the order of the instances, instead of the order in which they were initialized
+                    var order = new ArrayList<>(accessor.getStartedServers());
+                    var sorted = new ArrayList<>(servers);
+                    sorted.sort(Comparator.comparingInt(server -> order.indexOf(server.getServerWrapper())));
+                    return sorted;
+                });
+    }
+
+    private static @NotNull CompletableFuture<@Nullable LanguageServerItem> getInitializedServer(@NotNull LanguageServerWrapper languageServer) {
+        if (!languageServer.isEnabled()) {
+            return CompletableFuture.completedFuture(null);
+        }
+        return languageServer.getInitializedServer()
+                .thenApply(server -> server != null ? new LanguageServerItem(server, languageServer) : null)
+                // As for the language servers of a request: a stop or restart while it starts is no error
+                .exceptionally(LanguageServiceAccessor::handleFutureException);
     }
 
     /**
@@ -275,6 +512,12 @@ public class LanguageServerManager {
 
         /**
          * Set true if the language server should be started even if there are no open files corresponding to the language server and false otherwise.
+         *
+         * <p>
+         * For a definition with several language server instances, nothing tells which instance to create without a
+         * file, so this starts none if none exists yet: {@link LanguageServerManager#start(String, WorkspaceFolder, StartOptions)} starts the
+         * instance with a given root.
+         * </p>
          *
          * @param forceStart true if the language server should be started even if there are no open files corresponding to the language server and false otherwise.
          * @return the start options instance.
