@@ -573,7 +573,9 @@ public class LanguageServerWrapper implements Disposable {
             };
             this.initializeFuture = startFuture
                     .thenApply(initializingContext -> {
-                        var languageClient = serverDefinition.createLanguageClient(initialProject);
+                        var languageClient = instanceRoot != null ?
+                                serverDefinition.createLanguageClient(initialProject, instanceRoot) :
+                                serverDefinition.createLanguageClient(initialProject);
                         initializingContext.languageClient = languageClient;
                         languageClient.setServerWrapper(this);
                         initParams.setProcessId(getParentProcessId());

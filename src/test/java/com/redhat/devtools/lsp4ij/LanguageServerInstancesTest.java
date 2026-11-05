@@ -17,6 +17,7 @@ import com.intellij.psi.PsiFile;
 import com.intellij.psi.PsiManager;
 import com.intellij.testFramework.IndexingTestUtil;
 import com.intellij.testFramework.PlatformTestUtil;
+import com.redhat.devtools.lsp4ij.client.LanguageClientImpl;
 import com.redhat.devtools.lsp4ij.client.features.FileUriSupport;
 import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
 import com.redhat.devtools.lsp4ij.client.features.LSPWorkspaceFolderFeature;
@@ -342,6 +343,13 @@ public class LanguageServerInstancesTest extends LSPCodeInsightFixtureTestCase {
         var instance = instanceOf(file("a/one.per-folder"));
 
         assertEquals(List.of(instance.getInstanceRoot()), definition.connectionFolders);
+    }
+
+    public void testEachInstanceStartsItsLanguageClientWithItsRoot() throws Exception {
+        var a = instanceOf(file("a/one.per-folder"));
+        var b = instanceOf(file("b/one.per-folder"));
+
+        assertEquals(List.of(a.getInstanceRoot(), b.getInstanceRoot()), definition.languageClientRoots);
     }
 
     public void testAnInstanceAnswersWithItsFolder() throws Exception {
@@ -901,6 +909,7 @@ public class LanguageServerInstancesTest extends LSPCodeInsightFixtureTestCase {
         volatile WorkspaceFolderStrategy activeStrategy = strategy;
         final List<MockLanguageServer> servers = new CopyOnWriteArrayList<>();
         final List<WorkspaceFolder> connectionFolders = new CopyOnWriteArrayList<>();
+        final List<WorkspaceFolder> languageClientRoots = new CopyOnWriteArrayList<>();
 
         PerFolderDefinition() {
             super("per-folder-server", false);
@@ -918,6 +927,13 @@ public class LanguageServerInstancesTest extends LSPCodeInsightFixtureTestCase {
                                                                           @NotNull WorkspaceFolder instanceRoot) {
             connectionFolders.add(instanceRoot);
             return super.createConnectionProvider(project, instanceRoot);
+        }
+
+        @Override
+        public @NotNull LanguageClientImpl createLanguageClient(@NotNull Project project,
+                                                                @NotNull WorkspaceFolder instanceRoot) {
+            languageClientRoots.add(instanceRoot);
+            return super.createLanguageClient(project, instanceRoot);
         }
 
         @Override

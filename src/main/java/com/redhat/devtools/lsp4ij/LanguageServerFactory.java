@@ -12,11 +12,14 @@ package com.redhat.devtools.lsp4ij;
 
 import com.intellij.openapi.project.Project;
 import com.redhat.devtools.lsp4ij.client.LanguageClientImpl;
+import com.redhat.devtools.lsp4ij.features.workspaceFolder.WorkspaceFolderStrategy;
 import com.redhat.devtools.lsp4ij.installation.ServerInstaller;
 import com.redhat.devtools.lsp4ij.server.StreamConnectionProvider;
 import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
 import com.redhat.devtools.lsp4ij.settings.contributors.LanguageServerSettingsContributor;
+import org.eclipse.lsp4j.WorkspaceFolder;
 import org.eclipse.lsp4j.services.LanguageServer;
+import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -35,6 +38,22 @@ public interface LanguageServerFactory {
     @NotNull StreamConnectionProvider createConnectionProvider(@NotNull Project project);
 
     /**
+     * Returns an instance of a connection provider to connect to the language server instance with the given root, for
+     * a workspace folder strategy that {@link WorkspaceFolderStrategy#hasServerInstances() has instances}. Override it
+     * if the instances don't all run the same way. By default, it is {@link #createConnectionProvider(Project)}.
+     *
+     * @param project      the project.
+     * @param instanceRoot the root of the language server instance.
+     *
+     * @return an instance of a connection provider to connect to the language server instance with the given root.
+     */
+    @ApiStatus.Experimental
+    @NotNull default StreamConnectionProvider createConnectionProvider(@NotNull Project project,
+                                                                       @NotNull WorkspaceFolder instanceRoot) {
+        return createConnectionProvider(project);
+    }
+
+    /**
      * Returns an instance of language client.
      *
      * @param project the project.
@@ -43,6 +62,22 @@ public interface LanguageServerFactory {
      */
     @NotNull default LanguageClientImpl createLanguageClient(@NotNull Project project) {
         return new LanguageClientImpl(project);
+    }
+
+    /**
+     * Returns an instance of language client for the language server instance with the given root, for a workspace
+     * folder strategy that {@link WorkspaceFolderStrategy#hasServerInstances() has instances}. Override it if the
+     * language client has to know the instance. By default, it is {@link #createLanguageClient(Project)}.
+     *
+     * @param project      the project.
+     * @param instanceRoot the root of the language server instance.
+     *
+     * @return an instance of language client for the language server instance with the given root.
+     */
+    @ApiStatus.Experimental
+    @NotNull default LanguageClientImpl createLanguageClient(@NotNull Project project,
+                                                             @NotNull WorkspaceFolder instanceRoot) {
+        return createLanguageClient(project);
     }
 
     /**

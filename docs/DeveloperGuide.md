@@ -1323,6 +1323,34 @@ Set this strategy with a workspace folder feature as described above. Then:
  * File events and file operations aren't limited to the workspace folders of an instance: each instance gets what it registered, as with a language server client per folder in VS Code.
  * The Language Servers view shows each instance as a process of its own, with the name of its root.
 
+By default, all instances run the same way. If each one needs its own command, for example the interpreter of its module, override the methods of the factory that get the root of the instance:
+
+```java
+package my.language.server;
+
+import com.intellij.openapi.project.Project;
+import com.redhat.devtools.lsp4ij.LanguageServerFactory;
+import com.redhat.devtools.lsp4ij.server.StreamConnectionProvider;
+import org.eclipse.lsp4j.WorkspaceFolder;
+import org.jetbrains.annotations.NotNull;
+
+public class MyLanguageServerFactory implements LanguageServerFactory {
+
+    @Override
+    public @NotNull StreamConnectionProvider createConnectionProvider(@NotNull Project project) {
+        return new MyLanguageServer(project);
+    }
+
+    @Override
+    public @NotNull StreamConnectionProvider createConnectionProvider(@NotNull Project project,
+                                                                      @NotNull WorkspaceFolder instanceRoot) {
+        return new MyLanguageServer(project, instanceRoot);
+    }
+}
+```
+
+`createLanguageClient(project, instanceRoot)` does the same for the language client. By default, these methods call the ones without a root, which a language server without instances keeps using. Like those, they run on a background thread without a read action. `LSPIJUtils.findResourceFor(instanceRoot.getUri())` gives the directory of the root.
+
 ## User-Defined Language Server Configuration
 
 For user-defined language servers, workspace folder configuration can be specified in the `workspaceFolderSettings.json` template file or configured in the UI:
