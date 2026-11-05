@@ -17,6 +17,8 @@ import com.intellij.openapi.application.ModalityState;
 import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.components.Service;
 import com.intellij.openapi.editor.Document;
+import com.intellij.openapi.editor.impl.DocumentMarkupModel;
+import com.intellij.openapi.editor.markup.RangeHighlighter;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiFile;
@@ -25,12 +27,16 @@ import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.WeakHashMap;
 
 /**
  * Service that applies LSP diagnostics reactively when the server sends publishDiagnostics.
@@ -44,6 +50,9 @@ public final class LSPDiagnosticsApplier implements Disposable {
     public static volatile int GROUP_ID = -1;
 
     private final Project project;
+
+    // The highlighters that the diagnostics applied last time, by document, only used on the UI thread
+    private final Map<Document, List<RangeHighlighter>> appliedHighlighters = new WeakHashMap<>();
 
     // Refreshes requested before a highlighting pass registrar set GROUP_ID, by file. Checking GROUP_ID
     // and adding a refresh under this lock means applyPendingRefreshes() cannot miss one.
@@ -254,10 +263,45 @@ public final class LSPDiagnosticsApplier implements Disposable {
                 null,
                 data.groupId
         );
+        removeHighlightersOfOtherContexts(data);
+    }
+
+    /**
+     * Removes the highlighters that the diagnostics applied last time for the document and that the highlights just
+     * applied don't reuse. Since IntelliJ 2025.1, a highlighter belongs to the code insight context of its file, which is
+     * the file's module, and {@link UpdateHighlightersUtil#setHighlightersToEditor} only replaces those of the file's
+     * current context. So after a file moved to another module, the diagnostics shown before the move would stay.
+     * Without such contexts, setHighlightersToEditor has already disposed or reused them all.
+     */
+    private void removeHighlightersOfOtherContexts(@NotNull HighlightsToApply data) {
+        Set<HighlightInfo> applied = Collections.newSetFromMap(new IdentityHashMap<>());
+        applied.addAll(data.highlights);
+        var previous = appliedHighlighters.get(data.document);
+        if (previous != null) {
+            for (var highlighter : previous) {
+                // A reused highlighter refers to the HighlightInfo that was just applied
+                var info = highlighter.isValid() ? HighlightInfo.fromRangeHighlighter(highlighter) : null;
+                if (info != null && !applied.contains(info)) {
+                    highlighter.dispose();
+                }
+            }
+        }
+        List<RangeHighlighter> current = new ArrayList<>();
+        for (var highlighter : DocumentMarkupModel.forDocument(data.document, project, true).getAllHighlighters()) {
+            var info = HighlightInfo.fromRangeHighlighter(highlighter);
+            if (info != null && applied.contains(info)) {
+                current.add(highlighter);
+            }
+        }
+        if (current.isEmpty()) {
+            appliedHighlighters.remove(data.document);
+        } else {
+            appliedHighlighters.put(data.document, current);
+        }
     }
 
     @Override
     public void dispose() {
-        // Nothing to clean up
+        appliedHighlighters.clear();
     }
 }
