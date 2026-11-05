@@ -180,9 +180,10 @@ public class SocketStreamConnectionProviderTest extends LightPlatformTestCase {
 
     public void testALanguageServerThatEndsOnceConnectedStopsUnexpectedlyWhenNothingReadsTheConnection() throws Exception {
         var provider = SocketStreamConnectionProvider.startAndAccept(0, port -> java(ConnectingServer.class, port));
+        // the handlers run in their order, so the count is up to date once the test is released
+        var stops = countUnexpectedStops(provider);
         var stopped = new CompletableFuture<Void>();
         provider.addUnexpectedServerStopHandler(() -> stopped.complete(null));
-        var stops = countUnexpectedStops(provider);
         try {
             provider.start();
             writeLine(provider.getOutputStream(), "bye");
