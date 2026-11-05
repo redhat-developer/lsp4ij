@@ -64,6 +64,7 @@ import org.eclipse.lsp4j.services.LanguageServer;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.jetbrains.annotations.TestOnly;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -170,6 +171,9 @@ public class LanguageServerWrapper implements Disposable {
     private volatile @Nullable ConcurrentLinkedQueue<LSPTrace> traces;
     private @Nullable Alarm traceFlushAlarm;
     private volatile @Nullable InitializingContext currentInitializingContext;
+    // Where the connection of a document runs once its start attempt is initialized: the executor that
+    // thenComposeAsync uses by default, which a test can replace to run the connection when it chooses
+    private @NotNull Executor connectionExecutor = CompletableFuture.completedFuture(null).defaultExecutor();
     private @NotNull TextDocumentSyncOptions syncOptions;
 
     /* Backwards compatible constructor */
@@ -648,6 +652,17 @@ public class LanguageServerWrapper implements Disposable {
     }
 
     /**
+     * Sets where the connection of a document runs once its start attempt is initialized, so that a test can run it
+     * when it chooses, as after a stop.
+     *
+     * @param connectionExecutor the executor.
+     */
+    @TestOnly
+    void setConnectionExecutor(@NotNull Executor connectionExecutor) {
+        this.connectionExecutor = connectionExecutor;
+    }
+
+    /**
      * Throws a {@link CancellationException} unless the given start attempt is still the current one. A stop, or a
      * stop and a newer start, replaces an attempt, but cancels only the last stage of its start chain, so the stages
      * before it still run when the attempt's initialize reply comes. The caller holds this wrapper's monitor, which
@@ -930,16 +945,28 @@ public class LanguageServerWrapper implements Disposable {
             return getLanguageServerWhenDidOpen(connected, waitForDidOpen);
         }
 
-        // start language server if needed
-        start();
+        // start language server if needed, and take the start attempt that the connection is for
+        InitializingContext attempt;
+        CompletableFuture<Void> initialized;
+        synchronized (this) {
+            start();
+            attempt = currentInitializingContext;
+            initialized = this.initializeFuture;
+        }
 
-        if (this.initializeFuture == null) {
+        if (initialized == null) {
             // The "initialize" future is not initialized, return null as language server.
             return CompletableFuture.completedFuture(null);
         }
 
-        return initializeFuture.thenComposeAsync(theVoid -> {
+        return initialized.thenComposeAsync(theVoid -> {
             // Here, the "initialize" future is initialized
+
+            // A stop, as by stopAndDisable(), can replace the attempt before this runs: the connection is then
+            // dropped, so that it neither starts the server again nor connects the document to a stopped server
+            if (currentInitializingContext != attempt) {
+                return CompletableFuture.completedFuture(null);
+            }
 
             // Here the file is not already connected
             // To connect the file, we need the document instance to add LSP document listener to manage didOpen, didChange, etc.
@@ -956,11 +983,22 @@ public class LanguageServerWrapper implements Disposable {
             }
 
             // Before the lock: getInitializedServer() calls the synchronized start(), and stop() takes that
-            // monitor before documentsLock
-            var initializedServer = folderToNotify != null ? getInitializedServer() : null;
+            // monitor before documentsLock. Under that monitor, a stop comes before the check or after the call, so
+            // that the call does not start the server again.
+            CompletableFuture<LanguageServer> initializedServer = null;
+            if (folderToNotify != null) {
+                synchronized (this) {
+                    if (currentInitializingContext != attempt) {
+                        return CompletableFuture.completedFuture(null);
+                    }
+                    initializedServer = getInitializedServer();
+                }
+            }
             DocumentContentSynchronizer synchronizer;
             synchronized (documentsLock) {
-                if (!isCurrent(claim)) {
+                // A stop which replaced the attempt after this check disconnects the document once this lock is
+                // released, as it disconnects every opened document
+                if (!isCurrent(claim) || currentInitializingContext != attempt) {
                     return CompletableFuture.completedFuture(null);
                 }
                 if (claim == null) {
@@ -1003,7 +1041,7 @@ public class LanguageServerWrapper implements Disposable {
             // After the lock: the didOpen can need the synchronized start(), and stop() takes that monitor
             // before documentsLock
             return getLanguageServerWhenDidOpen(synchronizer, waitForDidOpen);
-        });
+        }, connectionExecutor);
     }
 
     /**

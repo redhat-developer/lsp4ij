@@ -41,6 +41,7 @@ import org.jetbrains.annotations.NotNull;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.Proxy;
+import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -150,6 +151,35 @@ public class LanguageServerWrapperRestartTest extends UsefulTestCase {
         assertFalse("the replaced attempt must not send its server initialized", first.initialized);
 
         wrapper.stop();
+    }
+
+    public void testAConnectionQueuedBeforeAStopNeitherStartsTheServerAgainNorConnectsTheFile() {
+        var definition = new ScriptedServerDefinition();
+        var wrapper = new LanguageServerWrapper(myFixture.getProject(), definition);
+        Disposer.register(getTestRootDisposable(), wrapper);
+        var file = myFixture.addFileToProject("queued.foo", "queued").getVirtualFile();
+
+        // The server starts, with its start task in this thread and its initialize answered by the test
+        runPooledThreadTasksHere(() -> {
+            wrapper.start();
+            return null;
+        });
+        definition.servers.get(0).reply();
+        assertEquals(ServerStatus.started, wrapper.getServerStatus());
+
+        // The connection of a file is queued, and a stop comes before it runs
+        var queued = new ArrayList<Runnable>();
+        wrapper.setConnectionExecutor(queued::add);
+        var connected = wrapper.connect(file, new LanguageServerWrapper.LSPFileConnectionInfo(null, null, null, true));
+        assertEquals(1, queued.size());
+        wrapper.stop();
+
+        // The connection runs after the stop
+        queued.forEach(Runnable::run);
+        assertTrue("the connection must end without waiting for a server", connected.isDone());
+        assertNull(connected.join());
+        assertEquals("the connection must not start the server again", 1, definition.servers.size());
+        assertNull("the file must not be connected", wrapper.getOpenedDocument(wrapper.toUri(file), false));
     }
 
     /**
