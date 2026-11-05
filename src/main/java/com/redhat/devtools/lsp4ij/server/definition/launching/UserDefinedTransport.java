@@ -97,7 +97,18 @@ public record UserDefinedTransport(@NotNull Mode mode, @Nullable String host, in
      * @return the transport which the given settings describe.
      */
     public static @NotNull UserDefinedTransport of(@Nullable String modeId, @Nullable String host, int port) {
-        var mode = Mode.fromId(modeId);
+        return of(Mode.fromId(modeId), host, port);
+    }
+
+    /**
+     * Returns the transport of the given mode, host and port.
+     *
+     * @param mode the mode.
+     * @param host the host.
+     * @param port the port.
+     * @return the transport of the given mode, host and port.
+     */
+    public static @NotNull UserDefinedTransport of(@NotNull Mode mode, @Nullable String host, int port) {
         return mode == Mode.STDIO ? STDIO : new UserDefinedTransport(mode, host, port);
     }
 

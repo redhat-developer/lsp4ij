@@ -32,18 +32,27 @@ public class UserDefinedTransportSettingsTest extends LightPlatformTestCase {
         var loaded = XmlSerializer.deserialize(element, UserDefinedLanguageServerItemSettings.class);
 
         assertEquals(RUNNING, loaded.getTransport());
-        assertEquals("attach", loaded.getTransportMode());
+        assertSame(UserDefinedTransport.Mode.ATTACH, loaded.getTransportMode());
         assertEquals("127.0.0.1", loaded.getSocketHost());
         assertEquals(6005, loaded.getSocketPort());
     }
 
-    public void testTheStandardInputAndOutputPersistsAsNoMode() {
+    public void testTheStandardInputAndOutputIsTheDefaultMode() {
         var settings = settings();
         settings.setTransport(UserDefinedTransport.STDIO);
 
         var loaded = XmlSerializer.deserialize(XmlSerializer.serialize(settings), UserDefinedLanguageServerItemSettings.class);
 
-        assertNull(loaded.getTransportMode());
+        assertSame(UserDefinedTransport.Mode.STDIO, loaded.getTransportMode());
+        assertSame(UserDefinedTransport.STDIO, loaded.getTransport());
+    }
+
+    public void testSettingsSavedWithoutAModeTalkOverTheStandardInputAndOutput() {
+        // as the settings of a language server saved before the transport existed
+        var loaded = XmlSerializer.deserialize(XmlSerializer.serialize(settings()), UserDefinedLanguageServerItemSettings.class);
+        loaded.setTransportMode(null);
+
+        assertSame(UserDefinedTransport.Mode.STDIO, new UserDefinedLanguageServerItemSettings().getTransportMode());
         assertSame(UserDefinedTransport.STDIO, loaded.getTransport());
     }
 

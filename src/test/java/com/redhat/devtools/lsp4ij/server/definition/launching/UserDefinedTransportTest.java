@@ -34,7 +34,7 @@ public class UserDefinedTransportTest {
 
     @Test
     void theStandardInputAndOutputHasNoHostNorPort() {
-        assertSame(UserDefinedTransport.STDIO, UserDefinedTransport.of(null, "localhost", 6005));
+        assertSame(UserDefinedTransport.STDIO, UserDefinedTransport.of((String) null, "localhost", 6005));
         assertSame(UserDefinedTransport.STDIO, UserDefinedTransport.of("stdio", null, 0));
     }
 

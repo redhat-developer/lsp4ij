@@ -79,7 +79,7 @@ public class LanguageServerViewTransportTest extends BasePlatformTestCase {
         view.apply();
 
         assertSame(UserDefinedTransport.STDIO, savedTransport());
-        assertNull("the settings store no mode for the standard input and output", settings().getTransportMode());
+        assertSame(UserDefinedTransport.Mode.STDIO, settings().getTransportMode());
     }
 
     public void testARunningLanguageServerWithoutItsPortIsNotSaved() {

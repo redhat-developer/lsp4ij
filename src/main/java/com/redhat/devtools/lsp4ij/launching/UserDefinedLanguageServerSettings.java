@@ -132,9 +132,9 @@ public class UserDefinedLanguageServerSettings implements PersistentStateCompone
 
         private String workspaceFolderStrategyConfiguration;
 
-        // How LSP4IJ talks to the language server: the id of a UserDefinedTransport.Mode, null for its standard input
-        // and output, and the host and port of a socket
-        private String transportMode;
+        // How LSP4IJ talks to the language server, and the host and port of a socket. Settings saved without a mode
+        // talk over the standard input and output, as they did.
+        private @NotNull UserDefinedTransport.Mode transportMode = UserDefinedTransport.Mode.STDIO;
 
         private String socketHost;
 
@@ -187,12 +187,12 @@ public class UserDefinedLanguageServerSettings implements PersistentStateCompone
             return workingDir;
         }
 
-        public String getTransportMode() {
+        public @NotNull UserDefinedTransport.Mode getTransportMode() {
             return transportMode;
         }
 
-        public void setTransportMode(String transportMode) {
-            this.transportMode = transportMode;
+        public void setTransportMode(@Nullable UserDefinedTransport.Mode transportMode) {
+            this.transportMode = transportMode != null ? transportMode : UserDefinedTransport.Mode.STDIO;
         }
 
         public String getSocketHost() {
@@ -227,7 +227,7 @@ public class UserDefinedLanguageServerSettings implements PersistentStateCompone
          * @param transport how LSP4IJ talks to the language server.
          */
         public void setTransport(@NotNull UserDefinedTransport transport) {
-            this.transportMode = transport.mode() == UserDefinedTransport.Mode.STDIO ? null : transport.mode().getId();
+            this.transportMode = transport.mode();
             this.socketHost = transport.host();
             this.socketPort = transport.port();
         }
