@@ -19,9 +19,12 @@ import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.application.impl.NonBlockingReadActionImpl;
 import com.intellij.openapi.command.WriteCommandAction;
 import com.intellij.openapi.fileEditor.FileEditor;
+import com.intellij.psi.PsiDocumentManager;
 import com.intellij.psi.PsiFile;
 import com.intellij.testFramework.PlatformTestUtil;
+import com.intellij.util.Alarm;
 import com.intellij.util.concurrency.AppExecutorUtil;
+import com.redhat.devtools.lsp4ij.LSPFileSupport;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
 import com.redhat.devtools.lsp4ij.features.codeAction.intention.LSPIntentionAction0;
@@ -46,9 +49,11 @@ import java.util.concurrent.atomic.AtomicInteger;
 /**
  * The EDT never waits for a textDocument/codeAction answer: IntelliJ asks the lazy intentions and quick fixes for their
  * text and availability there, when the lightbulb and the intention popup sort them. While the answer is pending they
- * are not available, and they are once it is in; the file's highlighting restarts once for the answers the EDT found
- * pending, unless the file changed meanwhile. The tests run on the EDT, and the mock server holds its answers until
- * the test releases them.
+ * are not available, and they are once it is in; the file's code actions then refresh through the
+ * {@link com.redhat.devtools.lsp4ij.internal.editor.EditorFeatureManager}, whose debounced restart of the file's
+ * highlighting runs once for the answers that come together, unless the file changed meanwhile. The tests run on the
+ * EDT, the mock server holds its answers until the test releases them, and the tests count the restarts that the
+ * refreshes leave pending in the file's debounce, which they run at once.
  */
 public class CodeActionsOnTheEdtTest extends LSPCodeInsightFixtureTestCase {
 
@@ -64,7 +69,7 @@ public class CodeActionsOnTheEdtTest extends LSPCodeInsightFixtureTestCase {
         PsiFile file = myFixture.configureByText("test.ts", "const foo = <caret>1;");
         IntentionAction intention = new LSPIntentionAction0();
         var passes = passesOf(file);
-        int restarts = restartManager().getRestartCount();
+        settle(file);
         var daemon = (DaemonCodeAnalyzerImpl) DaemonCodeAnalyzer.getInstance(myFixture.getProject());
         var editors = EditorTracker.getInstance(myFixture.getProject());
         // the daemon highlights the active editors once its timer runs, as when the editor is shown
@@ -78,9 +83,10 @@ public class CodeActionsOnTheEdtTest extends LSPCodeInsightFixtureTestCase {
                 release.complete(null);
             }
 
-            assertRestarts(file, restarts + 1);
+            assertRestarts(file, 1, intentionRefresh(file));
             // the restarted highlighting runs a pass, which shows the intention
             passes.set(0);
+            runRestarts(file);
             PlatformTestUtil.waitWithEventsDispatching("a highlighting pass must run after the restart",
                     () -> passes.get() > 0, 10);
         } finally {
@@ -97,8 +103,9 @@ public class CodeActionsOnTheEdtTest extends LSPCodeInsightFixtureTestCase {
     public void testAQuickFixOnTheEdtDoesNotWaitForItsCodeAction() throws Exception {
         MockLanguageServer.INSTANCE.setCodeActions(List.of(Either.forRight(quickFix())));
         PsiFile file = myFixture.configureByText("test.ts", "const foo = 1;");
-        IntentionAction intention = quickFixOf(file);
-        int restarts = restartManager().getRestartCount();
+        LSPLazyCodeActions quickFixes = quickFixesOf(file);
+        IntentionAction intention = quickFixes.getCodeActions().get(0);
+        settle(file);
         CompletableFuture<Void> release = hold();
         try {
             assertNotWaitedFor(intention, file, release);
@@ -106,7 +113,7 @@ public class CodeActionsOnTheEdtTest extends LSPCodeInsightFixtureTestCase {
             release.complete(null);
         }
 
-        assertRestarts(file, restarts + 1);
+        assertRestarts(file, 1, quickFixes.getRefresh());
         assertTrue(intention.isAvailable(myFixture.getProject(), myFixture.getEditor(), file));
         assertEquals("Remove unused declaration for: 'foo'", intention.getText());
         assertAvailableWithNoOtherRequest(intention, file, 1);
@@ -116,27 +123,31 @@ public class CodeActionsOnTheEdtTest extends LSPCodeInsightFixtureTestCase {
         MockLanguageServer.INSTANCE.setCodeActions(List.of(Either.forRight(refactoring())));
         PsiFile file = myFixture.configureByText("test.ts", "const foo = <caret>1;");
         IntentionAction intention = new LSPIntentionAction0();
-        int restarts = restartManager().getRestartCount();
+        settle(file);
         CompletableFuture<Void> release = hold();
         try {
             assertNotWaitedFor(intention, file, release);
-            // The edit restarts the file's highlighting itself, whose pass asks for code actions of its own
+            // The edit restarts the file's highlighting itself, whose pass asks for code actions of its own; it is
+            // committed, as IntelliJ commits a typed change before it highlights
             WriteCommandAction.runWriteCommandAction(myFixture.getProject(),
                     () -> myFixture.getEditor().getDocument().insertString(0, " "));
+            PsiDocumentManager.getInstance(myFixture.getProject()).commitAllDocuments();
+            settle(file);
         } finally {
             release.complete(null);
         }
 
-        assertRestarts(file, restarts);
+        assertRestarts(file, 0, intentionRefresh(file));
     }
 
     public void testTheAnswersOfAFileRestartItOnce() throws Exception {
         MockLanguageServer.INSTANCE.setCodeActions(List.of(Either.forRight(refactoring()), Either.forRight(quickFix())));
         PsiFile file = myFixture.configureByText("test.ts", "const foo = <caret>1;");
         IntentionAction intention = new LSPIntentionAction0();
-        IntentionAction quickFix = quickFixOf(file);
+        LSPLazyCodeActions quickFixes = quickFixesOf(file);
+        IntentionAction quickFix = quickFixes.getCodeActions().get(0);
         var textDocumentService = MockLanguageServer.INSTANCE.getTextDocumentService();
-        int restarts = restartManager().getRestartCount();
+        settle(file);
         CompletableFuture<Void> release = hold();
         try {
             assertFalse(intention.isAvailable(myFixture.getProject(), myFixture.getEditor(), file));
@@ -148,7 +159,7 @@ public class CodeActionsOnTheEdtTest extends LSPCodeInsightFixtureTestCase {
         }
 
         // Both answers come at once, and the file restarts once
-        assertRestarts(file, restarts + 1);
+        assertRestarts(file, 1, intentionRefresh(file), quickFixes.getRefresh());
         assertAvailableWithNoOtherRequest(intention, file, 2);
         assertAvailableWithNoOtherRequest(quickFix, file, 2);
     }
@@ -181,18 +192,57 @@ public class CodeActionsOnTheEdtTest extends LSPCodeInsightFixtureTestCase {
     }
 
     /**
-     * Waits until the answers that the EDT found pending for the file have completed, and the restart they make, if
-     * any, has run, and checks the number of restarts so far.
+     * Waits until the refreshes that the answers the EDT found pending make have refreshed the file's editors, or found
+     * the file changed, and checks the restarts of its highlighting that they leave pending.
      */
-    private void assertRestarts(PsiFile file, int expected) {
-        PlatformTestUtil.waitWithEventsDispatching("the answers must complete",
-                () -> !restartManager().isPending(file.getVirtualFile()), 5);
+    @SafeVarargs
+    private void assertRestarts(PsiFile file, int expected, CompletableFuture<Void>... refreshes) throws Exception {
+        for (var refresh : refreshes) {
+            assertNotNull("The EDT found the answer pending, which refreshes the file once it is in", refresh);
+            refresh.get(HANG_SECONDS, TimeUnit.SECONDS);
+        }
         NonBlockingReadActionImpl.waitForAsyncTaskCompletion();
-        assertEquals(expected, restartManager().getRestartCount());
+        assertEquals(expected, pendingRestarts(file));
     }
 
-    private RestartWhenCodeActionsLoadedManager restartManager() {
-        return RestartWhenCodeActionsLoadedManager.getInstance(myFixture.getProject());
+    /**
+     * Runs the restarts of the file's highlighting that are pending, and anything they leave to finish, so that the file
+     * has none pending.
+     */
+    private void settle(PsiFile file) throws Exception {
+        getLanguageServer(file);
+        NonBlockingReadActionImpl.waitForAsyncTaskCompletion();
+        runRestarts(file);
+        assertEquals(0, pendingRestarts(file));
+    }
+
+    /**
+     * Runs the restarts of the file's highlighting that its debounce holds, at once.
+     */
+    private void runRestarts(PsiFile file) throws Exception {
+        var alarm = restartAlarm(file);
+        if (alarm != null) {
+            alarm.drainRequestsInTest();
+        }
+        NonBlockingReadActionImpl.waitForAsyncTaskCompletion();
+    }
+
+    private int pendingRestarts(PsiFile file) throws Exception {
+        var alarm = restartAlarm(file);
+        return alarm == null ? 0 : alarm.getActiveRequestCount();
+    }
+
+    /**
+     * Returns the debounce of the restarts of the file's highlighting, which LSPFileSupport makes once one is asked for.
+     */
+    private static Alarm restartAlarm(PsiFile file) throws ReflectiveOperationException {
+        var field = LSPFileSupport.class.getDeclaredField("refreshPsiFileAlarm");
+        field.setAccessible(true);
+        return (Alarm) field.get(LSPFileSupport.getSupport(file));
+    }
+
+    private static CompletableFuture<Void> intentionRefresh(PsiFile file) {
+        return LSPFileSupport.getSupport(file).getIntentionCodeActionSupport().getRefresh();
     }
 
     /**
@@ -225,11 +275,8 @@ public class CodeActionsOnTheEdtTest extends LSPCodeInsightFixtureTestCase {
         return passes;
     }
 
-    private IntentionAction quickFixOf(PsiFile file) throws Exception {
-        var diagnostic = diagnostic();
-        return new LSPLazyCodeActions(List.of(diagnostic), file.getVirtualFile(), getLanguageServer(file))
-                .getCodeActions()
-                .get(0);
+    private LSPLazyCodeActions quickFixesOf(PsiFile file) throws Exception {
+        return new LSPLazyCodeActions(List.of(diagnostic()), file.getVirtualFile(), getLanguageServer(file));
     }
 
     private static CodeAction refactoring() {

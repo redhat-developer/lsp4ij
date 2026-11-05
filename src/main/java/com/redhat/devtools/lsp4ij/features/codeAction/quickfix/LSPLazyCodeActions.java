@@ -17,15 +17,18 @@ import com.intellij.codeInsight.intention.IntentionAction;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.vfs.VirtualFile;
+import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LSPRequestConstants;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import com.redhat.devtools.lsp4ij.client.features.FileUriSupport;
 import com.redhat.devtools.lsp4ij.features.codeAction.CodeActionData;
 import com.redhat.devtools.lsp4ij.features.codeAction.LSPLazyCodeActionIntentionAction;
 import com.redhat.devtools.lsp4ij.features.codeAction.LSPLazyCodeActionProvider;
-import com.redhat.devtools.lsp4ij.features.codeAction.RestartWhenCodeActionsLoadedManager;
 import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
 import com.redhat.devtools.lsp4ij.internal.CompletableFutures;
+import com.redhat.devtools.lsp4ij.internal.PsiFileCancelChecker;
+import com.redhat.devtools.lsp4ij.internal.editor.EditorFeatureManager;
+import com.redhat.devtools.lsp4ij.internal.editor.EditorFeatureType;
 import org.eclipse.lsp4j.*;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
 import org.jetbrains.annotations.NotNull;
@@ -72,6 +75,10 @@ public class LSPLazyCodeActions implements LSPLazyCodeActionProvider {
     // LSP code actions request used to load code action for the diagnostic.
     private volatile CompletableFuture<List<CodeActionData>> lspCodeActionRequest = null;
     private CancellationSupport cancellationSupport;
+
+    // The request whose code actions the EDT did not wait for, and the refresh of the file's editors once they load
+    private @Nullable CompletableFuture<?> refreshedRequest;
+    private @Nullable CompletableFuture<Void> refresh;
 
     public LSPLazyCodeActions(@NotNull List<Diagnostic> diagnostics,
                               @NotNull VirtualFile file,
@@ -121,7 +128,7 @@ public class LSPLazyCodeActions implements LSPLazyCodeActionProvider {
         if (!future.isDone() && ApplicationManager.getApplication().isDispatchThread()) {
             // The EDT never waits for the language server, which would freeze the IDE for as long as it takes. The
             // code actions are not loaded yet; the intention pass shows the quick fixes once they are.
-            RestartWhenCodeActionsLoadedManager.getInstance(languageServer.getProject()).schedule(future, file);
+            refreshWhenLoaded(future);
             return null;
         }
         // Wait for the LSP response, cooperating with IntelliJ's threading model.
@@ -242,5 +249,33 @@ public class LSPLazyCodeActions implements LSPLazyCodeActionProvider {
     @TestOnly
     synchronized boolean hasRequest() {
         return lspCodeActionRequest != null;
+    }
+
+    /**
+     * Refreshes the code actions of the file's editors once the given request has loaded them, unless the file changed
+     * meanwhile, when its edit has restarted its highlighting already: the restarted intention pass shows the quick
+     * fixes. Each request refreshes once, however often the EDT asks while it is pending.
+     */
+    private synchronized void refreshWhenLoaded(@NotNull CompletableFuture<?> request) {
+        if (refreshedRequest == request) {
+            return;
+        }
+        var psiFile = LSPIJUtils.getPsiFile(file, languageServer.getProject());
+        if (psiFile == null) {
+            return;
+        }
+        refreshedRequest = request;
+        refresh = EditorFeatureManager.getInstance(psiFile.getProject())
+                .refreshEditorFeatureWhenAllDone(request, psiFile, EditorFeatureType.CODE_ACTION,
+                        new PsiFileCancelChecker(psiFile));
+    }
+
+    /**
+     * Returns the refresh that the last request the EDT did not wait for makes once it has loaded, done once it has
+     * refreshed or found the file changed, or null when there is none.
+     */
+    @TestOnly
+    public synchronized @Nullable CompletableFuture<Void> getRefresh() {
+        return refresh;
     }
 }

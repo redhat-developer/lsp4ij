@@ -68,6 +68,7 @@ public class EditorFeatureManager implements Disposable {
         addEditorFeature(new StructureViewEditorFeature());
         addEditorFeature(new LSPDiagnosticsEditorFeature());
         addEditorFeature(new LSPDocumentLinkEditorFeature());
+        addEditorFeature(new CodeActionEditorFeature());
     }
 
     private void addEditorFeature(EditorFeature editorFeature) {

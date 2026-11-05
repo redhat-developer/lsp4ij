@@ -18,14 +18,17 @@ import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import com.redhat.devtools.lsp4ij.features.AbstractLSPDocumentFeatureSupport;
 import com.redhat.devtools.lsp4ij.features.codeAction.CodeActionData;
 import com.redhat.devtools.lsp4ij.features.codeAction.LSPLazyCodeActionProvider;
-import com.redhat.devtools.lsp4ij.features.codeAction.RestartWhenCodeActionsLoadedManager;
 import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
 import com.redhat.devtools.lsp4ij.internal.CompletableFutures;
+import com.redhat.devtools.lsp4ij.internal.PsiFileCancelChecker;
+import com.redhat.devtools.lsp4ij.internal.editor.EditorFeatureManager;
+import com.redhat.devtools.lsp4ij.internal.editor.EditorFeatureType;
 import org.eclipse.lsp4j.CodeActionKind;
 import org.eclipse.lsp4j.CodeActionParams;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.jetbrains.annotations.TestOnly;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -49,6 +52,10 @@ public class LSPIntentionCodeActionSupport extends AbstractLSPDocumentFeatureSup
     private static final Logger LOGGER = LoggerFactory.getLogger(LSPIntentionCodeActionSupport.class);
 
     private CodeActionParams previousParams;
+
+    // The request whose code actions the EDT did not wait for, and the refresh of the file's editors once they load
+    private @Nullable CompletableFuture<?> refreshedRequest;
+    private @Nullable CompletableFuture<Void> refresh;
 
     public LSPIntentionCodeActionSupport(@NotNull PsiFile file) {
         super(file);
@@ -149,10 +156,7 @@ public class LSPIntentionCodeActionSupport extends AbstractLSPDocumentFeatureSup
             // The EDT never waits for the language server: IntelliJ asks the intentions for their text there, when
             // the lightbulb and the intention popup sort them, and the IDE would freeze for as long as the server
             // takes. The code actions are not loaded yet; the intention pass shows them once they are.
-            var file = getFile().getVirtualFile();
-            if (file != null) {
-                RestartWhenCodeActionsLoadedManager.getInstance(getFile().getProject()).schedule(future, file);
-            }
+            refreshWhenLoaded(future);
             return null;
         }
         // This method is called from ShowIntentionsPass inside a ReadAction.
@@ -198,5 +202,30 @@ public class LSPIntentionCodeActionSupport extends AbstractLSPDocumentFeatureSup
             return !CodeActionKind.QuickFix.equals(codeAction.getRight().getKind());
         }
         return true;
+    }
+
+    /**
+     * Refreshes the code actions of the file's editors once the given request has loaded them, unless the file changed
+     * meanwhile, when its edit has restarted its highlighting already: the restarted intention pass shows them. Each
+     * request refreshes once, however often the EDT asks while it is pending.
+     */
+    private synchronized void refreshWhenLoaded(@NotNull CompletableFuture<?> request) {
+        if (refreshedRequest == request) {
+            return;
+        }
+        refreshedRequest = request;
+        PsiFile file = getFile();
+        refresh = EditorFeatureManager.getInstance(file.getProject())
+                .refreshEditorFeatureWhenAllDone(request, file, EditorFeatureType.CODE_ACTION,
+                        new PsiFileCancelChecker(file));
+    }
+
+    /**
+     * Returns the refresh that the last request the EDT did not wait for makes once it has loaded, done once it has
+     * refreshed or found the file changed, or null when there is none.
+     */
+    @TestOnly
+    public synchronized @Nullable CompletableFuture<Void> getRefresh() {
+        return refresh;
     }
 }
