@@ -72,9 +72,11 @@ public final class SocketTestServers {
     private static void echo(Socket connection) throws IOException {
         try (connection) {
             var in = new BufferedReader(new InputStreamReader(connection.getInputStream(), StandardCharsets.UTF_8));
-            var out = new PrintWriter(connection.getOutputStream(), true, StandardCharsets.UTF_8);
+            var out = new PrintWriter(connection.getOutputStream(), false, StandardCharsets.UTF_8);
             for (String line = in.readLine(); line != null && !line.equals("bye"); line = in.readLine()) {
-                out.println(line);
+                // A line feed, as the test writes and reads lines, not the platform's line separator
+                out.print(line + '\n');
+                out.flush();
             }
         }
     }
