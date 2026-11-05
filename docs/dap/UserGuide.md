@@ -297,6 +297,15 @@ completion should be available in the expression editor by consuming the
 
 ![Completion](images/DAP_debugging_completion.png)
 
+### Debug console
+
+A line typed in the debug session's `Console` is sent to the DAP server as an
+[Evaluate request](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_Evaluate) with the
+context `repl`, as VS Code's Debug Console sends it: in the selected stack frame when the program is stopped, and
+without a frame when it runs. The console prints its result, or the DAP server's error. The lines are sent one after
+the other, in the order they were typed, an empty line too, so that a DAP server which takes the program's input over
+the debug connection can take each line as the program's input while it runs.
+
 ## Hexadecimal values
 
 When the DAP server supports value formatting (`supportsValueFormattingOptions`), the context menu of the Variables and

@@ -27,13 +27,18 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.TestOnly;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Consumer;
+import java.util.function.Supplier;
 
 /**
  * Extends {@link ConsoleViewImpl} to support custom DAP folding by using [Trace
  */
 public class DAPConsoleView extends ConsoleViewImpl {
+
+    private volatile @Nullable Consumer<String> inputHandler;
 
     public DAPConsoleView(@NotNull Project project,
                           @NotNull GlobalSearchScope searchScope,
@@ -41,13 +46,97 @@ public class DAPConsoleView extends ConsoleViewImpl {
                           boolean usePredefinedMessageFilter) {
         super(project, searchScope, viewer, new DAPConsoleState(), usePredefinedMessageFilter);
     }
-    
+
+    /**
+     * Sets what takes each line typed in the console, without its line end, such as the debug session, which
+     * evaluates it. Without one, the console takes no input, since a debug adapter's process input can be the debug
+     * protocol's channel.
+     *
+     * @param inputHandler what takes each typed line, or null for no input.
+     */
+    public void setInputHandler(@Nullable Consumer<String> inputHandler) {
+        this.inputHandler = inputHandler;
+    }
+
     private static class DAPConsoleState extends ConsoleState.NotStartedStated {
 
         @Override
         public @NotNull ConsoleState attachTo(@NotNull ConsoleViewImpl console, @NotNull ProcessHandler processHandler) {
-            return new ConsoleViewRunningState(console, processHandler, this, true, false);
+            // The process's output is shown; its input, which can be the debug protocol's channel, takes nothing
+            var running = new ConsoleViewRunningState(console, processHandler, this, true, false);
+            return console instanceof DAPConsoleView dapConsole ?
+                    new InputState(running, () -> dapConsole.inputHandler) : running;
         }
+    }
+
+    /**
+     * The state of a console attached to a process, which hands each line typed in the console to the console's input
+     * handler, if it has one, and is the given running state otherwise.
+     */
+    static class InputState extends ConsoleState {
+
+        private final ConsoleState running;
+        private final Supplier<@Nullable Consumer<String>> inputHandler;
+        private final StringBuilder typed = new StringBuilder();
+
+        InputState(@NotNull ConsoleState running, @NotNull Supplier<@Nullable Consumer<String>> inputHandler) {
+            this.running = running;
+            this.inputHandler = inputHandler;
+        }
+
+        @Override
+        public synchronized void sendUserInput(@NotNull String input) throws IOException {
+            var handler = inputHandler.get();
+            if (handler == null) {
+                running.sendUserInput(input);
+                return;
+            }
+            // A line not ended yet waits for its end
+            typed.append(input);
+            for (int end = typed.indexOf("\n"); end >= 0; end = typed.indexOf("\n")) {
+                int lineEnd = end > 0 && typed.charAt(end - 1) == '\r' ? end - 1 : end;
+                String line = typed.substring(0, lineEnd);
+                typed.delete(0, end + 1);
+                handler.accept(line);
+            }
+        }
+
+        @Override
+        public @NotNull ConsoleState attachTo(@NotNull ConsoleViewImpl console, @NotNull ProcessHandler processHandler) {
+            return dispose().attachTo(console, processHandler);
+        }
+
+        @Override
+        public @NotNull ConsoleState dispose() {
+            return running.dispose();
+        }
+
+        @Override
+        public boolean isFinished() {
+            return running.isFinished();
+        }
+
+        @Override
+        public boolean isRunning() {
+            return running.isRunning();
+        }
+
+        @Override
+        public boolean isCommandLine(@NotNull String line) {
+            return running.isCommandLine(line);
+        }
+    }
+
+    /**
+     * Prints text which is not the debug adapter's process output, such as the result of an evaluation typed in the
+     * console, which the filter of DAP traces in {@link #print(String, ConsoleViewContentType)} must not hide: a
+     * result can be a JSON object.
+     *
+     * @param text        the text.
+     * @param contentType the console content type.
+     */
+    public void printUnfiltered(@NotNull String text, @NotNull ConsoleViewContentType contentType) {
+        super.print(text, contentType);
     }
 
     @Override

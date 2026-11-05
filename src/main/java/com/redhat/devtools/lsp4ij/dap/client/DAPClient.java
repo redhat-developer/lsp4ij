@@ -970,18 +970,59 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
         return debugProtocolServer.stepInTargets(args);
     }
 
+    /**
+     * What the debug console shows for a typed line that it cannot send, since the debug session is not connected to
+     * the debug adapter yet.
+     */
+    public static final String CONSOLE_LINE_NOT_SENT = "The line was not sent: the debug adapter is not connected yet.";
+
     public CompletableFuture<EvaluateResponse> evaluate(@NotNull String expression,
                                                         @Nullable Integer frameId,
                                                         @NotNull String context) {
         if (debugProtocolServer == null) {
             return CompletableFuture.completedFuture(null);
         }
+        return evaluate(debugProtocolServer, expression, frameId, context, getValueFormat());
+    }
+
+    private static CompletableFuture<EvaluateResponse> evaluate(@NotNull IDebugProtocolServer server,
+                                                                @NotNull String expression,
+                                                                @Nullable Integer frameId,
+                                                                @NotNull String context,
+                                                                @Nullable ValueFormat format) {
         EvaluateArguments args = new EvaluateArguments();
         args.setExpression(expression);
         args.setFrameId(frameId);
         args.setContext(context);
-        args.setFormat(getValueFormat());
-        return debugProtocolServer.evaluate(args);
+        args.setFormat(format);
+        return server.evaluate(args);
+    }
+
+    /**
+     * Evaluates a line typed in the debug console, as VS Code's Debug Console does: an evaluate request with the
+     * context repl, in the given stack frame when the program is stopped. A debug adapter which takes a running
+     * program's input over the debug connection can take the line as the program's input.
+     *
+     * @param line    the typed line, without its line end.
+     * @param frameId the selected stack frame, or null when the program runs.
+     * @return the text the console shows for the line: its result, or null when there is none, as when the program
+     * took the line as its input; it fails with the debug adapter's error, or with {@link #CONSOLE_LINE_NOT_SENT}
+     * when the client is not connected to the debug adapter yet.
+     */
+    public CompletableFuture<@Nullable String> evaluateConsoleLine(@NotNull String line, @Nullable Integer frameId) {
+        return evaluateConsoleLine(debugProtocolServer, line, frameId, getValueFormat());
+    }
+
+    static CompletableFuture<@Nullable String> evaluateConsoleLine(@Nullable IDebugProtocolServer server,
+                                                                   @NotNull String line,
+                                                                   @Nullable Integer frameId,
+                                                                   @Nullable ValueFormat format) {
+        if (server == null) {
+            return CompletableFuture.failedFuture(new IllegalStateException(CONSOLE_LINE_NOT_SENT));
+        }
+        return evaluate(server, line, frameId, EvaluateArgumentsContext.REPL, format)
+                .thenApply(response -> response != null && !StringUtils.isBlank(response.getResult()) ?
+                        response.getResult() : null);
     }
 
     public CompletableFuture<CompletionsResponse> completion(@NotNull String text,

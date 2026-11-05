@@ -10,8 +10,15 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.dap.console;
 
+import com.intellij.execution.impl.ConsoleState;
+import com.intellij.execution.impl.ConsoleViewImpl;
+import com.intellij.execution.process.ProcessHandler;
 import com.intellij.execution.ui.ConsoleViewContentType;
+import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.Test;
+
+import java.util.ArrayList;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -74,5 +81,77 @@ class DAPConsoleViewTest {
         String text = "{ \"a\": 1 }Content-Length: 45";
         String result = DAPConsoleView.getApplicableText(text, ConsoleViewContentType.NORMAL_OUTPUT);
         assertNull(result);
+    }
+
+    @Test
+    void typedLines_goToTheInputHandler_withoutTheirLineEnds() throws Exception {
+        var lines = new ArrayList<String>();
+        var state = new DAPConsoleView.InputState(new RunningState(), () -> lines::add);
+
+        state.sendUserInput("1 + 2\n");
+        state.sendUserInput("first\r\nsecond\n");
+
+        assertEquals(List.of("1 + 2", "first", "second"), lines);
+    }
+
+    @Test
+    void aTypedLine_waitsForItsEnd() throws Exception {
+        var lines = new ArrayList<String>();
+        var state = new DAPConsoleView.InputState(new RunningState(), () -> lines::add);
+
+        state.sendUserInput("par");
+        assertEquals(List.of(), lines);
+        state.sendUserInput("tial\n");
+
+        assertEquals(List.of("partial"), lines);
+    }
+
+    @Test
+    void anEmptyTypedLine_isALine() throws Exception {
+        // A program which waits for Enter takes the empty line as its input
+        var lines = new ArrayList<String>();
+        var state = new DAPConsoleView.InputState(new RunningState(), () -> lines::add);
+
+        state.sendUserInput("\n");
+
+        assertEquals(List.of(""), lines);
+    }
+
+    @Test
+    void withoutAnInputHandler_theRunningStateTakesTheInput() throws Exception {
+        var running = new RunningState();
+        var state = new DAPConsoleView.InputState(running, () -> null);
+
+        state.sendUserInput("text\n");
+
+        assertEquals(List.of("text\n"), running.input);
+    }
+
+    /**
+     * A running console state which records the input it gets.
+     */
+    private static class RunningState extends ConsoleState {
+
+        private final List<String> input = new ArrayList<>();
+
+        @Override
+        public @NotNull ConsoleState attachTo(@NotNull ConsoleViewImpl console, @NotNull ProcessHandler processHandler) {
+            return this;
+        }
+
+        @Override
+        public @NotNull ConsoleState dispose() {
+            return this;
+        }
+
+        @Override
+        public boolean isRunning() {
+            return true;
+        }
+
+        @Override
+        public void sendUserInput(@NotNull String input) {
+            this.input.add(input);
+        }
     }
 }

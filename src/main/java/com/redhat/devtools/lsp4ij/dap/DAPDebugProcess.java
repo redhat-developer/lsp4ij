@@ -12,6 +12,7 @@ package com.redhat.devtools.lsp4ij.dap;
 
 import com.intellij.execution.ExecutionResult;
 import com.intellij.execution.process.ProcessHandler;
+import com.intellij.execution.ui.ConsoleView;
 import com.intellij.execution.ui.ConsoleViewContentType;
 import com.intellij.execution.ui.ExecutionConsole;
 import com.intellij.execution.ui.RunnerLayoutUi;
@@ -61,6 +62,7 @@ import com.redhat.devtools.lsp4ij.dap.client.files.DAPFileRegistry;
 import com.redhat.devtools.lsp4ij.dap.client.files.DAPSourceReferencePosition;
 import com.redhat.devtools.lsp4ij.dap.client.variables.DAPValueFormat;
 import com.redhat.devtools.lsp4ij.dap.configurations.DAPCommandLineState;
+import com.redhat.devtools.lsp4ij.dap.console.DAPConsoleView;
 import com.redhat.devtools.lsp4ij.dap.descriptors.DebugAdapterDescriptor;
 import com.redhat.devtools.lsp4ij.dap.disassembly.DAPAlternativeSourceHandler;
 import com.redhat.devtools.lsp4ij.dap.disassembly.DisassemblyFile;
@@ -92,6 +94,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Supplier;
@@ -161,6 +164,8 @@ public class DAPDebugProcess extends XDebugProcess implements Disposable {
     // Smart Step Into
     private DAPSmartStepIntoHandler smartStepIntoHandler;
 
+    // Debug console: the evaluations of the lines typed in it, one after the other, guarded by consoleLock
+    private @NotNull CompletableFuture<?> consoleEvaluations = CompletableFuture.completedFuture(null);
     // Debug console: whether what it printed last ends its line, so that a message of LSP4IJ's own starts a line
     private final Object consoleLock = new Object();
     private boolean consoleLineEnded = true;
@@ -169,7 +174,7 @@ public class DAPDebugProcess extends XDebugProcess implements Disposable {
     private final @NotNull DAPDropFrameHandler dropFrameHandler;
 
     private @Nullable CompletableFuture<Void> connectToServerFuture;
-    private Status status;
+    private volatile Status status;
     private Supplier<TransportStreams> streamsSupplier;
     private DAPClient parentClient;
     private final @NotNull DAPValueFormat valueFormat = new DAPValueFormat();
@@ -353,7 +358,47 @@ public class DAPDebugProcess extends XDebugProcess implements Disposable {
     @Override
     public @NotNull ExecutionConsole createConsole() {
         // Override this method to avoid creating a new console and use the console from the execution result.
-        return executionResult.getExecutionConsole();
+        var console = executionResult.getExecutionConsole();
+        if (console instanceof DAPConsoleView dapConsole) {
+            // A line typed in the console is evaluated by the debug adapter, as VS Code's Debug Console does
+            dapConsole.setInputHandler(this::evaluateConsoleLine);
+        }
+        return console;
+    }
+
+    /**
+     * Sends a line typed in the debug console to the debug adapter as an evaluate request with the context repl, in
+     * the selected stack frame when the program is stopped, and prints its result, or the adapter's error, in the
+     * console. The lines are evaluated one after the other, so that the adapter gets them, and the console shows
+     * their results, in the order they were typed.
+     *
+     * @param line the typed line, without its line end.
+     */
+    private void evaluateConsoleLine(@NotNull String line) {
+        DAPStackFrame frame = getCurrentDapStackFrame();
+        DAPClient client = frame != null ? frame.getClient() : parentClient;
+        if (client == null) {
+            // Typed before the debug session made its client: the line is not dropped silently
+            print(DAPClient.CONSOLE_LINE_NOT_SENT, ConsoleViewContentType.ERROR_OUTPUT);
+            return;
+        }
+        Integer frameId = frame != null ? frame.getFrameId() : null;
+        synchronized (consoleLock) {
+            consoleEvaluations = consoleEvaluations
+                    .handle((ignored, previousError) -> null)
+                    // A line still queued when the session stops is not sent to the debug adapter it terminates
+                    .thenCompose(ignored -> status == Status.STOPPING || status == Status.STOPPED ?
+                            CompletableFuture.completedFuture(null) : client.evaluateConsoleLine(line, frameId))
+                    .whenComplete((result, error) -> {
+                        if (error != null) {
+                            Throwable cause = error instanceof CompletionException && error.getCause() != null ?
+                                    error.getCause() : error;
+                            print(cause.getMessage(), ConsoleViewContentType.ERROR_OUTPUT);
+                        } else if (result != null) {
+                            printText(result, ConsoleViewContentType.NORMAL_OUTPUT, true, true);
+                        }
+                    });
+        }
     }
 
     @Override
@@ -470,7 +515,7 @@ public class DAPDebugProcess extends XDebugProcess implements Disposable {
      * @param type    the console content type.
      */
     public void print(@Nullable String message, @NotNull ConsoleViewContentType type) {
-        printText(message, type, true);
+        printText(message, type, true, false);
     }
 
     /**
@@ -482,7 +527,7 @@ public class DAPDebugProcess extends XDebugProcess implements Disposable {
      * @param type   the console content type.
      */
     public void printOutput(@Nullable String output, @NotNull ConsoleViewContentType type) {
-        printText(output, type, false);
+        printText(output, type, false, false);
     }
 
     /**
@@ -505,26 +550,46 @@ public class DAPDebugProcess extends XDebugProcess implements Disposable {
         return text.charAt(text.length() - 1) == '\n' ? text : text + "\n";
     }
 
-    private void printText(@Nullable String message, @NotNull ConsoleViewContentType type, boolean ownMessage) {
+    /**
+     * @param unfiltered true for text which is not the debug adapter's process output, such as an evaluation's result,
+     *                   which the console's filter of DAP traces must not hide.
+     */
+    private void printText(@Nullable String message, @NotNull ConsoleViewContentType type, boolean ownMessage,
+                           boolean unfiltered) {
         synchronized (consoleLock) {
             final String text = getConsoleText(message, ownMessage, consoleLineEnded);
             if (text == null) {
                 return;
             }
             consoleLineEnded = text.charAt(text.length() - 1) == '\n';
-            printOnEdt(text, type);
+            printOnEdt(text, type, unfiltered);
         }
     }
 
-    private void printOnEdt(@NotNull String text, @NotNull ConsoleViewContentType type) {
+    private void printOnEdt(@NotNull String text, @NotNull ConsoleViewContentType type, boolean unfiltered) {
         AppUIUtil.invokeOnEdt(() -> {
             var consoleView = getSession().getConsoleView();
             if (consoleView == null) {
                 return;
 
             }
-            consoleView.print(text, type);
+            printOnConsole(consoleView, text, type, unfiltered);
         });
+    }
+
+    /**
+     * Prints the text on the console, past the filter of DAP traces of a {@link DAPConsoleView} when it is not the
+     * debug adapter's process output.
+     */
+    static void printOnConsole(@NotNull ConsoleView consoleView,
+                               @NotNull String text,
+                               @NotNull ConsoleViewContentType type,
+                               boolean unfiltered) {
+        if (unfiltered && consoleView instanceof DAPConsoleView dapConsoleView) {
+            dapConsoleView.printUnfiltered(text, type);
+        } else {
+            consoleView.print(text, type);
+        }
     }
 
     @Override
