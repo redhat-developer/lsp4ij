@@ -7,14 +7,20 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij;
 
+import com.intellij.codeInsight.daemon.impl.DaemonCodeAnalyzerImpl;
+import com.intellij.codeInsight.daemon.impl.HighlightInfo;
 import com.intellij.openapi.application.impl.NonBlockingReadActionImpl;
+import com.intellij.openapi.command.WriteCommandAction;
+import com.intellij.openapi.fileEditor.FileDocumentManager;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiFile;
+import com.intellij.testFramework.EdtTestUtil;
 import com.intellij.testFramework.PlatformTestUtil;
 import com.redhat.devtools.lsp4ij.client.features.FileUriSupport;
 import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
 import com.redhat.devtools.lsp4ij.client.features.LSPWorkspaceFolderFeature;
+import com.redhat.devtools.lsp4ij.features.diagnostics.LSPDiagnosticsApplier;
 import com.redhat.devtools.lsp4ij.features.workspaceFolder.WorkspaceFolderStrategy;
 import com.redhat.devtools.lsp4ij.fixtures.LSPCodeInsightFixtureTestCase;
 import com.redhat.devtools.lsp4ij.installation.ConsoleProvider;
@@ -26,13 +32,23 @@ import com.redhat.devtools.lsp4ij.mock.MockLanguageServer;
 import com.redhat.devtools.lsp4ij.mock.MockLanguageServerDefinition;
 import com.redhat.devtools.lsp4ij.server.StreamConnectionProvider;
 import com.redhat.devtools.lsp4ij.templates.ServerMappingSettings;
+import org.eclipse.lsp4j.Diagnostic;
+import org.eclipse.lsp4j.FileOperationFilter;
+import org.eclipse.lsp4j.FileOperationOptions;
+import org.eclipse.lsp4j.FileOperationPattern;
+import org.eclipse.lsp4j.FileOperationsServerCapabilities;
+import org.eclipse.lsp4j.Position;
+import org.eclipse.lsp4j.Range;
+import org.eclipse.lsp4j.ServerCapabilities;
 import org.eclipse.lsp4j.WorkspaceFolder;
+import org.eclipse.lsp4j.WorkspaceServerCapabilities;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -215,6 +231,75 @@ public class LanguageServerManagerInstancesTest extends LSPCodeInsightFixtureTes
         assertEquals(1, definition.installations.get());
     }
 
+    public void testAMovedFileGoesToTheInstanceOfItsNewRoot() throws Exception {
+        var file = file("a/moved.instances").getVirtualFile();
+        var a = openAndConnect(file);
+
+        move(file, myFixture.getTempDirFixture().findOrCreateDir("b"));
+
+        var instance = waitForTheInstanceConnectedTo(file);
+        assertEquals("b", instance.getInstanceRoot().getName());
+        assertFalse(a.isConnectedTo(a.toUri(file)));
+    }
+
+    public void testAMovedFileWithoutARootIsConnectedToNoInstance() throws Exception {
+        var file = file("a/moved.instances").getVirtualFile();
+        var a = openAndConnect(file);
+
+        move(file, myFixture.getTempDirFixture().findOrCreateDir("other"));
+
+        // A connection to an instance would come within this time
+        long end = System.currentTimeMillis() + 3000;
+        while (System.currentTimeMillis() < end) {
+            dispatchAll();
+            assertNull(instanceConnectedTo(file));
+            Thread.sleep(50);
+        }
+        assertEquals(List.of(a), instances());
+    }
+
+    public void testAFileOfAMovedDirectoryGoesToTheInstanceOfItsNewPlace() throws Exception {
+        var file = file("x/a/moved.instances").getVirtualFile();
+        var old = openAndConnect(file);
+        var oldRoot = old.getInstanceRoot().getUri();
+
+        move(file.getParent(), myFixture.getTempDirFixture().findOrCreateDir("y"));
+
+        var instance = waitForTheInstanceConnectedTo(file);
+        assertNotSame(old, instance);
+        assertFalse(oldRoot.equals(instance.getInstanceRoot().getUri()));
+        assertEquals(rootOf("y/a").getUri(), instance.getInstanceRoot().getUri());
+    }
+
+    public void testAMovedFileShowsOnlyTheDiagnosticsOfItsNewInstance() throws Exception {
+        if (LSPDiagnosticsApplier.GROUP_ID == -1) {
+            // Let the project's registrar register the pass factory, which shows the diagnostics
+            myFixture.configureByText("first.txt", "");
+            myFixture.doHighlighting();
+        }
+        var file = file("a/moved.instances").getVirtualFile();
+        openAndConnect(file);
+        PlatformTestUtil.waitWithEventsDispatching("The diagnostics of instance a must be shown",
+                () -> List.of("from a").equals(shownDiagnostics(file)), 10);
+
+        move(file, myFixture.getTempDirFixture().findOrCreateDir("b"));
+
+        PlatformTestUtil.waitWithEventsDispatching("The diagnostics of instance b must be shown",
+                () -> shownDiagnostics(file).contains("from b"), 10);
+        dispatchAll();
+        assertEquals(List.of("from b"), shownDiagnostics(file));
+    }
+
+    public void testAFileMovedWithinItsRootStaysWithItsInstance() throws Exception {
+        var file = file("a/moved.instances").getVirtualFile();
+        var a = openAndConnect(file);
+
+        EdtTestUtil.runInEdtAndWait(() -> WriteCommandAction.writeCommandAction(myFixture.getProject())
+                .run(() -> file.rename(this, "renamed.instances")));
+
+        assertSame(a, waitForTheInstanceConnectedTo(file));
+    }
+
     /**
      * Creates an instance for each root, the one of "a" first, and stops them.
      */
@@ -227,6 +312,16 @@ public class LanguageServerManagerInstancesTest extends LSPCodeInsightFixtureTes
             stop(instance);
         }
         return instances;
+    }
+
+    private @NotNull List<String> shownDiagnostics(@NotNull VirtualFile file) {
+        var document = FileDocumentManager.getInstance().getDocument(file);
+        assertNotNull(document);
+        return DaemonCodeAnalyzerImpl.getHighlights(document, null, myFixture.getProject())
+                .stream()
+                .map(HighlightInfo::getDescription)
+                .filter(Objects::nonNull)
+                .toList();
     }
 
     private @NotNull PsiFile file(@NotNull String path) {
@@ -245,6 +340,39 @@ public class LanguageServerManagerInstancesTest extends LSPCodeInsightFixtureTes
         var server = waitFor(manager.getLanguageServer(ID, file.getVirtualFile()));
         assertNotNull(server);
         return server.getServerWrapper();
+    }
+
+    private @NotNull LanguageServerWrapper openAndConnect(@NotNull VirtualFile file) throws Exception {
+        myFixture.openFileInEditor(file);
+        var psiFile = myFixture.getPsiManager().findFile(file);
+        assertNotNull(psiFile);
+        var servers = waitFor(LanguageServiceAccessor.getInstance(myFixture.getProject()).getLanguageServers(psiFile, null, null));
+        assertEquals(1, servers.size());
+        var instance = servers.get(0).getServerWrapper();
+        assertTrue(instance.isConnectedTo(instance.toUri(file)));
+        return instance;
+    }
+
+    private void move(@NotNull VirtualFile file, @NotNull VirtualFile target) throws IOException {
+        EdtTestUtil.runInEdtAndWait(() -> WriteCommandAction.writeCommandAction(myFixture.getProject())
+                .run(() -> file.move(this, target)));
+    }
+
+    private @Nullable LanguageServerWrapper instanceConnectedTo(@NotNull VirtualFile file) {
+        for (var instance : instances()) {
+            if (instance.isConnectedTo(instance.toUri(file))) {
+                return instance;
+            }
+        }
+        return null;
+    }
+
+    private @NotNull LanguageServerWrapper waitForTheInstanceConnectedTo(@NotNull VirtualFile file) {
+        PlatformTestUtil.waitWithEventsDispatching("The moved file must be connected to an instance",
+                () -> instanceConnectedTo(file) != null, 10);
+        var instance = instanceConnectedTo(file);
+        assertNotNull(instance);
+        return instance;
     }
 
     private static void stop(@NotNull LanguageServerWrapper instance) {
@@ -356,9 +484,19 @@ public class LanguageServerManagerInstancesTest extends LSPCodeInsightFixtureTes
 
         @Override
         public @NotNull StreamConnectionProvider createConnectionProvider(@NotNull Project project) {
-            var server = new MockLanguageServer(MockLanguageServer::defaultServerCapabilities);
+            var server = new MockLanguageServer(InstancesDefinition::capabilities);
             servers.add(server);
             return new MockConnectionProvider(server);
+        }
+
+        @Override
+        public @NotNull StreamConnectionProvider createConnectionProvider(@NotNull Project project,
+                                                                          @NotNull WorkspaceFolder instanceRoot) {
+            var provider = (MockConnectionProvider) createConnectionProvider(project);
+            // Each instance publishes a diagnostic that names it
+            servers.get(servers.size() - 1).getTextDocumentService().setPublishDiagnostics(List.of(
+                    new Diagnostic(new Range(new Position(0, 0), new Position(0, 4)), "from " + instanceRoot.getName())));
+            return provider;
         }
 
         @Override
@@ -371,6 +509,20 @@ public class LanguageServerManagerInstancesTest extends LSPCodeInsightFixtureTes
             });
             features.setServerInstaller(new CountingInstaller(installations));
             return features;
+        }
+
+        /**
+         * LSP4IJ handles a renamed or moved file only for a language server that supports workspace/didRenameFiles.
+         */
+        private static ServerCapabilities capabilities() {
+            var operations = new FileOperationsServerCapabilities();
+            operations.setDidRename(new FileOperationOptions(List.of(
+                    new FileOperationFilter(new FileOperationPattern("**/*.instances")))));
+            var workspace = new WorkspaceServerCapabilities();
+            workspace.setFileOperations(operations);
+            var capabilities = MockLanguageServer.defaultServerCapabilities();
+            capabilities.setWorkspace(workspace);
+            return capabilities;
         }
     }
 }
