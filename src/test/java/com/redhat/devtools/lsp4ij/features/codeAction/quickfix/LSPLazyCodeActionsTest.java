@@ -16,6 +16,7 @@ import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiFile;
 import com.intellij.testFramework.PlatformTestUtil;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
+import com.redhat.devtools.lsp4ij.LanguageServerWrapper;
 import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
 import com.redhat.devtools.lsp4ij.ServerStatus;
 import com.redhat.devtools.lsp4ij.client.features.FileUriSupport;
@@ -196,6 +197,19 @@ public class LSPLazyCodeActionsTest extends LSPCodeInsightFixtureTestCase {
         assertTrue(codeAction.isLeft());
         // The request cancelled while the server initialized must not be sent; only the new load's request is.
         assertEquals(1, textDocumentService.codeActionRequests);
+    }
+
+    public void testCodeActionsOfADisposedLanguageServerAreNone() throws Exception {
+        PsiFile file = myFixture.configureByText("test.ts", "const foo = 1;");
+        // A language server of the file's definition that is disposed, as one whose definition was removed, gives no
+        // server; the quick fixes made for its diagnostics then have no code actions, and their request no failure
+        var definition = getLanguageServer(file).getServerWrapper().getServerDefinition();
+        var disposed = new LanguageServerWrapper(myFixture.getProject(), definition);
+        disposed.dispose();
+        var codeActions = new LSPLazyCodeActions(List.of(createDiagnostic()), file.getVirtualFile(),
+                new LanguageServerItem(null, disposed));
+
+        assertEquals(Either.forRight(Boolean.FALSE), load(codeActions));
     }
 
     /**

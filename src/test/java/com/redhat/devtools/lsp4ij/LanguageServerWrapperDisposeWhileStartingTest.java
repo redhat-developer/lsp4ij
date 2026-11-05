@@ -77,6 +77,21 @@ public class LanguageServerWrapperDisposeWhileStartingTest extends UsefulTestCas
         assertEquals(ServerStatus.none, wrapper.getServerStatus());
     }
 
+    public void testADirectStartOfADisposedLanguageServerStartsNothing() throws Exception {
+        var wrapper = new LanguageServerWrapper(myFixture.getProject(), serverDefinition);
+
+        // A caller that starts a disposed language server itself, without asking for its server
+        wrapper.dispose();
+        wrapper.start();
+
+        // A start would have begun an initialization, which the server's answer would wait for
+        var server = wrapper.getInitializedServer();
+        assertTrue("A disposed language server must not start", server.isDone());
+        assertNull(server.get());
+        assertEquals("No connection may be created", 1, serverDefinition.creating.getCount());
+        assertEquals(ServerStatus.none, wrapper.getServerStatus());
+    }
+
     private static void await(CountDownLatch latch) {
         try {
             assertTrue(latch.await(10, TimeUnit.SECONDS));

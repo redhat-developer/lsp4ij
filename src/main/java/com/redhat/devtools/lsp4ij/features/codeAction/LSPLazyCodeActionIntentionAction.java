@@ -110,7 +110,8 @@ public class LSPLazyCodeActionIntentionAction implements IntentionAction {
                     languageServer
                             .getInitializedServer()
                             .thenApply(ls ->
-                                    ls.getTextDocumentService().resolveCodeAction(codeAction)
+                                    // A language server that cannot start, as one that is disposed, resolves nothing
+                                    ls == null ? null : ls.getTextDocumentService().resolveCodeAction(codeAction)
                                             .thenAccept(resolved -> {
                                                 ApplicationManager.getApplication().invokeLater(() ->
                                                         applyResolved(resolved != null ? resolved : codeAction, snapshot, project, file, editor, languageServer));
