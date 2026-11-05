@@ -57,7 +57,7 @@ public class SocketLanguageServerTest extends LSPCodeInsightFixtureTestCase {
             var definition = new MockLanguageServerDefinition("socket-server", false) {
                 @Override
                 public @NotNull StreamConnectionProvider createConnectionProvider(@NotNull Project project) {
-                    return SocketStreamConnectionProvider.connectTo(InetAddress.getLoopbackAddress().getHostAddress(),
+                    return SocketStreamConnectionProvider.attachTo(InetAddress.getLoopbackAddress().getHostAddress(),
                             listening.getLocalPort());
                 }
             };

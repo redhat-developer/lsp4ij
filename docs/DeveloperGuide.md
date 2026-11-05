@@ -208,7 +208,7 @@ It covers the three ways a language server takes a socket connection:
 
 ```java
 // The language server runs already, as in a debugger or inside another application, and listens on port 6005
-SocketStreamConnectionProvider.connectTo("127.0.0.1", 6005);
+SocketStreamConnectionProvider.attachTo("127.0.0.1", 6005);
 
 // LSP4IJ starts the language server, which listens on a free port, and connects to it once it accepts connections
 SocketStreamConnectionProvider.startAndConnect(0, port ->

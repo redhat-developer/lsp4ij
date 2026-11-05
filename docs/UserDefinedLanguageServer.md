@@ -40,7 +40,7 @@ You can reinstall the server at any time (e.g. to fetch the latest version) usin
 ### Server tab
 
 The `Server tab` requires the `server name` and `command` fields to be set. A language server which runs already, and
-which LSP4IJ reaches over a socket, needs no command, but its port (see [Transport](#transport)).
+to which LSP4IJ attaches over a socket, needs no command, but its port (see [Transport](#transport)).
 
 Here is a sample with the [typescript-language-server](https://github.com/typescript-language-server/typescript-language-server):
 
@@ -84,23 +84,24 @@ When commands contain macros, their resolved value is visible below the `Command
 
 #### Transport
 
-By default, LSP4IJ talks to the language server over the standard input and output of its process. A language server
-which talks LSP over a TCP socket instead is configured with the `Transport` field, in one of three ways, which are
-experimental:
+By default, LSP4IJ talks to the language server over the standard input and output (stdio) of its process. A language
+server which talks LSP over a TCP socket instead is configured with `Transport: Socket (experimental)`, in one of three
+ways, which are experimental:
 
 ![Transport](./images/user-defined-ls/SocketTransportModes.png)
 
-* `Socket (experimental): connect to a running language server`: the language server runs already and listens on `Host` and `Port`, as
-  when it runs in a debugger or inside another application. LSP4IJ doesn't start it, so the `Command` is not used, and
+* `Attach to a running language server`: the language server runs already and listens on `Host` and `Port`, as when it
+  runs in a debugger or inside another application. LSP4IJ doesn't start it, so the `Command` is not used, and
   stopping the language server only closes the connection. Without a host, LSP4IJ connects to the loopback address.
-* `Socket (experimental): start the language server, which listens on the port`: LSP4IJ starts the language server with the `Command`,
-  and connects to the port once the language server accepts connections.
-* `Socket (experimental): start the language server, which connects to the port`: LSP4IJ listens on the port and starts the language
-  server with the `Command`, which connects to it, as VS Code's socket transport does for a language server started
-  with `--socket=<port>`.
+  The port is needed, since LSP4IJ can't choose it.
+* `Start the language server, LSP4IJ connects to it`: LSP4IJ starts the language server with the `Command`, and
+  connects to the port once the language server accepts connections.
+* `Start the language server, it connects to LSP4IJ`: LSP4IJ listens on the port and starts the language server with
+  the `Command`, which connects to it, as VS Code's socket transport does for a language server started with
+  `--socket=<port>`.
 
-When LSP4IJ starts the language server, the `Command` takes the port as `${port}`, and a `Port` of 0 lets LSP4IJ choose
-a free port each time. For instance, with a language server built on `vscode-languageserver`:
+When LSP4IJ starts the language server, the `Command` takes the port as `${port}`, and a `Port` of `Auto` lets LSP4IJ
+choose a free port each time. For instance, with a language server built on `vscode-languageserver`:
 
 `node path/to/server.js --socket=${port}`
 

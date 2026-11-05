@@ -41,7 +41,7 @@ public class UserDefinedSocketConnectionTest extends BasePlatformTestCase {
 
     public void testALanguageServerThatRunsAlreadyIsReachedOnTheLoopbackAddressWithoutAHost() {
         var definition = definition("", null);
-        definition.setTransport(new UserDefinedTransport(UserDefinedTransport.Mode.CONNECT, null, 6005));
+        definition.setTransport(new UserDefinedTransport(UserDefinedTransport.Mode.ATTACH, null, 6005));
 
         var provider = assertInstanceOf(definition.createConnectionProvider(getProject()),
                 UserDefinedSocketStreamConnectionProvider.class);
@@ -53,7 +53,7 @@ public class UserDefinedSocketConnectionTest extends BasePlatformTestCase {
 
     public void testABlankHostIsTheLoopbackAddress() {
         var definition = definition("", null);
-        definition.setTransport(new UserDefinedTransport(UserDefinedTransport.Mode.CONNECT, "  ", 6005));
+        definition.setTransport(new UserDefinedTransport(UserDefinedTransport.Mode.ATTACH, "  ", 6005));
 
         var provider = definition.createConnectionProvider(getProject());
 
@@ -62,7 +62,7 @@ public class UserDefinedSocketConnectionTest extends BasePlatformTestCase {
 
     public void testALanguageServerWithoutSettingsHasNoInitializationOptions() {
         var definition = definition("", "{\"provideFormatter\": true}");
-        definition.setTransport(new UserDefinedTransport(UserDefinedTransport.Mode.CONNECT, null, 6005));
+        definition.setTransport(new UserDefinedTransport(UserDefinedTransport.Mode.ATTACH, null, 6005));
         var provider = assertInstanceOf(definition.createConnectionProvider(getProject()),
                 UserDefinedSocketStreamConnectionProvider.class);
 
@@ -112,7 +112,7 @@ public class UserDefinedSocketConnectionTest extends BasePlatformTestCase {
 
     public void testTheInitializationOptionsAreTheUsersJson() {
         var definition = definition("", "{\"provideFormatter\": true}");
-        definition.setTransport(new UserDefinedTransport(UserDefinedTransport.Mode.CONNECT, null, 6005));
+        definition.setTransport(new UserDefinedTransport(UserDefinedTransport.Mode.ATTACH, null, 6005));
         LanguageServersRegistry.getInstance().addServerDefinition(getProject(), definition, List.of());
         try {
             var provider = assertInstanceOf(definition.createConnectionProvider(getProject()),

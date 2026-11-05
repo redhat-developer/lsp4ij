@@ -28,7 +28,7 @@ import java.util.Map;
 public class NewLanguageServerDialogTransportTest extends BasePlatformTestCase {
 
     private static final UserDefinedTransport RUNNING =
-            new UserDefinedTransport(UserDefinedTransport.Mode.CONNECT, "127.0.0.1", 6005);
+            new UserDefinedTransport(UserDefinedTransport.Mode.ATTACH, "127.0.0.1", 6005);
 
     public void testARunningLanguageServerNeedsNoCommand() {
         var dialog = dialog(template("", RUNNING));
@@ -40,7 +40,7 @@ public class NewLanguageServerDialogTransportTest extends BasePlatformTestCase {
     }
 
     public void testARunningLanguageServerNeedsItsPort() {
-        var dialog = dialog(template("", new UserDefinedTransport(UserDefinedTransport.Mode.CONNECT, null, 0)));
+        var dialog = dialog(template("", new UserDefinedTransport(UserDefinedTransport.Mode.ATTACH, null, 0)));
         try {
             List<ValidationInfo> errors = dialog.doValidateAll();
             assertEquals(1, errors.size());

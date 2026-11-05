@@ -46,7 +46,7 @@ public class SocketStreamConnectionProviderTest extends LightPlatformTestCase {
 
     public void testConnectsToALanguageServerThatRunsAlreadyAndLeavesItRunningWhenItStops() throws Exception {
         try (var server = new ServerSocket(0, 1, InetAddress.getLoopbackAddress())) {
-            var provider = SocketStreamConnectionProvider.connectTo(HOST, server.getLocalPort());
+            var provider = SocketStreamConnectionProvider.attachTo(HOST, server.getLocalPort());
             var stops = countUnexpectedStops(provider);
             try {
                 // the connection is made once the language server's socket takes it, before it accepts it
@@ -78,7 +78,7 @@ public class SocketStreamConnectionProviderTest extends LightPlatformTestCase {
         try (var server = new ServerSocket(0, 1, InetAddress.getLoopbackAddress())) {
             port = server.getLocalPort();
         }
-        var provider = SocketStreamConnectionProvider.connectTo(HOST, port);
+        var provider = SocketStreamConnectionProvider.attachTo(HOST, port);
 
         assertThrows(CannotStartProcessException.class, provider::start);
         assertFalse(provider.isAlive());
@@ -86,7 +86,7 @@ public class SocketStreamConnectionProviderTest extends LightPlatformTestCase {
 
     public void testALanguageServerThatClosesTheConnectionStopsUnexpectedlyOnce() throws Exception {
         try (var server = new ServerSocket(0, 1, InetAddress.getLoopbackAddress())) {
-            var provider = SocketStreamConnectionProvider.connectTo(HOST, server.getLocalPort());
+            var provider = SocketStreamConnectionProvider.attachTo(HOST, server.getLocalPort());
             var stops = countUnexpectedStops(provider);
             try {
                 provider.start();
@@ -105,7 +105,7 @@ public class SocketStreamConnectionProviderTest extends LightPlatformTestCase {
 
     public void testReadingAfterItsOwnStopIsNoUnexpectedStop() throws Exception {
         try (var server = new ServerSocket(0, 1, InetAddress.getLoopbackAddress())) {
-            var provider = SocketStreamConnectionProvider.connectTo(HOST, server.getLocalPort());
+            var provider = SocketStreamConnectionProvider.attachTo(HOST, server.getLocalPort());
             var stops = countUnexpectedStops(provider);
             provider.start();
             try (var ignored = server.accept()) {
@@ -252,7 +252,7 @@ public class SocketStreamConnectionProviderTest extends LightPlatformTestCase {
     }
 
     public void testCannotStartOnceStopped() {
-        var provider = SocketStreamConnectionProvider.connectTo(HOST, 6005);
+        var provider = SocketStreamConnectionProvider.attachTo(HOST, 6005);
         provider.stop();
 
         assertThrows(CannotStartProcessException.class, provider::start);
@@ -262,7 +262,7 @@ public class SocketStreamConnectionProviderTest extends LightPlatformTestCase {
 
     public void testEachWayHasItsDirection() {
         assertSame(SocketStreamConnectionProvider.Direction.CONNECT,
-                SocketStreamConnectionProvider.connectTo(HOST, 6005).getDirection());
+                SocketStreamConnectionProvider.attachTo(HOST, 6005).getDirection());
         assertSame(SocketStreamConnectionProvider.Direction.CONNECT,
                 SocketStreamConnectionProvider.startAndConnect(0, port -> java(ListeningServer.class, port)).getDirection());
         assertSame(SocketStreamConnectionProvider.Direction.ACCEPT,
@@ -271,7 +271,7 @@ public class SocketStreamConnectionProviderTest extends LightPlatformTestCase {
 
     public void testStartsOnce() throws Exception {
         try (var server = new ServerSocket(0, 1, InetAddress.getLoopbackAddress())) {
-            var provider = SocketStreamConnectionProvider.connectTo(HOST, server.getLocalPort());
+            var provider = SocketStreamConnectionProvider.attachTo(HOST, server.getLocalPort());
             try {
                 provider.start();
                 assertThrows(CannotStartProcessException.class, provider::start);
@@ -283,9 +283,9 @@ public class SocketStreamConnectionProviderTest extends LightPlatformTestCase {
     }
 
     public void testARunningLanguageServerNeedsItsPort() {
-        assertThrows(IllegalArgumentException.class, () -> SocketStreamConnectionProvider.connectTo(HOST, 0));
-        assertThrows(IllegalArgumentException.class, () -> SocketStreamConnectionProvider.connectTo(HOST, 65536));
-        assertThrows(IllegalArgumentException.class, () -> SocketStreamConnectionProvider.connectTo(HOST, -1));
+        assertThrows(IllegalArgumentException.class, () -> SocketStreamConnectionProvider.attachTo(HOST, 0));
+        assertThrows(IllegalArgumentException.class, () -> SocketStreamConnectionProvider.attachTo(HOST, 65536));
+        assertThrows(IllegalArgumentException.class, () -> SocketStreamConnectionProvider.attachTo(HOST, -1));
     }
 
     /**

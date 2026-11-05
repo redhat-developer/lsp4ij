@@ -63,7 +63,7 @@ public class LanguageServerViewTransportTest extends BasePlatformTestCase {
     }
 
     public void testAChangedTransportIsSaved() throws ConfigurationException {
-        var running = new UserDefinedTransport(UserDefinedTransport.Mode.CONNECT, "127.0.0.1", 6005);
+        var running = new UserDefinedTransport(UserDefinedTransport.Mode.ATTACH, "127.0.0.1", 6005);
         view.setTransport(running);
         assertTrue(view.isModified());
 
@@ -83,7 +83,7 @@ public class LanguageServerViewTransportTest extends BasePlatformTestCase {
     }
 
     public void testARunningLanguageServerWithoutItsPortIsNotSaved() {
-        view.setTransport(new UserDefinedTransport(UserDefinedTransport.Mode.CONNECT, "127.0.0.1", 0));
+        view.setTransport(new UserDefinedTransport(UserDefinedTransport.Mode.ATTACH, "127.0.0.1", 0));
 
         try {
             view.apply();
@@ -101,9 +101,9 @@ public class LanguageServerViewTransportTest extends BasePlatformTestCase {
     }
 
     public void testABlankHostIsNoHost() {
-        view.setTransport(new UserDefinedTransport(UserDefinedTransport.Mode.CONNECT, "  ", 6005));
+        view.setTransport(new UserDefinedTransport(UserDefinedTransport.Mode.ATTACH, "  ", 6005));
 
-        assertEquals(new UserDefinedTransport(UserDefinedTransport.Mode.CONNECT, null, 6005), view.getTransport());
+        assertEquals(new UserDefinedTransport(UserDefinedTransport.Mode.ATTACH, null, 6005), view.getTransport());
     }
 
     public void testALanguageServerWhichIsNotUserDefinedHasNoTransportToSet() {
@@ -112,7 +112,7 @@ public class LanguageServerViewTransportTest extends BasePlatformTestCase {
         var notUserDefinedView = new LanguageServerView(notUserDefined, null, false, getProject());
         try {
             notUserDefinedView.reset();
-            notUserDefinedView.setTransport(new UserDefinedTransport(UserDefinedTransport.Mode.CONNECT, null, 0));
+            notUserDefinedView.setTransport(new UserDefinedTransport(UserDefinedTransport.Mode.ATTACH, null, 0));
 
             // its page has no command, so no transport, which it leaves as the standard input and output
             assertSame(UserDefinedTransport.STDIO, notUserDefinedView.getTransport());

@@ -53,7 +53,6 @@ import javax.swing.*;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 import java.awt.*;
-import java.net.InetAddress;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -89,9 +88,7 @@ public class LanguageServerPanel implements Disposable {
     private @Nullable EnvironmentVariablesComponent environmentVariables;
     private CommandLineWidget commandLine;
     private TextFieldWithBrowseButton workingDir;
-    private @Nullable ComboBox<UserDefinedTransport.Mode> transportModeCombo;
-    private @Nullable JBTextField socketHost;
-    private @Nullable PortField socketPort;
+    private @Nullable TransportFields transportFields;
     private ServerMappingsPanel mappingsPanel;
     private @Nullable SchemaBackedJsonTextField configurationWidget;
     private String configurationSchemaContent;
@@ -452,45 +449,17 @@ public class LanguageServerPanel implements Disposable {
     }
 
     private void createTransportFields(@NotNull FormBuilder builder) {
-        var modeCombo = new ComboBox<>(new DefaultComboBoxModel<>(UserDefinedTransport.Mode.values()));
-        modeCombo.setRenderer(BuilderKt.textListCellRenderer(mode -> mode != null ? getTransportModeText(mode) : ""));
-        modeCombo.addActionListener(event -> updateTransportFields());
-        var host = new JBTextField();
-        host.getEmptyText().setText(InetAddress.getLoopbackAddress().getHostAddress());
-        var port = new PortField(0, 0);
-        builder.addLabeledComponent(LanguageServerBundle.message("language.server.transport"), modeCombo);
-        builder.addLabeledComponent(LanguageServerBundle.message("language.server.socket.host"), host);
-        builder.addLabeledComponent(LanguageServerBundle.message("language.server.socket.port"), port);
-        builder.addComponent(createLabelForComponent(
-                LanguageServerBundle.message("language.server.socket.port.hint", UserDefinedTransport.PORT_MACRO), port), 0);
-        transportModeCombo = modeCombo;
-        socketHost = host;
-        socketPort = port;
-        updateTransportFields();
-    }
-
-    private static @NotNull String getTransportModeText(@NotNull UserDefinedTransport.Mode mode) {
-        return switch (mode) {
-            case STDIO -> LanguageServerBundle.message("language.server.transport.stdio");
-            case CONNECT -> LanguageServerBundle.message("language.server.transport.connect");
-            case START_AND_CONNECT -> LanguageServerBundle.message("language.server.transport.startAndConnect");
-            case START_AND_ACCEPT -> LanguageServerBundle.message("language.server.transport.startAndAccept");
-        };
+        transportFields = new TransportFields();
+        transportFields.addTo(builder);
+        transportFields.addChangeListener(this::updateCommandFields);
+        updateCommandFields();
     }
 
     /**
-     * Enables the fields which the selected transport uses: the host for a language server which runs already, the
-     * port for a socket, and the command line and working directory for a language server which LSP4IJ starts.
+     * Enables the command line and working directory for a language server which LSP4IJ starts.
      */
-    private void updateTransportFields() {
-        if (transportModeCombo == null || socketHost == null || socketPort == null) {
-            return;
-        }
-        var mode = transportModeCombo.getSelectedItem() instanceof UserDefinedTransport.Mode selected
-                ? selected : UserDefinedTransport.Mode.STDIO;
-        socketHost.setEnabled(mode == UserDefinedTransport.Mode.CONNECT);
-        socketPort.setEnabled(mode != UserDefinedTransport.Mode.STDIO);
-        boolean startsLanguageServer = mode != UserDefinedTransport.Mode.CONNECT;
+    private void updateCommandFields() {
+        boolean startsLanguageServer = getTransport().startsLanguageServer();
         if (commandLine != null) {
             commandLine.setEnabled(startsLanguageServer);
         }
@@ -591,15 +560,7 @@ public class LanguageServerPanel implements Disposable {
      * @return how LSP4IJ talks to the language server.
      */
     public @NotNull UserDefinedTransport getTransport() {
-        if (transportModeCombo == null || socketHost == null || socketPort == null
-                || !(transportModeCombo.getSelectedItem() instanceof UserDefinedTransport.Mode mode)
-                || mode == UserDefinedTransport.Mode.STDIO) {
-            return UserDefinedTransport.STDIO;
-        }
-        String host = socketHost.getText().trim();
-        return new UserDefinedTransport(mode,
-                mode == UserDefinedTransport.Mode.CONNECT && !host.isEmpty() ? host : null,
-                socketPort.getNumber());
+        return transportFields != null ? transportFields.getTransport() : UserDefinedTransport.STDIO;
     }
 
     /**
@@ -608,13 +569,9 @@ public class LanguageServerPanel implements Disposable {
      * @param transport how LSP4IJ talks to the language server.
      */
     public void setTransport(@NotNull UserDefinedTransport transport) {
-        if (transportModeCombo == null || socketHost == null || socketPort == null) {
-            return;
+        if (transportFields != null) {
+            transportFields.setTransport(transport);
         }
-        transportModeCombo.setSelectedItem(transport.mode());
-        socketHost.setText(transport.host() != null ? transport.host() : "");
-        socketPort.setNumber(transport.port());
-        updateTransportFields();
     }
 
     public ServerMappingsPanel getMappingsPanel() {
@@ -723,20 +680,6 @@ public class LanguageServerPanel implements Disposable {
      *
      * @return an error for each JSON field whose content is not valid JSON.
      */
-    /**
-     * Returns an error when the transport can't be used: a language server which runs already needs its port, since
-     * LSP4IJ can't choose one for it.
-     *
-     * @return the error of the transport, or null if it can be used.
-     */
-    public @Nullable ValidationInfo validateTransport() {
-        var transport = getTransport();
-        if (transport.mode() == UserDefinedTransport.Mode.CONNECT && transport.port() == 0 && socketPort != null) {
-            return new ValidationInfo(LanguageServerBundle.message("language.server.validation.socket.port"), socketPort);
-        }
-        return null;
-    }
-
     public @NotNull List<ValidationInfo> validateJsonFields() {
         List<ValidationInfo> errors = new ArrayList<>();
         // The language server reads these three once their variables, such as $PROJECT_DIR$, are expanded
@@ -756,6 +699,16 @@ public class LanguageServerPanel implements Disposable {
                 false,
                 errors);
         return errors;
+    }
+
+    /**
+     * Returns an error when the transport can't be used: a language server which runs already needs its port, since
+     * LSP4IJ can't choose one for it.
+     *
+     * @return the error of the transport, or null if it can be used.
+     */
+    public @Nullable ValidationInfo validateTransport() {
+        return transportFields != null ? transportFields.validate() : null;
     }
 
     private void addJsonError(@NotNull @PropertyKey(resourceBundle = BUNDLE) String fieldKey,

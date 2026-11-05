@@ -40,13 +40,13 @@ public class UserDefinedTransportTest {
 
     @Test
     void aSocketKeepsItsHostAndPort() {
-        assertEquals(new UserDefinedTransport(UserDefinedTransport.Mode.CONNECT, "localhost", 6005),
-                UserDefinedTransport.of("connect", "localhost", 6005));
+        assertEquals(new UserDefinedTransport(UserDefinedTransport.Mode.ATTACH, "localhost", 6005),
+                UserDefinedTransport.of("attach", "localhost", 6005));
     }
 
     @Test
     void onlyARunningLanguageServerIsNotStarted() {
-        assertFalse(UserDefinedTransport.of("connect", "localhost", 6005).startsLanguageServer());
+        assertFalse(UserDefinedTransport.of("attach", "localhost", 6005).startsLanguageServer());
         assertTrue(UserDefinedTransport.of("startAndConnect", null, 0).startsLanguageServer());
         assertTrue(UserDefinedTransport.of("startAndAccept", null, 0).startsLanguageServer());
         assertTrue(UserDefinedTransport.STDIO.startsLanguageServer());

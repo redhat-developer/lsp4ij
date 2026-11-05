@@ -40,11 +40,11 @@ public class LanguageServerSocketTemplateTest extends LightPlatformTestCase {
 
     public void testAnExportedLanguageServerThatRunsAlreadyHasItsHost() {
         var definition = definition("");
-        definition.setTransport(new UserDefinedTransport(UserDefinedTransport.Mode.CONNECT, "127.0.0.1", 6005));
+        definition.setTransport(new UserDefinedTransport(UserDefinedTransport.Mode.ATTACH, "127.0.0.1", 6005));
 
         JsonObject socket = GSON.toJsonTree(definition).getAsJsonObject().getAsJsonObject("socket");
 
-        assertEquals("connect", socket.get("mode").getAsString());
+        assertEquals("attach", socket.get("mode").getAsString());
         assertEquals("127.0.0.1", socket.get("host").getAsString());
         assertEquals(6005, socket.get("port").getAsInt());
     }
@@ -71,10 +71,10 @@ public class LanguageServerSocketTemplateTest extends LightPlatformTestCase {
                   "id": "godot",
                   "name": "Godot",
                   "programArgs": { "default": "" },
-                  "socket": { "mode": "connect", "host": "127.0.0.1", "port": 6005 }
+                  "socket": { "mode": "attach", "host": "127.0.0.1", "port": 6005 }
                 }""", LanguageServerTemplate.class);
 
-        assertEquals(new UserDefinedTransport(UserDefinedTransport.Mode.CONNECT, "127.0.0.1", 6005), template.getTransport());
+        assertEquals(new UserDefinedTransport(UserDefinedTransport.Mode.ATTACH, "127.0.0.1", 6005), template.getTransport());
     }
 
     public void testAnImportedTemplateWithoutASocketTalksOverTheStandardInputAndOutput() {

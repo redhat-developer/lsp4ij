@@ -47,7 +47,7 @@ import java.util.stream.Stream;
  * Stream connection provider which talks to a language server over a TCP socket, instead of the standard input and
  * output of its process. It covers the three ways a language server takes a socket connection:
  * <ul>
- *     <li>{@link #connectTo(String, int)}: the language server runs already and listens on a host and port, as when it
+ *     <li>{@link #attachTo(String, int)}: the language server runs already and listens on a host and port, as when it
  *     runs in a debugger or inside another application, and LSP4IJ connects to it.</li>
  *     <li>{@link #startAndConnect(int, IntFunction)}: LSP4IJ starts the language server, which listens on the port,
  *     and connects to it once it accepts connections.</li>
@@ -120,7 +120,7 @@ public class SocketStreamConnectionProvider implements StreamConnectionProvider,
      * @param port the port the language server listens on.
      * @return a provider which connects to a running language server.
      */
-    public static @NotNull SocketStreamConnectionProvider connectTo(@NotNull String host, int port) {
+    public static @NotNull SocketStreamConnectionProvider attachTo(@NotNull String host, int port) {
         return new SocketStreamConnectionProvider(Direction.CONNECT, host, port, null);
     }
 

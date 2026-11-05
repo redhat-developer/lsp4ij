@@ -100,7 +100,7 @@ The template descriptor (`template.json`) is a JSON file used to define:
 A language server which talks LSP over a TCP socket instead of its standard input and output has a `socket`, which is
 experimental, whose `mode` is one of the [transports](./UserDefinedLanguageServer.md#transport):
 
-* `connect`: LSP4IJ connects to a language server which runs already and listens on `host` (the loopback address by
+* `attach`: LSP4IJ attaches to a language server which runs already and listens on `host` (the loopback address by
   default) and `port`.
 * `startAndConnect`: LSP4IJ starts the language server, which listens on the port, and connects to it.
 * `startAndAccept`: LSP4IJ listens on the port and starts the language server, which connects to it.

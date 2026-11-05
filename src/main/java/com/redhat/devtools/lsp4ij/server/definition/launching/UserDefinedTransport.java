@@ -24,7 +24,7 @@ import java.util.Arrays;
  * The socket transports are experimental: this API may change in a future release.
  *
  * @param mode the way LSP4IJ talks to the language server.
- * @param host the host of a language server which runs already, for {@link Mode#CONNECT}.
+ * @param host the host of a language server which runs already, for {@link Mode#ATTACH}.
  * @param port the port of the socket, or 0 to choose a free port, which the command line takes as
  *             {@value #PORT_MACRO}, when LSP4IJ starts the language server.
  */
@@ -52,7 +52,7 @@ public record UserDefinedTransport(@NotNull Mode mode, @Nullable String host, in
         /**
          * Over a socket, to a language server which runs already and listens on the host and port.
          */
-        CONNECT("connect"),
+        ATTACH("attach"),
         /**
          * Over a socket, to a language server which LSP4IJ starts and which listens on the port.
          */
@@ -107,7 +107,7 @@ public record UserDefinedTransport(@NotNull Mode mode, @Nullable String host, in
      * @return true if LSP4IJ starts the language server, and false if it runs already.
      */
     public boolean startsLanguageServer() {
-        return mode != Mode.CONNECT;
+        return mode != Mode.ATTACH;
     }
 
     /**

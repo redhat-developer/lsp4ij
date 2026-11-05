@@ -146,7 +146,7 @@ public class UserDefinedLanguageServerDefinition extends LanguageServerDefinitio
                     includeSystemEnvironmentVariables,
                     this,
                     project);
-            case CONNECT -> new UserDefinedSocketStreamConnectionProvider(SocketStreamConnectionProvider.Direction.CONNECT,
+            case ATTACH -> new UserDefinedSocketStreamConnectionProvider(SocketStreamConnectionProvider.Direction.CONNECT,
                     transport.host() != null && !transport.host().isBlank() ? transport.host() : LOOPBACK_HOST,
                     transport.port(),
                     null,

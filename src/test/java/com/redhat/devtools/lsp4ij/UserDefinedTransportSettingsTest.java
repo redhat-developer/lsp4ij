@@ -22,7 +22,7 @@ import java.util.Map;
 public class UserDefinedTransportSettingsTest extends LightPlatformTestCase {
 
     private static final UserDefinedTransport RUNNING =
-            new UserDefinedTransport(UserDefinedTransport.Mode.CONNECT, "127.0.0.1", 6005);
+            new UserDefinedTransport(UserDefinedTransport.Mode.ATTACH, "127.0.0.1", 6005);
 
     public void testASocketPersists() {
         var settings = settings();
@@ -32,7 +32,7 @@ public class UserDefinedTransportSettingsTest extends LightPlatformTestCase {
         var loaded = XmlSerializer.deserialize(element, UserDefinedLanguageServerItemSettings.class);
 
         assertEquals(RUNNING, loaded.getTransport());
-        assertEquals("connect", loaded.getTransportMode());
+        assertEquals("attach", loaded.getTransportMode());
         assertEquals("127.0.0.1", loaded.getSocketHost());
         assertEquals(6005, loaded.getSocketPort());
     }
