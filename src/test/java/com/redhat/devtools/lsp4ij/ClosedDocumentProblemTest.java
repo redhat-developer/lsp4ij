@@ -54,6 +54,28 @@ public class ClosedDocumentProblemTest extends LSPCodeInsightFixtureTestCase {
         assertFalse("other.foo must be no problem file once it opens without errors", problems.isProblemFile(other));
     }
 
+    public void testAFileWhoseOpenedDocumentHeldOnlyErrorsIsNoProblemFileOnceItConnectsWithoutErrors() throws Exception {
+        var problems = problemFiles();
+        var main = myFixture.configureByText("main.foo", "main");
+        var wrapper = LanguageServiceAccessor.getInstance(myFixture.getProject())
+                .getLanguageServers(main, null, null).get(1, TimeUnit.HOURS).get(0).getServerWrapper();
+        var other = myFixture.addFileToProject("other.foo", "other").getVirtualFile();
+
+        // The server's error for a file that is open in an editor, but not connected yet: an opened document without
+        // synchronization holds it, and the file is a problem file
+        wrapper.getOpenedDocument(wrapper.toUri(other), true);
+        var error = new Diagnostic(new Range(new Position(0, 0), new Position(0, 5)), "an error", DiagnosticSeverity.Error, "mock");
+        wrapper.updateDiagnostics(other, LSPDocumentBase.PUBLISH_DIAGNOSTIC_IDENTIFIER, List.of(error), null);
+        NonBlockingReadActionImpl.waitForAsyncTaskCompletion();
+        assertTrue("other.foo must be a problem file", problems.isProblemFile(other));
+
+        // The connection replaces that opened document with one that has no errors
+        wrapper.connect(other, new LanguageServerWrapper.LSPFileConnectionInfo(null, null, null, true))
+                .get(1, TimeUnit.HOURS);
+        NonBlockingReadActionImpl.waitForAsyncTaskCompletion();
+        assertFalse("other.foo must be no problem file once it connects without errors", problems.isProblemFile(other));
+    }
+
     /**
      * Returns the project's problem files. A light test's problem solver ignores every report unless it has a real
      * one behind it.
