@@ -12,6 +12,7 @@ package com.redhat.devtools.lsp4ij;
 
 import com.intellij.openapi.project.Project;
 import com.intellij.testFramework.PlatformTestUtil;
+import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
 import com.redhat.devtools.lsp4ij.fixtures.LSPCodeInsightFixtureTestCase;
 import com.redhat.devtools.lsp4ij.mock.MockConnectionProvider;
 import com.redhat.devtools.lsp4ij.mock.MockLanguageServerDefinition;
@@ -24,7 +25,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * A language server whose dispose fails, as one does when its connection fails to stop, neither keeps the other
+ * A language server whose connection fails to stop is still cleaned up as it is disposed, and neither keeps the other
  * language servers from being disposed nor stays among the started servers: when its server definition is removed,
  * and when the project closes.
  */
@@ -64,6 +65,7 @@ public class LanguageServerDisposeFailureTest extends LSPCodeInsightFixtureTestC
 
         assertEquals("The connection must be asked to stop, which fails", 1, definition.stops.get());
         assertTrue(failing.isDisposed());
+        assertEquals("The dispose must clean up after the failed stop", 1, definition.disposedClientFeatures.get());
         assertFalse("No language server of the removed definition may stay started",
                 accessor.getStartedServers().stream().anyMatch(server -> server.getServerDefinition() == definition));
     }
@@ -77,6 +79,7 @@ public class LanguageServerDisposeFailureTest extends LSPCodeInsightFixtureTestC
 
         assertEquals("The connection must be asked to stop, which fails", 1, definition.stops.get());
         assertTrue(failing.isDisposed());
+        assertEquals("The dispose must clean up after the failed stop", 1, definition.disposedClientFeatures.get());
         assertTrue(other.isDisposed());
         assertEmpty(accessor.getStartedServers());
     }
@@ -99,14 +102,27 @@ public class LanguageServerDisposeFailureTest extends LSPCodeInsightFixtureTestC
     }
 
     /**
-     * Server definition whose connection throws when it is stopped, once it has closed its streams.
+     * Server definition whose connection throws when it is stopped, once it has closed its streams, and which counts
+     * the client features disposed, as the cleanup that a dispose makes after it stops the connection.
      */
     private static class StopFailingServerDefinition extends MockLanguageServerDefinition {
 
         private final AtomicInteger stops = new AtomicInteger();
+        private final AtomicInteger disposedClientFeatures = new AtomicInteger();
 
         StopFailingServerDefinition() {
             super("stop-failing-server", false);
+        }
+
+        @Override
+        public @NotNull LSPClientFeatures createClientFeatures() {
+            return new LSPClientFeatures() {
+                @Override
+                public void dispose() {
+                    super.dispose();
+                    disposedClientFeatures.incrementAndGet();
+                }
+            };
         }
 
         @Override

@@ -2357,14 +2357,18 @@ public class LanguageServerWrapper implements Disposable {
         }
         this.disposed = true;
         fileListener.disposeFileSystemWatchers();
-        // A language server that never started has nothing to stop, and no status to report
-        if (currentInitializingContext != null || getServerStatus() != ServerStatus.none) {
-            stopAndRefreshEditorFeature(refreshEditorFeature, false);
-        }
-        stopDispatcher();
-        if (clientFeatures != null) {
-            clientFeatures.dispose();
-            clientFeatures = null;
+        try {
+            // A language server that never started has nothing to stop, and no status to report
+            if (currentInitializingContext != null || getServerStatus() != ServerStatus.none) {
+                stopAndRefreshEditorFeature(refreshEditorFeature, false);
+            }
+        } finally {
+            // Also when the stop fails, as when the connection fails to stop: the executors would keep their threads
+            stopDispatcher();
+            if (clientFeatures != null) {
+                clientFeatures.dispose();
+                clientFeatures = null;
+            }
         }
     }
 
