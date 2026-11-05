@@ -47,11 +47,13 @@ final class TransportFields {
     private final JBRadioButton fixedPort = new JBRadioButton(message("language.server.socket.port.fixed"));
     private final PortField port = new PortField(0, 0);
     private final JBLabel socketLabel = new JBLabel(message("language.server.socket"));
+    // the other modes' rows have no label, so "Socket:" stands on the row of the first mode
+    private final JBLabel startAndConnectLabel = new JBLabel();
+    private final JBLabel startAndAcceptLabel = new JBLabel();
     private final JBLabel hostLabel = new JBLabel(message("language.server.socket.host"));
     private final JBLabel portLabel = new JBLabel(message("language.server.socket.port"));
     private final JBLabel portHint = new JBLabel(message("language.server.socket.port.hint", UserDefinedTransport.PORT_MACRO));
     private final JPanel transportRow = row(GAP, stdio, socket);
-    private final JPanel socketModes = column(attach, startAndConnect, startAndAccept);
     // Auto and Fixed have a row of their own, whose gaps hide with them, so the port lines up with the host without them
     private final JPanel portChoice = row(GAP, autoPort, fixedPort);
     private final JPanel portRow = row(0, portChoice, port);
@@ -78,7 +80,9 @@ final class TransportFields {
      */
     void addTo(@NotNull FormBuilder builder) {
         builder.addLabeledComponent(message("language.server.transport"), transportRow);
-        builder.addLabeledComponent(socketLabel, socketModes);
+        builder.addLabeledComponent(socketLabel, attach);
+        builder.addLabeledComponent(startAndConnectLabel, startAndConnect);
+        builder.addLabeledComponent(startAndAcceptLabel, startAndAccept);
         builder.addLabeledComponent(hostLabel, host);
         builder.addLabeledComponent(portLabel, portRow);
         builder.addComponent(portHint, 0);
@@ -145,16 +149,21 @@ final class TransportFields {
     }
 
     /**
-     * Returns an error when the transport can't be used: a language server which runs already needs its port, since
-     * LSP4IJ can't choose one for it.
+     * Returns an error when the port can't be used: a language server which runs already needs its port, since LSP4IJ
+     * can't choose one for it, and a fixed port isn't 0, which would be Auto once saved.
      *
-     * @return the error of the transport, or null if it can be used.
+     * @return the error of the port, or null if it can be used.
      */
     @Nullable
     ValidationInfo validate() {
-        var transport = getTransport();
-        if (transport.mode() == UserDefinedTransport.Mode.ATTACH && transport.port() == 0) {
+        if (!socket.isSelected() || port.getNumber() != 0) {
+            return null;
+        }
+        if (attach.isSelected()) {
             return new ValidationInfo(message("language.server.validation.socket.port"), port);
+        }
+        if (fixedPort.isSelected()) {
+            return new ValidationInfo(message("language.server.validation.socket.port.fixed"), port);
         }
         return null;
     }
@@ -165,8 +174,10 @@ final class TransportFields {
     private void update() {
         boolean isSocket = socket.isSelected();
         boolean isAttach = isSocket && attach.isSelected();
-        socketLabel.setVisible(isSocket);
-        socketModes.setVisible(isSocket);
+        for (var component : List.of(socketLabel, attach, startAndConnectLabel, startAndConnect, startAndAcceptLabel,
+                startAndAccept)) {
+            component.setVisible(isSocket);
+        }
         hostLabel.setVisible(isAttach);
         host.setVisible(isAttach);
         portLabel.setVisible(isSocket);
@@ -203,14 +214,5 @@ final class TransportFields {
         }
         row.add(Box.createHorizontalGlue());
         return row;
-    }
-
-    private static @NotNull JPanel column(@NotNull JComponent... components) {
-        var column = new JPanel();
-        column.setLayout(new BoxLayout(column, BoxLayout.Y_AXIS));
-        for (var component : components) {
-            column.add(component);
-        }
-        return column;
     }
 }

@@ -702,13 +702,29 @@ public class LanguageServerPanel implements Disposable {
     }
 
     /**
-     * Returns an error when the transport can't be used: a language server which runs already needs its port, since
-     * LSP4IJ can't choose one for it.
+     * Returns an error when the transport can't be used: a language server which runs already needs its port, a fixed
+     * port isn't 0, and the command of a language server on a port which LSP4IJ chooses takes it as
+     * {@value UserDefinedTransport#PORT_MACRO}, or the language server never learns it.
      *
      * @return the error of the transport, or null if it can be used.
      */
     public @Nullable ValidationInfo validateTransport() {
-        return transportFields != null ? transportFields.validate() : null;
+        if (transportFields == null) {
+            return null;
+        }
+        var error = transportFields.validate();
+        if (error != null) {
+            return error;
+        }
+        var transport = transportFields.getTransport();
+        if (transport.mode() != UserDefinedTransport.Mode.STDIO && transport.startsLanguageServer() && transport.port() == 0
+                // an empty command has an error of its own
+                && commandLine != null && !commandLine.getText().isBlank()
+                && !commandLine.getText().contains(UserDefinedTransport.PORT_MACRO)) {
+            return new ValidationInfo(LanguageServerBundle.message("language.server.validation.socket.port.macro",
+                    UserDefinedTransport.PORT_MACRO), commandLine);
+        }
+        return null;
     }
 
     private void addJsonError(@NotNull @PropertyKey(resourceBundle = BUNDLE) String fieldKey,

@@ -225,7 +225,9 @@ only. The output of a language server which LSP4IJ starts goes to the `Log tab` 
 [LSP console](https://github.com/redhat-developer/lsp4ij/blob/main/docs/UserGuide.md#lsp-console), since the socket
 carries the protocol. A language server which ends, or closes the connection, is reported as stopped unexpectedly, as
 a language server process is. Stopping the language server closes the connection, and ends the process only if LSP4IJ
-started it: a language server which ran already keeps running.
+started it: a language server which ran already keeps running. A start waits for the connection 60 seconds by default
+(`setStartTimeout`), as when the command of a language server doesn't take the port: past it, the start fails, and stops
+the language server if LSP4IJ started it.
 
 As with any TCP transport of LSP, which has no handshake to authenticate its peer, any local process can connect to a
 loopback port: on a machine shared with other users, prefer the standard input and output of the language server's

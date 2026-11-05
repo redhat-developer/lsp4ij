@@ -23,6 +23,7 @@ import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
@@ -269,6 +270,21 @@ public class SocketStreamConnectionProviderTest extends LightPlatformTestCase {
                 SocketStreamConnectionProvider.startAndAccept(0, port -> java(ConnectingServer.class, port)).getDirection());
     }
 
+    public void testAStartEndsWhenTheLanguageServerDoesNotListenInTime() throws Exception {
+        assertStartTimesOut(SocketStreamConnectionProvider.startAndConnect(0, port -> java(WaitingServer.class, port)));
+    }
+
+    public void testAStartEndsWhenTheLanguageServerDoesNotConnectInTime() throws Exception {
+        assertStartTimesOut(SocketStreamConnectionProvider.startAndAccept(0, port -> java(WaitingServer.class, port)));
+    }
+
+    public void testTheStartTimeoutIsPositive() {
+        var provider = SocketStreamConnectionProvider.attachTo(HOST, 6005);
+        assertEquals(SocketStreamConnectionProvider.DEFAULT_START_TIMEOUT, provider.getStartTimeout());
+        assertThrows(IllegalArgumentException.class, () -> provider.setStartTimeout(Duration.ZERO));
+        assertThrows(IllegalArgumentException.class, () -> provider.setStartTimeout(Duration.ofSeconds(-1)));
+    }
+
     public void testStartsOnce() throws Exception {
         try (var server = new ServerSocket(0, 1, InetAddress.getLoopbackAddress())) {
             var provider = SocketStreamConnectionProvider.attachTo(HOST, server.getLocalPort());
@@ -286,6 +302,23 @@ public class SocketStreamConnectionProviderTest extends LightPlatformTestCase {
         assertThrows(IllegalArgumentException.class, () -> SocketStreamConnectionProvider.attachTo(HOST, 0));
         assertThrows(IllegalArgumentException.class, () -> SocketStreamConnectionProvider.attachTo(HOST, 65536));
         assertThrows(IllegalArgumentException.class, () -> SocketStreamConnectionProvider.attachTo(HOST, -1));
+    }
+
+    /**
+     * Starts the provider with a start timeout which any machine passes, since the language server never listens nor
+     * connects: the start fails, and stops the language server.
+     */
+    private static void assertStartTimesOut(SocketStreamConnectionProvider provider) throws Exception {
+        provider.setStartTimeout(Duration.ofMillis(1));
+        var stops = countUnexpectedStops(provider);
+        try {
+            assertThrows(CannotStartProcessException.class, provider::start);
+            awaitExit(provider);
+            assertFalse(provider.isAlive());
+            assertEquals("start() reports it", 0, stops.get());
+        } finally {
+            reap(provider);
+        }
     }
 
     /**

@@ -62,6 +62,26 @@ public class NewLanguageServerDialogTransportTest extends BasePlatformTestCase {
         }
     }
 
+    public void testTheCommandOfALanguageServerOnAFreePortTakesThePort() {
+        var transport = new UserDefinedTransport(UserDefinedTransport.Mode.START_AND_ACCEPT, null, 0);
+        var dialog = dialog(template("node server.js", transport));
+        try {
+            List<ValidationInfo> errors = dialog.doValidateAll();
+            assertEquals(1, errors.size());
+            assertEquals(LanguageServerBundle.message("language.server.validation.socket.port.macro",
+                    UserDefinedTransport.PORT_MACRO), errors.get(0).message);
+        } finally {
+            dialog.close(DialogWrapper.CANCEL_EXIT_CODE);
+        }
+
+        var takesThePort = dialog(template("node server.js --socket=${port}", transport));
+        try {
+            assertEmpty(takesThePort.doValidateAll());
+        } finally {
+            takesThePort.close(DialogWrapper.CANCEL_EXIT_CODE);
+        }
+    }
+
     public void testTheAddedLanguageServerHasTheTransport() {
         var dialog = dialog(template("", RUNNING));
         dialog.doOKAction();

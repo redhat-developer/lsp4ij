@@ -35,10 +35,13 @@ import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketException;
+import java.net.SocketTimeoutException;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.IntFunction;
 import java.util.stream.Stream;
@@ -91,6 +94,11 @@ public class SocketStreamConnectionProvider implements StreamConnectionProvider,
     private static final long FIRST_RETRY_PAUSE_MILLIS = 10;
     private static final long MAX_RETRY_PAUSE_MILLIS = 500;
 
+    /**
+     * How long a start waits for the connection by default.
+     */
+    public static final @NotNull Duration DEFAULT_START_TIMEOUT = Duration.ofSeconds(60);
+
     private final @NotNull Direction direction;
     private final @NotNull String host;
     private final int port;
@@ -111,6 +119,7 @@ public class SocketStreamConnectionProvider implements StreamConnectionProvider,
     private volatile @Nullable OutputStream outputStream;
     private volatile boolean connectionEnded;
     private volatile int boundPort;
+    private volatile @NotNull Duration startTimeout = DEFAULT_START_TIMEOUT;
 
     /**
      * Returns a provider which connects to a language server that runs already and listens on the given host and
@@ -195,6 +204,29 @@ public class SocketStreamConnectionProvider implements StreamConnectionProvider,
         return boundPort;
     }
 
+    /**
+     * Returns how long a start waits for the connection: for a language server which runs already to accept it, for a
+     * language server which LSP4IJ starts to listen or to connect. Past it, the start fails.
+     *
+     * @return how long a start waits for the connection.
+     */
+    public @NotNull Duration getStartTimeout() {
+        return startTimeout;
+    }
+
+    /**
+     * Sets how long a start waits for the connection, {@link #DEFAULT_START_TIMEOUT} by default, as for a language
+     * server which starts slowly. Past it, the start fails, and stops the language server if LSP4IJ started it.
+     *
+     * @param startTimeout how long a start waits for the connection.
+     */
+    public void setStartTimeout(@NotNull Duration startTimeout) {
+        if (startTimeout.isNegative() || startTimeout.isZero()) {
+            throw new IllegalArgumentException("The start timeout must be positive: " + startTimeout);
+        }
+        this.startTimeout = startTimeout;
+    }
+
     @Override
     public void addLogErrorHandler(LanguageServerLogErrorHandler handler) {
         logErrorHandlers.add(handler);
@@ -248,14 +280,21 @@ public class SocketStreamConnectionProvider implements StreamConnectionProvider,
             checkNothingListens(port);
         }
         var handler = startProcess(commandLine.apply(port));
-        // The language server listens once it has started: try until it accepts the connection, or ends
+        // The language server listens once it has started: try until it accepts the connection, ends, or the start
+        // times out, as when its command doesn't take the port
+        long deadline = System.nanoTime() + startTimeout.toNanos();
         long pause = FIRST_RETRY_PAUSE_MILLIS;
         while (true) {
             try {
                 install(connectOnce(port));
                 return;
             } catch (ConnectException notListeningYet) {
-                boolean ended = handler.waitFor(pause);
+                long remaining = TimeUnit.NANOSECONDS.toMillis(deadline - System.nanoTime());
+                if (remaining <= 0) {
+                    throw new CannotStartProcessException("The language server didn't accept a connection on port "
+                            + port + " within " + startTimeout.toSeconds() + " s: " + this);
+                }
+                boolean ended = handler.waitFor(Math.min(pause, remaining));
                 checkNotStopped();
                 if (ended) {
                     throw new CannotStartProcessException("The language server ended before it accepted a connection: " + this);
@@ -282,7 +321,7 @@ public class SocketStreamConnectionProvider implements StreamConnectionProvider,
         }
         try {
             // stop() closes the attempt
-            attempt.connect(new InetSocketAddress(host, port));
+            attempt.connect(new InetSocketAddress(host, port), timeoutMillis());
             return attempt;
         } catch (IOException e) {
             closeQuietly(attempt);
@@ -308,7 +347,11 @@ public class SocketStreamConnectionProvider implements StreamConnectionProvider,
         Socket accepted;
         try {
             // stop(), and the end of the language server, close the server socket
+            server.setSoTimeout(timeoutMillis());
             accepted = server.accept();
+        } catch (SocketTimeoutException e) {
+            throw new CannotStartProcessException("The language server didn't connect to port " + boundPort
+                    + " within " + startTimeout.toSeconds() + " s: " + this);
         } catch (SocketException e) {
             checkNotStopped();
             if (handler != null && handler.isProcessTerminated()) {
@@ -392,6 +435,10 @@ public class SocketStreamConnectionProvider implements StreamConnectionProvider,
         if (!stopped && socket != null && unexpectedStopReported.compareAndSet(false, true)) {
             unexpectedServerStopHandlers.forEach(Runnable::run);
         }
+    }
+
+    private int timeoutMillis() {
+        return (int) Math.min(Integer.MAX_VALUE, Math.max(1, startTimeout.toMillis()));
     }
 
     private void checkNotStopped() throws CannotStartProcessException {

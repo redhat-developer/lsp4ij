@@ -42,7 +42,7 @@ public class TransportFieldsTest extends LightPlatformTestCase {
 
     public void testTheStandardInputAndOutputShowsNoSocket() {
         assertTrue(radio("language.server.transport.stdio").isSelected());
-        assertFalse("the socket's modes are hidden", radio("language.server.socket.attach").getParent().isVisible());
+        assertFalse("the socket's modes are hidden", radio("language.server.socket.attach").isVisible());
         assertFalse(port().getParent().isVisible());
         assertSame(UserDefinedTransport.STDIO, fields.getTransport());
         assertNull(fields.validate());
@@ -55,12 +55,25 @@ public class TransportFieldsTest extends LightPlatformTestCase {
         radio("language.server.transport.socket").doClick();
 
         assertTrue(changes.get() > 0);
-        assertTrue(radio("language.server.socket.startAndAccept").getParent().isVisible());
+        assertTrue(radio("language.server.socket.startAndAccept").isVisible());
         assertTrue(radio("language.server.socket.startAndAccept").isSelected());
         assertTrue(radio("language.server.socket.port.auto").isSelected());
         assertFalse("the port is chosen", port().isEnabled());
         assertFalse("LSP4IJ starts the language server, so it has no host", host().isVisible());
         assertEquals(new UserDefinedTransport(UserDefinedTransport.Mode.START_AND_ACCEPT, null, 0), fields.getTransport());
+    }
+
+    public void testAFixedPortIsNotZero() {
+        radio("language.server.transport.socket").doClick();
+        radio("language.server.socket.port.fixed").doClick();
+
+        // 0 would be Auto once saved
+        var error = fields.validate();
+        assertNotNull(error);
+        assertEquals(message("language.server.validation.socket.port.fixed"), error.message);
+
+        port().setNumber(4389);
+        assertNull(fields.validate());
     }
 
     public void testAFixedPortIsTheOneTyped() {

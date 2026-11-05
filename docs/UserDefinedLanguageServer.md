@@ -101,7 +101,8 @@ ways, which are experimental:
   `--socket=<port>`.
 
 When LSP4IJ starts the language server, the `Command` takes the port as `${port}`, and a `Port` of `Auto` lets LSP4IJ
-choose a free port each time. For instance, with a language server built on `vscode-languageserver`:
+choose a free port each time: the `Command` must then have `${port}`, or the language server can't know the port. A
+start that gets no connection within 60 seconds fails. For instance, with a language server built on `vscode-languageserver`:
 
 `node path/to/server.js --socket=${port}`
 
