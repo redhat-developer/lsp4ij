@@ -73,6 +73,14 @@ public class DAPClientConsoleLineTest {
         assertEquals("not an expression", thrown.getCause().getMessage());
     }
 
+    @Test
+    void aTypedLineBeforeTheAdapterIsConnectedFailsTheEvaluationWithAMessage() {
+        var evaluation = DAPClient.evaluateConsoleLine(null, "input", null, null);
+
+        var thrown = assertThrows(CompletionException.class, evaluation::join);
+        assertEquals(DAPClient.CONSOLE_LINE_NOT_SENT, thrown.getCause().getMessage());
+    }
+
     private static IDebugProtocolServer server(List<EvaluateArguments> requests,
                                                CompletableFuture<EvaluateResponse> response) {
         return (IDebugProtocolServer) Proxy.newProxyInstance(IDebugProtocolServer.class.getClassLoader(),

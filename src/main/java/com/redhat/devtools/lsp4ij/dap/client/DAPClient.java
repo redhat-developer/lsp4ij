@@ -970,6 +970,12 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
         return debugProtocolServer.stepInTargets(args);
     }
 
+    /**
+     * What the debug console shows for a typed line that it cannot send, since the debug session is not connected to
+     * the debug adapter yet.
+     */
+    public static final String CONSOLE_LINE_NOT_SENT = "The line was not sent: the debug adapter is not connected yet.";
+
     public CompletableFuture<EvaluateResponse> evaluate(@NotNull String expression,
                                                         @Nullable Integer frameId,
                                                         @NotNull String context) {
@@ -1000,19 +1006,20 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
      * @param line    the typed line, without its line end.
      * @param frameId the selected stack frame, or null when the program runs.
      * @return the text the console shows for the line: its result, or null when there is none, as when the program
-     * took the line as its input; it fails with the debug adapter's error.
+     * took the line as its input; it fails with the debug adapter's error, or with {@link #CONSOLE_LINE_NOT_SENT}
+     * when the client is not connected to the debug adapter yet.
      */
     public CompletableFuture<@Nullable String> evaluateConsoleLine(@NotNull String line, @Nullable Integer frameId) {
-        if (debugProtocolServer == null) {
-            return CompletableFuture.completedFuture(null);
-        }
         return evaluateConsoleLine(debugProtocolServer, line, frameId, getValueFormat());
     }
 
-    static CompletableFuture<@Nullable String> evaluateConsoleLine(@NotNull IDebugProtocolServer server,
+    static CompletableFuture<@Nullable String> evaluateConsoleLine(@Nullable IDebugProtocolServer server,
                                                                    @NotNull String line,
                                                                    @Nullable Integer frameId,
                                                                    @Nullable ValueFormat format) {
+        if (server == null) {
+            return CompletableFuture.failedFuture(new IllegalStateException(CONSOLE_LINE_NOT_SENT));
+        }
         return evaluate(server, line, frameId, EvaluateArgumentsContext.REPL, format)
                 .thenApply(response -> response != null && !StringUtils.isBlank(response.getResult()) ?
                         response.getResult() : null);

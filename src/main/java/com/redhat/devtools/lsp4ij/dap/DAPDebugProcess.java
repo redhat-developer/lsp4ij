@@ -377,6 +377,8 @@ public class DAPDebugProcess extends XDebugProcess implements Disposable {
         DAPStackFrame frame = getCurrentDapStackFrame();
         DAPClient client = frame != null ? frame.getClient() : parentClient;
         if (client == null) {
+            // Typed before the debug session made its client: the line is not dropped silently
+            print(DAPClient.CONSOLE_LINE_NOT_SENT, ConsoleViewContentType.ERROR_OUTPUT);
             return;
         }
         Integer frameId = frame != null ? frame.getFrameId() : null;
