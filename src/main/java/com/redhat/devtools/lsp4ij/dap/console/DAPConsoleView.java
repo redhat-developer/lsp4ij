@@ -127,6 +127,18 @@ public class DAPConsoleView extends ConsoleViewImpl {
         }
     }
 
+    /**
+     * Prints text which is not the debug adapter's process output, such as the result of an evaluation typed in the
+     * console, which the filter of DAP traces in {@link #print(String, ConsoleViewContentType)} must not hide: a
+     * result can be a JSON object.
+     *
+     * @param text        the text.
+     * @param contentType the console content type.
+     */
+    public void printUnfiltered(@NotNull String text, @NotNull ConsoleViewContentType contentType) {
+        super.print(text, contentType);
+    }
+
     @Override
     public void print(@NotNull String text, @NotNull ConsoleViewContentType contentType) {
         String applicableText = getApplicableText(text, contentType);
