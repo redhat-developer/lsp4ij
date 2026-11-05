@@ -144,15 +144,27 @@ public class LSPDiagnosticUtils {
         return false;
     }
 
+    /**
+     * Clears the problem of the given files in the Project View, once a language server no longer holds their
+     * documents, unless they still have errors when the clear runs.
+     * <p>
+     * Each file is cleared by a report of it, made from the errors held when it runs: an unconditional clear could
+     * run after the report of errors published since, such as for the document of a file that just closed, and leave
+     * the file with errors unmarked. Reports of a file share their coalescing key, so they run one after another and
+     * the last one submitted runs last.
+     *
+     * @param fileUris       the URIs of the files.
+     * @param clientFeatures the client features of the language server which held their documents.
+     * @param project        the project.
+     */
     public static void clearProblem(@NotNull Set<URI> fileUris,
                                     @NotNull LSPClientFeatures clientFeatures,
                                     @NotNull Project project) {
-        WolfTheProblemSolver wolf = WolfTheProblemSolver.getInstance(project);
         ReadAction.nonBlocking((Callable<Void>) () -> {
                     for (URI fileUri : fileUris) {
                         VirtualFile file = FileUriSupport.findFileByUri(fileUri.toASCIIString(), clientFeatures);
                         if (file != null && clientFeatures.getDiagnosticFeature().canReportProblem(file)) {
-                            wolf.clearProblemsFromExternalSource(file, LSP4IJ_REPORT_PROBLEM_SOURCE);
+                            reportProblem(file, null, project);
                         }
                     }
                     return null;

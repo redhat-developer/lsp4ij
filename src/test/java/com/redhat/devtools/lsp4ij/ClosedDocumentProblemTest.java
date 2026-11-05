@@ -12,6 +12,7 @@ import com.intellij.codeInsight.daemon.impl.WolfTheProblemSolverImpl;
 import com.intellij.openapi.application.impl.NonBlockingReadActionImpl;
 import com.intellij.openapi.util.Disposer;
 import com.intellij.problems.WolfTheProblemSolver;
+import com.redhat.devtools.lsp4ij.features.diagnostics.LSPDiagnosticUtils;
 import com.redhat.devtools.lsp4ij.fixtures.LSPCodeInsightFixtureTestCase;
 import org.eclipse.lsp4j.Diagnostic;
 import org.eclipse.lsp4j.DiagnosticSeverity;
@@ -19,11 +20,12 @@ import org.eclipse.lsp4j.Position;
 import org.eclipse.lsp4j.Range;
 
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 /**
- * Verifies that the Project view's problem files follow the errors of a file whose closed document LSP4IJ drops when
- * the file opens.
+ * Verifies that the Project view's problem files follow the errors of a file as it opens and closes: LSP4IJ drops the
+ * file's closed document when it opens, and clears its problem when it closes.
  */
 public class ClosedDocumentProblemTest extends LSPCodeInsightFixtureTestCase {
 
@@ -74,6 +76,60 @@ public class ClosedDocumentProblemTest extends LSPCodeInsightFixtureTestCase {
                 .get(1, TimeUnit.HOURS);
         NonBlockingReadActionImpl.waitForAsyncTaskCompletion();
         assertFalse("other.foo must be no problem file once it connects without errors", problems.isProblemFile(other));
+    }
+
+    public void testAFileThatClosesIsNoProblemFileUntilTheServerPublishesErrorsForItsClosedDocument() throws Exception {
+        var problems = problemFiles();
+        var main = myFixture.configureByText("main.foo", "main");
+        var wrapper = LanguageServiceAccessor.getInstance(myFixture.getProject())
+                .getLanguageServers(main, null, null).get(1, TimeUnit.HOURS).get(0).getServerWrapper();
+        var other = myFixture.addFileToProject("other.foo", "other").getVirtualFile();
+        var error = new Diagnostic(new Range(new Position(0, 0), new Position(0, 5)), "an error", DiagnosticSeverity.Error, "mock");
+
+        // The opened file's error makes it a problem file
+        wrapper.connect(other, new LanguageServerWrapper.LSPFileConnectionInfo(null, null, null, true))
+                .get(1, TimeUnit.HOURS);
+        wrapper.updateDiagnostics(other, LSPDocumentBase.PUBLISH_DIAGNOSTIC_IDENTIFIER, List.of(error), null);
+        waitForProblemReports();
+        assertTrue("other.foo must be a problem file", problems.isProblemFile(other));
+
+        // As it closes, nothing holds an error for it
+        wrapper.disconnect(other, false);
+        waitForProblemReports();
+        assertFalse("other.foo must be no problem file once it closes", problems.isProblemFile(other));
+
+        // The server publishes the error again, for the closed document
+        wrapper.updateDiagnostics(other, LSPDocumentBase.PUBLISH_DIAGNOSTIC_IDENTIFIER, List.of(error), null);
+        waitForProblemReports();
+        assertTrue("other.foo must be a problem file once its closed document has an error", problems.isProblemFile(other));
+    }
+
+    public void testAClosedFileWithErrorsStaysAProblemFileWhenTheClearOfItsCloseRunsLast() throws Exception {
+        var problems = problemFiles();
+        var main = myFixture.configureByText("main.foo", "main");
+        var wrapper = LanguageServiceAccessor.getInstance(myFixture.getProject())
+                .getLanguageServers(main, null, null).get(1, TimeUnit.HOURS).get(0).getServerWrapper();
+        var other = myFixture.addFileToProject("other.foo", "other").getVirtualFile();
+
+        // The errors that the server publishes for a file's closed document as it closes make it a problem file
+        var error = new Diagnostic(new Range(new Position(0, 0), new Position(0, 5)), "an error", DiagnosticSeverity.Error, "mock");
+        wrapper.updateDiagnostics(other, LSPDocumentBase.PUBLISH_DIAGNOSTIC_IDENTIFIER, List.of(error), null);
+        waitForProblemReports();
+        assertTrue("other.foo must be a problem file", problems.isProblemFile(other));
+
+        // Nothing orders the clear that the close submitted before that report, so it can run last, as it does here
+        LSPDiagnosticUtils.clearProblem(Set.of(wrapper.toUri(other)), wrapper.getClientFeatures(), myFixture.getProject());
+        waitForProblemReports();
+        assertTrue("other.foo must stay a problem file while its closed document has an error", problems.isProblemFile(other));
+    }
+
+    /**
+     * Waits for the problem reports submitted so far. A clear submits a report of each of its files as it runs, so a
+     * second wait takes the reports that the first one's clears submitted.
+     */
+    private static void waitForProblemReports() {
+        NonBlockingReadActionImpl.waitForAsyncTaskCompletion();
+        NonBlockingReadActionImpl.waitForAsyncTaskCompletion();
     }
 
     /**
