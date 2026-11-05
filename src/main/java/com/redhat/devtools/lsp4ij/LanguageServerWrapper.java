@@ -64,6 +64,7 @@ import org.eclipse.lsp4j.services.LanguageServer;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.jetbrains.annotations.TestOnly;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -170,6 +171,9 @@ public class LanguageServerWrapper implements Disposable {
     private volatile @Nullable ConcurrentLinkedQueue<LSPTrace> traces;
     private @Nullable Alarm traceFlushAlarm;
     private volatile @Nullable InitializingContext currentInitializingContext;
+    // Where the connection of a document runs once its start attempt is initialized: the executor that
+    // thenComposeAsync uses by default, which a test can replace to run the connection when it chooses
+    private @NotNull Executor connectionExecutor = CompletableFuture.completedFuture(null).defaultExecutor();
     private @NotNull TextDocumentSyncOptions syncOptions;
 
     /* Backwards compatible constructor */
@@ -572,7 +576,8 @@ public class LanguageServerWrapper implements Disposable {
                     .thenApply(initializingContext -> {
                         synchronized (this) {
                             // An attempt that a stop replaced while it initialized must not clear the error that the
-                            // current attempt restarts for, nor set the capabilities of its own server
+                            // current attempt restarts for, set the capabilities of its own server, nor send that
+                            // server, which the stop is shutting down, initialized
                             requireCurrent(initializingContext);
                             serverError = null;
                             if (errorNotification != null) {
@@ -585,11 +590,8 @@ public class LanguageServerWrapper implements Disposable {
                             syncOptions = createSyncOptions();
                             getClientFeatures().setServerCapabilities(serverCapabilities);
                             this.initiallySupportsWorkspaceFolders = supportsWorkspaceFolders(serverCapabilities);
+                            initializingContext.languageServer.initialized(new InitializedParams());
                         }
-                        return initializingContext;
-                    })
-                    .thenApply(initializingContext -> {
-                        initializingContext.languageServer.initialized(new InitializedParams());
                         return initializingContext;
                     })
                     .thenApply(initializingContext -> {
@@ -615,9 +617,17 @@ public class LanguageServerWrapper implements Disposable {
                         initializingContext.languageClient.updateWorkspaceDiagnosticProviders();
                         return initializingContext;
                     })
-                    .thenRun(() -> {
+                    .thenAccept(initializingContext -> {
                         for (VirtualFile fileToReconnect : filesToReconnect) {
-                            connect(fileToReconnect, new LSPFileConnectionInfo(null, null, null, true));
+                            synchronized (this) {
+                                // A stop after the install must not have the reconnection start the server again. The
+                                // stop takes this monitor too, so it comes before the check or after the connect call,
+                                // which takes documentsLock after this monitor, as the stop does
+                                if (currentInitializingContext != initializingContext) {
+                                    return;
+                                }
+                                connect(fileToReconnect, new LSPFileConnectionInfo(null, null, null, true));
+                            }
                         }
                     })
                     .exceptionally(e -> {
@@ -639,6 +649,17 @@ public class LanguageServerWrapper implements Disposable {
             // above, which fails initializeFuture and then stops the server, clearing it
             ApplicationManager.getApplication().executeOnPooledThread(startTask);
         }
+    }
+
+    /**
+     * Sets where the connection of a document runs once its start attempt is initialized, so that a test can run it
+     * when it chooses, as after a stop.
+     *
+     * @param connectionExecutor the executor.
+     */
+    @TestOnly
+    void setConnectionExecutor(@NotNull Executor connectionExecutor) {
+        this.connectionExecutor = connectionExecutor;
     }
 
     /**
@@ -924,16 +945,28 @@ public class LanguageServerWrapper implements Disposable {
             return getLanguageServerWhenDidOpen(connected, waitForDidOpen);
         }
 
-        // start language server if needed
-        start();
+        // start language server if needed, and take the start attempt that the connection is for
+        InitializingContext attempt;
+        CompletableFuture<Void> initialized;
+        synchronized (this) {
+            start();
+            attempt = currentInitializingContext;
+            initialized = this.initializeFuture;
+        }
 
-        if (this.initializeFuture == null) {
+        if (initialized == null) {
             // The "initialize" future is not initialized, return null as language server.
             return CompletableFuture.completedFuture(null);
         }
 
-        return initializeFuture.thenComposeAsync(theVoid -> {
+        return initialized.thenComposeAsync(theVoid -> {
             // Here, the "initialize" future is initialized
+
+            // A stop, as by stopAndDisable(), can replace the attempt before this runs: the connection is then
+            // dropped, so that it neither starts the server again nor connects the document to a stopped server
+            if (currentInitializingContext != attempt) {
+                return CompletableFuture.completedFuture(null);
+            }
 
             // Here the file is not already connected
             // To connect the file, we need the document instance to add LSP document listener to manage didOpen, didChange, etc.
@@ -950,11 +983,22 @@ public class LanguageServerWrapper implements Disposable {
             }
 
             // Before the lock: getInitializedServer() calls the synchronized start(), and stop() takes that
-            // monitor before documentsLock
-            var initializedServer = folderToNotify != null ? getInitializedServer() : null;
+            // monitor before documentsLock. Under that monitor, a stop comes before the check or after the call, so
+            // that the call does not start the server again.
+            CompletableFuture<LanguageServer> initializedServer = null;
+            if (folderToNotify != null) {
+                synchronized (this) {
+                    if (currentInitializingContext != attempt) {
+                        return CompletableFuture.completedFuture(null);
+                    }
+                    initializedServer = getInitializedServer();
+                }
+            }
             DocumentContentSynchronizer synchronizer;
             synchronized (documentsLock) {
-                if (!isCurrent(claim)) {
+                // A stop which replaced the attempt after this check disconnects the document once this lock is
+                // released, as it disconnects every opened document
+                if (!isCurrent(claim) || currentInitializingContext != attempt) {
                     return CompletableFuture.completedFuture(null);
                 }
                 if (claim == null) {
@@ -962,17 +1006,13 @@ public class LanguageServerWrapper implements Disposable {
                 }
                 // Remove from closed documents and check if already opened
                 var closedDocument = closedDocuments.remove(fileUri);
-                if (closedDocument != null && closedDocument.hasErrors()
-                        && getClientFeatures().getDiagnosticFeature().canReportProblem(file)) {
-                    // The file is a problem file for its closed document's errors, and no update of its opened
-                    // document reports a change unless that one gets errors: report it from what the servers hold now
-                    LSPDiagnosticUtils.reportProblem(file, null, getProject());
-                }
+                boolean droppedErrors = closedDocument != null && closedDocument.hasErrors();
 
                 // Check again if file is already opened (within synchronized block)
                 var alreadyConnected = getConnectedSynchronizer(fileUri);
                 if (alreadyConnected != null) {
                     synchronizer = alreadyConnected;
+                    reportProblemOfDroppedDocument(file, droppedErrors);
                 } else {
 
                     // Mark the workspace folder as notified and queue its notification before the document's
@@ -989,8 +1029,10 @@ public class LanguageServerWrapper implements Disposable {
                     Disposer.register(this, synchronizer);
                     document.addDocumentListener(synchronizer, synchronizer);
                     OpenedDocument data = new OpenedDocument(new LanguageServerItem(languageServer, this), file, synchronizer);
-                    LanguageServerWrapper.this.openedDocuments.put(fileUri, data);
+                    // It replaces an opened document which held only the diagnostics published before the connection
+                    var replaced = LanguageServerWrapper.this.openedDocuments.put(fileUri, data);
                     invalidateWorkspaceDiagnosticCache(fileUri);
+                    reportProblemOfDroppedDocument(file, droppedErrors || (replaced != null && replaced.hasErrors()));
                     if (!waitForDidOpen) {
                         return CompletableFuture.completedFuture(languageServer);
                     }
@@ -999,7 +1041,23 @@ public class LanguageServerWrapper implements Disposable {
             // After the lock: the didOpen can need the synchronized start(), and stop() takes that monitor
             // before documentsLock
             return getLanguageServerWhenDidOpen(synchronizer, waitForDidOpen);
-        });
+        }, connectionExecutor);
+    }
+
+    /**
+     * Reports the file to the problems of the Project view again when the connection of the file dropped a document of
+     * it which had errors: its closed document, or an opened document which held only published diagnostics. The file
+     * is a problem file for those errors, and no update of the new opened document reports a change unless that one
+     * gets errors. The report, which runs later, reads what the language servers hold for the file, so it is made once
+     * the new opened document is installed.
+     *
+     * @param file          the file.
+     * @param droppedErrors whether a dropped document of the file had errors.
+     */
+    private void reportProblemOfDroppedDocument(@NotNull VirtualFile file, boolean droppedErrors) {
+        if (droppedErrors && getClientFeatures().getDiagnosticFeature().canReportProblem(file)) {
+            LSPDiagnosticUtils.reportProblem(file, null, getProject());
+        }
     }
 
     /**
