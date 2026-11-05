@@ -87,10 +87,14 @@ public class LanguageServiceAccessor implements Disposable {
                     .stream()
                     .filter(server -> event.serverDefinitions.contains(server.getServerDefinition()))
                     .toList();
-            serversToDispose.forEach(wrapper -> wrapper.dispose(!ApplicationManager.getApplication().isUnitTestMode())); // dispose by removing code vision, inlay hints, folding from editors
-            // Remove all servers which are removed from the cache
-            synchronized (startedServers) {
-                serversToDispose.forEach(startedServers::remove);
+            try {
+                // dispose by removing code vision, inlay hints, folding from editors
+                serversToDispose.forEach(wrapper -> disposeLoggingFailure(wrapper, !ApplicationManager.getApplication().isUnitTestMode()));
+            } finally {
+                // Remove all servers which are removed from the cache
+                synchronized (startedServers) {
+                    serversToDispose.forEach(startedServers::remove);
+                }
             }
         }
 
@@ -724,12 +728,33 @@ public class LanguageServiceAccessor implements Disposable {
 
     private void disposeAllServers() {
         synchronized (startedServers) {
-            startedServers.forEach(ls -> {
-                if (project.equals(ls.getProject())) {
-                    ls.dispose();
-                }
-            });
-            startedServers.clear();
+            try {
+                startedServers.forEach(ls -> {
+                    if (project.equals(ls.getProject())) {
+                        disposeLoggingFailure(ls, false);
+                    }
+                });
+            } finally {
+                startedServers.clear();
+            }
+        }
+    }
+
+    /**
+     * Disposes the given language server, and logs a failure of its dispose, for instance as its connection fails to
+     * stop, so that it neither keeps the other servers from being disposed nor stays among the started servers.
+     *
+     * @param wrapper              the language server to dispose.
+     * @param refreshEditorFeature true if the code vision, inlay hints and folding of its opened editors must be
+     *                             removed and false otherwise.
+     */
+    private static void disposeLoggingFailure(@NotNull LanguageServerWrapper wrapper, boolean refreshEditorFeature) {
+        try {
+            wrapper.dispose(refreshEditorFeature);
+        } catch (ProcessCanceledException cancellation) {
+            throw cancellation;
+        } catch (Exception e) {
+            LOGGER.warn("Error while disposing the language server '{}'.", wrapper.getServerDefinition().getId(), e);
         }
     }
 
