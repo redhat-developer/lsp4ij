@@ -937,7 +937,13 @@ public class LanguageServerWrapper implements Disposable {
                     promoteConnection(fileUri);
                 }
                 // Remove from closed documents and check if already opened
-                closedDocuments.remove(fileUri);
+                var closedDocument = closedDocuments.remove(fileUri);
+                if (closedDocument != null && closedDocument.hasErrors()
+                        && getClientFeatures().getDiagnosticFeature().canReportProblem(file)) {
+                    // The file is a problem file for its closed document's errors, and no update of its opened
+                    // document reports a change unless that one gets errors: report it from what the servers hold now
+                    LSPDiagnosticUtils.reportProblem(file, null, getProject());
+                }
 
                 // Check again if file is already opened (within synchronized block)
                 var alreadyConnected = getConnectedSynchronizer(fileUri);
