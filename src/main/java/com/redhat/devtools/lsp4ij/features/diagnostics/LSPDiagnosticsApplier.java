@@ -100,21 +100,27 @@ public final class LSPDiagnosticsApplier implements Disposable {
         synchronized (pendingRefreshes) {
             submittedRefreshes.computeIfAbsent(key, ignored -> new HashSet<>()).add(refresh);
         }
-        ReadAction
-                .nonBlocking(() -> collectDiagnostics(file, psiFile, document, modificationStamp))
-                .coalesceBy(this, file != null ? file : psiFile)
-                .finishOnUiThread(ModalityState.defaultModalityState(), highlights -> {
-                    try {
-                        if (highlights != null && !project.isDisposed()) {
-                            applyHighlights(highlights);
+        try {
+            ReadAction
+                    .nonBlocking(() -> collectDiagnostics(file, psiFile, document, modificationStamp))
+                    .coalesceBy(this, file != null ? file : psiFile)
+                    .finishOnUiThread(ModalityState.defaultModalityState(), highlights -> {
+                        try {
+                            if (highlights != null && !project.isDisposed()) {
+                                applyHighlights(highlights);
+                            }
+                        } finally {
+                            refreshEnded(key, refresh);
                         }
-                    } finally {
-                        refreshEnded(key, refresh);
-                    }
-                })
-                .submit(AppExecutorUtil.getAppExecutorService())
-                // A refresh that a later one of the same file replaces is cancelled, and is never applied
-                .onError(error -> refreshEnded(key, refresh));
+                    })
+                    .submit(AppExecutorUtil.getAppExecutorService())
+                    // A refresh that a later one of the same file replaces is cancelled, and is never applied
+                    .onError(error -> refreshEnded(key, refresh));
+        } catch (RuntimeException | Error e) {
+            // Not submitted, as when the executor rejects it: the refresh never runs
+            refreshEnded(key, refresh);
+            throw e;
+        }
     }
 
     /**

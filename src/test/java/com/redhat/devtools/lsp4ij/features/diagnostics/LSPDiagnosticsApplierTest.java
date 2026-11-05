@@ -15,6 +15,7 @@ import com.intellij.codeInsight.daemon.impl.UpdateHighlightersUtil;
 import com.intellij.openapi.application.impl.NonBlockingReadActionImpl;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.vfs.VirtualFile;
+import com.intellij.psi.PsiFile;
 import com.intellij.testFramework.PlatformTestUtil;
 import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
 import com.redhat.devtools.lsp4ij.fixtures.LSPCodeInsightFixtureTestCase;
@@ -78,15 +79,7 @@ public class LSPDiagnosticsApplierTest extends LSPCodeInsightFixtureTestCase {
 
     public void testARefreshIsPendingUntilItShowsTheDiagnostics() throws Exception {
         int groupId = registeredGroupId();
-        MockLanguageServer.INSTANCE.setPublishDiagnostics(List.of(
-                new Diagnostic(new Range(new Position(0, 0), new Position(0, 6)), "published")));
-        var file = myFixture.configureByText("test.foo", "before");
-        LanguageServiceAccessor.getInstance(myFixture.getProject())
-                .getLanguageServers(file, null, null).get(30, TimeUnit.SECONDS);
-        // the server publishes the diagnostics as the file opens
-        PlatformTestUtil.waitWithEventsDispatching("the published diagnostics must be shown",
-                () -> List.of("published").equals(shownDiagnostics()), 30);
-        NonBlockingReadActionImpl.waitForAsyncTaskCompletion();
+        var file = openWithItsDiagnosticsShown();
         var applier = LSPDiagnosticsApplier.getInstance(myFixture.getProject());
         VirtualFile virtualFile = file.getVirtualFile();
         Document document = myFixture.getEditor().getDocument();
@@ -100,13 +93,54 @@ public class LSPDiagnosticsApplierTest extends LSPCodeInsightFixtureTestCase {
         applier.scheduleRefresh(virtualFile, document);
         assertTrue("a refresh that replaces another must be pending", applier.isRefreshPending(virtualFile));
 
+        awaitShownWhilePending(applier, virtualFile);
+        assertFalse("no refresh may be pending once the diagnostics are shown", applier.isRefreshPending(virtualFile));
+    }
+
+    public void testARefreshOfAPsiFileIsPendingForItsVirtualFileUntilItShowsTheDiagnostics() throws Exception {
+        int groupId = registeredGroupId();
+        var file = openWithItsDiagnosticsShown();
+        var applier = LSPDiagnosticsApplier.getInstance(myFixture.getProject());
+        VirtualFile virtualFile = file.getVirtualFile();
+        Document document = myFixture.getEditor().getDocument();
+        clearDiagnostics(document, groupId);
+        assertEmpty(shownDiagnostics());
+
+        // as the editor feature asks for it, by the Psi file; the query is by its virtual file
+        applier.scheduleRefresh(file, document);
+        assertTrue("a refresh of the Psi file must be pending for its virtual file", applier.isRefreshPending(virtualFile));
+
+        awaitShownWhilePending(applier, virtualFile);
+        assertFalse("no refresh may be pending once the diagnostics are shown", applier.isRefreshPending(virtualFile));
+    }
+
+    /**
+     * Opens a file whose diagnostic the mock server publishes as it opens, and returns it once the diagnostic is shown
+     * and no refresh is still under way.
+     */
+    private PsiFile openWithItsDiagnosticsShown() throws Exception {
+        MockLanguageServer.INSTANCE.setPublishDiagnostics(List.of(
+                new Diagnostic(new Range(new Position(0, 0), new Position(0, 6)), "published")));
+        var file = myFixture.configureByText("test.foo", "before");
+        LanguageServiceAccessor.getInstance(myFixture.getProject())
+                .getLanguageServers(file, null, null).get(30, TimeUnit.SECONDS);
+        // the server publishes the diagnostics as the file opens
+        PlatformTestUtil.waitWithEventsDispatching("the published diagnostics must be shown",
+                () -> List.of("published").equals(shownDiagnostics()), 30);
+        NonBlockingReadActionImpl.waitForAsyncTaskCompletion();
+        return file;
+    }
+
+    /**
+     * Waits until the diagnostic is shown again, checking on every look that a refresh is pending until it is.
+     */
+    private void awaitShownWhilePending(LSPDiagnosticsApplier applier, VirtualFile virtualFile) {
         PlatformTestUtil.waitWithEventsDispatching("the refreshed diagnostics must be shown", () -> {
             boolean shown = List.of("published").equals(shownDiagnostics());
             assertTrue("a refresh must be pending until it shows the diagnostics",
                     shown || applier.isRefreshPending(virtualFile));
             return shown;
         }, 30);
-        assertFalse("no refresh may be pending once the diagnostics are shown", applier.isRefreshPending(virtualFile));
     }
 
     private int registeredGroupId() {
