@@ -10,17 +10,24 @@ package com.redhat.devtools.lsp4ij;
 import com.intellij.codeInsight.daemon.impl.MockWolfTheProblemSolver;
 import com.intellij.codeInsight.daemon.impl.WolfTheProblemSolverImpl;
 import com.intellij.openapi.application.impl.NonBlockingReadActionImpl;
+import com.intellij.openapi.progress.util.ProgressIndicatorUtils;
 import com.intellij.openapi.util.Disposer;
+import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.problems.WolfTheProblemSolver;
+import com.intellij.testFramework.PlatformTestUtil;
+import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
+import com.redhat.devtools.lsp4ij.client.features.LSPDiagnosticFeature;
 import com.redhat.devtools.lsp4ij.features.diagnostics.LSPDiagnosticUtils;
 import com.redhat.devtools.lsp4ij.fixtures.LSPCodeInsightFixtureTestCase;
 import org.eclipse.lsp4j.Diagnostic;
 import org.eclipse.lsp4j.DiagnosticSeverity;
 import org.eclipse.lsp4j.Position;
 import org.eclipse.lsp4j.Range;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -104,21 +111,38 @@ public class ClosedDocumentProblemTest extends LSPCodeInsightFixtureTestCase {
         assertTrue("other.foo must be a problem file once its closed document has an error", problems.isProblemFile(other));
     }
 
-    public void testAClosedFileWithErrorsStaysAProblemFileWhenTheClearOfItsCloseRunsLast() throws Exception {
+    public void testAClosedFileWithErrorsStaysAProblemFileWhenTheClearOfItsCloseRunsAfterTheirReport() throws Exception {
         var problems = problemFiles();
         var main = myFixture.configureByText("main.foo", "main");
         var wrapper = LanguageServiceAccessor.getInstance(myFixture.getProject())
                 .getLanguageServers(main, null, null).get(1, TimeUnit.HOURS).get(0).getServerWrapper();
         var other = myFixture.addFileToProject("other.foo", "other").getVirtualFile();
 
-        // The errors that the server publishes for a file's closed document as it closes make it a problem file
-        var error = new Diagnostic(new Range(new Position(0, 0), new Position(0, 5)), "an error", DiagnosticSeverity.Error, "mock");
-        wrapper.updateDiagnostics(other, LSPDocumentBase.PUBLISH_DIAGNOSTIC_IDENTIFIER, List.of(error), null);
-        waitForProblemReports();
-        assertTrue("other.foo must be a problem file", problems.isProblemFile(other));
+        // The clear that a file's close submits, while its closed document has no errors yet. It asks the client's
+        // canReportProblem in its background read action, which holds it there until it is released; the wait gives
+        // way to a write action, after which the clear runs again.
+        var release = new CountDownLatch(1);
+        var holdingFeatures = new LSPClientFeatures().setDiagnosticFeature(new LSPDiagnosticFeature() {
+            @Override
+            public boolean canReportProblem(@NotNull VirtualFile file) {
+                ProgressIndicatorUtils.awaitWithCheckCanceled(release);
+                return true;
+            }
+        });
+        try {
+            LSPDiagnosticUtils.clearProblem(Set.of(wrapper.toUri(other)), holdingFeatures, myFixture.getProject());
 
-        // Nothing orders the clear that the close submitted before that report, so it can run last, as it does here
-        LSPDiagnosticUtils.clearProblem(Set.of(wrapper.toUri(other)), wrapper.getClientFeatures(), myFixture.getProject());
+            // The server publishes an error for the closed document, whose report makes the file a problem file while
+            // the clear is still pending. The bound only ends a hang.
+            var error = new Diagnostic(new Range(new Position(0, 0), new Position(0, 5)), "an error", DiagnosticSeverity.Error, "mock");
+            wrapper.updateDiagnostics(other, LSPDocumentBase.PUBLISH_DIAGNOSTIC_IDENTIFIER, List.of(error), null);
+            PlatformTestUtil.waitWithEventsDispatching("other.foo must be a problem file",
+                    () -> problems.isProblemFile(other), 3600);
+        } finally {
+            release.countDown();
+        }
+
+        // The clear runs last, as nothing orders it before the report
         waitForProblemReports();
         assertTrue("other.foo must stay a problem file while its closed document has an error", problems.isProblemFile(other));
     }
