@@ -12,6 +12,7 @@ package com.redhat.devtools.lsp4ij.features.codeAction;
 
 import com.intellij.codeInsight.daemon.DaemonCodeAnalyzer;
 import com.intellij.openapi.application.ReadAction;
+import com.intellij.openapi.components.Service;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.fileEditor.FileDocumentManager;
 import com.intellij.openapi.fileEditor.FileEditorManager;
@@ -21,11 +22,12 @@ import com.intellij.psi.PsiFile;
 import com.intellij.psi.PsiManager;
 import com.intellij.util.concurrency.AppExecutorUtil;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.TestOnly;
 
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -44,79 +46,79 @@ import java.util.concurrent.atomic.AtomicInteger;
  * already and that pass sends requests of its own, nor a file that no editor shows. The restarted pass finds the
  * requests done and sends no other, so a restart never leads to another.
  */
-public class RestartWhenCodeActionsLoaded {
+@Service(Service.Level.PROJECT)
+public final class RestartWhenCodeActionsLoadedManager {
+
+    private final Project project;
 
     // The requests of each file that the EDT found pending and that have not completed; guarded by itself
-    private static final Map<Key, Pending> PENDING = new HashMap<>();
+    private final Map<VirtualFile, Pending> pendingFiles = new HashMap<>();
 
     // The restarts so far
-    private static final AtomicInteger RESTARTS = new AtomicInteger();
+    private final AtomicInteger restarts = new AtomicInteger();
 
-    // The request whose completion is counted for its file; guarded by this
-    private @Nullable CompletableFuture<?> scheduled;
+    public RestartWhenCodeActionsLoadedManager(@NotNull Project project) {
+        this.project = project;
+    }
+
+    @NotNull
+    public static RestartWhenCodeActionsLoadedManager getInstance(@NotNull Project project) {
+        return project.getService(RestartWhenCodeActionsLoadedManager.class);
+    }
 
     /**
      * Restarts the highlighting of the given file once the given request and the other requests of the file that the
      * EDT found pending have completed, unless the request is already counted.
      *
      * @param request the textDocument/codeAction request that the EDT did not wait for.
-     * @param project the project.
      * @param file    the file whose code actions the request loads.
      */
     public void schedule(@NotNull CompletableFuture<?> request,
-                         @NotNull Project project,
                          @NotNull VirtualFile file) {
-        synchronized (this) {
-            if (scheduled == request) {
+        long stamp = stamp(file);
+        synchronized (pendingFiles) {
+            var pending = pendingFiles.computeIfAbsent(file, k -> new Pending());
+            if (!pending.requests.add(request)) {
                 return;
             }
-            scheduled = request;
-        }
-        var key = new Key(project, file);
-        long stamp = stamp(file);
-        synchronized (PENDING) {
-            var pending = PENDING.computeIfAbsent(key, k -> new Pending());
-            pending.requests++;
             pending.stamp = stamp;
         }
-        request.whenComplete((result, failure) -> completed(key, failure == null));
+        request.whenComplete((result, failure) -> completed(file, request, failure == null));
     }
 
-    private static void completed(@NotNull Key key, boolean loaded) {
-        synchronized (PENDING) {
-            var pending = PENDING.get(key);
-            if (pending == null) {
+    private void completed(@NotNull VirtualFile file, @NotNull CompletableFuture<?> request, boolean loaded) {
+        synchronized (pendingFiles) {
+            var pending = pendingFiles.get(file);
+            if (pending == null || !pending.requests.remove(request)) {
                 return;
             }
             pending.loaded |= loaded;
-            if (--pending.requests > 0) {
+            if (!pending.requests.isEmpty()) {
                 return;
             }
-            PENDING.remove(key);
+            pendingFiles.remove(file);
             if (pending.loaded) {
                 // Submitted while the file is still pending, so that the restart is known once it is not
                 long stamp = pending.stamp;
                 ReadAction.nonBlocking((Callable<Void>) () -> {
-                            restart(key, stamp);
+                            restart(file, stamp);
                             return null;
                         })
-                        .coalesceBy(RestartWhenCodeActionsLoaded.class, key)
-                        .expireWith(key.project())
+                        .coalesceBy(this, file)
+                        .expireWith(project)
                         .submit(AppExecutorUtil.getAppExecutorService());
             }
         }
     }
 
-    private static void restart(@NotNull Key key, long stamp) {
-        var file = key.file();
-        var project = key.project();
+    private void restart(@NotNull VirtualFile file, long stamp) {
         if (!file.isValid() || stamp(file) != stamp || !FileEditorManager.getInstance(project).isFileOpen(file)) {
             // The file changed, and its edit restarted its highlighting, or no editor shows it
             return;
         }
         PsiFile psiFile = PsiManager.getInstance(project).findFile(file);
         if (psiFile != null) {
-            RESTARTS.incrementAndGet();
+            restarts.incrementAndGet();
             DaemonCodeAnalyzer.getInstance(project).restart(psiFile);
         }
     }
@@ -135,32 +137,26 @@ public class RestartWhenCodeActionsLoaded {
      * none has, when a restart that their completion makes is already submitted.
      */
     @TestOnly
-    public static boolean isPending(@NotNull Project project, @NotNull VirtualFile file) {
-        synchronized (PENDING) {
-            return PENDING.containsKey(new Key(project, file));
+    public boolean isPending(@NotNull VirtualFile file) {
+        synchronized (pendingFiles) {
+            return pendingFiles.containsKey(file);
         }
     }
 
     /**
-     * Returns the number of highlighting restarts so far.
+     * Returns the number of highlighting restarts of this project so far.
      */
     @TestOnly
-    public static int getRestartCount() {
-        return RESTARTS.get();
+    public int getRestartCount() {
+        return restarts.get();
     }
 
     /**
-     * A file of a project.
-     */
-    private record Key(@NotNull Project project, @NotNull VirtualFile file) {
-    }
-
-    /**
-     * The requests of a file that the EDT found pending: how many have not completed, the modification stamp of its
+     * The requests of a file that the EDT found pending: those that have not completed, the modification stamp of its
      * document when the EDT last found one pending, and whether one completed normally.
      */
     private static final class Pending {
-        private int requests;
+        private final Set<CompletableFuture<?>> requests = new HashSet<>();
         private long stamp;
         private boolean loaded;
     }

@@ -64,7 +64,7 @@ public class CodeActionsOnTheEdtTest extends LSPCodeInsightFixtureTestCase {
         PsiFile file = myFixture.configureByText("test.ts", "const foo = <caret>1;");
         IntentionAction intention = new LSPIntentionAction0();
         var passes = passesOf(file);
-        int restarts = RestartWhenCodeActionsLoaded.getRestartCount();
+        int restarts = restartManager().getRestartCount();
         var daemon = (DaemonCodeAnalyzerImpl) DaemonCodeAnalyzer.getInstance(myFixture.getProject());
         var editors = EditorTracker.getInstance(myFixture.getProject());
         // the daemon highlights the active editors once its timer runs, as when the editor is shown
@@ -98,7 +98,7 @@ public class CodeActionsOnTheEdtTest extends LSPCodeInsightFixtureTestCase {
         MockLanguageServer.INSTANCE.setCodeActions(List.of(Either.forRight(quickFix())));
         PsiFile file = myFixture.configureByText("test.ts", "const foo = 1;");
         IntentionAction intention = quickFixOf(file);
-        int restarts = RestartWhenCodeActionsLoaded.getRestartCount();
+        int restarts = restartManager().getRestartCount();
         CompletableFuture<Void> release = hold();
         try {
             assertNotWaitedFor(intention, file, release);
@@ -116,7 +116,7 @@ public class CodeActionsOnTheEdtTest extends LSPCodeInsightFixtureTestCase {
         MockLanguageServer.INSTANCE.setCodeActions(List.of(Either.forRight(refactoring())));
         PsiFile file = myFixture.configureByText("test.ts", "const foo = <caret>1;");
         IntentionAction intention = new LSPIntentionAction0();
-        int restarts = RestartWhenCodeActionsLoaded.getRestartCount();
+        int restarts = restartManager().getRestartCount();
         CompletableFuture<Void> release = hold();
         try {
             assertNotWaitedFor(intention, file, release);
@@ -136,7 +136,7 @@ public class CodeActionsOnTheEdtTest extends LSPCodeInsightFixtureTestCase {
         IntentionAction intention = new LSPIntentionAction0();
         IntentionAction quickFix = quickFixOf(file);
         var textDocumentService = MockLanguageServer.INSTANCE.getTextDocumentService();
-        int restarts = RestartWhenCodeActionsLoaded.getRestartCount();
+        int restarts = restartManager().getRestartCount();
         CompletableFuture<Void> release = hold();
         try {
             assertFalse(intention.isAvailable(myFixture.getProject(), myFixture.getEditor(), file));
@@ -186,9 +186,13 @@ public class CodeActionsOnTheEdtTest extends LSPCodeInsightFixtureTestCase {
      */
     private void assertRestarts(PsiFile file, int expected) {
         PlatformTestUtil.waitWithEventsDispatching("the answers must complete",
-                () -> !RestartWhenCodeActionsLoaded.isPending(myFixture.getProject(), file.getVirtualFile()), 5);
+                () -> !restartManager().isPending(file.getVirtualFile()), 5);
         NonBlockingReadActionImpl.waitForAsyncTaskCompletion();
-        assertEquals(expected, RestartWhenCodeActionsLoaded.getRestartCount());
+        assertEquals(expected, restartManager().getRestartCount());
+    }
+
+    private RestartWhenCodeActionsLoadedManager restartManager() {
+        return RestartWhenCodeActionsLoadedManager.getInstance(myFixture.getProject());
     }
 
     /**

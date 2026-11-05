@@ -18,7 +18,7 @@ import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import com.redhat.devtools.lsp4ij.features.AbstractLSPDocumentFeatureSupport;
 import com.redhat.devtools.lsp4ij.features.codeAction.CodeActionData;
 import com.redhat.devtools.lsp4ij.features.codeAction.LSPLazyCodeActionProvider;
-import com.redhat.devtools.lsp4ij.features.codeAction.RestartWhenCodeActionsLoaded;
+import com.redhat.devtools.lsp4ij.features.codeAction.RestartWhenCodeActionsLoadedManager;
 import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
 import com.redhat.devtools.lsp4ij.internal.CompletableFutures;
 import org.eclipse.lsp4j.CodeActionKind;
@@ -49,9 +49,6 @@ public class LSPIntentionCodeActionSupport extends AbstractLSPDocumentFeatureSup
     private static final Logger LOGGER = LoggerFactory.getLogger(LSPIntentionCodeActionSupport.class);
 
     private CodeActionParams previousParams;
-
-    // Restarts the file's highlighting once code actions that the EDT did not wait for have loaded
-    private final RestartWhenCodeActionsLoaded restart = new RestartWhenCodeActionsLoaded();
 
     public LSPIntentionCodeActionSupport(@NotNull PsiFile file) {
         super(file);
@@ -154,7 +151,7 @@ public class LSPIntentionCodeActionSupport extends AbstractLSPDocumentFeatureSup
             // takes. The code actions are not loaded yet; the intention pass shows them once they are.
             var file = getFile().getVirtualFile();
             if (file != null) {
-                restart.schedule(future, getFile().getProject(), file);
+                RestartWhenCodeActionsLoadedManager.getInstance(getFile().getProject()).schedule(future, file);
             }
             return null;
         }
