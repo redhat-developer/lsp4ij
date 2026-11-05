@@ -614,12 +614,16 @@ public class LanguageServerWrapper implements Disposable {
                         return initializingContext;
                     })
                     .thenAccept(initializingContext -> {
-                        // A stop after the install must not have the reconnection start the server again
-                        if (currentInitializingContext != initializingContext) {
-                            return;
-                        }
                         for (VirtualFile fileToReconnect : filesToReconnect) {
-                            connect(fileToReconnect, new LSPFileConnectionInfo(null, null, null, true));
+                            synchronized (this) {
+                                // A stop after the install must not have the reconnection start the server again. The
+                                // stop takes this monitor too, so it comes before the check or after the connect call,
+                                // which takes documentsLock after this monitor, as the stop does
+                                if (currentInitializingContext != initializingContext) {
+                                    return;
+                                }
+                                connect(fileToReconnect, new LSPFileConnectionInfo(null, null, null, true));
+                            }
                         }
                     })
                     .exceptionally(e -> {
