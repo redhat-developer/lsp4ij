@@ -20,6 +20,7 @@ import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.impl.DocumentMarkupModel;
 import com.intellij.openapi.editor.markup.RangeHighlighter;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.util.Key;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiFile;
 import com.intellij.util.concurrency.AppExecutorUtil;
@@ -36,7 +37,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.WeakHashMap;
 
 /**
  * Service that applies LSP diagnostics reactively when the server sends publishDiagnostics.
@@ -49,10 +49,11 @@ public final class LSPDiagnosticsApplier implements Disposable {
 
     public static volatile int GROUP_ID = -1;
 
-    private final Project project;
+    // The highlighters that the diagnostics applied last time, kept by the markup model of the document and the project,
+    // which owns them anyway
+    private static final Key<List<RangeHighlighter>> APPLIED_HIGHLIGHTERS = Key.create("lsp4ij.diagnostics.appliedHighlighters");
 
-    // The highlighters that the diagnostics applied last time, by document, only used on the UI thread
-    private final Map<Document, List<RangeHighlighter>> appliedHighlighters = new WeakHashMap<>();
+    private final Project project;
 
     // Refreshes requested before a highlighting pass registrar set GROUP_ID, by file. Checking GROUP_ID
     // and adding a refresh under this lock means applyPendingRefreshes() cannot miss one.
@@ -276,7 +277,8 @@ public final class LSPDiagnosticsApplier implements Disposable {
     private void removeHighlightersOfOtherContexts(@NotNull HighlightsToApply data) {
         Set<HighlightInfo> applied = Collections.newSetFromMap(new IdentityHashMap<>());
         applied.addAll(data.highlights);
-        var previous = appliedHighlighters.get(data.document);
+        var markup = DocumentMarkupModel.forDocument(data.document, project, true);
+        var previous = markup.getUserData(APPLIED_HIGHLIGHTERS);
         if (previous != null) {
             for (var highlighter : previous) {
                 // A reused highlighter refers to the HighlightInfo that was just applied
@@ -287,21 +289,17 @@ public final class LSPDiagnosticsApplier implements Disposable {
             }
         }
         List<RangeHighlighter> current = new ArrayList<>();
-        for (var highlighter : DocumentMarkupModel.forDocument(data.document, project, true).getAllHighlighters()) {
+        for (var highlighter : markup.getAllHighlighters()) {
             var info = HighlightInfo.fromRangeHighlighter(highlighter);
             if (info != null && applied.contains(info)) {
                 current.add(highlighter);
             }
         }
-        if (current.isEmpty()) {
-            appliedHighlighters.remove(data.document);
-        } else {
-            appliedHighlighters.put(data.document, current);
-        }
+        markup.putUserData(APPLIED_HIGHLIGHTERS, current.isEmpty() ? null : current);
     }
 
     @Override
     public void dispose() {
-        appliedHighlighters.clear();
+        // Nothing to clean up
     }
 }
