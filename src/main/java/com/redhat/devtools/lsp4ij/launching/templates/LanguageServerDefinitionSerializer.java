@@ -15,6 +15,7 @@ import com.google.gson.*;
 import com.intellij.openapi.fileTypes.FileNameMatcher;
 import com.intellij.openapi.util.Pair;
 import com.redhat.devtools.lsp4ij.server.definition.launching.UserDefinedLanguageServerDefinition;
+import com.redhat.devtools.lsp4ij.server.definition.launching.UserDefinedTransport;
 import org.jetbrains.annotations.NotNull;
 
 import java.lang.reflect.Type;
@@ -36,6 +37,18 @@ public class LanguageServerDefinitionSerializer implements JsonSerializer<UserDe
         // Working directory
         if (src.getWorkingDir() != null && !src.getWorkingDir().isBlank()) {
             userDefinedLSDefinitionJson.addProperty(WORKING_DIR_JSON_PROPERTY, src.getWorkingDir());
+        }
+
+        // Socket, for a language server which LSP4IJ doesn't reach over its standard input and output
+        var transport = src.getTransport();
+        if (transport.mode() != UserDefinedTransport.Mode.STDIO) {
+            JsonObject socket = new JsonObject();
+            socket.addProperty(SOCKET_MODE_JSON_PROPERTY, transport.mode().getId());
+            if (transport.host() != null) {
+                socket.addProperty(SOCKET_HOST_JSON_PROPERTY, transport.host());
+            }
+            socket.addProperty(SOCKET_PORT_JSON_PROPERTY, transport.port());
+            userDefinedLSDefinitionJson.add(SOCKET_JSON_PROPERTY, socket);
         }
 
         JsonArray languageMappings = new JsonArray();

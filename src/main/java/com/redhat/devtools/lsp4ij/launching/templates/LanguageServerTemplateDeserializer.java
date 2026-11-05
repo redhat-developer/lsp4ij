@@ -14,6 +14,7 @@ package com.redhat.devtools.lsp4ij.launching.templates;
 import com.google.common.reflect.TypeToken;
 import com.google.gson.*;
 import com.redhat.devtools.lsp4ij.JSONUtils;
+import com.redhat.devtools.lsp4ij.server.definition.launching.UserDefinedTransport;
 import com.redhat.devtools.lsp4ij.templates.ServerTemplateJsonDeserializer;
 import org.jetbrains.annotations.NotNull;
 
@@ -48,6 +49,7 @@ public class LanguageServerTemplateDeserializer extends ServerTemplateJsonDeseri
             languageServerTemplate.setWorkingDir(workingDir);
         }
         languageServerTemplate.setEnvData(deserializeEnvData(jsonObject));
+        languageServerTemplate.setTransport(deserializeTransport(jsonObject));
 
         boolean expandConfiguration = JSONUtils.getBoolean(jsonObject, EXPAND_CONFIGURATION_JSON_PROPERTY);
         languageServerTemplate.setExpandConfiguration(expandConfiguration);
@@ -61,6 +63,20 @@ public class LanguageServerTemplateDeserializer extends ServerTemplateJsonDeseri
                             .collect(Collectors.toSet());
             languageServerTemplate.setDisablePromotionFor(disablePromotionFor);
         }
+    }
+
+    /**
+     * Returns the transport of the "socket" object of the template, and the standard input and output without one.
+     */
+    private static @NotNull UserDefinedTransport deserializeTransport(@NotNull JsonObject jsonObject) {
+        JsonObject socket = JSONUtils.getJsonObject(jsonObject, SOCKET_JSON_PROPERTY);
+        if (socket == null) {
+            return UserDefinedTransport.STDIO;
+        }
+        Integer port = JSONUtils.getInteger(socket, SOCKET_PORT_JSON_PROPERTY);
+        return UserDefinedTransport.of(JSONUtils.getString(socket, SOCKET_MODE_JSON_PROPERTY),
+                JSONUtils.getString(socket, SOCKET_HOST_JSON_PROPERTY),
+                port != null ? port : 0);
     }
 
     @Override

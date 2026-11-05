@@ -36,6 +36,7 @@ import com.redhat.devtools.lsp4ij.launching.UserDefinedLanguageServerSettings;
 import com.redhat.devtools.lsp4ij.server.definition.*;
 import com.redhat.devtools.lsp4ij.server.definition.extension.*;
 import com.redhat.devtools.lsp4ij.server.definition.launching.UserDefinedLanguageServerDefinition;
+import com.redhat.devtools.lsp4ij.server.definition.launching.UserDefinedTransport;
 import com.redhat.devtools.lsp4ij.settings.GlobalLanguageServerSettings;
 import com.redhat.devtools.lsp4ij.settings.LanguageServerSettings;
 import com.redhat.devtools.lsp4ij.templates.ServerMappingSettings;
@@ -232,30 +233,47 @@ public class LanguageServersRegistry implements Disposable {
                     var globalSettings = GlobalLanguageServerSettings.getInstance().getLanguageServerSettings(serverId);
                     List<ServerMapping> mappings = toServerMappings(serverId, settings.getMappings());
                     // Register server definition from settings
-                    addServerDefinitionWithoutNotification(new UserDefinedLanguageServerDefinition(
-                                    serverId,
-                                    settings.getTemplateId(),
-                                    settings.getServerName(),
-                                    settings.getServerUrl(),
-                                    "",
-                                    settings.getCommandLine(),
-                                    settings.getWorkingDir(),
-                                    settings.getUserEnvironmentVariables(),
-                                    settings.isIncludeSystemEnvironmentVariables(),
-                                    globalSettings != null ? globalSettings.getConfigurationContent() : null,
-                                    globalSettings == null || globalSettings.isExpandConfiguration(),
-                                    globalSettings != null ? globalSettings.getConfigurationSchemaContent() : null,
-                                    globalSettings != null ? globalSettings.getInitializationOptionsContent() : null,
-                                    globalSettings != null ? globalSettings.getExperimentalContent() : null,
-                                    settings.getClientConfigurationContent(),
-                                    settings.getInstallerConfigurationContent(),
-                                    settings.getWorkspaceFolderStrategyConfiguration()),
+                    addServerDefinitionWithoutNotification(createUserDefinedServerDefinition(serverId, settings, globalSettings),
                             mappings, false);
                 }
             }
         } catch (Exception e) {
             LOGGER.error("Error while loading user defined language servers from settings", e);
         }
+    }
+
+    /**
+     * Returns the definition of a user-defined language server, from its settings.
+     *
+     * @param serverId       the id of the language server.
+     * @param settings       the user-defined language server's settings.
+     * @param globalSettings the language server's global settings, or null if it has none.
+     * @return the definition of the user-defined language server.
+     */
+    static @NotNull UserDefinedLanguageServerDefinition createUserDefinedServerDefinition(
+            @NotNull String serverId,
+            @NotNull UserDefinedLanguageServerSettings.UserDefinedLanguageServerItemSettings settings,
+            @Nullable LanguageServerSettings.LanguageServerDefinitionSettings globalSettings) {
+        var definition = new UserDefinedLanguageServerDefinition(
+                serverId,
+                settings.getTemplateId(),
+                settings.getServerName(),
+                settings.getServerUrl(),
+                "",
+                settings.getCommandLine(),
+                settings.getWorkingDir(),
+                settings.getUserEnvironmentVariables(),
+                settings.isIncludeSystemEnvironmentVariables(),
+                globalSettings != null ? globalSettings.getConfigurationContent() : null,
+                globalSettings == null || globalSettings.isExpandConfiguration(),
+                globalSettings != null ? globalSettings.getConfigurationSchemaContent() : null,
+                globalSettings != null ? globalSettings.getInitializationOptionsContent() : null,
+                globalSettings != null ? globalSettings.getExperimentalContent() : null,
+                settings.getClientConfigurationContent(),
+                settings.getInstallerConfigurationContent(),
+                settings.getWorkspaceFolderStrategyConfiguration());
+        definition.setTransport(settings.getTransport());
+        return definition;
     }
 
     /**
@@ -593,6 +611,7 @@ public class LanguageServersRegistry implements Disposable {
                 settings.setServerUrl(userDefinedServer.getUrl());
                 settings.setCommandLine(userDefinedServer.getCommandLine());
                 settings.setWorkingDir(userDefinedServer.getWorkingDir());
+                settings.setTransport(userDefinedServer.getTransport());
                 settings.setUserEnvironmentVariables(userDefinedServer.getUserEnvironmentVariables());
                 settings.setIncludeSystemEnvironmentVariables(userDefinedServer.isIncludeSystemEnvironmentVariables());
                 settings.setMappings(toServerMappingSettings(mappings));
@@ -989,6 +1008,7 @@ public class LanguageServersRegistry implements Disposable {
             ls.setUrl(request.url());
             ls.setCommandLine(request.commandLine());
             ls.setWorkingDir(request.workingDir());
+            ls.setTransport(request.transport());
             ls.setUserEnvironmentVariables(request.userEnvironmentVariables());
             ls.setIncludeSystemEnvironmentVariables(request.includeSystemEnvironmentVariables());
             ls.setClientConfigurationContent(request.clientConfigurationContent());
@@ -1004,7 +1024,9 @@ public class LanguageServersRegistry implements Disposable {
 
         UserDefinedLanguageServerSettings.UserDefinedLanguageServerItemSettings settings = UserDefinedLanguageServerSettings.getInstance().getUserDefinedLanguageServerSettings(languageServerId);
         boolean nameChanged = !Objects.equals(settings.getServerName(), request.name());
-        boolean commandChanged = !Objects.equals(settings.getCommandLine(), request.commandLine());
+        // A language server reached another way is started again, as one with another command is
+        boolean commandChanged = !Objects.equals(settings.getCommandLine(), request.commandLine())
+                || !settings.getTransport().equals(request.transport());
         boolean workingDirChanged = !Objects.equals(settings.getWorkingDir(), request.workingDir());
         boolean userEnvironmentVariablesChanged = !Objects.equals(settings.getUserEnvironmentVariables(), request.userEnvironmentVariables());
         boolean includeSystemEnvironmentVariablesChanged = settings.isIncludeSystemEnvironmentVariables() != request.includeSystemEnvironmentVariables();
@@ -1021,6 +1043,7 @@ public class LanguageServersRegistry implements Disposable {
         settings.setServerUrl(request.url());
         settings.setCommandLine(request.commandLine());
         settings.setWorkingDir(request.workingDir());
+        settings.setTransport(request.transport());
         settings.setUserEnvironmentVariables(request.userEnvironmentVariables());
         settings.setIncludeSystemEnvironmentVariables(request.includeSystemEnvironmentVariables());
         settings.setClientConfigurationContent(request.clientConfigurationContent());
@@ -1177,7 +1200,8 @@ public class LanguageServersRegistry implements Disposable {
                                                 @NotNull List<ServerMappingSettings> mappings,
                                                 @Nullable String clientConfigurationContent,
                                                 @Nullable String installerConfigurationContent,
-                                                @Nullable String workspaceFolderStrategyConfiguration) {
+                                                @Nullable String workspaceFolderStrategyConfiguration,
+                                                @NotNull UserDefinedTransport transport) {
     }
 
     /**

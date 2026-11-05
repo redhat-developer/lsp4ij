@@ -35,6 +35,7 @@ import com.redhat.devtools.lsp4ij.launching.ui.UICommandLineUpdater;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerFileAssociation;
 import com.redhat.devtools.lsp4ij.server.definition.launching.UserDefinedLanguageServerDefinition;
+import com.redhat.devtools.lsp4ij.server.definition.launching.UserDefinedTransport;
 import com.redhat.devtools.lsp4ij.settings.ui.LanguageServerPanel;
 import com.redhat.devtools.lsp4ij.settings.ui.ServerMappingsPanel;
 import com.redhat.devtools.lsp4ij.templates.ServerMappingSettings;
@@ -141,6 +142,7 @@ public class LanguageServerView implements Disposable {
             if (!(isEquals(getDisplayName(), settings.getServerName())
                     && isEquals(this.getCommandLine(), settings.getCommandLine())
                     && isEquals(this.getWorkingDir(), settings.getWorkingDir())
+                    && this.getTransport().equals(settings.getTransport())
                     && Objects.equals(this.getUserEnvironmentVariables(), settings.getUserEnvironmentVariables())
                     && this.isIncludeSystemEnvironmentVariables() == settings.isIncludeSystemEnvironmentVariables()
                     && Objects.deepEquals(this.getMappings(), settings.getMappings())
@@ -226,6 +228,7 @@ public class LanguageServerView implements Disposable {
             if (userSettings != null) {
                 this.setCommandLine(userSettings.getCommandLine());
                 this.setWorkingDir(userSettings.getWorkingDir());
+                this.setTransport(userSettings.getTransport());
                 this.setEnvData(EnvironmentVariablesData.create(
                         userSettings.getUserEnvironmentVariables(),
                         userSettings.isIncludeSystemEnvironmentVariables()));
@@ -308,12 +311,17 @@ public class LanguageServerView implements Disposable {
     /**
      * Update the proper language server settings and language server definition from the UI fields.
      *
-     * @throws ConfigurationException if a JSON field is not valid JSON, in which case nothing is saved.
+     * @throws ConfigurationException if a JSON field is not valid JSON, or the transport can't be used, in which case
+     *                                nothing is saved.
      */
     public void apply() throws ConfigurationException {
         var jsonErrors = languageServerPanel.validateJsonFields();
         if (!jsonErrors.isEmpty()) {
             throw new ConfigurationException(jsonErrors.get(0).message);
+        }
+        var transportError = languageServerPanel.validateTransport();
+        if (transportError != null) {
+            throw new ConfigurationException(transportError.message);
         }
 
         String languageServerId = languageServerDefinition.getId();
@@ -358,7 +366,8 @@ public class LanguageServerView implements Disposable {
                                     getMappings(),
                                     getClientConfigurationContent(),
                                     getInstallerConfigurationContent(),
-                                    getWorkspaceFolderStrategyConfiguration()),
+                                    getWorkspaceFolderStrategyConfiguration(),
+                                    getTransport()),
                             false);
             if (projectSettingsChangedEvent != null) {
                 // Settings has changed, fire the event
@@ -535,6 +544,14 @@ public class LanguageServerView implements Disposable {
 
     public void setWorkingDir(@Nullable String workingDir) {
         languageServerPanel.setWorkingDir(workingDir);
+    }
+
+    public @NotNull UserDefinedTransport getTransport() {
+        return languageServerPanel.getTransport();
+    }
+
+    public void setTransport(@NotNull UserDefinedTransport transport) {
+        languageServerPanel.setTransport(transport);
     }
 
     public String getServerUrl() {

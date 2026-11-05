@@ -12,7 +12,9 @@ package com.redhat.devtools.lsp4ij.launching.templates;
 
 import com.redhat.devtools.lsp4ij.LanguageServerBundle;
 import com.redhat.devtools.lsp4ij.internal.PluginUtils;
+import com.redhat.devtools.lsp4ij.server.definition.launching.UserDefinedTransport;
 import com.redhat.devtools.lsp4ij.templates.ServerTemplate;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.Set;
 
@@ -39,6 +41,10 @@ public class LanguageServerTemplate extends ServerTemplate {
     public static final String DISABLE_PROMOTION_FOR = "disablePromotionFor";
     public static final String PROGRAM_ARGS_JSON_PROPERTY = "programArgs";
     public static final String EXPAND_CONFIGURATION_JSON_PROPERTY = "expandConfiguration";
+    public static final String SOCKET_JSON_PROPERTY = "socket";
+    public static final String SOCKET_MODE_JSON_PROPERTY = "mode";
+    public static final String SOCKET_HOST_JSON_PROPERTY = "host";
+    public static final String SOCKET_PORT_JSON_PROPERTY = "port";
 
     private String description;
 
@@ -51,7 +57,22 @@ public class LanguageServerTemplate extends ServerTemplate {
     private String workspaceFolderConfiguration;
 
     private Set<String> disablePromotionFor;
+    private @NotNull UserDefinedTransport transport = UserDefinedTransport.STDIO;
     private Boolean promotable;
+
+    /**
+     * Returns how LSP4IJ talks to the language server: over the standard input and output of its process, unless the
+     * template has a "socket".
+     *
+     * @return how LSP4IJ talks to the language server.
+     */
+    public @NotNull UserDefinedTransport getTransport() {
+        return transport;
+    }
+
+    public void setTransport(@NotNull UserDefinedTransport transport) {
+        this.transport = transport;
+    }
 
     public String getDescription() {
         return description;

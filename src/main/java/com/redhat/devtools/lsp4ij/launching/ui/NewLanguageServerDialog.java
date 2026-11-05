@@ -216,6 +216,7 @@ public class NewLanguageServerDialog extends DialogWrapper {
         String command = getCommandLine(template);
         languageServerPanel.setCommandLine(command);
         languageServerPanel.setEnvData(template.getEnvData());
+        languageServerPanel.setTransport(template.getTransport());
 
         // Update mappings
         var mappingsPanel = this.languageServerPanel.getMappingsPanel();
@@ -254,6 +255,7 @@ public class NewLanguageServerDialog extends DialogWrapper {
         List<ValidationInfo> validations = new ArrayList<>();
         addValidationInfo(validateServerName(), validations);
         addValidationInfo(validateCommand(), validations);
+        addValidationInfo(this.languageServerPanel.validateTransport(), validations);
         validations.addAll(this.languageServerPanel.validateJsonFields());
         return validations;
     }
@@ -276,7 +278,9 @@ public class NewLanguageServerDialog extends DialogWrapper {
 
     private ValidationInfo validateCommand() {
         var commandLine = this.languageServerPanel.getCommandLineWidget();
-        if (commandLine != null && commandLine.getText().isBlank()) {
+        // A language server which runs already is not started, so it needs no command
+        if (commandLine != null && commandLine.getText().isBlank()
+                && this.languageServerPanel.getTransport().startsLanguageServer()) {
             String errorMessage = LanguageServerBundle.message("new.language.server.dialog.validation.commandLine.must.be.set");
             return new ValidationInfo(errorMessage, commandLine);
         }
@@ -331,6 +335,7 @@ public class NewLanguageServerDialog extends DialogWrapper {
                 installerConfiguration,
                 workspaceFolderStrategyConfiguration);
         definition.setUrl(this.languageServerPanel.getServerUrl());
+        definition.setTransport(this.languageServerPanel.getTransport());
         LanguageServersRegistry.getInstance().addServerDefinition(project, definition, mappingSettings);
     }
 
