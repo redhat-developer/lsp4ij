@@ -100,6 +100,8 @@ public class MockTextDocumentService implements TextDocumentService {
     private final List<InlineValueParams> inlineValueRequests = new CopyOnWriteArrayList<>();
     public int codeActionRequests = 0;
     public volatile CodeActionParams lastCodeActionParams;
+    // Completes when the replies to textDocument/codeAction may be sent
+    private volatile CompletableFuture<Void> codeActionGate = CompletableFuture.completedFuture(null);
     private Function<CompletionItem, CompletableFuture<CompletionItem>> resolveCompletionItemProcessor;
 
     public <U> MockTextDocumentService(Function<U, CompletableFuture<U>> futureFactory) {
@@ -244,7 +246,20 @@ public class MockTextDocumentService implements TextDocumentService {
                     })
                     .toList();
         }
-        return futureFactory(filteredCodeActions);
+        var codeActions = filteredCodeActions;
+        return codeActionGate.thenCompose(ignored -> futureFactory(codeActions));
+    }
+
+    /**
+     * Holds the replies to textDocument/codeAction requests until the returned future is completed, which the caller
+     * must do.
+     *
+     * @return the future that releases the held and later textDocument/codeAction replies when completed.
+     */
+    public CompletableFuture<Void> holdCodeActions() {
+        CompletableFuture<Void> gate = new CompletableFuture<>();
+        codeActionGate = gate;
+        return gate;
     }
 
     @Override
@@ -522,6 +537,7 @@ public class MockTextDocumentService implements TextDocumentService {
         this.foldingRanges = new ArrayList<>();
         this.codeActionRequests = 0;
         this.lastCodeActionParams = null;
+        this.codeActionGate = CompletableFuture.completedFuture(null);
         this.resolveCompletionItemProcessor = null;
         this.documentLinkResolveProcessor = null;
         this.documentLinkResolveRequests.clear();

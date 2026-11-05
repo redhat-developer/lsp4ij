@@ -14,6 +14,7 @@
 package com.redhat.devtools.lsp4ij.features.codeAction.quickfix;
 
 import com.intellij.codeInsight.intention.IntentionAction;
+import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.redhat.devtools.lsp4ij.LSPRequestConstants;
@@ -22,6 +23,7 @@ import com.redhat.devtools.lsp4ij.client.features.FileUriSupport;
 import com.redhat.devtools.lsp4ij.features.codeAction.CodeActionData;
 import com.redhat.devtools.lsp4ij.features.codeAction.LSPLazyCodeActionIntentionAction;
 import com.redhat.devtools.lsp4ij.features.codeAction.LSPLazyCodeActionProvider;
+import com.redhat.devtools.lsp4ij.features.codeAction.RestartWhenCodeActionsLoaded;
 import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
 import com.redhat.devtools.lsp4ij.internal.CompletableFutures;
 import org.eclipse.lsp4j.*;
@@ -71,6 +73,9 @@ public class LSPLazyCodeActions implements LSPLazyCodeActionProvider {
     private volatile CompletableFuture<List<CodeActionData>> lspCodeActionRequest = null;
     private CancellationSupport cancellationSupport;
 
+    // Restarts the file's highlighting once code actions that the EDT did not wait for have loaded
+    private final RestartWhenCodeActionsLoaded restart = new RestartWhenCodeActionsLoaded();
+
     public LSPLazyCodeActions(@NotNull List<Diagnostic> diagnostics,
                               @NotNull VirtualFile file,
                               @NotNull LanguageServerItem languageServer) {
@@ -115,6 +120,12 @@ public class LSPLazyCodeActions implements LSPLazyCodeActionProvider {
                 future = loadCodeActionsFor(diagnostics);
                 lspCodeActionRequest = future;
             }
+        }
+        if (!future.isDone() && ApplicationManager.getApplication().isDispatchThread()) {
+            // The EDT never waits for the language server, which would freeze the IDE for as long as it takes. The
+            // code actions are not loaded yet; the intention pass shows the quick fixes once they are.
+            restart.schedule(future, languageServer.getProject(), file);
+            return null;
         }
         // Wait for the LSP response, cooperating with IntelliJ's threading model.
         // See https://github.com/redhat-developer/lsp4ij/issues/1648

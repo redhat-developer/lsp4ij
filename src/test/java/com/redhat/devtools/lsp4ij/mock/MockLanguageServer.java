@@ -327,6 +327,16 @@ public final class MockLanguageServer implements LanguageServer {
 		this.textDocumentService.setResolvedCodeAction(codeAction);
 	}
 
+	/**
+	 * Holds the replies to textDocument/codeAction requests until the returned future is completed, which the caller
+	 * must do.
+	 *
+	 * @return the future that releases the held and later textDocument/codeAction replies when completed.
+	 */
+	public CompletableFuture<Void> holdCodeActions() {
+		return this.textDocumentService.holdCodeActions();
+	}
+
 	public void setSignatureHelp(SignatureHelp signatureHelp) {
 		this.textDocumentService.setSignatureHelp(signatureHelp);
 	}
