@@ -19,6 +19,8 @@ import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
 import com.redhat.devtools.lsp4ij.client.features.LSPDiagnosticFeature;
 import com.redhat.devtools.lsp4ij.features.diagnostics.LSPDiagnosticUtils;
 import com.redhat.devtools.lsp4ij.fixtures.LSPCodeInsightFixtureTestCase;
+import com.redhat.devtools.lsp4ij.mock.MockLanguageServerDefinition;
+import com.redhat.devtools.lsp4ij.templates.ServerMappingSettings;
 import org.eclipse.lsp4j.Diagnostic;
 import org.eclipse.lsp4j.DiagnosticSeverity;
 import org.eclipse.lsp4j.Position;
@@ -145,6 +147,51 @@ public class ClosedDocumentProblemTest extends LSPCodeInsightFixtureTestCase {
         // The clear runs last, as nothing orders it before the report
         waitForProblemReports();
         assertTrue("other.foo must stay a problem file while its closed document has an error", problems.isProblemFile(other));
+    }
+
+    public void testAServerThatDoesNotReportAFilesProblemsKeepsNoMarkForItWhenItCloses() throws Exception {
+        var problems = problemFiles();
+        var project = myFixture.getProject();
+        // A second server for the files, whose client doesn't report their problems in the Project view
+        var notReporting = new MockLanguageServerDefinition("problems-not-reported", false) {
+            @Override
+            public LSPClientFeatures createClientFeatures() {
+                return new LSPClientFeatures().setDiagnosticFeature(new LSPDiagnosticFeature() {
+                    @Override
+                    public boolean canReportProblem(@NotNull VirtualFile file) {
+                        return false;
+                    }
+                });
+            }
+        };
+        LanguageServersRegistry.getInstance().addServerDefinition(project, notReporting,
+                List.of(ServerMappingSettings.createFileNamePatternsMappingSettings(List.of("*.foo"), null)));
+        try {
+            var main = myFixture.configureByText("main.foo", "main");
+            var wrappers = LanguageServiceAccessor.getInstance(project).getLanguageServers(main, null, null)
+                    .get(1, TimeUnit.HOURS).stream().map(LanguageServerItem::getServerWrapper).toList();
+            var wrapper = wrappers.stream().filter(w -> w.getServerDefinition() != notReporting).findFirst().orElseThrow();
+            var notReportingWrapper = wrappers.stream().filter(w -> w.getServerDefinition() == notReporting).findFirst().orElseThrow();
+            var other = myFixture.addFileToProject("other.foo", "other").getVirtualFile();
+            var error = new Diagnostic(new Range(new Position(0, 0), new Position(0, 5)), "an error", DiagnosticSeverity.Error, "mock");
+
+            // The second server holds an error for the closed file; the first one's error for the opened file makes
+            // it a problem file
+            notReportingWrapper.updateDiagnostics(other, LSPDocumentBase.PUBLISH_DIAGNOSTIC_IDENTIFIER, List.of(error), null);
+            wrapper.connect(other, new LanguageServerWrapper.LSPFileConnectionInfo(null, null, null, true))
+                    .get(1, TimeUnit.HOURS);
+            wrapper.updateDiagnostics(other, LSPDocumentBase.PUBLISH_DIAGNOSTIC_IDENTIFIER, List.of(error), null);
+            waitForProblemReports();
+            assertTrue("other.foo must be a problem file", problems.isProblemFile(other));
+
+            // As it closes, only a server that doesn't report its problems holds an error for it
+            wrapper.disconnect(other, false);
+            waitForProblemReports();
+            assertFalse("other.foo must be no problem file once it closes", problems.isProblemFile(other));
+        } finally {
+            notReporting.getServer().waitBeforeTearDown();
+            LanguageServersRegistry.getInstance().removeServerDefinition(project, notReporting);
+        }
     }
 
     /**
