@@ -891,23 +891,41 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
     }
 
     public void next(int threadId, @Nullable SteppingGranularity granularity) {
-        if (debugProtocolServer == null) {
+        var server = debugProtocolServer;
+        if (server == null) {
             return;
         }
+        next(server, threadId, granularity, singleThreadStep());
+    }
+
+    static void next(@NotNull IDebugProtocolServer server,
+                     int threadId,
+                     @Nullable SteppingGranularity granularity,
+                     @Nullable Boolean singleThread) {
         NextArguments args = new NextArguments();
         args.setThreadId(threadId);
         args.setGranularity(granularity);
-        debugProtocolServer.next(args);
+        args.setSingleThread(singleThread);
+        server.next(args);
     }
 
     public void stepOut(int threadId, SteppingGranularity granularity) {
-        if (debugProtocolServer == null) {
+        var server = debugProtocolServer;
+        if (server == null) {
             return;
         }
+        stepOut(server, threadId, granularity, singleThreadStep());
+    }
+
+    static void stepOut(@NotNull IDebugProtocolServer server,
+                        int threadId,
+                        @Nullable SteppingGranularity granularity,
+                        @Nullable Boolean singleThread) {
         StepOutArguments args = new StepOutArguments();
         args.setThreadId(threadId);
         args.setGranularity(granularity);
-        debugProtocolServer.stepOut(args);
+        args.setSingleThread(singleThread);
+        server.stepOut(args);
     }
 
     public void stepIn(int threadId, SteppingGranularity granularity) {
@@ -915,14 +933,37 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
     }
 
     public void stepIn(int threadId, @Nullable Integer targetId, @Nullable SteppingGranularity granularity) {
-        if (debugProtocolServer == null) {
+        var server = debugProtocolServer;
+        if (server == null) {
             return;
         }
+        stepIn(server, threadId, targetId, granularity, singleThreadStep());
+    }
+
+    static void stepIn(@NotNull IDebugProtocolServer server,
+                       int threadId,
+                       @Nullable Integer targetId,
+                       @Nullable SteppingGranularity granularity,
+                       @Nullable Boolean singleThread) {
         StepInArguments args = new StepInArguments();
         args.setThreadId(threadId);
         args.setTargetId(targetId);
         args.setGranularity(granularity);
-        debugProtocolServer.stepIn(args);
+        args.setSingleThread(singleThread);
+        server.stepIn(args);
+    }
+
+    /**
+     * Returns the value of a step request's 'singleThread': true when the user chose to step only the current thread
+     * and the DAP server supports single thread execution requests, and null, which leaves it out, otherwise.
+     */
+    private @Nullable Boolean singleThreadStep() {
+        return singleThreadStep(debugProcess.isStepOnlyCurrentThread(), getCapabilities());
+    }
+
+    static @Nullable Boolean singleThreadStep(boolean stepOnlyCurrentThread, @NotNull Capabilities capabilities) {
+        return stepOnlyCurrentThread && Boolean.TRUE.equals(capabilities.getSupportsSingleThreadExecutionRequests())
+                ? Boolean.TRUE : null;
     }
 
     /**
@@ -1273,6 +1314,35 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
      * @return true if the debug adapter, or that of a child session, supports value formatting options, and false
      * otherwise.
      */
+    /**
+     * Returns true if the DAP server supports single thread execution requests, whose 'singleThread' resumes only the
+     * thread of a step, and false otherwise.
+     *
+     * @return true if the DAP server supports single thread execution requests, and false otherwise.
+     */
+    public boolean isSupportsSingleThreadExecutionRequests() {
+        return Boolean.TRUE.equals(getCapabilities().getSupportsSingleThreadExecutionRequests());
+    }
+
+    /**
+     * Returns true if the DAP server of this client, or that of a child session, supports single thread execution
+     * requests, and false otherwise.
+     *
+     * @return true if the DAP server of this client, or that of a child session, supports single thread execution
+     * requests, and false otherwise.
+     */
+    public boolean isSupportsSingleThreadExecutionRequestsInSessions() {
+        if (isSupportsSingleThreadExecutionRequests()) {
+            return true;
+        }
+        for (DAPClient child : List.copyOf(childrenClient)) {
+            if (child.isSupportsSingleThreadExecutionRequestsInSessions()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     public boolean isSupportsValueFormattingOptionsInSessions() {
         if (isSupportsValueFormattingOptions()) {
             return true;

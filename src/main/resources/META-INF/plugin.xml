@@ -1244,6 +1244,11 @@
                 description="Stop the program when the DAP server sees this value change">
             <add-to-group group-id="XDebugger.ValueGroup" anchor="last"/>
         </action>
+        <!-- Added to the settings of a DAP debug session by DAPDebugProcess.registerAdditionalActions -->
+        <action id="DAP.StepOnlyCurrentThread"
+                class="com.redhat.devtools.lsp4ij.dap.stepping.DAPStepOnlyCurrentThreadAction"
+                text="Step Only the Current Thread"
+                description="Resume only the thread that steps, while the other threads stay stopped"/>
     </actions>
 
 </idea-plugin>

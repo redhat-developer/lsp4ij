@@ -19,6 +19,8 @@ import com.intellij.execution.ui.RunnerLayoutUi;
 import com.intellij.execution.ui.layout.PlaceInGrid;
 import com.intellij.icons.AllIcons;
 import com.intellij.openapi.Disposable;
+import com.intellij.openapi.actionSystem.ActionManager;
+import com.intellij.openapi.actionSystem.DefaultActionGroup;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.fileEditor.OpenFileDescriptor;
 import com.intellij.openapi.progress.ProcessCanceledException;
@@ -71,6 +73,7 @@ import com.redhat.devtools.lsp4ij.dap.sources.LoadedSourcesPanel;
 import com.redhat.devtools.lsp4ij.dap.sources.ModulesPanel;
 import com.redhat.devtools.lsp4ij.dap.stepping.DAPSmartStepIntoHandler;
 import com.redhat.devtools.lsp4ij.dap.stepping.DAPStepIntoVariant;
+import com.redhat.devtools.lsp4ij.dap.stepping.DAPStepOnlyCurrentThreadAction;
 import com.redhat.devtools.lsp4ij.dap.threads.ThreadsPanel;
 import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
 import com.redhat.devtools.lsp4ij.internal.CompletableFutures;
@@ -178,6 +181,7 @@ public class DAPDebugProcess extends XDebugProcess implements Disposable {
     private Supplier<TransportStreams> streamsSupplier;
     private DAPClient parentClient;
     private final @NotNull DAPValueFormat valueFormat = new DAPValueFormat();
+    private volatile boolean stepOnlyCurrentThread;
 
     public DAPDebugProcess(@NotNull DAPCommandLineState dapState,
                            @NotNull XDebugSession session,
@@ -936,6 +940,48 @@ public class DAPDebugProcess extends XDebugProcess implements Disposable {
      */
     public boolean isSupportsValueFormattingOptions() {
         return parentClient != null && parentClient.isSupportsValueFormattingOptionsInSessions();
+    }
+
+    /**
+     * Returns true if a step resumes only the thread that steps, while the other threads stay stopped, and false if
+     * it resumes every thread. It applies to the DAP servers that support single thread execution requests.
+     *
+     * @return true if a step resumes only the thread that steps, and false if it resumes every thread.
+     */
+    public boolean isStepOnlyCurrentThread() {
+        return stepOnlyCurrentThread;
+    }
+
+    /**
+     * Sets whether a step resumes only the thread that steps, while the other threads stay stopped.
+     *
+     * @param stepOnlyCurrentThread true if a step resumes only the thread that steps, and false if it resumes every
+     *                              thread.
+     */
+    public void setStepOnlyCurrentThread(boolean stepOnlyCurrentThread) {
+        this.stepOnlyCurrentThread = stepOnlyCurrentThread;
+    }
+
+    /**
+     * Returns true if the DAP server of this debug session, or that of a child session, supports single thread
+     * execution requests, and false otherwise.
+     *
+     * @return true if the DAP server of this debug session, or that of a child session, supports single thread
+     * execution requests, and false otherwise.
+     */
+    public boolean isSupportsSingleThreadExecutionRequests() {
+        return parentClient != null && parentClient.isSupportsSingleThreadExecutionRequestsInSessions();
+    }
+
+    @Override
+    public void registerAdditionalActions(@NotNull DefaultActionGroup leftToolbar,
+                                          @NotNull DefaultActionGroup topToolbar,
+                                          @NotNull DefaultActionGroup settings) {
+        super.registerAdditionalActions(leftToolbar, topToolbar, settings);
+        var stepOnlyCurrentThreadAction = ActionManager.getInstance().getAction(DAPStepOnlyCurrentThreadAction.ID);
+        if (stepOnlyCurrentThreadAction != null) {
+            settings.add(stepOnlyCurrentThreadAction);
+        }
     }
 
     public @Nullable DisassemblyFile getDisassemblyFile() {
