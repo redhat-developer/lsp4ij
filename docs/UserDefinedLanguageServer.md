@@ -333,7 +333,7 @@ Without `rootType` and `markers` next to `serverInstances`, the root is the only
 }
 ```
 
-Here, each folder with a `pyproject.toml` has an instance, and that instance gets the source roots inside it. With `"lazy": true`, it gets them through `workspace/didChangeWorkspaceFolders` as their files are opened. A workspace folder that belongs to another instance, or that contains several, doesn't reach an instance. An instance that would be left without a folder gets its root, unless `rootType` next to `serverInstances` is `NONE`.
+Here, each folder with a `pyproject.toml` has an instance, and that instance gets the source roots inside it. With `"lazy": true`, it gets them through `workspace/didChangeWorkspaceFolders` as their files are opened. A workspace folder reaches the instance that its own directory has as root: a folder of another instance doesn't, nor does a folder above the root, such as one that contains several instances. An instance that would start without a folder gets its root, unless `rootType` next to `serverInstances` is `NONE`. In lazy mode, an instance starts without folders and gets those of its files as they are opened, and a file outside all of them adds none.
 
 In this example, `backend` and `frontend` each contain a `pyproject.toml` and source roots, so each has its own instance. `scripts/tool.py` has no marker up to the project's folder, so that folder is its root, with an instance of its own:
 

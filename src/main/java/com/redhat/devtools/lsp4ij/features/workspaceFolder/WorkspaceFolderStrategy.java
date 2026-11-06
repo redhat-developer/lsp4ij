@@ -103,8 +103,9 @@ public interface WorkspaceFolderStrategy {
 
     /**
      * Returns true if the given workspace folder belongs to the language server instance with the given root, which
-     * means that the directory of the folder has that root. So a folder that contains several instances, or the
-     * folder of a nested instance, doesn't belong to it.
+     * means that the directory of the folder has that root. So a folder above the root, such as one that contains
+     * several instances, or the folder of a nested instance, doesn't belong to it, and a folder below the root does,
+     * also when an instance is nested in it.
      *
      * @param folder the workspace folder
      * @param instanceRoot the root of the language server instance
