@@ -63,6 +63,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
+import java.util.function.Supplier;
 
 /**
  * Tests the {@link LanguageServerManager} with a language server definition whose workspace folder strategy spreads
@@ -291,6 +292,26 @@ public class LanguageServerManagerInstancesTest extends LSPCodeInsightFixtureTes
         PlatformTestUtil.waitWithEventsDispatching("The other instance must start again after the failed installation",
                 () -> definition.installations.get() > 0 && b.getServerStatus() == ServerStatus.started, TIMEOUT);
         assertEquals(1, definition.installations.get());
+    }
+
+    public void testAnInstanceSwitchedOffDuringAnInstallationStaysOff() throws Exception {
+        var a = serverOf(file("a/one.instances"));
+        var b = serverOf(file("b/one.instances"));
+        var gate = new CompletableFuture<Void>();
+        definition.installationGate = gate;
+        manager.install(ID, new ServerInstallationContext());
+        // b is stopped before the installation runs, which waits for the gate
+        PlatformTestUtil.waitWithEventsDispatching("The installation must run",
+                () -> definition.installations.get() > 0, TIMEOUT);
+        manager.stop(ID, b.getInstanceRoot(), new LanguageServerManager.StopOptions().setWillDisable(true));
+        waitForStatus(b, ServerStatus.stopped);
+
+        gate.complete(null);
+
+        // a installs, and starts again before the instances stopped for the installation do
+        waitForStatus(a, ServerStatus.started);
+        assertFalse(b.isEnabled());
+        assertEquals(ServerStatus.stopped, b.getServerStatus());
     }
 
     public void testTheRootOfAnInstanceCanBeWrittenInAnotherWay() throws Exception {
@@ -688,10 +709,14 @@ public class LanguageServerManagerInstancesTest extends LSPCodeInsightFixtureTes
 
         private final AtomicInteger installations;
         private final @NotNull BooleanSupplier failing;
+        private final @NotNull Supplier<@Nullable CompletableFuture<Void>> gate;
 
-        CountingInstaller(@NotNull AtomicInteger installations, @NotNull BooleanSupplier failing) {
+        CountingInstaller(@NotNull AtomicInteger installations,
+                          @NotNull BooleanSupplier failing,
+                          @NotNull Supplier<@Nullable CompletableFuture<Void>> gate) {
             this.installations = installations;
             this.failing = failing;
+            this.gate = gate;
         }
 
         @Override
@@ -702,8 +727,13 @@ public class LanguageServerManagerInstancesTest extends LSPCodeInsightFixtureTes
         @Override
         public @NotNull CompletableFuture<ServerInstallationStatus> checkInstallation(@NotNull ServerInstallationContext context) {
             installations.incrementAndGet();
-            return failing.getAsBoolean()
-                    ? CompletableFuture.failedFuture(new IllegalStateException("The installation fails"))
+            if (failing.getAsBoolean()) {
+                return CompletableFuture.failedFuture(new IllegalStateException("The installation fails"));
+            }
+            // An installation that the test ends when it completes the gate
+            var installed = gate.get();
+            return installed != null
+                    ? installed.thenApply(unused -> ServerInstallationStatus.INSTALLED)
                     : CompletableFuture.completedFuture(ServerInstallationStatus.INSTALLED);
         }
 
@@ -730,6 +760,7 @@ public class LanguageServerManagerInstancesTest extends LSPCodeInsightFixtureTes
         final List<MockLanguageServer> servers = new CopyOnWriteArrayList<>();
         final AtomicInteger installations = new AtomicInteger();
         volatile boolean failingInstallation;
+        volatile @Nullable CompletableFuture<Void> installationGate;
         // Is given each file whose instance root the strategy is asked for
         volatile @Nullable Consumer<VirtualFile> instanceRootAsked;
 
@@ -762,7 +793,7 @@ public class LanguageServerManagerInstancesTest extends LSPCodeInsightFixtureTes
                     return new InstancesStrategy(InstancesDefinition.this);
                 }
             });
-            features.setServerInstaller(new CountingInstaller(installations, () -> failingInstallation));
+            features.setServerInstaller(new CountingInstaller(installations, () -> failingInstallation, () -> installationGate));
             return features;
         }
 

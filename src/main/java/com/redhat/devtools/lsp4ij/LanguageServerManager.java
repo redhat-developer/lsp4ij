@@ -389,8 +389,10 @@ public class LanguageServerManager {
                 .handle((unused, error) -> null)
                 .thenCompose(unused -> installing.install(context))
                 // The instances that were stopped for the installation ran before it, so they start again, also when
-                // it failed
-                .whenComplete((status, error) -> others.forEach(LanguageServerWrapper::start));
+                // it failed, but not those switched off meanwhile
+                .whenComplete((status, error) -> others.stream()
+                        .filter(LanguageServerWrapper::isEnabled)
+                        .forEach(LanguageServerWrapper::start));
     }
 
     /**
