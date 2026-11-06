@@ -67,6 +67,10 @@ public interface WorkspaceFolderStrategy {
      * the folders that {@linkplain #belongsToServerInstance belong to it}. If none of them does and the folders are
      * sent at initialization, the instance gets its root.</p>
      *
+     * <p>LSP4IJ asks the strategy before there is an instance, so it takes the strategy from client features that
+     * have no language server. A strategy with instances must not need the language server: if getting it fails,
+     * one language server serves the project, and the log says why.</p>
+     *
      * @return true if the files of a project are spread over several language server instances
      */
     default boolean hasServerInstances() {

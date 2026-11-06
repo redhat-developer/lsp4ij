@@ -208,12 +208,17 @@ public abstract class LanguageServerDefinition implements LanguageServerFactory,
     }
 
     /**
-     * Drops the workspace folder strategy, for a definition whose strategy has changed.
+     * Drops the workspace folder strategy, for a definition whose strategy has changed or which goes.
      */
     @ApiStatus.Internal
     public void resetWorkspaceFolderStrategy() {
+        var uriSupport = workspaceFolderUriSupport;
         workspaceFolderStrategy = null;
         workspaceFolderUriSupport = null;
+        if (uriSupport instanceof LSPClientFeatures clientFeatures) {
+            // Only the strategy and the file URI support were used
+            clientFeatures.dispose();
+        }
     }
 
     private @NotNull FileUriSupport getWorkspaceFolderUriSupport() {
@@ -222,19 +227,27 @@ public abstract class LanguageServerDefinition implements LanguageServerFactory,
 
     /**
      * Returns the workspace folder strategy, which decides about the language server instance before there is one,
-     * so without client features of a language server.
+     * so without a language server: it comes from client features that have none, which also give the file URI
+     * support of the strategy.
      */
     private @NotNull WorkspaceFolderStrategy getWorkspaceFolderStrategy() {
         var strategy = workspaceFolderStrategy;
         if (strategy == null) {
+            LSPClientFeatures clientFeatures = null;
             try {
-                var clientFeatures = createClientFeatures();
+                clientFeatures = createClientFeatures();
                 clientFeatures.setServerDefinition(this);
                 strategy = clientFeatures.getWorkspaceFolderFeature().getStrategy();
                 workspaceFolderUriSupport = clientFeatures;
             } catch (ProcessCanceledException e) {
+                if (clientFeatures != null) {
+                    clientFeatures.dispose();
+                }
                 throw e;
             } catch (Exception e) {
+                if (clientFeatures != null) {
+                    clientFeatures.dispose();
+                }
                 // A strategy can need the language server: one instance per project works without it
                 LOGGER.warn("Cannot get the workspace folder strategy of the language server '" + id + "'", e);
                 strategy = WorkspaceFolderStrategy.getDefault();

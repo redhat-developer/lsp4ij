@@ -680,6 +680,8 @@ public class LanguageServersRegistry implements Disposable {
                 LOGGER.error("Error while server definition is removed of the language server '{}'", languageServerId, e);
             }
         }
+        // Disposes the client features that gave its workspace folder strategy
+        serverDefinition.resetWorkspaceFolderStrategy();
     }
 
     private void removeAssociationsFor(LanguageServerDefinition definition) {

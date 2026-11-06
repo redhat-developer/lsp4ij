@@ -180,7 +180,8 @@ public class LanguageServerDisposeFailureTest extends LSPCodeInsightFixtureTestC
 
     /**
      * Server definition whose connection throws when it is stopped, once it has closed its streams, and which counts
-     * the client features disposed, as the cleanup that a dispose makes after it stops the connection.
+     * the client features of a language server disposed, as the cleanup that a dispose makes after it stops the
+     * connection. The definition's own client features, which give its workspace folder strategy, don't count.
      */
     private static class StopFailingServerDefinition extends MockLanguageServerDefinition {
 
@@ -196,8 +197,11 @@ public class LanguageServerDisposeFailureTest extends LSPCodeInsightFixtureTestC
             return new LSPClientFeatures() {
                 @Override
                 public void dispose() {
+                    boolean ofALanguageServer = getServerWrapper() != null;
                     super.dispose();
-                    disposedClientFeatures.incrementAndGet();
+                    if (ofALanguageServer) {
+                        disposedClientFeatures.incrementAndGet();
+                    }
                 }
             };
         }

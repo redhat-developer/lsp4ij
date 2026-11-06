@@ -49,6 +49,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Tests a language server definition whose workspace folder strategy spreads the files over several instances. By
@@ -503,6 +504,19 @@ public class LanguageServerInstancesTest extends LSPCodeInsightFixtureTestCase {
         assertEquals(List.of(one), instances());
     }
 
+    public void testTheClientFeaturesThatGiveTheStrategyAreDisposedWithIt() {
+        assertTrue(definition.hasServerInstances());
+        assertEquals(0, definition.disposedWithoutLanguageServer.get());
+
+        // As a changed configuration does
+        definition.resetWorkspaceFolderStrategy();
+        assertEquals(1, definition.disposedWithoutLanguageServer.get());
+
+        assertTrue(definition.hasServerInstances());
+        LanguageServersRegistry.getInstance().removeServerDefinition(myFixture.getProject(), definition);
+        assertEquals(2, definition.disposedWithoutLanguageServer.get());
+    }
+
     public void testAStopWaitsForTheStopThatIsRunning() throws Exception {
         var instance = instanceOf(file("a/one.per-folder"));
         var shutdown = new CompletableFuture<Void>();
@@ -931,6 +945,8 @@ public class LanguageServerInstancesTest extends LSPCodeInsightFixtureTestCase {
         final List<MockLanguageServer> servers = new CopyOnWriteArrayList<>();
         final List<WorkspaceFolder> connectionFolders = new CopyOnWriteArrayList<>();
         final List<WorkspaceFolder> languageClientRoots = new CopyOnWriteArrayList<>();
+        // The client features that gave the strategy, which have no language server
+        final AtomicInteger disposedWithoutLanguageServer = new AtomicInteger();
 
         PerFolderDefinition() {
             super("per-folder-server", false);
@@ -959,7 +975,17 @@ public class LanguageServerInstancesTest extends LSPCodeInsightFixtureTestCase {
 
         @Override
         public @NotNull LSPClientFeatures createClientFeatures() {
-            return super.createClientFeatures().setWorkspaceFolderFeature(new LSPWorkspaceFolderFeature() {
+            var features = new LSPClientFeatures() {
+                @Override
+                public void dispose() {
+                    boolean ofNoLanguageServer = getServerWrapper() == null;
+                    super.dispose();
+                    if (ofNoLanguageServer) {
+                        disposedWithoutLanguageServer.incrementAndGet();
+                    }
+                }
+            };
+            return features.setWorkspaceFolderFeature(new LSPWorkspaceFolderFeature() {
                 @Override
                 protected @NotNull WorkspaceFolderStrategy createStrategy() {
                     return activeStrategy;
