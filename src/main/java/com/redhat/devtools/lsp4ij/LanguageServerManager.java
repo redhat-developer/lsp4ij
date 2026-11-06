@@ -365,8 +365,12 @@ public class LanguageServerManager {
         var installing = running.isEmpty() ? instances.get(0) : running.get(0);
         var others = running.stream().filter(instance -> instance != installing).toList();
         CompletableFuture.allOf(others.stream().map(LanguageServerWrapper::stop).toArray(CompletableFuture[]::new))
+                // A stop that fails must not keep the installation from running
+                .handle((unused, error) -> null)
                 .thenCompose(unused -> installing.install(context))
-                .thenAccept(status -> others.forEach(LanguageServerWrapper::start));
+                // The instances that were stopped for the installation ran before it, so they start again, also when
+                // it failed
+                .whenComplete((status, error) -> others.forEach(LanguageServerWrapper::start));
     }
 
     /**

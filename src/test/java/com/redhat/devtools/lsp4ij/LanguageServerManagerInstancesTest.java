@@ -28,6 +28,8 @@ import com.redhat.devtools.lsp4ij.installation.ConsoleProvider;
 import com.redhat.devtools.lsp4ij.installation.ServerInstallationContext;
 import com.redhat.devtools.lsp4ij.installation.ServerInstallationStatus;
 import com.redhat.devtools.lsp4ij.installation.ServerInstaller;
+import com.redhat.devtools.lsp4ij.lifecycle.LanguageServerLifecycleListener;
+import com.redhat.devtools.lsp4ij.lifecycle.LanguageServerLifecycleManager;
 import com.redhat.devtools.lsp4ij.mock.MockConnectionProvider;
 import com.redhat.devtools.lsp4ij.mock.MockLanguageServer;
 import com.redhat.devtools.lsp4ij.mock.MockLanguageServerDefinition;
@@ -43,6 +45,8 @@ import org.eclipse.lsp4j.Range;
 import org.eclipse.lsp4j.ServerCapabilities;
 import org.eclipse.lsp4j.WorkspaceFolder;
 import org.eclipse.lsp4j.WorkspaceServerCapabilities;
+import org.eclipse.lsp4j.jsonrpc.MessageConsumer;
+import org.eclipse.lsp4j.jsonrpc.messages.Message;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -53,6 +57,7 @@ import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.BooleanSupplier;
 
 /**
  * Tests the {@link LanguageServerManager} with a language server definition whose workspace folder strategy spreads
@@ -225,12 +230,61 @@ public class LanguageServerManagerInstancesTest extends LSPCodeInsightFixtureTes
     }
 
     public void testInstallWithoutAnInstanceLeavesNoLanguageServer() throws Exception {
+        List<LanguageServerWrapper> disposed = new CopyOnWriteArrayList<>();
+        var lifecycleManager = LanguageServerLifecycleManager.getInstance(myFixture.getProject());
+        var listener = new LanguageServerLifecycleListener() {
+            @Override
+            public void handleStatusChanged(@NotNull LanguageServerWrapper languageServer) {
+            }
+
+            @Override
+            public void handleLSPMessage(@NotNull Message message,
+                                         @NotNull MessageConsumer messageConsumer,
+                                         @NotNull LanguageServerWrapper languageServer) {
+            }
+
+            @Override
+            public void handleError(@NotNull LanguageServerWrapper languageServer, @Nullable Throwable exception) {
+            }
+
+            @Override
+            public void handleDisposed(@NotNull LanguageServerWrapper languageServer) {
+                if (languageServer.getServerDefinition() == definition) {
+                    disposed.add(languageServer);
+                }
+            }
+
+            @Override
+            public void dispose() {
+            }
+        };
+        lifecycleManager.addLanguageServerLifecycleListener(listener);
+        try {
+            manager.install(ID, new ServerInstallationContext());
+
+            // It is never one of the started language servers, so it has to be its dispose that says it went
+            PlatformTestUtil.waitWithEventsDispatching("The language server of the installation must be disposed",
+                    () -> definition.installations.get() > 0 && !disposed.isEmpty(), TIMEOUT);
+            assertEquals(1, definition.installations.get());
+            assertEquals(1, disposed.size());
+            assertNull(disposed.get(0).getInstanceRoot());
+            assertEmpty(instances());
+        } finally {
+            lifecycleManager.removeLanguageServerLifecycleListener(listener);
+        }
+    }
+
+    public void testTheInstancesStoppedForAFailedInstallationStartAgain() throws Exception {
+        serverOf(file("a/one.instances"));
+        var b = serverOf(file("b/one.instances"));
+        definition.failingInstallation = true;
+
         manager.install(ID, new ServerInstallationContext());
 
-        PlatformTestUtil.waitWithEventsDispatching("The installation must run",
-                () -> definition.installations.get() > 0, TIMEOUT);
-        PlatformTestUtil.waitWithEventsDispatching("No language server may stay for the installation",
-                () -> instances().isEmpty(), TIMEOUT);
+        // b is stopped before the installation runs, so started again once it failed. The instance that installs
+        // stays stopped, as a language server without instances does
+        PlatformTestUtil.waitWithEventsDispatching("The other instance must start again after the failed installation",
+                () -> definition.installations.get() > 0 && b.getServerStatus() == ServerStatus.started, TIMEOUT);
         assertEquals(1, definition.installations.get());
     }
 
@@ -456,9 +510,11 @@ public class LanguageServerManagerInstancesTest extends LSPCodeInsightFixtureTes
     private static final class CountingInstaller implements ServerInstaller {
 
         private final AtomicInteger installations;
+        private final @NotNull BooleanSupplier failing;
 
-        CountingInstaller(@NotNull AtomicInteger installations) {
+        CountingInstaller(@NotNull AtomicInteger installations, @NotNull BooleanSupplier failing) {
             this.installations = installations;
+            this.failing = failing;
         }
 
         @Override
@@ -469,7 +525,9 @@ public class LanguageServerManagerInstancesTest extends LSPCodeInsightFixtureTes
         @Override
         public @NotNull CompletableFuture<ServerInstallationStatus> checkInstallation(@NotNull ServerInstallationContext context) {
             installations.incrementAndGet();
-            return CompletableFuture.completedFuture(ServerInstallationStatus.INSTALLED);
+            return failing.getAsBoolean()
+                    ? CompletableFuture.failedFuture(new IllegalStateException("The installation fails"))
+                    : CompletableFuture.completedFuture(ServerInstallationStatus.INSTALLED);
         }
 
         @Override
@@ -494,6 +552,7 @@ public class LanguageServerManagerInstancesTest extends LSPCodeInsightFixtureTes
 
         final List<MockLanguageServer> servers = new CopyOnWriteArrayList<>();
         final AtomicInteger installations = new AtomicInteger();
+        volatile boolean failingInstallation;
 
         InstancesDefinition() {
             super(ID, false);
@@ -524,7 +583,7 @@ public class LanguageServerManagerInstancesTest extends LSPCodeInsightFixtureTes
                     return new InstancesStrategy();
                 }
             });
-            features.setServerInstaller(new CountingInstaller(installations));
+            features.setServerInstaller(new CountingInstaller(installations, () -> failingInstallation));
             return features;
         }
 
