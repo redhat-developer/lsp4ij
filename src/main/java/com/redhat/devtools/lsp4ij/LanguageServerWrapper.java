@@ -2543,27 +2543,31 @@ public class LanguageServerWrapper implements Disposable {
             return;
         }
         this.disposed = true;
-        fileListener.disposeFileSystemWatchers();
         try {
-            // A language server that never started has nothing to stop, and no status to report
-            if (currentInitializingContext != null || getServerStatus() != ServerStatus.none) {
-                stopAndRefreshEditorFeature(refreshEditorFeature, false);
+            fileListener.disposeFileSystemWatchers();
+            try {
+                // A language server that never started has nothing to stop, and no status to report
+                if (currentInitializingContext != null || getServerStatus() != ServerStatus.none) {
+                    stopAndRefreshEditorFeature(refreshEditorFeature, false);
+                }
+            } finally {
+                // Also when the stop fails, as when the connection fails to stop: the executors would keep their threads
+                stopDispatcher();
+                if (clientFeatures != null) {
+                    clientFeatures.dispose();
+                    clientFeatures = null;
+                }
             }
         } finally {
-            // Also when the stop fails, as when the connection fails to stop: the executors would keep their threads
-            stopDispatcher();
-            if (clientFeatures != null) {
-                clientFeatures.dispose();
-                clientFeatures = null;
+            // Also when the stop or the cleanup fails: a language server that is disposed is never disposed again
+            var notification = errorNotification;
+            if (notification != null) {
+                // Its actions would keep this language server, which no longer starts
+                errorNotification = null;
+                notification.expire();
             }
+            getLanguageServerLifecycleManager().onDisposed(this);
         }
-        var notification = errorNotification;
-        if (notification != null) {
-            // Its actions would keep this language server, which no longer starts
-            errorNotification = null;
-            notification.expire();
-        }
-        getLanguageServerLifecycleManager().onDisposed(this);
     }
 
     public boolean isDisposed() {

@@ -15,15 +15,21 @@ import com.intellij.openapi.project.Project;
 import com.intellij.testFramework.PlatformTestUtil;
 import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
 import com.redhat.devtools.lsp4ij.fixtures.LSPCodeInsightFixtureTestCase;
+import com.redhat.devtools.lsp4ij.lifecycle.LanguageServerLifecycleListener;
+import com.redhat.devtools.lsp4ij.lifecycle.LanguageServerLifecycleManager;
 import com.redhat.devtools.lsp4ij.mock.MockConnectionProvider;
 import com.redhat.devtools.lsp4ij.mock.MockLanguageServerDefinition;
 import com.redhat.devtools.lsp4ij.server.StreamConnectionProvider;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
 import com.redhat.devtools.lsp4ij.templates.ServerMappingSettings;
+import org.eclipse.lsp4j.jsonrpc.MessageConsumer;
+import org.eclipse.lsp4j.jsonrpc.messages.Message;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -71,6 +77,48 @@ public class LanguageServerDisposeFailureTest extends LSPCodeInsightFixtureTestC
         assertEquals("The dispose must clean up after the failed stop", 1, definition.disposedClientFeatures.get());
         assertFalse("No language server of the removed definition may stay started",
                 accessor.getStartedServers().stream().anyMatch(server -> server.getServerDefinition() == definition));
+    }
+
+    public void testALanguageServerWhoseConnectionFailsToStopSaysThatItIsDisposed() throws Exception {
+        var failing = start("one.failing");
+        List<LanguageServerWrapper> disposed = new CopyOnWriteArrayList<>();
+        var listener = new LanguageServerLifecycleListener() {
+            @Override
+            public void handleStatusChanged(@NotNull LanguageServerWrapper languageServer) {
+            }
+
+            @Override
+            public void handleLSPMessage(@NotNull Message message,
+                                         @NotNull MessageConsumer messageConsumer,
+                                         @NotNull LanguageServerWrapper languageServer) {
+            }
+
+            @Override
+            public void handleError(@NotNull LanguageServerWrapper languageServer, @Nullable Throwable exception) {
+            }
+
+            @Override
+            public void handleDisposed(@NotNull LanguageServerWrapper languageServer) {
+                disposed.add(languageServer);
+            }
+
+            @Override
+            public void dispose() {
+            }
+        };
+        var lifecycleManager = LanguageServerLifecycleManager.getInstance(project);
+        lifecycleManager.addLanguageServerLifecycleListener(listener);
+        try {
+            LanguageServersRegistry.getInstance().removeServerDefinition(project, definition);
+        } finally {
+            lifecycleManager.removeLanguageServerLifecycleListener(listener);
+        }
+
+        assertEquals("The connection must be asked to stop, which fails", 1, definition.stops.get());
+        assertTrue(failing.isDisposed());
+        // A language server that is disposed is never disposed again, so the listeners, like the Language Servers view,
+        // would never learn that it went
+        assertEquals(List.of(failing), disposed);
     }
 
     public void testEveryLanguageServerIsDisposedAsTheProjectClosesThoughOneFailsToStop() throws Exception {
