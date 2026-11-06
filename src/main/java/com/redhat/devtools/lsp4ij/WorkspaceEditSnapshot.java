@@ -39,7 +39,9 @@ import java.util.function.BooleanSupplier;
  * All text targets are checked before any mutation. This prevents partial application due to a
  * stale target. Failures inside {@link LSPIJUtils#applyWorkspaceEdit(WorkspaceEdit)} still follow
  * the existing application behavior, without rollback. An unversioned incoming edit can only
- * be checked for changes since receipt, not before it. Documents that were not synchronized with
+ * be checked for changes since receipt, not before it. A version below 1 counts as unversioned:
+ * LSP4IJ numbers document versions from 1, so such a version is a placeholder, not one it sent;
+ * intellij-quarkus and Liberty Tools send 0. Documents that were not synchronized with
  * this server at capture have no captured buffer state, so edits to them retain the existing
  * behavior unless this server has opened them since.
  */
@@ -176,7 +178,8 @@ public final class WorkspaceEditSnapshot {
         }
         // A supplied version must describe the current buffer, including pending local edits.
         // Documents that were never synchronized retain the existing behavior, as before.
-        if (version != null && state != null && !synchronizer.isCurrentVersion(version)) {
+        // A version below 1 was never sent by LSP4IJ, so it is checked like no version: by the stamp above.
+        if (version != null && version > 0 && state != null && !synchronizer.isCurrentVersion(version)) {
             return LanguageServerBundle.message("lsp.workspace.edit.version.changed", uriString);
         }
         return null;

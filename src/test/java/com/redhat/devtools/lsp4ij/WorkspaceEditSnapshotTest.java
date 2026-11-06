@@ -61,6 +61,11 @@ public class WorkspaceEditSnapshotTest extends LSPCodeInsightFixtureTestCase {
         return new WorkspaceEdit(Map.of(uri, List.of(replacement())));
     }
 
+    private static WorkspaceEdit versioned(String uri, int version) {
+        return new WorkspaceEdit(List.of(Either.forLeft(new TextDocumentEdit(
+                new VersionedTextDocumentIdentifier(uri, version), List.of(Either.forLeft(replacement()))))));
+    }
+
     private String validate(WorkspaceEditSnapshot snapshot, WorkspaceEdit edit) {
         return WriteCommandAction.writeCommandAction(myFixture.getProject())
                 .compute(() -> snapshot.validate(edit));
@@ -76,6 +81,25 @@ public class WorkspaceEditSnapshotTest extends LSPCodeInsightFixtureTestCase {
         var snapshot = WorkspaceEditSnapshot.capture(server);
 
         assertNull(validate(snapshot, unversioned(uri(server, myFixture.getFile()))));
+    }
+
+    public void testAVersionLsp4ijNeverAssignsIsNoVersion() throws Exception {
+        var server = open();
+        var snapshot = WorkspaceEditSnapshot.capture(server);
+        String uri = uri(server, myFixture.getFile());
+        int version = server.getServerWrapper().getOpenedDocument(URI.create(uri)).getSynchronizer().getVersion();
+        assertTrue("LSP4IJ numbers document versions from 1", version > 0);
+
+        // The edits of intellij-quarkus and Liberty Tools name their document with version 0
+        assertNull(validate(snapshot, versioned(uri, 0)));
+        assertNull(validate(snapshot, versioned(uri, -1)));
+        assertEquals(LanguageServerBundle.message("lsp.workspace.edit.version.changed", uri),
+                validate(snapshot, versioned(uri, version + 1)));
+
+        // As for an unversioned edit, the document must not have changed since the request
+        type("changed");
+        assertEquals(LanguageServerBundle.message("lsp.workspace.edit.document.changed", uri),
+                validate(snapshot, versioned(uri, 0)));
     }
 
     public void testChangedAndRestoredTextStillInvalidatesRequest() throws Exception {
