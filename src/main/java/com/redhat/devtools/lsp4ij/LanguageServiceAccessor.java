@@ -643,8 +643,24 @@ public class LanguageServiceAccessor implements Disposable {
         synchronized (startedServers) {
             languageServers.forEach(startedServers::remove);
         }
-        languageServers.forEach(languageServer ->
-                languageServer.stopAndDispose(!ApplicationManager.getApplication().isUnitTestMode()));
+        boolean refreshEditorFeature = !ApplicationManager.getApplication().isUnitTestMode();
+        for (int i = 0; i < languageServers.size(); i++) {
+            var languageServer = languageServers.get(i);
+            try {
+                languageServer.stopAndDispose(refreshEditorFeature);
+            } catch (ProcessCanceledException cancellation) {
+                // As a canceled dispose does: the language servers it did not reach stay started, for a later change,
+                // removal or close to dispose
+                synchronized (startedServers) {
+                    startedServers.addAll(languageServers.subList(i + 1, languageServers.size()));
+                }
+                throw cancellation;
+            } catch (Exception e) {
+                // A language server that fails to stop must neither keep running nor keep the others running
+                LOGGER.warn("Error while stopping the language server '{}'.", serverDefinition.getId(), e);
+                disposeLoggingFailure(languageServer, refreshEditorFeature);
+            }
+        }
         sendDidOpenAndRefreshEditorFeatureForOpenedFiles(serverDefinition, project);
     }
 

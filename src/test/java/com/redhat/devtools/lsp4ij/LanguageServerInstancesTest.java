@@ -259,6 +259,21 @@ public class LanguageServerInstancesTest extends LSPCodeInsightFixtureTestCase {
         assertFalse(server.isRunning());
     }
 
+    public void testAnInstanceThatFailsToStopAsItIsReplacedKeepsNoOtherInstanceRunning() throws Exception {
+        definition.failingClientRoot = "a";
+        var a = instanceOf(file("a/one.per-folder"));
+        var b = instanceOf(file("b/one.per-folder"));
+        var serverOfB = definition.servers.get(1);
+        assertTrue(serverOfB.isRunning());
+
+        fireStrategyChanged();
+
+        waitUntilDisposed(a);
+        waitUntilDisposed(b);
+        assertFalse(serverOfB.isRunning());
+        assertEmpty(instances());
+    }
+
     public void testAReplacedInstanceIsDisposedOnTheUiThread() throws Exception {
         var instance = instanceOf(file("a/one.per-folder"));
         var disposedOnTheUiThread = new AtomicBoolean();
@@ -1139,6 +1154,8 @@ public class LanguageServerInstancesTest extends LSPCodeInsightFixtureTestCase {
         volatile @Nullable Runnable strategyCreation;
         // The name of the root whose instance can't start
         volatile @Nullable String failingRoot;
+        // The name of the root whose instance has a language client that fails as a stop disposes it
+        volatile @Nullable String failingClientRoot;
 
         PerFolderDefinition() {
             super("per-folder-server", false);
@@ -1170,6 +1187,15 @@ public class LanguageServerInstancesTest extends LSPCodeInsightFixtureTestCase {
         public @NotNull LanguageClientImpl createLanguageClient(@NotNull Project project,
                                                                 @NotNull WorkspaceFolder instanceRoot) {
             languageClientRoots.add(instanceRoot);
+            if (instanceRoot.getName().equals(failingClientRoot)) {
+                return new LanguageClientImpl(project) {
+                    @Override
+                    public void dispose() {
+                        super.dispose();
+                        throw new IllegalStateException("The language client fails to be disposed");
+                    }
+                };
+            }
             return super.createLanguageClient(project, instanceRoot);
         }
 
