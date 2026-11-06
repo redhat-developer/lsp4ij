@@ -79,6 +79,22 @@ public class WorkspaceEditSnapshotTest extends LSPCodeInsightFixtureTestCase {
         server.getServerWrapper().sendNotification(ls -> ls).get(30, TimeUnit.SECONDS);
     }
 
+    /**
+     * Holds back the notifications queued after this call, such as didChange, until the returned latch is released.
+     */
+    private static CountDownLatch holdNotifications(LanguageServerItem server) {
+        var release = new CountDownLatch(1);
+        server.getServerWrapper().sendNotification(ls -> {
+            try {
+                release.await(30, TimeUnit.SECONDS);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+            return ls;
+        });
+        return release;
+    }
+
     private void type(String text) {
         WriteCommandAction.runWriteCommandAction(myFixture.getProject(), () ->
                 myFixture.getEditor().getDocument().setText(text));
@@ -113,19 +129,10 @@ public class WorkspaceEditSnapshotTest extends LSPCodeInsightFixtureTestCase {
 
     public void testAPlaceholderVersionIsRefusedForTextNotYetSent() throws Exception {
         var server = open();
-        var wrapper = server.getServerWrapper();
         String uri = uri(server, myFixture.getFile());
-        // Hold the notifications back, so that the typing below has not reached the server at capture,
-        // as for a request, such as codeAction/resolve, that does not wait for the document's changes
-        var release = new CountDownLatch(1);
-        wrapper.sendNotification(ls -> {
-            try {
-                release.await(30, TimeUnit.SECONDS);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-            }
-            return ls;
-        });
+        // The typing below has not reached the server at capture, as for a request, such as
+        // codeAction/resolve, that does not wait for the document's changes
+        var release = holdNotifications(server);
         WorkspaceEditSnapshot snapshot;
         try {
             type("changed");
@@ -140,6 +147,26 @@ public class WorkspaceEditSnapshotTest extends LSPCodeInsightFixtureTestCase {
                 validate(snapshot, versioned(uri, 0)));
         // Captured once the typing has been sent, the same edit applies
         assertNull(validate(WorkspaceEditSnapshot.capture(server), versioned(uri, 0)));
+    }
+
+    public void testCancellingAFlushDoesNotMakeTheTextLookSent() throws Exception {
+        var server = open();
+        String uri = uri(server, myFixture.getFile());
+        var synchronizer = server.getServerWrapper().getOpenedDocument(URI.create(uri)).getSynchronizer();
+        var release = holdNotifications(server);
+        WorkspaceEditSnapshot snapshot;
+        try {
+            type("changed");
+            // a caller gives up waiting for the typing to be dispatched
+            assertTrue(synchronizer.flushPendingChanges().cancel(true));
+            snapshot = WorkspaceEditSnapshot.capture(server);
+        } finally {
+            release.countDown();
+        }
+        dispatched(server);
+
+        assertEquals(LanguageServerBundle.message("lsp.workspace.edit.version.changed", uri),
+                validate(snapshot, versioned(uri, 0)));
     }
 
     public void testAnIncomingEditWithAPlaceholderVersionIsRefused() throws Exception {

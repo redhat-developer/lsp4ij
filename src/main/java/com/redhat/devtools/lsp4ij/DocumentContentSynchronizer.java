@@ -270,6 +270,8 @@ public class DocumentContentSynchronizer implements DocumentListener, Disposable
      * <p>
      * Before the document is opened, the server has no document for such a request, so this opens it;
      * the didOpen is followed by the pending changes, and the future completes once both are dispatched.
+     * <p>
+     * Cancelling the returned future doesn't cancel the notifications, or make them look dispatched.
      *
      * @return a CompletableFuture that completes when all didChange notifications have been dispatched
      */
@@ -281,9 +283,10 @@ public class DocumentContentSynchronizer implements DocumentListener, Disposable
         if (beforeOpen) {
             var open = getDidOpenFuture();
             var sent = openSent;
-            return sent != null ? sent : open.thenApply(ls -> null);
+            return sent != null ? sent.copy() : open.thenApply(ls -> null);
         }
-        return sendDidChangeEvents();
+        // A copy, so that a caller who cancels it leaves the dispatch tracked, as isCurrentTextSent reads it
+        return sendDidChangeEvents().copy();
     }
 
     /**
@@ -308,7 +311,7 @@ public class DocumentContentSynchronizer implements DocumentListener, Disposable
     CompletableFuture<Void> getChangesSent() {
         synchronized (changeEvents) {
             if (changeEvents.isEmpty()) {
-                return lastDidChangeFuture;
+                return lastDidChangeFuture.copy();
             }
         }
         return CompletableFuture.supplyAsync(this::sendDidChangeEvents)
@@ -324,7 +327,7 @@ public class DocumentContentSynchronizer implements DocumentListener, Disposable
      */
     @NotNull
     CompletableFuture<Void> getLastChangeSent() {
-        return lastDidChangeFuture;
+        return lastDidChangeFuture.copy();
     }
 
     /**
