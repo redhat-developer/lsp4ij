@@ -49,7 +49,7 @@ public class NewLanguageServerDialogTransportTest extends BasePlatformTestCase {
     public void testARunningLanguageServerNeedsItsPort() {
         var dialog = dialog(template("", new UserDefinedTransport(UserDefinedTransport.Mode.ATTACH, null, 0)));
         try {
-            List<ValidationInfo> errors = dialog.doValidateAll();
+            List<ValidationInfo> errors = fieldProblems(dialog);
             assertEquals(1, errors.size());
             assertEquals(LanguageServerBundle.message("language.server.validation.socket.port"), errors.get(0).message);
         } finally {
@@ -60,7 +60,7 @@ public class NewLanguageServerDialogTransportTest extends BasePlatformTestCase {
     public void testAStartedLanguageServerNeedsItsCommand() {
         var dialog = dialog(template("", new UserDefinedTransport(UserDefinedTransport.Mode.START_AND_ACCEPT, null, 0)));
         try {
-            List<ValidationInfo> errors = dialog.doValidateAll();
+            List<ValidationInfo> errors = fieldProblems(dialog);
             assertEquals(1, errors.size());
             assertEquals(LanguageServerBundle.message("new.language.server.dialog.validation.commandLine.must.be.set"),
                     errors.get(0).message);
@@ -73,7 +73,7 @@ public class NewLanguageServerDialogTransportTest extends BasePlatformTestCase {
         var transport = new UserDefinedTransport(UserDefinedTransport.Mode.START_AND_ACCEPT, null, 0);
         var dialog = dialog(template("node server.js", transport));
         try {
-            List<ValidationInfo> errors = dialog.doValidateAll();
+            List<ValidationInfo> errors = fieldProblems(dialog);
             assertEquals(1, errors.size());
             assertEquals(LanguageServerBundle.message("language.server.validation.socket.port.macro",
                     UserDefinedTransport.PORT_MACRO), errors.get(0).message);
@@ -119,6 +119,22 @@ public class NewLanguageServerDialogTransportTest extends BasePlatformTestCase {
         }
     }
 
+    public void testEveryProblemIsAlsoListedBelowTheFields() {
+        var dialog = dialog(template("", new UserDefinedTransport(UserDefinedTransport.Mode.START_AND_ACCEPT, null, 0)));
+        try {
+            ((JTextField) dialog.getPreferredFocusedComponent()).setText("");
+
+            List<ValidationInfo> problems = dialog.doValidateAll();
+            var onFields = problems.stream().filter(problem -> problem.component != null).map(problem -> problem.message).toList();
+            var listed = problems.stream().filter(problem -> problem.component == null).map(problem -> problem.message).toList();
+            assertEquals(List.of(LanguageServerBundle.message("new.language.server.dialog.validation.serverName.must.be.set"),
+                    LanguageServerBundle.message("new.language.server.dialog.validation.commandLine.must.be.set")), onFields);
+            assertEquals(onFields, listed);
+        } finally {
+            dialog.close(DialogWrapper.CANCEL_EXIT_CODE);
+        }
+    }
+
     public void testTheAddedLanguageServerHasTheTransport() {
         var dialog = dialog(template("", RUNNING));
         dialog.doOKAction();
@@ -134,6 +150,13 @@ public class NewLanguageServerDialogTransportTest extends BasePlatformTestCase {
         } finally {
             LanguageServersRegistry.getInstance().removeServerDefinition(getProject(), added);
         }
+    }
+
+    /**
+     * Returns the problems the dialog shows on its fields, without the list of them below the fields.
+     */
+    private static @NotNull List<ValidationInfo> fieldProblems(@NotNull NewLanguageServerDialog dialog) {
+        return dialog.doValidateAll().stream().filter(problem -> problem.component != null).toList();
     }
 
     /**

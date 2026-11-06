@@ -22,6 +22,8 @@ import com.intellij.openapi.options.ConfigurationException;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.project.ProjectManager;
 import com.intellij.openapi.util.Disposer;
+import com.intellij.openapi.util.text.HtmlBuilder;
+import com.intellij.openapi.util.text.HtmlChunk;
 import com.intellij.ui.IdeBorderFactory;
 import com.intellij.util.ui.FormBuilder;
 import com.intellij.util.ui.JBUI;
@@ -315,13 +317,16 @@ public class LanguageServerView implements Disposable {
      *                                nothing is saved.
      */
     public void apply() throws ConfigurationException {
-        var jsonErrors = languageServerPanel.validateJsonFields();
-        if (!jsonErrors.isEmpty()) {
-            throw new ConfigurationException(jsonErrors.get(0).message);
+        // The same checks as the New Language Server dialog, every problem listed
+        var problems = languageServerPanel.validateFields();
+        if (problems.size() == 1) {
+            throw new ConfigurationException(problems.get(0).message);
         }
-        var transportError = languageServerPanel.validateTransport();
-        if (transportError != null) {
-            throw new ConfigurationException(transportError.message);
+        if (!problems.isEmpty()) {
+            throw new ConfigurationException(new HtmlBuilder()
+                    .appendWithSeparators(HtmlChunk.br(), problems.stream().map(problem -> HtmlChunk.text(problem.message)).toList())
+                    .wrapWithHtmlBody()
+                    .toString());
         }
 
         String languageServerId = languageServerDefinition.getId();

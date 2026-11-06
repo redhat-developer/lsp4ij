@@ -16,6 +16,7 @@ import com.redhat.devtools.lsp4ij.launching.UserDefinedLanguageServerSettings;
 import com.redhat.devtools.lsp4ij.mock.MockLanguageServerDefinition;
 import com.redhat.devtools.lsp4ij.server.definition.launching.UserDefinedLanguageServerDefinition;
 import com.redhat.devtools.lsp4ij.server.definition.launching.UserDefinedTransport;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
 import java.util.Map;
@@ -124,6 +125,31 @@ public class LanguageServerViewTransportTest extends BasePlatformTestCase {
 
     private UserDefinedTransport savedTransport() {
         return settings().getTransport();
+    }
+
+    public void testAStartedLanguageServerNeedsItsCommandOnTheSettingsPageToo() {
+        view.setCommandLine("");
+
+        assertEquals(LanguageServerBundle.message("new.language.server.dialog.validation.commandLine.must.be.set"), applyError());
+        assertEquals("nothing is saved", "node server.js --socket=${port}", definition.getCommandLine());
+    }
+
+    public void testTheSettingsPageListsEveryProblem() {
+        view.setCommandLine("");
+        view.setInitializationOptionsContent("{\"provideFormatter\": ");
+
+        String error = applyError();
+        assertTrue(error, error.contains(LanguageServerBundle.message("new.language.server.dialog.validation.commandLine.must.be.set")));
+        assertTrue(error, error.contains(LanguageServerBundle.message("language.server.validation.json.initializationOptions")));
+    }
+
+    private @NotNull String applyError() {
+        try {
+            view.apply();
+        } catch (ConfigurationException e) {
+            return e.getLocalizedMessage();
+        }
+        throw new AssertionError("apply() saved settings with problems");
     }
 
     private UserDefinedLanguageServerSettings.UserDefinedLanguageServerItemSettings settings() {

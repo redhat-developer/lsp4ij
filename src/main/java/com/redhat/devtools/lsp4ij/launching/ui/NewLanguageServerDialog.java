@@ -256,39 +256,15 @@ public class NewLanguageServerDialog extends DialogWrapper {
 
     @Override
     protected @NotNull List<ValidationInfo> doValidateAll() {
-        List<ValidationInfo> validations = new ArrayList<>();
-        addValidationInfo(validateServerName(), validations);
-        addValidationInfo(validateCommand(), validations);
-        addValidationInfo(this.languageServerPanel.validateTransport(), validations);
-        validations.addAll(this.languageServerPanel.validateJsonFields());
-        return validations;
-    }
-
-    private void addValidationInfo(ValidationInfo validationInfo, List<ValidationInfo> validations) {
-        if (validationInfo == null) {
-            return;
-        }
-        validations.add((validationInfo));
-    }
-
-    private ValidationInfo validateServerName() {
-        var serverName = this.languageServerPanel.getServerName();
-        if (serverName.getText().isBlank()) {
-            String errorMessage = LanguageServerBundle.message("new.language.server.dialog.validation.serverName.must.be.set");
-            return new ValidationInfo(errorMessage, serverName);
-        }
-        return null;
-    }
-
-    private ValidationInfo validateCommand() {
-        var commandLine = this.languageServerPanel.getCommandLineWidget();
-        // A language server which runs already is not started, so it needs no command
-        if (commandLine != null && commandLine.getText().isBlank()
-                && this.languageServerPanel.getTransport().startsLanguageServer()) {
-            String errorMessage = LanguageServerBundle.message("new.language.server.dialog.validation.commandLine.must.be.set");
-            return new ValidationInfo(errorMessage, commandLine);
-        }
-        return null;
+        var problems = languageServerPanel.validateFields();
+        // A field shows its problem only as an outline, with the message on hover, so the messages are also listed
+        // below the fields, where the dialog shows the problems of no field
+        var listed = new ArrayList<>(problems);
+        problems.stream()
+                .filter(problem -> problem.component != null)
+                .map(problem -> new ValidationInfo(problem.message))
+                .forEach(listed::add);
+        return listed;
     }
 
     @Override

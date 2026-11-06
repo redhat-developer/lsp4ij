@@ -710,6 +710,32 @@ public class LanguageServerPanel implements Disposable {
     }
 
     /**
+     * Returns every problem of the fields this panel shows, each on its field: an empty server name, no command for a
+     * language server which LSP4IJ starts, a port which can't be used, and content which isn't valid JSON. The New
+     * Language Server dialog and the settings page both check with it.
+     *
+     * @return every problem of the shown fields, empty if there is none.
+     */
+    public @NotNull List<ValidationInfo> validateFields() {
+        List<ValidationInfo> problems = new ArrayList<>();
+        if (serverName != null && serverName.getText().isBlank()) {
+            problems.add(new ValidationInfo(
+                    LanguageServerBundle.message("new.language.server.dialog.validation.serverName.must.be.set"), serverName));
+        }
+        // A language server which runs already is not started, so it needs no command
+        if (commandLine != null && commandLine.getText().isBlank() && getTransport().startsLanguageServer()) {
+            problems.add(new ValidationInfo(
+                    LanguageServerBundle.message("new.language.server.dialog.validation.commandLine.must.be.set"), commandLine));
+        }
+        var transportProblem = validateTransport();
+        if (transportProblem != null) {
+            problems.add(transportProblem);
+        }
+        problems.addAll(validateJsonFields());
+        return problems;
+    }
+
+    /**
      * Returns an error when the transport can't be used: a language server which runs already needs its port, a fixed
      * port isn't 0, and the command of a language server on a port which LSP4IJ chooses takes it as
      * {@value UserDefinedTransport#PORT_MACRO}, or the language server never learns it.
