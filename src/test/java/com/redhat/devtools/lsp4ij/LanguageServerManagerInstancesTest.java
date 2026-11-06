@@ -392,6 +392,25 @@ public class LanguageServerManagerInstancesTest extends LSPCodeInsightFixtureTes
         assertEquals(List.of(a), instances());
     }
 
+    public void testAFileMovedToASwitchedOffInstanceLeavesItOff() throws Exception {
+        var b = serverOf(file("b/one.instances"));
+        manager.stop(ID, b.getInstanceRoot(), new LanguageServerManager.StopOptions().setWillDisable(true));
+        waitForStatus(b, ServerStatus.stopped);
+        var file = file("a/moved.instances").getVirtualFile();
+        var a = openAndConnect(file);
+        var oldUri = a.toUri(file);
+
+        move(file, myFixture.getTempDirFixture().findOrCreateDir("b"));
+
+        // The move takes the file from its instance, and decides its new one in a read action that it submits
+        PlatformTestUtil.waitWithEventsDispatching("The moved file must leave its instance",
+                () -> !a.isConnectedTo(oldUri), TIMEOUT);
+        dispatchAll();
+        assertFalse(b.isEnabled());
+        assertEquals(ServerStatus.stopped, b.getServerStatus());
+        assertNull(instanceConnectedTo(file));
+    }
+
     public void testAFileMovedAgainBeforeItIsConnectedGoesToTheInstanceOfItsLastPlace() throws Exception {
         var file = file("a/moved.instances").getVirtualFile();
         var bDirectory = myFixture.getTempDirFixture().findOrCreateDir("b");

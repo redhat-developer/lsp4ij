@@ -121,7 +121,8 @@ class LSPFileListener extends AbstractLSPFileListener {
                         // The document moved again before it was connected, so no instance saw that move: its new
                         // place decides again
                         reconnectMovedDocument(file);
-                    } else if (choice.instance() != null) {
+                    } else if (choice.instance() != null && choice.instance().isEnabled()) {
+                        // An instance that a stop switched off gets no moved document, as it gets no opened one
                         reconnectMovedDocument(choice.instance(), file);
                     }
                 }, ModalityState.any()));
