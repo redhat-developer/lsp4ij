@@ -599,9 +599,25 @@ public class DocumentContentSynchronizer implements DocumentListener, Disposable
      */
     boolean isCurrentVersion(int expectedVersion) {
         synchronized (changeEvents) {
-            return version == expectedVersion && changeEvents.isEmpty()
-                    && document.getModificationStamp() == synchronizedModificationStamp;
+            return version == expectedVersion && isCurrentTextAssigned();
         }
+    }
+
+    /**
+     * Returns whether the current buffer has reached the server's connection: no change is pending, and the
+     * notification with the current text, didOpen or didChange, has been dispatched. A request sent after this
+     * returns true reaches the server after that text, even one that does not wait for the document's changes.
+     */
+    boolean isCurrentTextSent() {
+        synchronized (changeEvents) {
+            var open = didOpenNotification;
+            return isCurrentTextAssigned() && lastDidChangeFuture.isDone() && (open == null || open.isDone());
+        }
+    }
+
+    // The caller holds changeEvents
+    private boolean isCurrentTextAssigned() {
+        return changeEvents.isEmpty() && document.getModificationStamp() == synchronizedModificationStamp;
     }
 
     @Override

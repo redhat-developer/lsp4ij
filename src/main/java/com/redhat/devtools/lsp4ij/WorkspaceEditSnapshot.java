@@ -39,9 +39,10 @@ import java.util.function.BooleanSupplier;
  * All text targets are checked before any mutation. This prevents partial application due to a
  * stale target. Failures inside {@link LSPIJUtils#applyWorkspaceEdit(WorkspaceEdit)} still follow
  * the existing application behavior, without rollback. An unversioned incoming edit can only
- * be checked for changes since receipt, not before it. A version below 1 counts as unversioned:
- * LSP4IJ numbers document versions from 1, so such a version is a placeholder, not one it sent;
- * intellij-quarkus and Liberty Tools send 0. Documents that were not synchronized with
+ * be checked for changes since receipt, not before it. A version below 1 is a placeholder, not one
+ * LSP4IJ sent, since it numbers document versions from 1; intellij-quarkus and Liberty Tools send 0.
+ * Such an edit is accepted only if the server had been sent the text at capture, so that the edit
+ * can only describe that text. Documents that were not synchronized with
  * this server at capture have no captured buffer state, so edits to them retain the existing
  * behavior unless this server has opened them since.
  */
@@ -65,7 +66,10 @@ public final class WorkspaceEditSnapshot {
             var synchronizer = opened.getSynchronizer();
             URI uri = wrapper.toUri(opened.getFile());
             if (synchronizer != null && uri != null) {
-                states.put(uri, new DocumentState(synchronizer, synchronizer.getDocument().getModificationStamp()));
+                // The stamp is read first: a change between the two reads either leaves the text unsent
+                // or changes the stamp, and both refuse an edit with a placeholder version.
+                long stamp = synchronizer.getDocument().getModificationStamp();
+                states.put(uri, new DocumentState(synchronizer, stamp, synchronizer.isCurrentTextSent()));
             }
         }
         this.documents = Map.copyOf(states);
@@ -90,9 +94,10 @@ public final class WorkspaceEditSnapshot {
     private static @NotNull WorkspaceEditSnapshot capture(@NotNull LanguageServerWrapper wrapper,
                                                           @Nullable LanguageServer server,
                                                           @NotNull BooleanSupplier ownerActive) {
-        // Only thread-safe state is read: the opened-document map, the synchronizers and the documents'
-        // volatile modification stamps. So the capture never waits for a write action: workspace/applyEdit
-        // captures on LSP4J's message thread, which must keep reading replies a write action may wait for.
+        // Only thread-safe state is read: the opened-document map, the synchronizers, whose monitor is held
+        // briefly and never while waiting for read or write access, and the documents' volatile modification
+        // stamps. So the capture never waits for a write action: workspace/applyEdit captures on LSP4J's
+        // message thread, which must keep reading replies a write action may wait for.
         return new WorkspaceEditSnapshot(wrapper, server, ownerActive);
     }
 
@@ -176,11 +181,18 @@ public final class WorkspaceEditSnapshot {
         if (state == null && synchronizer != null) {
             return LanguageServerBundle.message("lsp.workspace.edit.document.opened", uriString);
         }
-        // A supplied version must describe the current buffer, including pending local edits.
         // Documents that were never synchronized retain the existing behavior, as before.
-        // A version below 1 was never sent by LSP4IJ, so it is checked like no version: by the stamp above.
-        if (version != null && version > 0 && state != null && !synchronizer.isCurrentVersion(version)) {
-            return LanguageServerBundle.message("lsp.workspace.edit.version.changed", uriString);
+        if (version != null && state != null) {
+            if (version > 0) {
+                // A supplied version must describe the current buffer, including pending local edits.
+                if (!synchronizer.isCurrentVersion(version)) {
+                    return LanguageServerBundle.message("lsp.workspace.edit.version.changed", uriString);
+                }
+            } else if (!state.textSent()) {
+                // A version below 1 was never sent by LSP4IJ, so it can't tell which text the server used. The
+                // stamp above shows the text is the captured one, which the server had only if it was sent then.
+                return LanguageServerBundle.message("lsp.workspace.edit.document.changed", uriString);
+            }
         }
         return null;
     }
@@ -206,7 +218,7 @@ public final class WorkspaceEditSnapshot {
         return uri.endsWith("/") ? uri.substring(0, uri.length() - 1) : uri;
     }
 
-    private record DocumentState(DocumentContentSynchronizer synchronizer, long modificationStamp) {
+    private record DocumentState(DocumentContentSynchronizer synchronizer, long modificationStamp, boolean textSent) {
         boolean matches(@Nullable DocumentContentSynchronizer current) {
             return current == synchronizer && synchronizer.getDocument().getModificationStamp() == modificationStamp;
         }

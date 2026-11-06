@@ -25,6 +25,7 @@ import org.eclipse.lsp4j.jsonrpc.messages.Either;
 import java.net.URI;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -71,6 +72,13 @@ public class WorkspaceEditSnapshotTest extends LSPCodeInsightFixtureTestCase {
                 .compute(() -> snapshot.validate(edit));
     }
 
+    /**
+     * Waits until the notifications queued so far, as didOpen and didChange, have been dispatched.
+     */
+    private static void dispatched(LanguageServerItem server) throws Exception {
+        server.getServerWrapper().sendNotification(ls -> ls).get(30, TimeUnit.SECONDS);
+    }
+
     private void type(String text) {
         WriteCommandAction.runWriteCommandAction(myFixture.getProject(), () ->
                 myFixture.getEditor().getDocument().setText(text));
@@ -83,8 +91,9 @@ public class WorkspaceEditSnapshotTest extends LSPCodeInsightFixtureTestCase {
         assertNull(validate(snapshot, unversioned(uri(server, myFixture.getFile()))));
     }
 
-    public void testAVersionLsp4ijNeverAssignsIsNoVersion() throws Exception {
+    public void testAPlaceholderVersionAppliesToTheTextTheServerHad() throws Exception {
         var server = open();
+        dispatched(server);
         var snapshot = WorkspaceEditSnapshot.capture(server);
         String uri = uri(server, myFixture.getFile());
         int version = server.getServerWrapper().getOpenedDocument(URI.create(uri)).getSynchronizer().getVersion();
@@ -100,6 +109,37 @@ public class WorkspaceEditSnapshotTest extends LSPCodeInsightFixtureTestCase {
         type("changed");
         assertEquals(LanguageServerBundle.message("lsp.workspace.edit.document.changed", uri),
                 validate(snapshot, versioned(uri, 0)));
+    }
+
+    public void testAPlaceholderVersionIsRefusedForTextNotYetSent() throws Exception {
+        var server = open();
+        var wrapper = server.getServerWrapper();
+        String uri = uri(server, myFixture.getFile());
+        // Hold the notifications back, so that the typing below has not reached the server at capture,
+        // as for a request, such as codeAction/resolve, that does not wait for the document's changes
+        var release = new CountDownLatch(1);
+        wrapper.sendNotification(ls -> {
+            try {
+                release.await(30, TimeUnit.SECONDS);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+            return ls;
+        });
+        WorkspaceEditSnapshot snapshot;
+        try {
+            type("changed");
+            snapshot = WorkspaceEditSnapshot.capture(server);
+        } finally {
+            release.countDown();
+        }
+        dispatched(server);
+
+        // The server may have answered for the text before the typing, and version 0 does not say
+        assertEquals(LanguageServerBundle.message("lsp.workspace.edit.document.changed", uri),
+                validate(snapshot, versioned(uri, 0)));
+        // Captured once the typing has been sent, the same edit applies
+        assertNull(validate(WorkspaceEditSnapshot.capture(server), versioned(uri, 0)));
     }
 
     public void testChangedAndRestoredTextStillInvalidatesRequest() throws Exception {
