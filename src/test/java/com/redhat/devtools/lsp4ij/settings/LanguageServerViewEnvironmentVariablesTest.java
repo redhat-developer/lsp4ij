@@ -16,6 +16,7 @@ import com.redhat.devtools.lsp4ij.LanguageServerBundle;
 import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
 import com.redhat.devtools.lsp4ij.launching.UserDefinedLanguageServerSettings;
 import com.redhat.devtools.lsp4ij.server.definition.launching.UserDefinedLanguageServerDefinition;
+import com.redhat.devtools.lsp4ij.server.definition.launching.UserDefinedTransport;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
@@ -68,6 +69,17 @@ public class LanguageServerViewEnvironmentVariablesTest extends BasePlatformTest
                     e.getLocalizedMessage());
         }
         assertEquals(Map.of(), settings().getUserEnvironmentVariables());
+    }
+
+    public void testTheHiddenVariablesOfALanguageServerWhichRunsAlreadyAreNotChecked() throws ConfigurationException {
+        environmentVariables().setText("DEBUG");
+        var running = new UserDefinedTransport(UserDefinedTransport.Mode.ATTACH, null, 6005);
+
+        view.setTransport(running);
+
+        // LSP4IJ doesn't start it, so the field is hidden, and its entry can't block Apply
+        view.apply();
+        assertEquals(running, settings().getTransport());
     }
 
     public void testAVariableWithAnEmptyValueIsSaved() throws ConfigurationException {

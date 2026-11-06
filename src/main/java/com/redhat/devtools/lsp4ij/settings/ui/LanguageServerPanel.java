@@ -754,12 +754,13 @@ public class LanguageServerPanel implements Disposable {
 
     /**
      * Returns a problem when an environment variable isn't written as {@code NAME=value}. IntelliJ's field drops such
-     * an entry without a word, and its text without any {@code =} entirely.
+     * an entry without a word, and its text without any {@code =} entirely. A language server which runs already
+     * hides the field, as LSP4IJ doesn't start it, so its environment variables are not checked.
      *
-     * @return the problem of the environment variables, or null if each is written as {@code NAME=value}.
+     * @return the problem of the environment variables, or null if each is written as {@code NAME=value} or isn't used.
      */
     public @Nullable ValidationInfo validateEnvironmentVariables() {
-        if (environmentVariables == null) {
+        if (environmentVariables == null || !getTransport().startsLanguageServer()) {
             return null;
         }
         var field = environmentVariables.getComponent();
