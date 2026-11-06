@@ -604,9 +604,10 @@ public class DocumentContentSynchronizer implements DocumentListener, Disposable
     }
 
     /**
-     * Returns whether the current buffer has reached the server's connection: no change is pending, and the
-     * notification with the current text, didOpen or didChange, has been dispatched. A request sent after this
-     * returns true reaches the server after that text, even one that does not wait for the document's changes.
+     * Returns whether the current buffer has been handed to the server's connection: no change is pending, and the
+     * notification with the current text, didOpen or didChange, has been dispatched to the connection, which writes
+     * its messages in order. A request sent after this returns true reaches the server after that text, even one
+     * that does not wait for the document's changes. A message from the server can still cross that text.
      */
     boolean isCurrentTextSent() {
         synchronized (changeEvents) {

@@ -41,8 +41,10 @@ import java.util.function.BooleanSupplier;
  * the existing application behavior, without rollback. An unversioned incoming edit can only
  * be checked for changes since receipt, not before it. A version below 1 is a placeholder, not one
  * LSP4IJ sent, since it numbers document versions from 1; intellij-quarkus and Liberty Tools send 0.
- * Such an edit is accepted only if the server had been sent the text at capture, so that the edit
- * can only describe that text. Documents that were not synchronized with
+ * A reply with such a version is accepted only if the server had been sent the text when its request
+ * was captured, since the server reads that text before the request. An incoming edit follows no
+ * request of ours and can cross a change on its way, so its placeholder version can describe any
+ * text; it is refused, as VS Code does. Documents that were not synchronized with
  * this server at capture have no captured buffer state, so edits to them retain the existing
  * behavior unless this server has opened them since.
  */
@@ -56,7 +58,8 @@ public final class WorkspaceEditSnapshot {
 
     private WorkspaceEditSnapshot(@NotNull LanguageServerWrapper wrapper,
                                   @Nullable LanguageServer server,
-                                  @NotNull BooleanSupplier ownerActive) {
+                                  @NotNull BooleanSupplier ownerActive,
+                                  boolean request) {
         this.wrapper = wrapper;
         this.server = server;
         this.ownerActive = ownerActive;
@@ -69,7 +72,7 @@ public final class WorkspaceEditSnapshot {
                 // The stamp is read first: a change between the two reads either leaves the text unsent
                 // or changes the stamp, and both refuse an edit with a placeholder version.
                 long stamp = synchronizer.getDocument().getModificationStamp();
-                states.put(uri, new DocumentState(synchronizer, stamp, synchronizer.isCurrentTextSent()));
+                states.put(uri, new DocumentState(synchronizer, stamp, request && synchronizer.isCurrentTextSent()));
             }
         }
         this.documents = Map.copyOf(states);
@@ -77,28 +80,32 @@ public final class WorkspaceEditSnapshot {
 
     /**
      * Captures state for the exact server selected for a request, even if its wrapper restarts.
+     * Capture before the request is sent: a reply that names a placeholder version, below 1, is
+     * accepted only if the server had been sent the document's text by then.
      */
     public static @NotNull WorkspaceEditSnapshot capture(@NotNull LanguageServerItem server) {
-        return capture(server.getServerWrapper(), server.getServer(), () -> true);
+        return capture(server.getServerWrapper(), server.getServer(), () -> true, true);
     }
 
     /**
      * Also checks the lifetime of the client receiving an edit. Its wrapper can outlive it
      * after a restart, so comparing the wrapper's current server alone is not sufficient.
+     * The edit follows no request, so a placeholder version, below 1, is refused.
      */
     public static @NotNull WorkspaceEditSnapshot capture(@NotNull LanguageServerWrapper wrapper,
                                                          @NotNull BooleanSupplier ownerActive) {
-        return capture(wrapper, wrapper.getLanguageServer(), ownerActive);
+        return capture(wrapper, wrapper.getLanguageServer(), ownerActive, false);
     }
 
     private static @NotNull WorkspaceEditSnapshot capture(@NotNull LanguageServerWrapper wrapper,
                                                           @Nullable LanguageServer server,
-                                                          @NotNull BooleanSupplier ownerActive) {
-        // Only thread-safe state is read: the opened-document map, the synchronizers, whose monitor is held
-        // briefly and never while waiting for read or write access, and the documents' volatile modification
-        // stamps. So the capture never waits for a write action: workspace/applyEdit captures on LSP4J's
-        // message thread, which must keep reading replies a write action may wait for.
-        return new WorkspaceEditSnapshot(wrapper, server, ownerActive);
+                                                          @NotNull BooleanSupplier ownerActive,
+                                                          boolean request) {
+        // Only thread-safe state is read: the opened-document map, the synchronizers and the documents'
+        // volatile modification stamps, and for a request whether the text was sent, under the synchronizer's
+        // briefly held monitor. So the capture never waits for a write action: workspace/applyEdit captures on
+        // LSP4J's message thread, which must keep reading replies a write action may wait for.
+        return new WorkspaceEditSnapshot(wrapper, server, ownerActive, request);
     }
 
     /**
@@ -189,9 +196,10 @@ public final class WorkspaceEditSnapshot {
                     return LanguageServerBundle.message("lsp.workspace.edit.version.changed", uriString);
                 }
             } else if (!state.textSent()) {
-                // A version below 1 was never sent by LSP4IJ, so it can't tell which text the server used. The
-                // stamp above shows the text is the captured one, which the server had only if it was sent then.
-                return LanguageServerBundle.message("lsp.workspace.edit.document.changed", uriString);
+                // A version below 1 was never sent by LSP4IJ, so it can't tell which text the server used. A reply
+                // describes the captured text if that was sent before its request, and the stamp above shows it is
+                // still the document's. An incoming edit follows no request, so its placeholder is refused.
+                return LanguageServerBundle.message("lsp.workspace.edit.version.changed", uriString);
             }
         }
         return null;

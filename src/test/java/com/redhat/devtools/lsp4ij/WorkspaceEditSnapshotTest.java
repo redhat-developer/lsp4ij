@@ -136,10 +136,22 @@ public class WorkspaceEditSnapshotTest extends LSPCodeInsightFixtureTestCase {
         dispatched(server);
 
         // The server may have answered for the text before the typing, and version 0 does not say
-        assertEquals(LanguageServerBundle.message("lsp.workspace.edit.document.changed", uri),
+        assertEquals(LanguageServerBundle.message("lsp.workspace.edit.version.changed", uri),
                 validate(snapshot, versioned(uri, 0)));
         // Captured once the typing has been sent, the same edit applies
         assertNull(validate(WorkspaceEditSnapshot.capture(server), versioned(uri, 0)));
+    }
+
+    public void testAnIncomingEditWithAPlaceholderVersionIsRefused() throws Exception {
+        var server = open();
+        dispatched(server);
+        String uri = uri(server, myFixture.getFile());
+        // workspace/applyEdit follows no request of ours, so its version 0 can describe text that a change crossed,
+        // even when the text had been sent at receipt
+        var snapshot = WorkspaceEditSnapshot.capture(server.getServerWrapper(), () -> true);
+
+        assertEquals(LanguageServerBundle.message("lsp.workspace.edit.version.changed", uri),
+                validate(snapshot, versioned(uri, 0)));
     }
 
     public void testChangedAndRestoredTextStillInvalidatesRequest() throws Exception {
