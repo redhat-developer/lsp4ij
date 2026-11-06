@@ -60,6 +60,16 @@ Depending on your OS, the environment variables may not be accessible. To make s
 * with `Windows OS`: `cmd /c command_to_start_your_ls`
 * with `Linux`, `Mac OS`: `sh -c command_to_start_your_ls`
 
+##### Directory-specific environment variables
+
+On supported IntelliJ Platform versions, when a working directory is configured (such as project or workspace directories), directory-specific environment managers (such as [mise](https://mise.jdx.dev/), [direnv](https://direnv.net/), or other plugins integrating with IntelliJ's `commandLineEnvCustomizer` extension point) can automatically configure environment variables for the language server process based on directory-level configuration files (such as `.mise.toml` or `.envrc`).
+
+> [!NOTE]
+> - **Tools not bundled**: LSP4IJ does not bundle `mise` or `direnv`. The respective CLI tools and their corresponding IntelliJ integration plugins (such as the IntelliJ mise plugin) must be installed separately.
+> - **`useMiseInAllCommandLines`**: In the IntelliJ mise plugin, the `useMiseInAllCommandLines` registry key / setting defaults to `false`. If you want mise to customize all command lines including language server processes, ensure this option is enabled.
+> - **Working directory required**: Environment customizers return early without modifying the environment if no valid working directory is present.
+> - **Precedence**: Any user-defined environment variables explicitly configured in the `Environment variables` field take precedence over both directory-customized and system environment variables.
+
 #### Macro syntax
 
 You can use [built-in macros](https://www.jetbrains.com/help/idea/built-in-macros.html) in your command. You could, for instance, store the language server in your project (to share it with your team) 

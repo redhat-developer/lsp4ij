@@ -38,6 +38,12 @@ The `Configuration` tab to specify the working directory and the file you want t
 
 Specifying a working directory sets the working directory for the debug adapter server process. On supported IntelliJ Platform versions, it also allows directory-specific environment managers (such as [mise](https://mise.jdx.dev/), [direnv](https://direnv.net/), or other plugins integrating with IntelliJ's command-line environment customizers) to automatically configure environment variables for the DAP process based on directory-level configuration files (such as `.mise.toml` or `.envrc`).
 
+> [!NOTE]
+> - **Tools not bundled**: LSP4IJ does not bundle `mise` or `direnv`. The respective CLI tools and their corresponding IntelliJ integration plugins (such as the IntelliJ mise plugin) must be installed separately.
+> - **`useMiseInAllCommandLines`**: In the IntelliJ mise plugin, the `useMiseInAllCommandLines` registry key / setting defaults to `false`. If you want mise to customize all command lines including DAP processes, ensure this option is enabled.
+> - **Working directory required**: Environment customizers return early without modifying the environment if no valid working directory is specified.
+> - **Precedence**: Any user-defined environment variables explicitly configured in the run configuration take precedence over both directory-customized and system environment variables.
+
 ### IntelliJ macro expansion
 
 You can use [built-in IntelliJ macros](https://www.jetbrains.com/help/idea/built-in-macros.html) in DAP configuration parameters. This allows you to reference project and file paths without hardcoding absolute paths.

@@ -14,8 +14,10 @@ import com.intellij.execution.configurations.GeneralCommandLine;
 import com.intellij.execution.util.ProgramParametersUtil;
 import com.intellij.openapi.application.Application;
 import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.diagnostic.ControlFlowException;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.extensions.ExtensionPoint;
+import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.project.ProjectManager;
 import com.intellij.openapi.util.Key;
@@ -24,12 +26,15 @@ import com.intellij.util.EnvironmentUtil;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.io.File;
+import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.TreeMap;
 
 /**
@@ -51,6 +56,9 @@ public class CommandUtils {
      * It does not guarantee prevention of external or third-party customizer invocations outside LSP4IJ.</p>
      */
     static final Key<Boolean> ENV_CUSTOMIZED_KEY = Key.create("LSP4IJ_ENV_CUSTOMIZED");
+    static final Key<String> CUSTOMIZED_WORKING_DIR_KEY = Key.create("LSP4IJ_CUSTOMIZED_WORKING_DIR");
+    static final Key<Map<String, String>> USER_ENV_KEY = Key.create("LSP4IJ_USER_ENVIRONMENT_VARIABLES");
+    static final Key<Map<String, String>> BASE_ENV_KEY = Key.create("LSP4IJ_BASE_ENVIRONMENT");
 
     /** Caches reflective access to the optional IntelliJ command-line environment customizer API. */
     static final class CommandLineEnvCustomizerReflection {
@@ -59,15 +67,18 @@ public class CommandUtils {
         private static volatile Method testCustomizeEnv;
 
         static {
-            Method customizeEnv = null;
+            CUSTOMIZE_ENV = findCustomizeEnvMethod(COMMAND_LINE_ENV_CUSTOMIZER_CLASS);
+        }
+
+        static Method findCustomizeEnvMethod(String className) {
             try {
-                Class<?> customizerClass = Class.forName(COMMAND_LINE_ENV_CUSTOMIZER_CLASS);
-                customizeEnv = customizerClass.getMethod("customizeEnv", GeneralCommandLine.class, Map.class);
+                Class<?> customizerClass = Class.forName(className);
+                return customizerClass.getMethod("customizeEnv", GeneralCommandLine.class, Map.class);
             } catch (ReflectiveOperationException | LinkageError e) {
                 // Expected on IDE versions that do not provide CommandLineEnvCustomizer (e.g. 2024.2).
                 LOG.debug("Directory-aware command-line environment customization is unavailable", e);
+                return null;
             }
-            CUSTOMIZE_ENV = customizeEnv;
         }
 
         static Method getCustomizeEnv() {
@@ -142,18 +153,37 @@ public class CommandUtils {
                                                        @Nullable String workingDir,
                                                        @NotNull Map<String, String> userEnvironmentVariables,
                                                        boolean includeSystemEnvironmentVariables) {
-        Map<String, String> environmentVariables = new HashMap<>(userEnvironmentVariables);
-        // Add System environment variables
-        if (includeSystemEnvironmentVariables) {
-            environmentVariables.putAll(EnvironmentUtil.getEnvironmentMap());
-        }
+        Map<String, String> environmentVariables = mergeEnvironmentVariables(
+                includeSystemEnvironmentVariables ? EnvironmentUtil.getEnvironmentMap() : null,
+                userEnvironmentVariables,
+                SystemInfo.isWindows);
         GeneralCommandLine generalCommandLine = new GeneralCommandLine(CommandUtils.createCommands(commandLine))
-                .withEnvironment(environmentVariables);
+                .withEnvironment(environmentVariables)
+                .withParentEnvironmentType(includeSystemEnvironmentVariables
+                        ? GeneralCommandLine.ParentEnvironmentType.CONSOLE
+                        : GeneralCommandLine.ParentEnvironmentType.NONE);
+        if (!userEnvironmentVariables.isEmpty()) {
+            generalCommandLine.putUserData(USER_ENV_KEY, new HashMap<>(userEnvironmentVariables));
+        }
+        generalCommandLine.putUserData(BASE_ENV_KEY, new HashMap<>(environmentVariables));
         if (workingDir != null && !workingDir.isBlank()) {
             generalCommandLine.setWorkDirectory(workingDir);
             customizeEnvironmentForWorkingDirectory(generalCommandLine);
         }
         return generalCommandLine;
+    }
+
+    @Nullable
+    private static String getWorkDirectoryPath(@NotNull GeneralCommandLine commandLine) {
+        File workDirectory = commandLine.getWorkDirectory();
+        if (workDirectory == null) {
+            return null;
+        }
+        try {
+            return workDirectory.getCanonicalPath();
+        } catch (IOException e) {
+            return workDirectory.getAbsolutePath();
+        }
     }
 
     /**
@@ -165,7 +195,7 @@ public class CommandUtils {
      * server or debug adapter from starting.</p>
      *
      * <p>This method tracks execution on the {@link GeneralCommandLine} via {@link #ENV_CUSTOMIZED_KEY}
-     * to ensure it runs only once per command-line instance within LSP4IJ.</p>
+     * and {@link #CUSTOMIZED_WORKING_DIR_KEY} to ensure it runs only once per working directory.</p>
      *
      * @param commandLine the command line to customize.
      */
@@ -173,7 +203,9 @@ public class CommandUtils {
         if (!CommandLineEnvCustomizerReflection.isAvailable()) {
             return;
         }
-        if (Boolean.TRUE.equals(commandLine.getUserData(ENV_CUSTOMIZED_KEY))) {
+        String currentWorkDir = getWorkDirectoryPath(commandLine);
+        if (Boolean.TRUE.equals(commandLine.getUserData(ENV_CUSTOMIZED_KEY))
+                && Objects.equals(currentWorkDir, commandLine.getUserData(CUSTOMIZED_WORKING_DIR_KEY))) {
             return;
         }
 
@@ -185,7 +217,8 @@ public class CommandUtils {
         ExtensionPoint<Object> ep;
         try {
             ep = application.getExtensionArea().getExtensionPointIfRegistered(COMMAND_LINE_ENV_CUSTOMIZER_EP);
-        } catch (Exception e) {
+        } catch (Exception | LinkageError e) {
+            checkFatalOrControlFlow(e);
             LOG.warn("Failed to retrieve command-line environment customizer extension point", e);
             return;
         }
@@ -211,15 +244,25 @@ public class CommandUtils {
         if (customizers.length == 0 || !CommandLineEnvCustomizerReflection.isAvailable()) {
             return;
         }
-        if (Boolean.TRUE.equals(commandLine.getUserData(ENV_CUSTOMIZED_KEY))) {
+        String currentWorkDir = getWorkDirectoryPath(commandLine);
+        if (Boolean.TRUE.equals(commandLine.getUserData(ENV_CUSTOMIZED_KEY))
+                && Objects.equals(currentWorkDir, commandLine.getUserData(CUSTOMIZED_WORKING_DIR_KEY))) {
             return;
         }
-        commandLine.putUserData(ENV_CUSTOMIZED_KEY, Boolean.TRUE);
 
-        Map<String, String> effectiveEnvironment = mergeEnvironmentVariables(
-                commandLine.getParentEnvironment(),
-                commandLine.getEnvironment(),
-                SystemInfo.isWindows);
+        Map<String, String> baseEnv = commandLine.getUserData(BASE_ENV_KEY);
+        Map<String, String> effectiveEnvironment;
+        if (baseEnv != null) {
+            effectiveEnvironment = SystemInfo.isWindows
+                    ? new TreeMap<>(String.CASE_INSENSITIVE_ORDER)
+                    : new HashMap<>();
+            effectiveEnvironment.putAll(baseEnv);
+        } else {
+            effectiveEnvironment = mergeEnvironmentVariables(
+                    commandLine.getParentEnvironment(),
+                    commandLine.getEnvironment(),
+                    SystemInfo.isWindows);
+        }
 
         boolean anyCustomized = false;
         for (Object customizer : customizers) {
@@ -234,19 +277,39 @@ public class CommandUtils {
                 effectiveEnvironment = workingCopy;
                 anyCustomized = true;
             } catch (InvocationTargetException e) {
+                Throwable cause = e.getCause();
+                checkFatalOrControlFlow(cause);
                 LOG.warn("Failed to customize command-line environment for working directory "
-                        + commandLine.getWorkDirectory(), e.getCause());
-            } catch (Exception e) {
+                        + commandLine.getWorkDirectory(), cause != null ? cause : e);
+            } catch (Exception | LinkageError e) {
+                checkFatalOrControlFlow(e);
                 LOG.warn("Unexpected error invoking command-line environment customizer "
                         + customizer.getClass().getName(), e);
             }
         }
 
         if (anyCustomized) {
+            Map<String, String> userEnv = commandLine.getUserData(USER_ENV_KEY);
+            if (userEnv != null && !userEnv.isEmpty()) {
+                effectiveEnvironment = mergeEnvironmentVariables(
+                        effectiveEnvironment,
+                        userEnv,
+                        SystemInfo.isWindows);
+            }
+
             commandLine.getEnvironment().clear();
-            commandLine.getEnvironment().putAll(effectiveEnvironment);
+            for (Map.Entry<String, String> entry : effectiveEnvironment.entrySet()) {
+                String key = entry.getKey();
+                String value = entry.getValue();
+                if (key != null && value != null && EnvironmentUtil.isValidName(key) && EnvironmentUtil.isValidValue(value)) {
+                    commandLine.getEnvironment().put(key, value);
+                }
+            }
             commandLine.withParentEnvironmentType(GeneralCommandLine.ParentEnvironmentType.NONE);
         }
+
+        commandLine.putUserData(ENV_CUSTOMIZED_KEY, Boolean.TRUE);
+        commandLine.putUserData(CUSTOMIZED_WORKING_DIR_KEY, currentWorkDir);
     }
 
     /**
@@ -277,6 +340,26 @@ public class CommandUtils {
             effectiveEnvironment.putAll(configuredEnvironment);
         }
         return effectiveEnvironment;
+    }
+
+    /**
+     * Rethrows fatal JVM errors and IntelliJ control-flow/cancellation exceptions.
+     * Ordinary exceptions and non-fatal linkage errors are not rethrown.
+     */
+    static void checkFatalOrControlFlow(@Nullable Throwable t) {
+        if (t instanceof VirtualMachineError || t instanceof ThreadDeath) {
+            throw (Error) t;
+        }
+        if (t instanceof ControlFlowException) {
+            if (t instanceof RuntimeException) {
+                throw (RuntimeException) t;
+            } else if (t instanceof Error) {
+                throw (Error) t;
+            }
+        }
+        if (t instanceof ProcessCanceledException) {
+            throw (ProcessCanceledException) t;
+        }
     }
 
     /**
