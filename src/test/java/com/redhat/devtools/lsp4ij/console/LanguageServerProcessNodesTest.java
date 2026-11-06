@@ -65,6 +65,7 @@ import org.jetbrains.annotations.Nullable;
 
 import javax.swing.tree.TreePath;
 import java.io.ByteArrayOutputStream;
+import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -208,8 +209,9 @@ public class LanguageServerProcessNodesTest extends LSPCodeInsightFixtureTestCas
 
         var labelOfA = processNode(a).getDisplayName();
         var labelOfB = processNode(b).getDisplayName();
-        assertTrue(labelOfA, labelOfA.endsWith("a/src: starting"));
-        assertTrue(labelOfB, labelOfB.endsWith("b/src: starting"));
+        // A path of the system, relative to the project's directory or in full
+        assertTrue(labelOfA, labelOfA.endsWith("a" + File.separator + "src: starting"));
+        assertTrue(labelOfB, labelOfB.endsWith("b" + File.separator + "src: starting"));
     }
 
     public void testTheProcessNodesAreSortedByTheirRoot() {

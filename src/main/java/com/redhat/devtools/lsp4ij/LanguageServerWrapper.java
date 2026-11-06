@@ -72,6 +72,7 @@ import org.jetbrains.annotations.TestOnly;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.File;
 import java.net.URI;
 import java.util.*;
 import java.util.concurrent.*;
@@ -1758,7 +1759,8 @@ public class LanguageServerWrapper implements Disposable {
             } else {
                 var projectDirectory = ProjectUtil.guessProjectDir(initialProject);
                 var relativePath = projectDirectory != null && !projectDirectory.equals(directory)
-                        ? VfsUtilCore.getRelativePath(directory, projectDirectory, '/')
+                        // With the separator of the full path that a root outside the project gets
+                        ? VfsUtilCore.getRelativePath(directory, projectDirectory, File.separatorChar)
                         : null;
                 if (relativePath != null) {
                     label = relativePath;
