@@ -10,8 +10,6 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij;
 
-import com.intellij.notification.Notification;
-import com.intellij.notification.Notifications;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.Disposer;
 import com.intellij.testFramework.UsefulTestCase;
@@ -27,14 +25,13 @@ import com.redhat.devtools.lsp4ij.templates.ServerMappingSettings;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
 /**
  * A {@link LanguageServerWrapper} stopped or disposed before the connection of a start exists closes the connection
  * which the start then opens: the stop could not close it, and nothing else would, so it stayed open, with the mock
- * language server's thread which reads it.
+ * language server's thread which reads it. A disposed one does not start again at all.
  */
 public class LanguageServerWrapperDisposeWhileStartingTest extends UsefulTestCase {
 
@@ -66,23 +63,33 @@ public class LanguageServerWrapperDisposeWhileStartingTest extends UsefulTestCas
         assertTrue("the connection should be closed", serverDefinition.stopped.await(10, TimeUnit.SECONDS));
     }
 
-    public void testAStartAfterADisposeClosesTheConnectionBeforeItFails() throws Exception {
+    public void testADisposedLanguageServerDoesNotStartAgain() throws Exception {
         var wrapper = new LanguageServerWrapper(myFixture.getProject(), serverDefinition);
-        var closedWhenNotified = new CompletableFuture<Boolean>();
-        myFixture.getProject().getMessageBus().connect(getTestRootDisposable()).subscribe(Notifications.TOPIC, new Notifications() {
-            @Override
-            public void notify(@NotNull Notification notification) {
-                closedWhenNotified.complete(serverDefinition.stopped.getCount() == 0);
-            }
-        });
-        serverDefinition.proceed.countDown();
 
-        // A start after the dispose, as from a document which connects late, fails: its connection is closed first
+        // A disposed language server that is asked for its server, as by a plugin that still holds it, or by a
+        // document that connects late, does not start again: it gives no server, as one that cannot start
+        wrapper.dispose();
+        var server = wrapper.getInitializedServer();
+
+        assertTrue("A disposed language server must answer at once", server.isDone());
+        assertNull(server.get());
+        assertEquals("No connection may be created", 1, serverDefinition.creating.getCount());
+        assertEquals(ServerStatus.none, wrapper.getServerStatus());
+    }
+
+    public void testADirectStartOfADisposedLanguageServerStartsNothing() throws Exception {
+        var wrapper = new LanguageServerWrapper(myFixture.getProject(), serverDefinition);
+
+        // A caller that starts a disposed language server itself, without asking for its server
         wrapper.dispose();
         wrapper.start();
 
-        assertTrue("the connection should be closed", serverDefinition.stopped.await(10, TimeUnit.SECONDS));
-        assertTrue("the connection should be closed before the error notification", closedWhenNotified.get(10, TimeUnit.SECONDS));
+        // A start would have begun an initialization, which the server's answer would wait for
+        var server = wrapper.getInitializedServer();
+        assertTrue("A disposed language server must not start", server.isDone());
+        assertNull(server.get());
+        assertEquals("No connection may be created", 1, serverDefinition.creating.getCount());
+        assertEquals(ServerStatus.none, wrapper.getServerStatus());
     }
 
     private static void await(CountDownLatch latch) {

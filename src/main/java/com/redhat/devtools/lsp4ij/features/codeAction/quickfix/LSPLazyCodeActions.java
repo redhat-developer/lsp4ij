@@ -167,6 +167,10 @@ public class LSPLazyCodeActions implements LSPLazyCodeActionProvider {
         return languageServer
                         .getInitializedServer()
                         .thenCompose(ls -> {
+                            if (ls == null) {
+                                // The language server cannot start, as one that is disposed: there are no code actions.
+                                return CompletableFuture.completedFuture(Collections.<CodeActionData>emptyList());
+                            }
                             if (requestCancellation.isCanceled()) {
                                 // cancel() retired this request while the server initialized: don't send it.
                                 return CompletableFuture.completedFuture(Collections.<CodeActionData>emptyList());
