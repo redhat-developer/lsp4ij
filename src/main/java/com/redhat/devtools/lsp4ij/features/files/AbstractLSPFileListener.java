@@ -194,7 +194,8 @@ public abstract class AbstractLSPFileListener implements FileEditorManagerListen
         boolean renameFilesSupported = canRenameFilesSupported();
         boolean changeFilesSupported = canChangeFilesSupported();
         boolean saveSupported = languageServerWrapper.isSaveSupported();
-        if (!createFilesSupported && !deleteFilesSupported && !renameFilesSupported && !changeFilesSupported && !saveSupported) {
+        if (!createFilesSupported && !deleteFilesSupported && !renameFilesSupported && !changeFilesSupported && !saveSupported
+                && languageServerWrapper.getOpenedDocuments().isEmpty()) {
             return Collections.emptyList();
         }
         List<@NotNull VFileEvent> supportedEvents = null;
@@ -214,7 +215,9 @@ public abstract class AbstractLSPFileListener implements FileEditorManagerListen
                     supportedEvents.add(event);
                 }
             } else if (event instanceof VFilePropertyChangeEvent || event instanceof VFileMoveEvent) {
-                if (renameFilesSupported) {
+                // An open file that is renamed or moved is connected again with its new URI, also without file
+                // operations
+                if (renameFilesSupported || isOpened(event.getFile())) {
                     if (supportedEvents == null) {
                         supportedEvents = new ArrayList<>();
                     }

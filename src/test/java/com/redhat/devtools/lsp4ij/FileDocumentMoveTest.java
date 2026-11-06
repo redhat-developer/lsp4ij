@@ -78,6 +78,19 @@ public class FileDocumentMoveTest extends LSPCodeInsightFixtureTestCase {
         assertEquals(destination, context.file().getParent());
     }
 
+    public void testARenameReconnectsTheFileOfALanguageServerWithoutFileOperations() throws Exception {
+        MockLanguageServer.reset();
+        var context = openDocument();
+        reconnectAfter(context, () -> write(() -> context.file().rename(this, "renamed.foo")), false);
+    }
+
+    public void testAMoveReconnectsTheFileOfALanguageServerWithoutFileOperations() throws Exception {
+        MockLanguageServer.reset();
+        var context = openDocument();
+        var destination = myFixture.getTempDirFixture().findOrCreateDir("destination");
+        reconnectAfter(context, () -> write(() -> context.file().move(this, destination)), false);
+    }
+
     public void testRenameTwiceBeforeReconnectOpensOnlyTheFinalUri() throws Exception {
         var context = openDocument();
         var reopened = new CompletableFuture<DidOpenTextDocumentParams>();
@@ -143,6 +156,10 @@ public class FileDocumentMoveTest extends LSPCodeInsightFixtureTestCase {
     }
 
     private void reconnectAfter(Context context, Runnable operation) {
+        reconnectAfter(context, operation, true);
+    }
+
+    private void reconnectAfter(Context context, Runnable operation, boolean didRenameFiles) {
         var closed = new CompletableFuture<DidCloseTextDocumentParams>();
         var opened = new CompletableFuture<DidOpenTextDocumentParams>();
         var renamed = new CompletableFuture<RenameFilesParams>();
@@ -153,7 +170,7 @@ public class FileDocumentMoveTest extends LSPCodeInsightFixtureTestCase {
         MockLanguageServer.INSTANCE.getWorkspaceService().setDidRenameCallback(renamed);
         operation.run();
         PlatformTestUtil.waitWithEventsDispatching("rename must deliver close, open and workspace notification",
-                () -> closed.isDone() && opened.isDone() && renamed.isDone() && closedBeforeOpen.isDone(), 10);
+                () -> closed.isDone() && opened.isDone() && (renamed.isDone() || !didRenameFiles) && closedBeforeOpen.isDone(), 10);
         URI newUri = context.wrapper().toUri(context.file());
         assertTrue("didClose must precede didOpen", closedBeforeOpen.join());
         assertEquals(oldUri, URI.create(closed.join().getTextDocument().getUri()));
@@ -166,9 +183,14 @@ public class FileDocumentMoveTest extends LSPCodeInsightFixtureTestCase {
                 Collections.frequency(beforeReopen, new OpenCloseNotification(false, oldUri)),
                 Collections.frequency(beforeReopen, new OpenCloseNotification(true, oldUri)));
         assertEquals("unsaved", opened.join().getTextDocument().getText());
-        assertEquals(1, renamed.join().getFiles().size());
-        assertEquals(oldUri, URI.create(renamed.join().getFiles().get(0).getOldUri()));
-        assertEquals(newUri, URI.create(renamed.join().getFiles().get(0).getNewUri()));
+        if (didRenameFiles) {
+            assertEquals(1, renamed.join().getFiles().size());
+            assertEquals(oldUri, URI.create(renamed.join().getFiles().get(0).getOldUri()));
+            assertEquals(newUri, URI.create(renamed.join().getFiles().get(0).getNewUri()));
+        } else {
+            assertFalse("A language server without file operations must not get workspace/didRenameFiles",
+                    renamed.isDone());
+        }
         assertEquals(1, context.wrapper().getOpenedDocuments().size());
         assertNotNull(context.wrapper().getOpenedDocument(context.wrapper().toUri(context.file())));
     }
