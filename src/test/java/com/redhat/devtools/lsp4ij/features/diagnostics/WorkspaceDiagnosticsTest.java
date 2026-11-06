@@ -492,8 +492,9 @@ public class WorkspaceDiagnosticsTest extends UsefulTestCase {
         definition.getServer().setPullDiagnostics(new DocumentDiagnosticReport(
                 new RelatedFullDocumentDiagnosticReport(List.of(diagnostic("document")))));
         start(false);
-        var editors = FileEditorManager.getInstance(fixture.getProject());
-        editors.openFile(file, false);
+        // No editor shows the file: an editor's code vision asks for the file's servers on its own
+        // schedule, and when that connection runs after the close below, it connects the file again,
+        // so that the fresh report is applied to an open file instead of the closed-file cache.
         LanguageServiceAccessor.getInstance(fixture.getProject()).getLanguageServers(psi, null, null)
                 .get(10, TimeUnit.SECONDS);
         var options = JSONUtils.getLsp4jGson().fromJson(
@@ -502,10 +503,10 @@ public class WorkspaceDiagnosticsTest extends UsefulTestCase {
                 new Registration("workspace", "textDocument/diagnostic", options)))).get(5, TimeUnit.SECONDS);
         var pending = next();
         assertTrue(pending.params.getPreviousResultIds().isEmpty());
-        editors.closeFile(file);
+        // The event that closing the file's last editor publishes, which disconnects the file.
         fixture.getProject().getMessageBus().syncPublisher(FileEditorManagerListener.FILE_EDITOR_MANAGER)
-                .fileClosed(editors, file);
-        PlatformTestUtil.waitWithEventsDispatching("the closed editor must disconnect",
+                .fileClosed(FileEditorManager.getInstance(fixture.getProject()), file);
+        PlatformTestUtil.waitWithEventsDispatching("the closed file must disconnect",
                 () -> wrapper.getOpenedDocument(LSPIJUtils.toUri(file)) == null, 10);
         var stale = report(file, "stale", null);
         stale.getLeft().setResultId("stale");

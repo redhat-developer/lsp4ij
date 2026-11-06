@@ -152,10 +152,16 @@ public class FileSystemWatchRootsTest extends BasePlatformTestCase {
     public void testReplacedRootsDoNotJoinARefreshOfThePreviousGeneration() throws Exception {
         Path oldRoot = Files.createDirectories(directory.resolve("old"));
         Path newRoot = Files.createDirectories(directory.resolve("new"));
+        roots.replace(Set.of(new FileSystemWatchRoots.Root(oldRoot, true)));
+        // A periodic pass running when the write action below asks to refresh the old roots would make that refresh()
+        // return the pass queued after it, which the new roots' refresh() rightly shares, since it starts after the
+        // replacement. Only the test's passes run, and the refresh awaited here outlasts any periodic pass already
+        // started. The replacement starts the timer again, but its pass waits for the old roots' pass held below
+        roots.stopPeriodicRefresh();
+        refresh();
         var current = new AtomicReference<CompletableFuture<Void>>();
         WriteAction.run(() -> {
             // Hold write access so the old background pass cannot finish its read action.
-            roots.replace(Set.of(new FileSystemWatchRoots.Root(oldRoot, true)));
             var previous = roots.refresh();
             roots.replace(Set.of(new FileSystemWatchRoots.Root(newRoot, true)));
             current.set(roots.refresh());

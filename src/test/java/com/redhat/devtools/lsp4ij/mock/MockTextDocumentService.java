@@ -29,7 +29,6 @@ import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import java.util.function.Predicate;
@@ -78,7 +77,7 @@ public class MockTextDocumentService implements TextDocumentService {
     private CompletableFuture<DidSaveTextDocumentParams> didSaveCallback;
     private CompletableFuture<DidCloseTextDocumentParams> didCloseCallback;
     private List<TextEdit> mockWillSaveWaitUntilTextEdits;
-    private volatile long willSaveWaitUntilDelayMs;
+    private volatile CompletableFuture<Void> willSaveWaitUntilGate = CompletableFuture.completedFuture(null);
     private ConcurrentLinkedQueue<DidChangeTextDocumentParams> didChangeEvents = new ConcurrentLinkedQueue<>();
 
     private Function<?, ? extends CompletableFuture<?>> _futureFactory;
@@ -368,15 +367,18 @@ public class MockTextDocumentService implements TextDocumentService {
     public CompletableFuture<List<TextEdit>> willSaveWaitUntil(WillSaveTextDocumentParams params) {
         MockLanguageServer.INSTANCE.record("willSaveWaitUntil");
         List<TextEdit> edits = mockWillSaveWaitUntilTextEdits != null ? mockWillSaveWaitUntilTextEdits : List.of();
-        long delay = willSaveWaitUntilDelayMs;
-        if (delay <= 0) {
-            return CompletableFuture.completedFuture(edits);
-        }
-        return CompletableFuture.supplyAsync(() -> edits, CompletableFuture.delayedExecutor(delay, TimeUnit.MILLISECONDS));
+        return willSaveWaitUntilGate.thenApply(ignored -> edits);
     }
 
-    public void setWillSaveWaitUntilDelayMs(long delayMs) {
-        this.willSaveWaitUntilDelayMs = delayMs;
+    /**
+     * Holds the replies to willSaveWaitUntil requests until the returned future is completed, which the caller must do.
+     *
+     * @return the future that releases the held and later willSaveWaitUntil replies when completed.
+     */
+    public CompletableFuture<Void> holdWillSaveWaitUntil() {
+        CompletableFuture<Void> gate = new CompletableFuture<>();
+        willSaveWaitUntilGate = gate;
+        return gate;
     }
 
     @Override
