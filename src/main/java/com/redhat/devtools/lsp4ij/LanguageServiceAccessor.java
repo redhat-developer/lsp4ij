@@ -11,6 +11,9 @@
 package com.redhat.devtools.lsp4ij;
 
 import com.intellij.lang.Language;
+import com.intellij.notification.Notification;
+import com.intellij.notification.NotificationType;
+import com.intellij.notification.Notifications;
 import com.intellij.openapi.Disposable;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.ReadAction;
@@ -28,6 +31,7 @@ import com.intellij.psi.PsiFile;
 import com.intellij.psi.PsiManager;
 import com.intellij.util.concurrency.AppExecutorUtil;
 import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
+import com.redhat.devtools.lsp4ij.console.explorer.actions.EditServerAction;
 import com.redhat.devtools.lsp4ij.internal.PsiFileCancelChecker;
 import com.redhat.devtools.lsp4ij.internal.editor.EditorFeatureManager;
 import com.redhat.devtools.lsp4ij.internal.editor.EditorFeatureType;
@@ -47,6 +51,7 @@ import static com.redhat.devtools.lsp4ij.internal.ApplicationUtils.runCancellabl
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
@@ -69,6 +74,8 @@ public class LanguageServiceAccessor implements Disposable {
     // Instances of a definition can start at any time, while other threads go through the started servers. The set
     // keeps the order in which the language servers were created, so that the first one of a definition is its oldest
     private final Set<LanguageServerWrapper> startedServers = new CopyOnWriteArraySet<>();
+    // The definitions with instances that said once that an open file gets none, until their configuration changes
+    private final Set<LanguageServerDefinition> definitionsWithoutInstanceHint = ConcurrentHashMap.newKeySet();
     private final LanguageServerDefinitionListener serverDefinitionListener = new LanguageServerDefinitionListener() {
 
         @Override
@@ -84,6 +91,7 @@ public class LanguageServiceAccessor implements Disposable {
         public void handleRemoved(@NotNull LanguageServerDefinitionListener.LanguageServerRemovedEvent event) {
             // Bump the accessor-level modification tracker
             modificationTracker.incModificationCount();
+            event.serverDefinitions.forEach(definitionsWithoutInstanceHint::remove);
 
             // Dispose all servers which are removed
             // and remove code vision, inlay hints, folding from editors
@@ -114,6 +122,8 @@ public class LanguageServiceAccessor implements Disposable {
 
             // Bump the modification trackers
             languageServerWrappers.forEach(LanguageServerWrapper::incrementModificationCount);
+            // A changed configuration can leave an open file without an instance again
+            definitionsWithoutInstanceHint.remove(event.serverDefinition);
 
             // Restart all servers where command, working dir or mappings has changed
             // if changes doesn't come from installer.
@@ -564,6 +574,13 @@ public class LanguageServiceAccessor implements Disposable {
         var file = psiFile != null ? psiFile.getVirtualFile() : null;
         // A workspace folder strategy can do I/O, so ask it before entering the monitor
         var instanceChoices = file != null ? chooseInstances(file, serverDefinitions) : Map.<LanguageServerDefinition, InstanceChoice>of();
+        if (file != null) {
+            for (var serverDefinition : serverDefinitions) {
+                if (serverDefinition.hasServerInstances() && !instanceChoices.containsKey(serverDefinition)) {
+                    hintAboutAnOpenFileWithoutInstance(file, serverDefinition);
+                }
+            }
+        }
         synchronized (startedServers) {
             for (var serverDefinition : serverDefinitions) {
                 if (serverDefinition.hasServerInstances()) {
@@ -703,6 +720,25 @@ public class LanguageServiceAccessor implements Disposable {
         return connected != null
                 ? new InstanceChoice(connected, null)
                 : new InstanceChoice(null, serverDefinition.getServerInstanceRoot(file, project));
+    }
+
+    /**
+     * Says once per definition, until its configuration changes, that a file open in an editor has no root, so that no
+     * instance of the definition serves it: the language server then provides no features for that file.
+     */
+    private void hintAboutAnOpenFileWithoutInstance(@NotNull VirtualFile file,
+                                                    @NotNull LanguageServerDefinition serverDefinition) {
+        if (definitionsWithoutInstanceHint.contains(serverDefinition)
+                || !FileEditorManager.getInstance(project).isFileOpen(file)
+                || !definitionsWithoutInstanceHint.add(serverDefinition)) {
+            return;
+        }
+        var notification = new Notification(LSPNotificationConstants.LSP4IJ_GENERAL_NOTIFICATIONS_ID,
+                serverDefinition.getDisplayName(),
+                LanguageServerBundle.message("language.server.instances.noInstance", file.getName()),
+                NotificationType.INFORMATION);
+        notification.addAction(new EditServerAction(serverDefinition));
+        Notifications.Bus.notify(notification, project);
     }
 
     /**

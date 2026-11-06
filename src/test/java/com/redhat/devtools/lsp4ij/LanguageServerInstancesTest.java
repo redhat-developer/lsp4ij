@@ -7,6 +7,8 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij;
 
+import com.intellij.notification.Notification;
+import com.intellij.notification.Notifications;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.application.impl.NonBlockingReadActionImpl;
@@ -517,6 +519,38 @@ public class LanguageServerInstancesTest extends LSPCodeInsightFixtureTestCase {
         assertEquals(2, definition.disposedWithoutLanguageServer.get());
     }
 
+    public void testAnOpenFileWithoutAnInstanceSaysSoOnce() throws Exception {
+        var hints = hintsWithoutInstance();
+        var one = file("other/one.per-folder");
+        var two = file("other/two.per-folder");
+
+        // The editor connects an open file in the background, which can say it first
+        myFixture.openFileInEditor(one.getVirtualFile());
+        assertEmpty(serversOf(one));
+        PlatformTestUtil.waitWithEventsDispatching("An open file without an instance must say so", () -> !hints.isEmpty(), TIMEOUT);
+        assertTrue(hints.get(0).getContent(), hints.get(0).getContent().contains("one.per-folder"));
+
+        myFixture.openFileInEditor(two.getVirtualFile());
+        assertEmpty(serversOf(two));
+        waitUntilOpeningTheFileIsDone();
+        assertEquals(1, hints.size());
+
+        // Until the configuration changes
+        fireStrategyChanged();
+        assertEmpty(serversOf(two));
+        PlatformTestUtil.waitWithEventsDispatching("A changed configuration must say so again", () -> hints.size() > 1, TIMEOUT);
+        waitUntilOpeningTheFileIsDone();
+        assertEquals(2, hints.size());
+    }
+
+    public void testAFileWithoutAnInstanceWhichIsNotOpenSaysNothing() throws Exception {
+        var hints = hintsWithoutInstance();
+
+        assertEmpty(serversOf(file("other/one.per-folder")));
+
+        assertEmpty(hints);
+    }
+
     public void testAStopWaitsForTheStopThatIsRunning() throws Exception {
         var instance = instanceOf(file("a/one.per-folder"));
         var shutdown = new CompletableFuture<Void>();
@@ -744,6 +778,23 @@ public class LanguageServerInstancesTest extends LSPCodeInsightFixtureTestCase {
         PlatformTestUtil.waitWithEventsDispatching("The language server must hear about the folders",
                 () -> addedFolders(server).size() >= names.length, TIMEOUT);
         assertEquals(List.of(names), addedFolders(server));
+    }
+
+    /**
+     * Collects the notifications that say that an open file gets no instance of the definition of the tests.
+     */
+    private @NotNull List<Notification> hintsWithoutInstance() {
+        List<Notification> hints = new CopyOnWriteArrayList<>();
+        myFixture.getProject().getMessageBus().connect(getTestRootDisposable()).subscribe(Notifications.TOPIC, new Notifications() {
+            @Override
+            public void notify(@NotNull Notification notification) {
+                if (LSPNotificationConstants.LSP4IJ_GENERAL_NOTIFICATIONS_ID.equals(notification.getGroupId())
+                        && definition.getDisplayName().equals(notification.getTitle())) {
+                    hints.add(notification);
+                }
+            }
+        });
+        return hints;
     }
 
     private static List<LanguageServerWrapper> wrappersOf(List<LanguageServerItem> servers) {
