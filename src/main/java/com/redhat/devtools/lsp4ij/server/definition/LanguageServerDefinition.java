@@ -48,7 +48,6 @@ import javax.swing.Icon;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -77,8 +76,10 @@ public abstract class LanguageServerDefinition implements LanguageServerFactory,
     Map<FileType, String> languageIdFileTypeMappings;
     private final List<Pair<List<FileNameMatcher>, String>> languageIdFileNameMatcherMappings;
     private boolean enabled;
-    private volatile @Nullable WorkspaceFolderStrategy workspaceFolderStrategy;
-    private volatile @Nullable FileUriSupport workspaceFolderUriSupport;
+    // Set and reset with the lock, which is not held while the strategy is created
+    private final Object workspaceFolderStrategyLock = new Object();
+    private volatile @Nullable DefinitionStrategy workspaceFolderStrategy;
+    private int workspaceFolderStrategyResets;
     private SemanticTokensColorsProvider semanticTokensColorsProvider;
 
     private boolean serverInstallerCreated;
@@ -166,7 +167,7 @@ public abstract class LanguageServerDefinition implements LanguageServerFactory,
      */
     @ApiStatus.Internal
     public boolean hasServerInstances() {
-        return getWorkspaceFolderStrategy().hasServerInstances();
+        return getWorkspaceFolderStrategy().strategy().hasServerInstances();
     }
 
     /**
@@ -182,8 +183,8 @@ public abstract class LanguageServerDefinition implements LanguageServerFactory,
                                                            @NotNull Project project) {
         var strategy = getWorkspaceFolderStrategy();
         try {
-            var root = strategy.getServerInstanceRoot(file, project, getWorkspaceFolderUriSupport());
-            return root != null ? normalizeServerInstanceRoot(root) : null;
+            var root = strategy.strategy().getServerInstanceRoot(file, project, strategy.fileUriSupport());
+            return root != null ? normalizeServerInstanceRoot(root, strategy) : null;
         } catch (ProcessCanceledException e) {
             throw e;
         } catch (Exception e) {
@@ -202,8 +203,12 @@ public abstract class LanguageServerDefinition implements LanguageServerFactory,
      */
     @ApiStatus.Internal
     public @NotNull WorkspaceFolder normalizeServerInstanceRoot(@NotNull WorkspaceFolder root) {
-        getWorkspaceFolderStrategy();
-        String uri = FileUriSupport.normalize(root.getUri(), getWorkspaceFolderUriSupport());
+        return normalizeServerInstanceRoot(root, getWorkspaceFolderStrategy());
+    }
+
+    private static @NotNull WorkspaceFolder normalizeServerInstanceRoot(@NotNull WorkspaceFolder root,
+                                                                        @NotNull DefinitionStrategy strategy) {
+        String uri = FileUriSupport.normalize(root.getUri(), strategy.fileUriSupport());
         return uri.equals(root.getUri()) ? root : new WorkspaceFolder(uri, root.getName());
     }
 
@@ -212,17 +217,16 @@ public abstract class LanguageServerDefinition implements LanguageServerFactory,
      */
     @ApiStatus.Internal
     public void resetWorkspaceFolderStrategy() {
-        var uriSupport = workspaceFolderUriSupport;
-        workspaceFolderStrategy = null;
-        workspaceFolderUriSupport = null;
-        if (uriSupport instanceof LSPClientFeatures clientFeatures) {
-            // Only the strategy and the file URI support were used
-            clientFeatures.dispose();
+        DefinitionStrategy strategy;
+        synchronized (workspaceFolderStrategyLock) {
+            strategy = workspaceFolderStrategy;
+            workspaceFolderStrategy = null;
+            // A strategy that is being created meanwhile can come from the configuration before, so it is not kept
+            workspaceFolderStrategyResets++;
         }
-    }
-
-    private @NotNull FileUriSupport getWorkspaceFolderUriSupport() {
-        return Objects.requireNonNullElse(workspaceFolderUriSupport, FileUriSupport.DEFAULT);
+        if (strategy != null) {
+            strategy.dispose();
+        }
     }
 
     /**
@@ -230,31 +234,67 @@ public abstract class LanguageServerDefinition implements LanguageServerFactory,
      * so without a language server: it comes from client features that have none, which also give the file URI
      * support of the strategy.
      */
-    private @NotNull WorkspaceFolderStrategy getWorkspaceFolderStrategy() {
-        var strategy = workspaceFolderStrategy;
-        if (strategy == null) {
-            LSPClientFeatures clientFeatures = null;
-            try {
-                clientFeatures = createClientFeatures();
-                clientFeatures.setServerDefinition(this);
-                strategy = clientFeatures.getWorkspaceFolderFeature().getStrategy();
-                workspaceFolderUriSupport = clientFeatures;
-            } catch (ProcessCanceledException e) {
-                if (clientFeatures != null) {
-                    clientFeatures.dispose();
-                }
-                throw e;
-            } catch (Exception e) {
-                if (clientFeatures != null) {
-                    clientFeatures.dispose();
-                }
-                // A strategy can need the language server: one instance per project works without it
-                LOGGER.warn("Cannot get the workspace folder strategy of the language server '" + id + "'", e);
-                strategy = WorkspaceFolderStrategy.getDefault();
+    private @NotNull DefinitionStrategy getWorkspaceFolderStrategy() {
+        while (true) {
+            var strategy = workspaceFolderStrategy;
+            if (strategy != null) {
+                return strategy;
             }
-            workspaceFolderStrategy = strategy;
+            int resets;
+            synchronized (workspaceFolderStrategyLock) {
+                resets = workspaceFolderStrategyResets;
+            }
+            // Without the lock: the client features come from the plugin, and the strategy can be asked for meanwhile
+            var created = createWorkspaceFolderStrategy();
+            synchronized (workspaceFolderStrategyLock) {
+                if (workspaceFolderStrategy == null && resets == workspaceFolderStrategyResets) {
+                    workspaceFolderStrategy = created;
+                    return created;
+                }
+            }
+            // Another thread kept its strategy first, or a reset came meanwhile, after which this one can be outdated
+            created.dispose();
         }
-        return strategy;
+    }
+
+    private @NotNull DefinitionStrategy createWorkspaceFolderStrategy() {
+        LSPClientFeatures clientFeatures = null;
+        try {
+            clientFeatures = createClientFeatures();
+            clientFeatures.setServerDefinition(this);
+            return new DefinitionStrategy(clientFeatures.getWorkspaceFolderFeature().getStrategy(), clientFeatures);
+        } catch (ProcessCanceledException e) {
+            if (clientFeatures != null) {
+                clientFeatures.dispose();
+            }
+            throw e;
+        } catch (Exception e) {
+            if (clientFeatures != null) {
+                clientFeatures.dispose();
+            }
+            // A strategy can need the language server: one instance per project works without it
+            LOGGER.warn("Cannot get the workspace folder strategy of the language server '" + id + "'", e);
+            return new DefinitionStrategy(WorkspaceFolderStrategy.getDefault(), null);
+        }
+    }
+
+    /**
+     * The workspace folder strategy of a definition, with the client features that gave it, which also give its file
+     * URI support. A strategy that could not be created is the default one, without client features.
+     */
+    private record DefinitionStrategy(@NotNull WorkspaceFolderStrategy strategy,
+                                      @Nullable LSPClientFeatures clientFeatures) {
+
+        @NotNull FileUriSupport fileUriSupport() {
+            return clientFeatures != null ? clientFeatures : FileUriSupport.DEFAULT;
+        }
+
+        void dispose() {
+            if (clientFeatures != null) {
+                // Only the strategy and the file URI support were used
+                clientFeatures.dispose();
+            }
+        }
     }
 
     public int getLastDocumentDisconnectedTimeout() {

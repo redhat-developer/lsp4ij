@@ -19,6 +19,7 @@ import com.intellij.psi.PsiFile;
 import com.intellij.psi.PsiManager;
 import com.intellij.testFramework.IndexingTestUtil;
 import com.intellij.testFramework.PlatformTestUtil;
+import com.intellij.util.concurrency.AppExecutorUtil;
 import com.intellij.util.containers.ContainerUtil;
 import com.redhat.devtools.lsp4ij.client.LanguageClientImpl;
 import com.redhat.devtools.lsp4ij.client.features.FileUriSupport;
@@ -52,7 +53,10 @@ import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -598,6 +602,59 @@ public class LanguageServerInstancesTest extends LSPCodeInsightFixtureTestCase {
         assertEquals(2, definition.disposedWithoutLanguageServer.get());
     }
 
+    public void testTheClientFeaturesOfAStrategyThatTwoThreadsCreateAtOnceAreAllDisposed() throws Exception {
+        definition.resetWorkspaceFolderStrategy();
+        int disposed = definition.disposedWithoutLanguageServer.get();
+        int created = definition.strategiesWithoutLanguageServer.get();
+        // Each thread waits until the other one creates a strategy too, so neither finds the strategy of the other
+        var bothCreating = new CyclicBarrier(2);
+        definition.strategyCreation = () -> {
+            try {
+                bothCreating.await(TIMEOUT, TimeUnit.SECONDS);
+            } catch (Exception e) {
+                throw new IllegalStateException(e);
+            }
+        };
+        var executor = AppExecutorUtil.getAppExecutorService();
+        var first = CompletableFuture.supplyAsync(definition::hasServerInstances, executor);
+        var second = CompletableFuture.supplyAsync(definition::hasServerInstances, executor);
+        assertTrue(first.get(TIMEOUT, TimeUnit.SECONDS));
+        assertTrue(second.get(TIMEOUT, TimeUnit.SECONDS));
+        definition.strategyCreation = null;
+        assertEquals(2, definition.strategiesWithoutLanguageServer.get() - created);
+
+        // One strategy is kept, and the client features of both are disposed: the other ones at once, the kept ones
+        // with their strategy
+        definition.resetWorkspaceFolderStrategy();
+        assertEquals(2, definition.disposedWithoutLanguageServer.get() - disposed);
+    }
+
+    public void testAStrategyCreatedBeforeAResetIsNotKept() throws Exception {
+        definition.resetWorkspaceFolderStrategy();
+        var creating = new CountDownLatch(1);
+        var reset = new CountDownLatch(1);
+        // Only the first strategy is created before the reset, and waits for it
+        definition.strategyCreation = () -> {
+            definition.strategyCreation = null;
+            creating.countDown();
+            try {
+                assertTrue(reset.await(TIMEOUT, TimeUnit.SECONDS));
+            } catch (InterruptedException e) {
+                throw new IllegalStateException(e);
+            }
+        };
+        var asking = CompletableFuture.supplyAsync(definition::hasServerInstances, AppExecutorUtil.getAppExecutorService());
+        assertTrue(creating.await(TIMEOUT, TimeUnit.SECONDS));
+
+        // As a changed configuration does, while the strategy of the configuration before is created
+        definition.activeStrategy = WorkspaceFolderStrategy.getDefault();
+        definition.resetWorkspaceFolderStrategy();
+        reset.countDown();
+
+        assertFalse("The strategy of the changed configuration must be used", asking.get(TIMEOUT, TimeUnit.SECONDS));
+        assertFalse(definition.hasServerInstances());
+    }
+
     public void testAnOpenFileWithoutAnInstanceSaysSoOnce() throws Exception {
         var hints = hintsWithoutInstance();
         var one = file("other/one.per-folder");
@@ -1077,6 +1134,9 @@ public class LanguageServerInstancesTest extends LSPCodeInsightFixtureTestCase {
         final List<WorkspaceFolder> languageClientRoots = new CopyOnWriteArrayList<>();
         // The client features that gave the strategy, which have no language server
         final AtomicInteger disposedWithoutLanguageServer = new AtomicInteger();
+        final AtomicInteger strategiesWithoutLanguageServer = new AtomicInteger();
+        // Runs as the strategy of client features without a language server is created, after it is chosen
+        volatile @Nullable Runnable strategyCreation;
         // The name of the root whose instance can't start
         volatile @Nullable String failingRoot;
 
@@ -1128,7 +1188,15 @@ public class LanguageServerInstancesTest extends LSPCodeInsightFixtureTestCase {
             return features.setWorkspaceFolderFeature(new LSPWorkspaceFolderFeature() {
                 @Override
                 protected @NotNull WorkspaceFolderStrategy createStrategy() {
-                    return activeStrategy;
+                    var created = activeStrategy;
+                    if (getClientFeatures().getServerWrapper() == null) {
+                        strategiesWithoutLanguageServer.incrementAndGet();
+                        var creation = strategyCreation;
+                        if (creation != null) {
+                            creation.run();
+                        }
+                    }
+                    return created;
                 }
             });
         }
