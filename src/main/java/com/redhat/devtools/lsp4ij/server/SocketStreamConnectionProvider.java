@@ -99,6 +99,12 @@ public class SocketStreamConnectionProvider implements StreamConnectionProvider,
      */
     public static final @NotNull Duration DEFAULT_START_TIMEOUT = Duration.ofSeconds(60);
 
+    /**
+     * How long an attach waits for the connection at most: a language server which runs already accepts it at once,
+     * or not at all, as on a host which drops packets, which shouldn't look like a minute-long hang.
+     */
+    public static final @NotNull Duration ATTACH_TIMEOUT = Duration.ofSeconds(10);
+
     private final @NotNull Direction direction;
     private final @NotNull String host;
     private final int port;
@@ -272,7 +278,12 @@ public class SocketStreamConnectionProvider implements StreamConnectionProvider,
         boundPort = port;
         if (commandLine == null) {
             // The language server runs already: it listens, or it doesn't
-            install(connectOnce(port));
+            try {
+                install(connectOnce(port, connectTimeout()));
+            } catch (SocketTimeoutException noAnswer) {
+                throw new CannotStartProcessException("No answer from " + host + ":" + port + " within "
+                        + connectTimeout().toSeconds() + " s: " + this);
+            }
             return;
         }
         if (this.port != 0) {
@@ -286,7 +297,7 @@ public class SocketStreamConnectionProvider implements StreamConnectionProvider,
         long pause = FIRST_RETRY_PAUSE_MILLIS;
         while (true) {
             try {
-                install(connectOnce(port));
+                install(connectOnce(port, connectTimeout()));
                 return;
             } catch (ConnectException notListeningYet) {
                 long remaining = TimeUnit.NANOSECONDS.toMillis(deadline - System.nanoTime());
@@ -313,7 +324,16 @@ public class SocketStreamConnectionProvider implements StreamConnectionProvider,
         throw new CannotStartProcessException("A process listens on port " + port + " already: " + this);
     }
 
-    private @NotNull Socket connectOnce(int port) throws IOException, CannotStartProcessException {
+    /**
+     * Returns how long one connection attempt waits: for a language server which runs already, the shorter of
+     * {@link #ATTACH_TIMEOUT} and the start timeout; for one which this provider starts, the start timeout.
+     */
+    @NotNull
+    Duration connectTimeout() {
+        return commandLine == null && ATTACH_TIMEOUT.compareTo(startTimeout) < 0 ? ATTACH_TIMEOUT : startTimeout;
+    }
+
+    private @NotNull Socket connectOnce(int port, @NotNull Duration timeout) throws IOException, CannotStartProcessException {
         var attempt = new Socket();
         synchronized (this) {
             checkNotStopped();
@@ -321,7 +341,7 @@ public class SocketStreamConnectionProvider implements StreamConnectionProvider,
         }
         try {
             // stop() closes the attempt
-            attempt.connect(new InetSocketAddress(host, port), timeoutMillis());
+            attempt.connect(new InetSocketAddress(host, port), Math.toIntExact(timeout.toMillis()));
             return attempt;
         } catch (IOException e) {
             closeQuietly(attempt);
@@ -378,9 +398,12 @@ public class SocketStreamConnectionProvider implements StreamConnectionProvider,
             handler.addProcessListener(new ProcessListener() {
                 @Override
                 public void onTextAvailable(@NotNull ProcessEvent event, @NotNull Key outputType) {
-                    // The connection carries the protocol, so the output of the language server is its log
-                    if (ProcessOutputType.isStdout(outputType) || ProcessOutputType.isStderr(outputType)) {
-                        log(event.getText());
+                    // The connection carries the protocol, so the output of the language server is its log: its
+                    // standard output information, as it is free over a socket, and its standard error errors
+                    if (ProcessOutputType.isStdout(outputType)) {
+                        log(event.getText(), false);
+                    } else if (ProcessOutputType.isStderr(outputType)) {
+                        log(event.getText(), true);
                     }
                 }
 
@@ -408,11 +431,17 @@ public class SocketStreamConnectionProvider implements StreamConnectionProvider,
         }
     }
 
-    private void log(@NotNull String text) {
+    private void log(@NotNull String text, boolean error) {
         String line = text.endsWith("\r\n") ? text.substring(0, text.length() - 2)
                 : text.endsWith("\n") ? text.substring(0, text.length() - 1) : text;
         if (!line.isEmpty()) {
-            logErrorHandlers.forEach(handler -> handler.logError(line));
+            logErrorHandlers.forEach(handler -> {
+                if (error) {
+                    handler.logError(line);
+                } else {
+                    handler.logInfo(line);
+                }
+            });
         }
     }
 

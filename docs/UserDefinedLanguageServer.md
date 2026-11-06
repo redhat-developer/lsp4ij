@@ -95,7 +95,7 @@ ways, which are experimental:
 
 * `Attach to a running language server`: the language server runs already and listens on `Host` and `Port`, as when it
   runs in a debugger or inside another application. LSP4IJ doesn't start it, so the environment variables, the
-  `Command` and the working directory are hidden, and stopping the language server only closes the connection. Without a host, LSP4IJ connects to the loopback address.
+  `Command` and the working directory are hidden, and stopping the language server only closes the connection. Without a host, LSP4IJ connects to the loopback address. An attach that gets no answer within 10 seconds fails.
   The port is needed, since LSP4IJ can't choose it.
 * `Start the language server, LSP4IJ connects to it`: LSP4IJ starts the language server with the `Command`, and
   connects to the port once the language server accepts connections.
@@ -116,7 +116,8 @@ input and output unless it takes the port as `${port}`. A language server which 
 switched back to the standard input and output; set the socket again with a command that takes the port.
 
 LSP4IJ listens on the loopback address only. The output of a language server which LSP4IJ starts is shown in the `Log`
-tab of the [LSP console](./UserGuide.md#lsp-console), since the socket carries the protocol. As with any TCP transport
+tab of the [LSP console](./UserGuide.md#lsp-console), since the socket carries the protocol: its standard output as
+information, and its standard error as errors. As with any TCP transport
 of LSP, which has no handshake to authenticate its peer, any local process can connect to a loopback port: on a machine
 shared with other users, prefer the standard input and output.
 

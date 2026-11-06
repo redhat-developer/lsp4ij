@@ -128,6 +128,21 @@ public class UserDefinedSocketConnectionTest extends BasePlatformTestCase {
         }
     }
 
+    public void testEveryTransportSendsTheSameInitializationOptions() {
+        var definition = definition("server --stdio", "{\"provideFormatter\": true}");
+        LanguageServersRegistry.getInstance().addServerDefinition(getProject(), definition, List.of());
+        try {
+            Object overStdio = definition.createConnectionProvider(getProject()).getInitializationOptions(null);
+            definition.setTransport(new UserDefinedTransport(UserDefinedTransport.Mode.ATTACH, null, 6005));
+            Object overSocket = definition.createConnectionProvider(getProject()).getInitializationOptions(null);
+
+            assertNotNull(overSocket);
+            assertEquals(overStdio, overSocket);
+        } finally {
+            LanguageServersRegistry.getInstance().removeServerDefinition(getProject(), definition);
+        }
+    }
+
     private static UserDefinedLanguageServerDefinition definition(String commandLine, String initializationOptions) {
         return new UserDefinedLanguageServerDefinition(UUID.randomUUID().toString(), null, "Server", null, null,
                 commandLine, null, Map.of(), false, null, false, null, initializationOptions, null, null, null, null);

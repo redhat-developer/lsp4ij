@@ -132,8 +132,8 @@ public class SocketStreamConnectionProviderTest extends LightPlatformTestCase {
 
             writeLine(provider.getOutputStream(), "ping");
             assertEquals("ping", readLine(provider.getInputStream()));
-            // the output of the language server is its log
-            awaitLog(log, "listening on " + port);
+            // the output of the language server is its log, and its standard output is free, so information
+            awaitLog(log, "info: listening on " + port);
         } finally {
             reap(provider);
         }
@@ -152,7 +152,8 @@ public class SocketStreamConnectionProviderTest extends LightPlatformTestCase {
 
             writeLine(provider.getOutputStream(), "ping");
             assertEquals("ping", readLine(provider.getInputStream()));
-            awaitLog(log, "connecting to " + port);
+            // its standard error is errors
+            awaitLog(log, "error: connecting to " + port);
         } finally {
             reap(provider);
         }
@@ -170,7 +171,7 @@ public class SocketStreamConnectionProviderTest extends LightPlatformTestCase {
             assertEquals(-1, provider.getInputStream().read(new byte[8]));
             assertEquals(1, stops.get());
             // its last line has no line feed
-            awaitLog(log, "ended");
+            awaitLog(log, "error: ended");
             awaitExit(provider);
             assertFalse(provider.isAlive());
             assertEquals("reported once", 1, stops.get());
@@ -261,6 +262,17 @@ public class SocketStreamConnectionProviderTest extends LightPlatformTestCase {
         assertNull(provider.getInputStream());
     }
 
+    public void testAnAttachWaitsLessForItsConnectionThanAStart() {
+        var attach = SocketStreamConnectionProvider.attachTo(HOST, 6005);
+        // a language server which runs already accepts the connection at once, or never
+        assertEquals(SocketStreamConnectionProvider.ATTACH_TIMEOUT, attach.connectTimeout());
+        attach.setStartTimeout(Duration.ofSeconds(5));
+        assertEquals("a shorter start timeout bounds it", Duration.ofSeconds(5), attach.connectTimeout());
+
+        var start = SocketStreamConnectionProvider.startAndConnect(0, port -> java(ListeningServer.class, port));
+        assertEquals(SocketStreamConnectionProvider.DEFAULT_START_TIMEOUT, start.connectTimeout());
+    }
+
     public void testEachWayHasItsDirection() {
         assertSame(SocketStreamConnectionProvider.Direction.CONNECT,
                 SocketStreamConnectionProvider.attachTo(HOST, 6005).getDirection());
@@ -335,7 +347,7 @@ public class SocketStreamConnectionProviderTest extends LightPlatformTestCase {
                     throw new CompletionException(e);
                 }
             });
-            awaitLog(log, "waiting");
+            awaitLog(log, "error: waiting");
 
             provider.stop();
 
@@ -367,9 +379,22 @@ public class SocketStreamConnectionProviderTest extends LightPlatformTestCase {
         return stops;
     }
 
+    /**
+     * Returns the log of the given provider, each line led by its level, "info: " or "error: ".
+     */
     private static LinkedBlockingQueue<String> log(StreamConnectionProvider provider) {
         var log = new LinkedBlockingQueue<String>();
-        provider.addLogErrorHandler(log::add);
+        provider.addLogErrorHandler(new LanguageServerLogErrorHandler() {
+            @Override
+            public void logError(String error) {
+                log.add("error: " + error);
+            }
+
+            @Override
+            public void logInfo(String message) {
+                log.add("info: " + message);
+            }
+        });
         return log;
     }
 

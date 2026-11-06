@@ -66,6 +66,16 @@ public class TransportFieldsTest extends LightPlatformTestCase {
         assertEquals(new UserDefinedTransport(UserDefinedTransport.Mode.START_AND_ACCEPT, null, 0), fields.getTransport());
     }
 
+    public void testAClickUpdatesTheFieldsOnce() {
+        radio("language.server.transport.socket").doClick();
+        var changes = new AtomicInteger();
+        fields.addChangeListener(changes::incrementAndGet);
+
+        radio("language.server.socket.startAndConnect").doClick();
+
+        assertEquals("a click deselects one button and selects another, but updates once", 1, changes.get());
+    }
+
     public void testAFixedPortIsNotZero() {
         radio("language.server.transport.socket").doClick();
         radio("language.server.socket.port.fixed").doClick();

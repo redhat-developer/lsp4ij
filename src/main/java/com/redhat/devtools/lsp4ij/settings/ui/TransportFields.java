@@ -25,6 +25,7 @@ import org.jetbrains.annotations.Nullable;
 import javax.swing.*;
 import javax.swing.text.DefaultFormatterFactory;
 import javax.swing.text.NumberFormatter;
+import java.awt.event.ItemEvent;
 import java.net.InetAddress;
 import java.text.DecimalFormat;
 import java.text.ParseException;
@@ -83,7 +84,12 @@ final class TransportFields {
         typedPortCommits();
         setTransport(UserDefinedTransport.STDIO);
         for (var button : List.of(stdio, socket, attach, startAndConnect, startAndAccept, autoPort, fixedPort)) {
-            button.addItemListener(event -> update());
+            // a click deselects one button and selects another: update once, for the selection
+            button.addItemListener(event -> {
+                if (event.getStateChange() == ItemEvent.SELECTED) {
+                    update();
+                }
+            });
         }
         port.addChangeListener(event -> update());
     }

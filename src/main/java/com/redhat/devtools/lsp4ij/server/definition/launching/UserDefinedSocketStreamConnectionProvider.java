@@ -15,8 +15,6 @@ import com.intellij.execution.configurations.GeneralCommandLine;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.redhat.devtools.lsp4ij.server.SocketStreamConnectionProvider;
-import com.redhat.devtools.lsp4ij.settings.GlobalLanguageServerSettings;
-import com.redhat.devtools.lsp4ij.settings.LanguageServerSettings;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -47,20 +45,11 @@ public class UserDefinedSocketStreamConnectionProvider extends SocketStreamConne
 
     @Override
     public @Nullable JsonElement getInitializationOptions(@Nullable VirtualFile rootUri) {
-        // The settings parse the user's JSON into a JsonElement, or have none
-        var settings = settings();
-        return settings != null && settings.getLanguageServerInitializationOptions(project) instanceof JsonElement options
-                ? options : null;
+        return UserDefinedServerOptions.initializationOptions(serverDefinition, project);
     }
 
     @Override
     public @Nullable JsonElement getExperimentalFeaturesPOJO() {
-        var settings = settings();
-        return settings != null && settings.getLanguageServerExperimental(project) instanceof JsonElement experimental
-                ? experimental : null;
-    }
-
-    private @Nullable LanguageServerSettings.LanguageServerDefinitionSettings settings() {
-        return GlobalLanguageServerSettings.getInstance().getLanguageServerSettings(serverDefinition.getId());
+        return UserDefinedServerOptions.experimental(serverDefinition, project);
     }
 }
