@@ -108,7 +108,7 @@ public class WorkspaceFoldersPanelTest extends BasePlatformTestCase {
     }
 
     public void testTheRootOfATestedFileIsAnInstance() throws IOException {
-        var directory = localDirectory();
+        var directory = localContentRoot().toNioPath();
         Files.writeString(directory.resolve("lsp4ij-test-marker"), "");
         var folder = localFile(directory);
         var json = "{\"serverInstances\": {\"markers\": [\"lsp4ij-test-marker\"]}}";
@@ -149,7 +149,7 @@ public class WorkspaceFoldersPanelTest extends BasePlatformTestCase {
     }
 
     public void testAFolderInsideAnInstanceIsARowBelowIt() throws IOException {
-        var directory = localDirectory();
+        var directory = localContentRoot().toNioPath();
         Files.writeString(directory.resolve("instance-marker"), "");
         Files.createDirectories(directory.resolve("src"));
         Files.writeString(directory.resolve("src/folder-marker"), "");
@@ -166,7 +166,7 @@ public class WorkspaceFoldersPanelTest extends BasePlatformTestCase {
     }
 
     public void testAFolderOutsideAnInstanceGivesItsRoot() throws IOException {
-        var directory = localDirectory();
+        var directory = localContentRoot().toNioPath();
         Files.writeString(directory.resolve("folder-marker"), "");
         Files.createDirectories(directory.resolve("instance"));
         Files.writeString(directory.resolve("instance/instance-marker"), "");
@@ -182,7 +182,7 @@ public class WorkspaceFoldersPanelTest extends BasePlatformTestCase {
     }
 
     public void testRemovingTheLastFileOfAFolderRemovesItsInstanceToo() throws IOException {
-        var directory = localDirectory();
+        var directory = localContentRoot().toNioPath();
         Files.writeString(directory.resolve("instance-marker"), "");
         Files.createDirectories(directory.resolve("src"));
         Files.writeString(directory.resolve("src/folder-marker"), "");

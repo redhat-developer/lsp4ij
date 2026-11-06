@@ -163,6 +163,18 @@ public class ConfigurableWorkspaceFolderStrategy extends BaseWorkspaceFolderStra
                 // An instance runs in its root, so a marker above the project must not make that directory its root
                 return getTopmostContentRoot(file, project);
             }
+
+            @Override
+            public @Nullable WorkspaceFolder getWorkspaceFolderForFile(@NotNull VirtualFile file,
+                                                                       @NotNull Project project,
+                                                                       @NotNull FileUriSupport fileUriSupport) {
+                // Nor must a file outside the content roots of the project, whose search for markers would have no end.
+                // A project without content roots has no such limit
+                return ProjectRootManager.getInstance(project).getContentRoots().length > 0
+                        && getTopmostContentRoot(file, project) == null
+                        ? null
+                        : super.getWorkspaceFolderForFile(file, project, fileUriSupport);
+            }
         };
         try {
             rule.configure(ruleConfig.toString());

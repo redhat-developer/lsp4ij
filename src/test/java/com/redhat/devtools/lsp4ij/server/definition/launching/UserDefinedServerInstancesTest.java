@@ -13,6 +13,7 @@ import com.intellij.openapi.vfs.JarFileSystem;
 import com.intellij.openapi.vfs.LocalFileSystem;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.openapi.vfs.newvfs.impl.VfsRootAccess;
+import com.intellij.testFramework.PsiTestUtil;
 import com.intellij.testFramework.fixtures.BasePlatformTestCase;
 import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
 import com.redhat.devtools.lsp4ij.client.features.FileUriSupport;
@@ -78,6 +79,9 @@ public class UserDefinedServerInstancesTest extends BasePlatformTestCase {
 
     public void testTheConfigurationDecidesTheRootOfAFile() throws IOException {
         var root = localDirectory();
+        // An instance has its root in the project
+        PsiTestUtil.addContentRoot(getModule(), root);
+        Disposer.register(getTestRootDisposable(), () -> PsiTestUtil.removeContentEntry(getModule(), root));
         Files.writeString(root.toNioPath().resolve(MARKER), "");
         var file = localFile(root, "src/one.user-defined");
         addDefinition(null, "{\"serverInstances\": {\"markers\": [\"" + MARKER + "\"]}}");

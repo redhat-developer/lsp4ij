@@ -213,6 +213,7 @@ public class WorkspaceFolderStrategiesTest extends BasePlatformTestCase {
 
     public void testConfigurableStrategyCanAskForServerInstances() throws IOException {
         var root = localDirectory();
+        addContentRoot(root);
         localFile(root, MARKER);
         var file = localFile(root, "src/one.txt");
         var strategy = new ConfigurableWorkspaceFolderStrategy();
@@ -227,6 +228,7 @@ public class WorkspaceFolderStrategiesTest extends BasePlatformTestCase {
 
     public void testConfigurableStrategyDescribesTheFoldersInsideAnInstance() throws IOException {
         var root = localDirectory();
+        addContentRoot(root);
         localFile(root, MARKER);
         localFile(root, "src/" + FOLDER_MARKER);
         var file = localFile(root, "src/one.txt");
@@ -389,6 +391,7 @@ public class WorkspaceFolderStrategiesTest extends BasePlatformTestCase {
 
     public void testAWorkspaceFolderBelongsToTheInstanceThatItsDirectoryHas() throws IOException {
         var parent = localDirectory();
+        addContentRoot(parent);
         localFile(parent, "instance/" + MARKER);
         localFile(parent, "instance/src/" + FOLDER_MARKER);
         localFile(parent, "instance/nested/" + MARKER);
@@ -429,6 +432,17 @@ public class WorkspaceFolderStrategiesTest extends BasePlatformTestCase {
         } finally {
             PsiTestUtil.removeContentEntry(getModule(), project);
         }
+    }
+
+    public void testAFileOutsideTheProjectHasNoRootOfAnInstance() throws IOException {
+        var outside = localDirectory();
+        localFile(outside, MARKER);
+        var file = localFile(outside, "one.txt");
+        var strategy = new ConfigurableWorkspaceFolderStrategy();
+        strategy.configure("{\"serverInstances\": {\"markers\": [\"" + MARKER + "\"]}}");
+
+        // No instance runs outside the project, though the directory of the file has a marker
+        assertNull(rootOf(strategy, file));
     }
 
     public void testTheRootOfAnInstanceIsTheNearestMarkerInTheProject() throws IOException {
@@ -520,6 +534,14 @@ public class WorkspaceFolderStrategiesTest extends BasePlatformTestCase {
 
     private @NotNull VirtualFile sourceRoot() {
         return ModuleRootManager.getInstance(getModule()).getSourceRoots()[0];
+    }
+
+    /**
+     * Makes the given directory a content root of the project for the test: an instance has its root in the project.
+     */
+    private void addContentRoot(@NotNull VirtualFile directory) {
+        PsiTestUtil.addContentRoot(getModule(), directory);
+        Disposer.register(getTestRootDisposable(), () -> PsiTestUtil.removeContentEntry(getModule(), directory));
     }
 
     private @NotNull VirtualFile localDirectory() throws IOException {
