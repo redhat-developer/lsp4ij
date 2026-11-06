@@ -9,14 +9,23 @@ package com.redhat.devtools.lsp4ij.features;
 
 import com.intellij.codeInsight.hints.InlayHintsSink;
 import com.intellij.codeInsight.hints.NoSettings;
+import com.intellij.openapi.editor.EditorFactory;
+import com.intellij.openapi.editor.ScrollingModel;
+import com.intellij.openapi.editor.event.EditorFactoryEvent;
+import com.intellij.openapi.editor.event.VisibleAreaEvent;
+import com.intellij.openapi.editor.event.VisibleAreaListener;
+import com.intellij.openapi.editor.ex.EditorEx;
 import com.intellij.openapi.project.Project;
 import com.intellij.psi.PsiFile;
+import com.intellij.testFramework.PlatformTestUtil;
 import com.intellij.testFramework.UsefulTestCase;
 import com.intellij.testFramework.fixtures.IdeaProjectTestFixture;
 import com.intellij.testFramework.fixtures.IdeaTestFixtureFactory;
 import com.intellij.testFramework.fixtures.TestFixtureBuilder;
+import com.redhat.devtools.lsp4ij.LSPFileSupport;
 import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
 import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
+import com.redhat.devtools.lsp4ij.features.codeLens.LSPCodeLensEditorFactoryListener;
 import com.redhat.devtools.lsp4ij.features.color.LSPColorProvider;
 import com.redhat.devtools.lsp4ij.features.foldingRange.LSPFoldingRangeBuilder;
 import com.redhat.devtools.lsp4ij.fixtures.LSPCodeInsightTestFixture;
@@ -26,8 +35,13 @@ import com.redhat.devtools.lsp4ij.mock.MockLanguageServerDefinition;
 import com.redhat.devtools.lsp4ij.server.CannotStartProcessException;
 import com.redhat.devtools.lsp4ij.server.StreamConnectionProvider;
 import com.redhat.devtools.lsp4ij.templates.ServerMappingSettings;
+import org.eclipse.lsp4j.CodeLensParams;
+import org.eclipse.lsp4j.TextDocumentIdentifier;
 import org.jetbrains.annotations.NotNull;
 
+import java.awt.Rectangle;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.util.ArrayList;
 import java.util.List;
@@ -66,6 +80,48 @@ public class ServerStartFailureTest extends UsefulTestCase {
 
         assertEmpty(LSPFoldingRangeBuilder.getFoldingRanges(file));
         assertServerCannotStart(file.getProject());
+    }
+
+    public void testAScrollOfAnEditorWhoseCodeLensesFailedDoesNotThrow() {
+        PsiFile file = myFixture.configureByText("main.foo", "a\nb\nc\n");
+        // The visible area of an editor never changes in a headless test, so the listener that
+        // LSPCodeLensEditorFactoryListener attaches to the editor's scrolling model is taken to be called directly
+        var editor = (EditorEx) myFixture.getEditor();
+        var scrollingModel = editor.getScrollingModel();
+        List<VisibleAreaListener> listeners = new ArrayList<>();
+        var listenedScrollingModel = (ScrollingModel) Proxy.newProxyInstance(ScrollingModel.class.getClassLoader(),
+                new Class<?>[]{ScrollingModel.class}, (proxy, method, args) -> {
+                    if (method.getName().equals("addVisibleAreaListener")) {
+                        listeners.add((VisibleAreaListener) args[0]);
+                        return null;
+                    }
+                    return invoke(method, scrollingModel, args);
+                });
+        var listenedEditor = (EditorEx) Proxy.newProxyInstance(EditorEx.class.getClassLoader(),
+                new Class<?>[]{EditorEx.class}, (proxy, method, args) -> method.getName().equals("getScrollingModel")
+                        ? listenedScrollingModel : invoke(method, editor, args));
+        new LSPCodeLensEditorFactoryListener().editorCreated(new EditorFactoryEvent(EditorFactory.getInstance(), listenedEditor));
+        assertSize(1, listeners);
+        // What LSPCodeLensProvider does for each editor of the file when code vision asks for its lenses
+        var support = LSPFileSupport.getSupport(file).getCodeLensSupport();
+        LSPCodeLensEditorFactoryListener.setCodelensSupport(listenedEditor, support);
+        var codeLenses = support.getCodeLenses(new CodeLensParams(new TextDocumentIdentifier()));
+        PlatformTestUtil.waitWithEventsDispatching("the code lens request must end", codeLenses::isDone, 10);
+        assertTrue(codeLenses.isCompletedExceptionally());
+
+        // A scroll of the editor, on the UI thread
+        listeners.get(0).visibleAreaChanged(new VisibleAreaEvent(listenedEditor,
+                new Rectangle(0, 0, 800, 600), new Rectangle(0, 10, 800, 600)));
+
+        assertServerCannotStart(file.getProject());
+    }
+
+    private static Object invoke(Method method, Object target, Object[] args) throws Throwable {
+        try {
+            return method.invoke(target, args);
+        } catch (InvocationTargetException e) {
+            throw e.getCause();
+        }
     }
 
     private void assertServerCannotStart(@NotNull Project project) {

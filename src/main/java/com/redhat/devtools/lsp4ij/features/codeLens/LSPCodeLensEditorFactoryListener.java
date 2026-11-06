@@ -26,6 +26,7 @@ import org.jetbrains.annotations.Nullable;
 import java.awt.*;
 
 import static com.redhat.devtools.lsp4ij.internal.ApplicationUtils.runCancellableReadAction;
+import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.isDoneNormally;
 
 /**
  * Listens to editor events and manages the context for unresolved code lenses.
@@ -171,9 +172,10 @@ public class LSPCodeLensEditorFactoryListener implements EditorFactoryListener {
                 return;
             }
 
-            // Get valid LSP codelens future.
+            // Get valid LSP codelens future. A request that failed, as when the language server cannot start, has no
+            // code lenses, and getNow() would throw its failure on the UI thread.
             var resultFuture = codeLensSupport.getFuture();
-            if (resultFuture != null && resultFuture.isDone()) {
+            if (isDoneNormally(resultFuture)) {
                 var result = resultFuture.getNow(null);
                 if (result == null) {
                     return;
