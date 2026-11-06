@@ -40,6 +40,7 @@ public class CommandUtilsTest {
     @After
     public void tearDown() {
         CommandUtils.CommandLineEnvCustomizerReflection.setTestCustomizeEnv(null);
+        CommandUtils.CommandLineEnvCustomizerReflection.setTestCustomizers(null);
     }
 
     @Test

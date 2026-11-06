@@ -61,15 +61,22 @@ public class CommandUtils {
     static final Key<Map<String, String>> BASE_ENV_KEY = Key.create("LSP4IJ_BASE_ENVIRONMENT");
 
     /** Caches reflective access to the optional IntelliJ command-line environment customizer API. */
-    static final class CommandLineEnvCustomizerReflection {
+    public static final class CommandLineEnvCustomizerReflection {
 
         private static final Method CUSTOMIZE_ENV;
         private static volatile Method testCustomizeEnv;
+        private static volatile Object[] testCustomizers;
 
         static {
             CUSTOMIZE_ENV = findCustomizeEnvMethod(COMMAND_LINE_ENV_CUSTOMIZER_CLASS);
         }
 
+        /**
+         * Resolves the {@code customizeEnv} method of {@code CommandLineEnvCustomizer} via reflection.
+         *
+         * @param className the fully qualified class name of the customizer interface.
+         * @return the resolved {@link Method}, or null if the class or method is unavailable.
+         */
         static Method findCustomizeEnvMethod(String className) {
             try {
                 Class<?> customizerClass = Class.forName(className);
@@ -86,13 +93,22 @@ public class CommandUtils {
             return testMethod != null ? testMethod : CUSTOMIZE_ENV;
         }
 
+        static Object[] getTestCustomizers() {
+            return testCustomizers;
+        }
+
         static boolean isAvailable() {
             return getCustomizeEnv() != null;
         }
 
         @org.jetbrains.annotations.TestOnly
-        static void setTestCustomizeEnv(@Nullable Method method) {
+        public static void setTestCustomizeEnv(@Nullable Method method) {
             testCustomizeEnv = method;
+        }
+
+        @org.jetbrains.annotations.TestOnly
+        public static void setTestCustomizers(@Nullable Object[] customizers) {
+            testCustomizers = customizers;
         }
     }
 
@@ -141,6 +157,14 @@ public class CommandUtils {
         }
     }
 
+    /**
+     * Creates a {@link GeneralCommandLine} from the given command line and environment settings.
+     *
+     * @param commandLine the command line string to execute.
+     * @param userEnvironmentVariables explicitly configured user environment variables.
+     * @param includeSystemEnvironmentVariables whether to inherit system environment variables.
+     * @return the initialized command line.
+     */
     @NotNull
     public static GeneralCommandLine createCommandLine(@NotNull String commandLine,
                                                        @NotNull Map<String, String> userEnvironmentVariables,
@@ -148,6 +172,16 @@ public class CommandUtils {
         return createCommandLine(commandLine, null, userEnvironmentVariables, includeSystemEnvironmentVariables);
     }
 
+    /**
+     * Creates a {@link GeneralCommandLine} from the given command line, working directory,
+     * and environment settings, applying directory-aware environment customizers when available.
+     *
+     * @param commandLine the command line string to execute.
+     * @param workingDir the working directory, or null if unspecified.
+     * @param userEnvironmentVariables explicitly configured user environment variables.
+     * @param includeSystemEnvironmentVariables whether to inherit system environment variables.
+     * @return the initialized and customized command line.
+     */
     @NotNull
     public static GeneralCommandLine createCommandLine(@NotNull String commandLine,
                                                        @Nullable String workingDir,
@@ -173,6 +207,13 @@ public class CommandUtils {
         return generalCommandLine;
     }
 
+    /**
+     * Resolves the canonical path of the command line's working directory,
+     * falling back to the absolute path if canonicalization fails.
+     *
+     * @param commandLine the command line whose working directory is resolved.
+     * @return the canonical or absolute path, or null if no working directory is set.
+     */
     @Nullable
     private static String getWorkDirectoryPath(@NotNull GeneralCommandLine commandLine) {
         File workDirectory = commandLine.getWorkDirectory();
@@ -209,24 +250,30 @@ public class CommandUtils {
             return;
         }
 
-        Application application = ApplicationManager.getApplication();
-        if (application == null) {
-            return;
-        }
+        Object[] testCustomizers = CommandLineEnvCustomizerReflection.getTestCustomizers();
+        Object[] customizers;
+        if (testCustomizers != null) {
+            customizers = testCustomizers;
+        } else {
+            Application application = ApplicationManager.getApplication();
+            if (application == null) {
+                return;
+            }
 
-        ExtensionPoint<Object> ep;
-        try {
-            ep = application.getExtensionArea().getExtensionPointIfRegistered(COMMAND_LINE_ENV_CUSTOMIZER_EP);
-        } catch (Exception | LinkageError e) {
-            checkFatalOrControlFlow(e);
-            LOG.warn("Failed to retrieve command-line environment customizer extension point", e);
-            return;
-        }
-        if (ep == null) {
-            return;
-        }
+            ExtensionPoint<Object> ep;
+            try {
+                ep = application.getExtensionArea().getExtensionPointIfRegistered(COMMAND_LINE_ENV_CUSTOMIZER_EP);
+            } catch (Exception | LinkageError e) {
+                checkFatalOrControlFlow(e);
+                LOG.warn("Failed to retrieve command-line environment customizer extension point", e);
+                return;
+            }
+            if (ep == null) {
+                return;
+            }
 
-        Object[] customizers = ep.getExtensions();
+            customizers = ep.getExtensions();
+        }
         if (customizers.length == 0) {
             return;
         }
@@ -345,6 +392,8 @@ public class CommandUtils {
     /**
      * Rethrows fatal JVM errors and IntelliJ control-flow/cancellation exceptions.
      * Ordinary exceptions and non-fatal linkage errors are not rethrown.
+     *
+     * @param t the throwable to check, or null.
      */
     static void checkFatalOrControlFlow(@Nullable Throwable t) {
         if (t instanceof VirtualMachineError || t instanceof ThreadDeath) {

@@ -108,11 +108,28 @@ public abstract class DebugAdapterDescriptor implements DebuggableFile {
         return processHandler;
     }
 
+    /**
+     * Creates the command line used to launch the DAP server process without a working directory.
+     *
+     * @param command the command string to execute.
+     * @return the initialized command line.
+     * @throws ExecutionException if the command string is blank.
+     */
     protected @NotNull GeneralCommandLine createStartServerCommandLine(@Nullable String command) throws ExecutionException {
         return createStartServerCommandLine(null, command, Collections.emptyMap(), false);
-
     }
 
+    /**
+     * Creates the command line used to launch the DAP server process, validating the working
+     * directory and applying directory-aware environment customizers when available.
+     *
+     * @param workingDirectory the effective working directory, or null if none is configured.
+     * @param command the command string to execute.
+     * @param userEnvironmentVariables user-configured environment variables.
+     * @param includeSystemEnvironmentVariables whether system environment variables should be included.
+     * @return the initialized and customized command line.
+     * @throws ExecutionException if the command string is blank.
+     */
     protected @NotNull GeneralCommandLine createStartServerCommandLine(@Nullable String workingDirectory,
                                                                        @Nullable String command,
                                                                        @NotNull Map<String, String> userEnvironmentVariables,
