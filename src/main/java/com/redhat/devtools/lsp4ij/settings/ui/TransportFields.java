@@ -217,6 +217,27 @@ final class TransportFields {
     }
 
     /**
+     * Returns the error of a transport that can serve one language server instance only, for a language server with
+     * several instances: a running language server, which every instance would reach, or a fixed port, on which only
+     * one of them can listen or be reached.
+     *
+     * @return the error of the transport, or null if each instance can have one of its own.
+     */
+    @Nullable
+    ValidationInfo validateForServerInstances() {
+        if (!socket.isSelected()) {
+            return null;
+        }
+        if (attach.isSelected()) {
+            return new ValidationInfo(message("language.server.validation.socket.instances.attach"), attach);
+        }
+        if (fixedPort.isSelected()) {
+            return new ValidationInfo(message("language.server.validation.socket.instances.port"), port);
+        }
+        return null;
+    }
+
+    /**
      * Shows the fields which the selected transport uses, and tells the listeners.
      */
     private void update() {

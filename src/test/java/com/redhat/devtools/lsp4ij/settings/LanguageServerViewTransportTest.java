@@ -143,6 +143,32 @@ public class LanguageServerViewTransportTest extends BasePlatformTestCase {
         assertTrue(error, error.contains(LanguageServerBundle.message("language.server.validation.json.initializationOptions")));
     }
 
+    public void testInstancesCanNotShareARunningLanguageServer() {
+        view.setWorkspaceFolderStrategyConfiguration("{\"serverInstances\": {}}");
+        view.setTransport(new UserDefinedTransport(UserDefinedTransport.Mode.ATTACH, "127.0.0.1", 6005));
+
+        assertEquals(LanguageServerBundle.message("language.server.validation.socket.instances.attach"), applyError());
+        assertEquals("nothing is saved", ACCEPT, savedTransport());
+    }
+
+    public void testInstancesCanNotShareAFixedPort() {
+        view.setWorkspaceFolderStrategyConfiguration("{\"serverInstances\": {}}");
+        view.setTransport(new UserDefinedTransport(UserDefinedTransport.Mode.START_AND_CONNECT, null, 4389));
+
+        assertEquals(LanguageServerBundle.message("language.server.validation.socket.instances.port"), applyError());
+        assertEquals("nothing is saved", ACCEPT, savedTransport());
+    }
+
+    public void testInstancesWithAnAutoPortAreSaved() throws ConfigurationException {
+        var connect = new UserDefinedTransport(UserDefinedTransport.Mode.START_AND_CONNECT, null, 0);
+        view.setWorkspaceFolderStrategyConfiguration("{\"serverInstances\": {}}");
+        view.setTransport(connect);
+
+        view.apply();
+
+        assertEquals(connect, savedTransport());
+    }
+
     private @NotNull String applyError() {
         try {
             view.apply();

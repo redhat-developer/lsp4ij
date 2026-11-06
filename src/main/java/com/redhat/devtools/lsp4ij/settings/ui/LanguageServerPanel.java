@@ -39,6 +39,7 @@ import com.intellij.util.ui.NamedColorUtil;
 import com.intellij.util.ui.UIUtil;
 import com.intellij.util.ui.components.BorderLayoutPanel;
 import com.redhat.devtools.lsp4ij.LanguageServerBundle;
+import com.redhat.devtools.lsp4ij.features.workspaceFolder.ConfigurableWorkspaceFolderStrategy;
 import com.redhat.devtools.lsp4ij.features.workspaceFolder.WorkspaceFolderStrategy;
 import com.redhat.devtools.lsp4ij.installation.CommandLineUpdater;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
@@ -834,7 +835,20 @@ public class LanguageServerPanel implements Disposable {
             return new ValidationInfo(LanguageServerBundle.message("language.server.validation.socket.port.macro",
                     UserDefinedTransport.PORT_MACRO), commandLine);
         }
-        return null;
+        return hasServerInstances() ? transportFields.validateForServerInstances() : null;
+    }
+
+    /**
+     * Returns true if the workspace folder configuration asks for several language server instances.
+     */
+    private boolean hasServerInstances() {
+        var configuration = workspaceFoldersPanel != null ? workspaceFoldersPanel.getJsonConfiguration() : null;
+        if (configuration == null) {
+            return false;
+        }
+        var strategy = new ConfigurableWorkspaceFolderStrategy();
+        strategy.configure(configuration);
+        return strategy.hasServerInstances();
     }
 
     private void addJsonError(@NotNull @PropertyKey(resourceBundle = BUNDLE) String fieldKey,
