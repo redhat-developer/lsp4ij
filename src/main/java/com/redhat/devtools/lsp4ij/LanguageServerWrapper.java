@@ -21,9 +21,12 @@ import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.fileEditor.FileEditorManager;
 import com.intellij.openapi.fileEditor.FileEditorManagerListener;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.project.ProjectUtil;
 import com.intellij.openapi.util.Disposer;
+import com.intellij.openapi.util.io.FileUtil;
 import com.intellij.openapi.util.ModificationTracker;
 import com.intellij.openapi.util.SimpleModificationTracker;
+import com.intellij.openapi.vfs.VfsUtilCore;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.openapi.vfs.VirtualFileManager;
 import com.intellij.openapi.vfs.impl.BulkVirtualFileListenerAdapter;
@@ -132,6 +135,7 @@ public class LanguageServerWrapper implements Disposable {
     @Nullable
     protected final URI initialPath;
     private final @Nullable WorkspaceFolder instanceRoot;
+    private volatile @Nullable String instanceLabel;
 
     // The last stop that runs in the background, for a stop that comes while it is running
     private CompletableFuture<Void> runningStop = CompletableFuture.completedFuture(null);
@@ -1735,6 +1739,41 @@ public class LanguageServerWrapper implements Disposable {
     }
 
     /**
+     * Returns the name of this language server instance for the user: the path of its root relative to the project's
+     * directory, the name of its root if that is the project's directory, or its full path outside the project.
+     *
+     * @return the name of this language server instance, and null if one instance serves the whole project.
+     */
+    @ApiStatus.Internal
+    public @Nullable String getInstanceLabel() {
+        var root = instanceRoot;
+        if (root == null) {
+            return null;
+        }
+        var label = instanceLabel;
+        if (label == null) {
+            var directory = LSPIJUtils.findResourceFor(root.getUri());
+            if (directory == null) {
+                label = root.getName();
+            } else {
+                var projectDirectory = ProjectUtil.guessProjectDir(initialProject);
+                var relativePath = projectDirectory != null && !projectDirectory.equals(directory)
+                        ? VfsUtilCore.getRelativePath(directory, projectDirectory, '/')
+                        : null;
+                if (relativePath != null) {
+                    label = relativePath;
+                } else if (directory.equals(projectDirectory)) {
+                    label = directory.getName();
+                } else {
+                    label = FileUtil.getLocationRelativeToUserHome(directory.getPresentableUrl());
+                }
+            }
+            instanceLabel = label;
+        }
+        return label;
+    }
+
+    /**
      * Returns true if the language server got the given file with didOpen and follows its changes. Unlike
      * {@link #isConnectedTo(URI)}, this doesn't count an entry that only keeps what the language server reported about
      * a file that is open in the editor.
@@ -2502,6 +2541,12 @@ public class LanguageServerWrapper implements Disposable {
                 clientFeatures.dispose();
                 clientFeatures = null;
             }
+        }
+        var notification = errorNotification;
+        if (notification != null) {
+            // Its actions would keep this language server, which no longer starts
+            errorNotification = null;
+            notification.expire();
         }
         getLanguageServerLifecycleManager().onDisposed(this);
     }

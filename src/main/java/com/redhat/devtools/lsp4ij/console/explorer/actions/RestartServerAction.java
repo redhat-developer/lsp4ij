@@ -16,6 +16,7 @@ package com.redhat.devtools.lsp4ij.console.explorer.actions;
 import com.intellij.openapi.actionSystem.AnActionEvent;
 import com.intellij.openapi.project.DumbAware;
 import com.intellij.ui.treeStructure.Tree;
+import com.redhat.devtools.lsp4ij.LanguageServerManager;
 import com.redhat.devtools.lsp4ij.LanguageServerWrapper;
 import org.jetbrains.annotations.NotNull;
 
@@ -29,8 +30,21 @@ public class RestartServerAction extends TreeAction implements DumbAware {
     @Override
     protected void actionPerformed(@NotNull Tree tree, @NotNull AnActionEvent e) {
         LanguageServerWrapper languageServer = getSelectedLanguageServer(tree);
-        if (languageServer != null) {
+        if (languageServer == null) {
+            return;
+        }
+        if (!languageServer.isDisposed()) {
             languageServer.restart();
+            return;
+        }
+        // The node stays after its language server went, and starts the one of its root, which takes the node over
+        var options = new LanguageServerManager.StartOptions().setForceStart(true).setWillEnable(true);
+        var manager = LanguageServerManager.getInstance(languageServer.getProject());
+        var instanceRoot = languageServer.getInstanceRoot();
+        if (instanceRoot != null) {
+            manager.start(languageServer.getServerDefinition().getId(), instanceRoot, options);
+        } else {
+            manager.start(languageServer.getServerDefinition(), options);
         }
     }
 }

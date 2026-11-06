@@ -14,6 +14,7 @@
 package com.redhat.devtools.lsp4ij.console.explorer;
 
 import com.redhat.devtools.lsp4ij.LanguageServerWrapper;
+import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
 import com.redhat.devtools.lsp4ij.ServerStatus;
 import com.redhat.devtools.lsp4ij.lifecycle.LanguageServerLifecycleListener;
 import org.eclipse.lsp4j.jsonrpc.MessageConsumer;
@@ -106,10 +107,21 @@ public class LanguageServerExplorerLifecycleListener implements LanguageServerLi
 
     @Override
     public void handleDisposed(@NotNull LanguageServerWrapper languageServer) {
+        // Its node stays, with its traces and logs, until a language server with its root takes it over
         invokeLaterIfNeeded(() -> {
-            if (!explorer.isDisposed()) {
-                explorer.removeProcessNode(languageServer);
+            if (explorer.isDisposed()) {
+                return;
             }
+            var serverNode = explorer.findNodeForServer(languageServer.getServerDefinition());
+            if (serverNode == null) {
+                return;
+            }
+            var processTreeNode = serverNode.findProcessTreeNode(languageServer);
+            if (processTreeNode != null && processTreeNode.getLanguageServer() == languageServer) {
+                // The stop of a disposed language server says stopping and nothing after, but no process runs any more
+                processTreeNode.setServerStatus(ServerStatus.stopped);
+            }
+            refreshProcessNodes(serverNode);
         });
     }
 
@@ -123,12 +135,25 @@ public class LanguageServerExplorerLifecycleListener implements LanguageServerLi
         }
         LanguageServerProcessTreeNode processTreeNode;
         boolean created = false;
+        boolean takenOver = false;
         // Instances of one definition can start at the same time
         synchronized (serverNode) {
-            processTreeNode = serverNode.getProcessTreeNode(languageServer);
+            processTreeNode = serverNode.findProcessTreeNode(languageServer.getInstanceRoot());
+            if (processTreeNode != null && processTreeNode.getLanguageServer() != languageServer) {
+                if (languageServer.isDisposed() || !isGone(processTreeNode.getLanguageServer())) {
+                    // A late status of a language server which went, or which another one with its root replaced
+                    return null;
+                }
+                // The node shows the language server that replaces the one it showed, as for a restart
+                processTreeNode.setLanguageServer(languageServer);
+                if (serverStatus == null) {
+                    serverStatus = languageServer.getServerStatus();
+                }
+                takenOver = true;
+            }
             if (processTreeNode == null) {
                 if (languageServer.isDisposed()) {
-                    // Its node is gone, and a late status must not bring it back
+                    // A late status must not bring back the node of a language server which went with its definition
                     return null;
                 }
                 var treeModel = explorer.getTreeModel();
@@ -138,19 +163,20 @@ public class LanguageServerExplorerLifecycleListener implements LanguageServerLi
                     serverStatus = languageServer.getServerStatus();
                 }
                 selectProcess = true;
-                serverNode.add(processTreeNode);
+                serverNode.insert(processTreeNode, serverNode.getInsertionIndex(processTreeNode));
                 created = true;
             }
         }
         boolean serverStatusChanged = serverStatus != null && serverStatus != processTreeNode.getServerStatus();
-        boolean updateUI = serverStatusChanged || selectProcess;
+        boolean updateUI = serverStatusChanged || selectProcess || takenOver;
         if (updateUI) {
             final var node = processTreeNode;
             final var status = serverStatus;
             final var select = selectProcess;
             final var inserted = created;
+            final var replaced = takenOver;
             invokeLaterIfNeeded(() -> {
-                // The language server or its definition can have gone in the meantime, and the node with them
+                // The definition can have gone in the meantime, and the node with it
                 if (explorer.isDisposed() || node.getRoot() != explorer.getTreeModel().getRoot()) {
                     return;
                 }
@@ -159,8 +185,12 @@ public class LanguageServerExplorerLifecycleListener implements LanguageServerLi
                     // children again: another thread can have added a node, and an insert event would show it twice.
                     explorer.getTreeModel().nodeStructureChanged(serverNode);
                 }
-                if (serverStatusChanged) {
-                    node.setServerStatus(status);
+                // A status that comes once another language server took the node over is no longer the node's, and one
+                // that comes after the disposal of its language server, as from another thread, must not outlast it
+                if ((serverStatusChanged || replaced) && node.getLanguageServer() == languageServer) {
+                    node.setServerStatus(languageServer.isDisposed() ? ServerStatus.stopped : status);
+                    // A stop or start changes the enabled flag of the definition, which the other nodes show too
+                    refreshProcessNodes(serverNode);
                 }
                 if (select && !explorer.isEditingCommand(serverNode)) {
                     // The LSP console is selected only if the command used to start the language server is not editing.
@@ -169,6 +199,24 @@ public class LanguageServerExplorerLifecycleListener implements LanguageServerLi
             });
         }
         return processTreeNode;
+    }
+
+    /**
+     * Returns true if the given language server went or was replaced: it is disposed, or no longer one of the started
+     * language servers, as the one made for an installation never is.
+     */
+    private static boolean isGone(@NotNull LanguageServerWrapper languageServer) {
+        return languageServer.isDisposed()
+                || languageServer.getProject().isDisposed()
+                || !LanguageServiceAccessor.getInstance(languageServer.getProject()).getStartedServers().contains(languageServer);
+    }
+
+    private static void refreshProcessNodes(@NotNull LanguageServerTreeNode serverNode) {
+        for (int i = 0; i < serverNode.getChildCount(); i++) {
+            if (serverNode.getChildAt(i) instanceof LanguageServerProcessTreeNode processTreeNode) {
+                processTreeNode.refresh();
+            }
+        }
     }
 
     private void showTrace(LanguageServerProcessTreeNode processTreeNode, String message) {

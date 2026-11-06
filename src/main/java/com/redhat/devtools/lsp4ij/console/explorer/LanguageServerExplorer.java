@@ -24,7 +24,6 @@ import com.intellij.ui.AnimatedIcon;
 import com.intellij.ui.PopupHandler;
 import com.intellij.ui.treeStructure.Tree;
 import com.intellij.util.concurrency.AppExecutorUtil;
-import com.redhat.devtools.lsp4ij.LanguageServerWrapper;
 import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
 import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
 import com.redhat.devtools.lsp4ij.ServerStatus;
@@ -334,31 +333,6 @@ public class LanguageServerExplorer extends SimpleToolWindowPanel implements Dis
      */
     public void removeConsolePanel(LanguageServerTreeNode serverTreeNode) {
         panel.removeConsolePanel(serverTreeNode);
-    }
-
-    /**
-     * Removes the process node of the given language server and its console panel.
-     *
-     * @param languageServer the language server.
-     */
-    void removeProcessNode(@NotNull LanguageServerWrapper languageServer) {
-        var serverNode = findNodeForServer(languageServer.getServerDefinition());
-        if (serverNode == null) {
-            return;
-        }
-        LanguageServerProcessTreeNode processNode;
-        synchronized (serverNode) {
-            processNode = serverNode.getProcessTreeNode(languageServer);
-            if (processNode == null) {
-                return;
-            }
-            boolean selected = tree.isPathSelected(new TreePath(processNode.getPath()));
-            getTreeModel().removeNodeFromParent(processNode);
-            if (selected) {
-                selectAndExpand(serverNode);
-            }
-        }
-        panel.removeConsolePanel(processNode);
     }
 
     public DefaultTreeModel getTreeModel() {

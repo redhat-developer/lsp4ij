@@ -51,6 +51,7 @@ import com.redhat.devtools.lsp4ij.settings.LanguageServerView;
 import com.redhat.devtools.lsp4ij.settings.LanguageServerSettingsListener;
 import org.eclipse.lsp4j.MessageParams;
 import org.eclipse.lsp4j.MessageType;
+import org.eclipse.lsp4j.WorkspaceFolder;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.TestOnly;
@@ -195,12 +196,17 @@ public class LSPConsoleToolWindowPanel extends SimpleToolWindowPanel implements 
     }
 
     /**
-     * Select the "Log tab" of the LSP console of the given language server.
+     * Select the "Log tab" of the LSP console of the language server instance with the given root, or of the given
+     * definition if it has none.
      *
-     * @param languageServer the language server.
+     * @param serverDefinition the language server definition.
+     * @param instanceRoot     the root of the language server instance, or null for a language server without one.
+     * @param project          the project.
      */
-    public static void selectLogTab(@NotNull LanguageServerWrapper languageServer) {
-        invokeOnPanel(languageServer.getProject(), panel -> panel.selectLogTabOf(languageServer));
+    public static void selectLogTab(@NotNull LanguageServerDefinition serverDefinition,
+                                    @Nullable WorkspaceFolder instanceRoot,
+                                    @NotNull Project project) {
+        invokeOnPanel(project, panel -> panel.selectLogTab(serverDefinition, instanceRoot));
     }
 
     private static void invokeOnPanel(@NotNull Project project,
@@ -397,23 +403,10 @@ public class LSPConsoleToolWindowPanel extends SimpleToolWindowPanel implements 
      * @param serverTreeNode the language server tree node.
      */
     public void removeConsolePanel(LanguageServerTreeNode serverTreeNode) {
-        removeConsolePanelOf(serverTreeNode);
-    }
-
-    /**
-     * Remove the console panel of the given language server process tree node.
-     *
-     * @param processTreeNode the language server process tree node.
-     */
-    public void removeConsolePanel(LanguageServerProcessTreeNode processTreeNode) {
-        removeConsolePanelOf(processTreeNode);
-    }
-
-    private void removeConsolePanelOf(DefaultMutableTreeNode treeNode) {
         if (consoles == null || isDisposed()) {
             return;
         }
-        consoles.dispose(treeNode);
+        consoles.dispose(serverTreeNode);
     }
 
     @Override
@@ -515,7 +508,7 @@ public class LSPConsoleToolWindowPanel extends SimpleToolWindowPanel implements 
         if (serverNode == null) {
             return;
         }
-        showLog(params, serverNode.getProcessTreeNode(languageServer));
+        showLog(params, serverNode.findProcessTreeNode(languageServer));
     }
 
     private void showLog(@NotNull MessageParams params,
@@ -546,19 +539,22 @@ public class LSPConsoleToolWindowPanel extends SimpleToolWindowPanel implements 
     }
 
     /**
-     * Select "Log" tab for the given language server.
+     * Select "Log" tab for the language server instance with the given root, or for the definition if it has none.
      *
-     * @param languageServer the language server.
+     * @param serverDefinition the language server definition.
+     * @param instanceRoot     the root of the language server instance, or null for a language server without one.
      */
-    private void selectLogTabOf(@NotNull LanguageServerWrapper languageServer) {
+    private void selectLogTab(@NotNull LanguageServerDefinition serverDefinition,
+                              @Nullable WorkspaceFolder instanceRoot) {
         if (isDisposed()) {
             return;
         }
-        LanguageServerTreeNode serverNode = explorer.findNodeForServer(languageServer.getServerDefinition());
+        LanguageServerTreeNode serverNode = explorer.findNodeForServer(serverDefinition);
         if (serverNode == null) {
             return;
         }
-        selectLogTab(serverNode.getProcessTreeNode(languageServer));
+        var processTreeNode = serverNode.findProcessTreeNode(instanceRoot);
+        selectLogTab(processTreeNode != null ? processTreeNode : serverNode.getActiveProcessTreeNode());
     }
 
     private void selectLogTab(@Nullable LanguageServerProcessTreeNode processTreeNode) {
@@ -758,8 +754,12 @@ public class LSPConsoleToolWindowPanel extends SimpleToolWindowPanel implements 
             }
             serverDefinitionListeners.clear();
             super.dispose();
+            // Both are registered on the tool window panel, which would keep them until the project closes
             if (tracesConsoleView != null) {
                 tracesConsoleView.dispose();
+            }
+            if (logsConsoleView != null) {
+                logsConsoleView.dispose();
             }
         }
 

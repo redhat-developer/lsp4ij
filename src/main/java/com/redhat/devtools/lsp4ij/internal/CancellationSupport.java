@@ -217,7 +217,11 @@ public class CancellationSupport implements CancelChecker {
                                                      @NotNull Exception error) {
         var languageServerDefinition = languageServer.getServerDefinition();
         var project = languageServer.getProject();
-        String languageServerName = languageServerDefinition.getDisplayName();
+        String instanceLabel = languageServer.getInstanceLabel();
+        // An instance of the language server says which one it is
+        String languageServerName = instanceLabel != null
+                ? languageServerDefinition.getDisplayName() + " (" + instanceLabel + ")"
+                : languageServerDefinition.getDisplayName();
         String content = error.getMessage();
         Notification notification = new Notification(ServerMessageHandler.LSP_WINDOW_SHOW_MESSAGE_GROUP_ID,
                 languageServerName,
