@@ -96,7 +96,11 @@ public class NewLanguageServerDialog extends DialogWrapper {
 
             @Override
             public void setCommandLine(String commandLine) {
-                ApplicationManager.getApplication().invokeLater(() -> languageServerPanel.setCommandLine(commandLine));
+                ApplicationManager.getApplication().invokeLater(() -> {
+                    languageServerPanel.setCommandLine(commandLine);
+                    // The installer's command is written for the standard input and output, unless it takes the port
+                    languageServerPanel.setTransport(languageServerPanel.getTransport().forInstalledCommand(commandLine));
+                });
             }
         });
 

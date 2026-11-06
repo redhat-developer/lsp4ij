@@ -108,6 +108,10 @@ start that gets no connection within 60 seconds fails. For instance, with a lang
 
 ![Socket transport](./images/user-defined-ls/SocketTransport.png)
 
+An [installer](#installer-tab) which sets the `Command` writes the command of its template, which is for the standard
+input and output unless it takes the port as `${port}`. A language server which LSP4IJ starts over a socket is then
+switched back to the standard input and output; set the socket again with a command that takes the port.
+
 LSP4IJ listens on the loopback address only. The output of a language server which LSP4IJ starts is shown in the `Log`
 tab of the [LSP console](./UserGuide.md#lsp-console), since the socket carries the protocol. As with any TCP transport
 of LSP, which has no handshake to authenticate its peer, any local process can connect to a loopback port: on a machine

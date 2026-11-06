@@ -131,4 +131,19 @@ public record UserDefinedTransport(@NotNull Mode mode, @Nullable String host, in
     public static @NotNull String withPort(@NotNull String commandLine, int port) {
         return commandLine.replace(PORT_MACRO, String.valueOf(port));
     }
+
+    /**
+     * Returns the transport to use with a command which an installer sets. An installer's command is written for the
+     * standard input and output unless it takes the port as {@value #PORT_MACRO}, so a language server which LSP4IJ
+     * starts over a socket is started over its standard input and output instead: with the installer's command, it
+     * would never listen on the port, or connect to it. A language server which runs already doesn't use the command,
+     * so it keeps its socket.
+     *
+     * @param command the command which the installer sets.
+     * @return the transport to use with that command.
+     */
+    public @NotNull UserDefinedTransport forInstalledCommand(@Nullable String command) {
+        boolean startedOverSocket = mode == Mode.START_AND_CONNECT || mode == Mode.START_AND_ACCEPT;
+        return startedOverSocket && (command == null || !command.contains(PORT_MACRO)) ? STDIO : this;
+    }
 }

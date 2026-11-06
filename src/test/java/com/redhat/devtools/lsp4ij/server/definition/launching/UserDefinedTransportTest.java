@@ -58,4 +58,23 @@ public class UserDefinedTransportTest {
                 UserDefinedTransport.withPort("server --port ${port} --log server-${port}.log", 4389));
         assertEquals("server --stdio", UserDefinedTransport.withPort("server --stdio", 4389));
     }
+
+    @Test
+    void anInstallerCommandWithoutThePortStartsTheLanguageServerOverItsStandardInputAndOutput() {
+        for (var mode : new UserDefinedTransport.Mode[]{UserDefinedTransport.Mode.START_AND_CONNECT, UserDefinedTransport.Mode.START_AND_ACCEPT}) {
+            for (int port : new int[]{0, 4389}) {
+                var transport = new UserDefinedTransport(mode, null, port);
+                assertSame(UserDefinedTransport.STDIO, transport.forInstalledCommand("node server.js --stdio"));
+                assertSame(UserDefinedTransport.STDIO, transport.forInstalledCommand(null));
+                assertSame(transport, transport.forInstalledCommand("node server.js --socket=${port}"));
+            }
+        }
+    }
+
+    @Test
+    void anInstallerCommandLeavesTheTransportOfALanguageServerWhichDoesNotUseIt() {
+        var running = new UserDefinedTransport(UserDefinedTransport.Mode.ATTACH, "localhost", 6005);
+        assertSame(running, running.forInstalledCommand("node server.js --stdio"));
+        assertSame(UserDefinedTransport.STDIO, UserDefinedTransport.STDIO.forInstalledCommand("node server.js --socket=${port}"));
+    }
 }
