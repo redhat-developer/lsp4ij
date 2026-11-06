@@ -99,7 +99,7 @@ public class LSPCodeLensEditorFactoryListener implements EditorFactoryListener {
                 lastViewportLine);
     }
 
-    private static boolean updateViewportLinesAndRefreshCodeVision(@NotNull CodeLensDataResult result,
+    private static boolean updateViewportLinesAndRefreshCodeVision(@Nullable CodeLensDataResult result,
                                                                    @NotNull Rectangle newRect,
                                                                    @NotNull LSPCodeLensSupport codeLensSupport,
                                                                    @NotNull UnresolvedCodeLensViewportContext context,
@@ -119,8 +119,10 @@ public class LSPCodeLensEditorFactoryListener implements EditorFactoryListener {
             context.updateViewportLines(newRect);
         }
 
-        // Step 2: Refresh code visions
-        updateViewportLinesAndRefreshCodeVision(result, codeLensSupport, context);
+        // Step 2: Refresh code visions, if there are code lenses
+        if (result != null) {
+            updateViewportLinesAndRefreshCodeVision(result, codeLensSupport, context);
+        }
         return true;
     }
 
@@ -175,26 +177,23 @@ public class LSPCodeLensEditorFactoryListener implements EditorFactoryListener {
             // Get valid LSP codelens future. A request that failed, as when the language server cannot start, has no
             // code lenses, and getNow() would throw its failure on the UI thread.
             var resultFuture = codeLensSupport.getFuture();
-            if (isDoneNormally(resultFuture)) {
-                var result = resultFuture.getNow(null);
-                if (result == null) {
-                    return;
-                }
+            // The viewport is updated also while there are no code lenses, as while the request runs or after it
+            // failed, since the code lenses of a later result are resolved in it
+            var result = isDoneNormally(resultFuture) ? resultFuture.getNow(null) : null;
 
-                // call of context.updateViewportLines requires EDT+ReadAction
-                if (!updateViewportLinesAndRefreshCodeVision(result, newRect, codeLensSupport, context, false)) {
-                    // Use NonBlockingReadAction to safely read PSI and file data
-                    ReadAction.nonBlocking(() -> {
-                                return null;
-                            })
-                            .expireWhen(() -> editor.isDisposed())
-                            .coalesceBy(editor, LSPCodeLensEditorFactoryListener.this)
-                            .finishOnUiThread(ModalityState.any(), unused -> {
-                                // Refresh Code visions by forcing ReadAction if needed
-                                updateViewportLinesAndRefreshCodeVision(result, newRect, codeLensSupport, context, true);
-                            })
-                            .submit(AppExecutorUtil.getAppExecutorService());
-                }
+            // call of context.updateViewportLines requires EDT+ReadAction
+            if (!updateViewportLinesAndRefreshCodeVision(result, newRect, codeLensSupport, context, false)) {
+                // Use NonBlockingReadAction to safely read PSI and file data
+                ReadAction.nonBlocking(() -> {
+                            return null;
+                        })
+                        .expireWhen(() -> editor.isDisposed())
+                        .coalesceBy(editor, LSPCodeLensEditorFactoryListener.this)
+                        .finishOnUiThread(ModalityState.any(), unused -> {
+                            // Refresh Code visions by forcing ReadAction if needed
+                            updateViewportLinesAndRefreshCodeVision(result, newRect, codeLensSupport, context, true);
+                        })
+                        .submit(AppExecutorUtil.getAppExecutorService());
             }
         });
     }

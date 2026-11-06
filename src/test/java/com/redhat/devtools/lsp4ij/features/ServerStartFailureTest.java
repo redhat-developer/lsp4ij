@@ -84,9 +84,42 @@ public class ServerStartFailureTest extends UsefulTestCase {
 
     public void testAScrollOfAnEditorWhoseCodeLensesFailedDoesNotThrow() {
         PsiFile file = myFixture.configureByText("main.foo", "a\nb\nc\n");
-        // The visible area of an editor never changes in a headless test, so the listener that
-        // LSPCodeLensEditorFactoryListener attaches to the editor's scrolling model is taken to be called directly
-        var editor = (EditorEx) myFixture.getEditor();
+        var scrolled = listenToScrolls((EditorEx) myFixture.getEditor());
+        failCodeLenses(file, scrolled.editor());
+
+        // A scroll of the editor, on the UI thread
+        scrolled.listener().visibleAreaChanged(new VisibleAreaEvent(scrolled.editor(),
+                new Rectangle(0, 0, 800, 600), new Rectangle(0, 10, 800, 600)));
+
+        assertServerCannotStart(file.getProject());
+    }
+
+    public void testAScrollOfAnEditorWhoseCodeLensesFailedUpdatesItsViewport() {
+        // The code lenses of a later result, as once the server is fixed and restarted, are resolved in the viewport
+        PsiFile file = myFixture.configureByText("main.foo", "line\n".repeat(100));
+        var scrolled = listenToScrolls((EditorEx) myFixture.getEditor());
+        failCodeLenses(file, scrolled.editor());
+        int lineHeight = scrolled.editor().getLineHeight();
+        var top = new Rectangle(0, 0, 800, 10 * lineHeight);
+        var below = new Rectangle(0, 50 * lineHeight, 800, 10 * lineHeight);
+        scrolled.listener().visibleAreaChanged(new VisibleAreaEvent(scrolled.editor(), new Rectangle(), top));
+
+        scrolled.listener().visibleAreaChanged(new VisibleAreaEvent(scrolled.editor(), top, below));
+
+        assertEquals(50, LSPCodeLensEditorFactoryListener.getCodeLensResolveContext(scrolled.editor()).getFirstViewportLine());
+    }
+
+    /**
+     * An editor and the listener that LSPCodeLensEditorFactoryListener attaches to its scrolling model.
+     */
+    private record ScrolledEditor(EditorEx editor, VisibleAreaListener listener) {
+    }
+
+    /**
+     * Returns the editor with the listener that LSPCodeLensEditorFactoryListener attaches to its scrolling model. The
+     * visible area of an editor never changes in a headless test, so the listener is called directly.
+     */
+    private static ScrolledEditor listenToScrolls(EditorEx editor) {
         var scrollingModel = editor.getScrollingModel();
         List<VisibleAreaListener> listeners = new ArrayList<>();
         var listenedScrollingModel = (ScrollingModel) Proxy.newProxyInstance(ScrollingModel.class.getClassLoader(),
@@ -102,18 +135,19 @@ public class ServerStartFailureTest extends UsefulTestCase {
                         ? listenedScrollingModel : invoke(method, editor, args));
         new LSPCodeLensEditorFactoryListener().editorCreated(new EditorFactoryEvent(EditorFactory.getInstance(), listenedEditor));
         assertSize(1, listeners);
-        // What LSPCodeLensProvider does for each editor of the file when code vision asks for its lenses
+        return new ScrolledEditor(listenedEditor, listeners.get(0));
+    }
+
+    /**
+     * Asks for the code lenses of the file for the editor, as LSPCodeLensProvider does for each editor of the file when
+     * code vision asks for them, and waits for the request to fail, since the language server cannot start.
+     */
+    private static void failCodeLenses(PsiFile file, EditorEx editor) {
         var support = LSPFileSupport.getSupport(file).getCodeLensSupport();
-        LSPCodeLensEditorFactoryListener.setCodelensSupport(listenedEditor, support);
+        LSPCodeLensEditorFactoryListener.setCodelensSupport(editor, support);
         var codeLenses = support.getCodeLenses(new CodeLensParams(new TextDocumentIdentifier()));
         PlatformTestUtil.waitWithEventsDispatching("the code lens request must end", codeLenses::isDone, 10);
         assertTrue(codeLenses.isCompletedExceptionally());
-
-        // A scroll of the editor, on the UI thread
-        listeners.get(0).visibleAreaChanged(new VisibleAreaEvent(listenedEditor,
-                new Rectangle(0, 0, 800, 600), new Rectangle(0, 10, 800, 600)));
-
-        assertServerCannotStart(file.getProject());
     }
 
     private static Object invoke(Method method, Object target, Object[] args) throws Throwable {
