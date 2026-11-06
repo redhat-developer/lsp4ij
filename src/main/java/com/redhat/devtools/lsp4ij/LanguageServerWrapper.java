@@ -168,7 +168,7 @@ public class LanguageServerWrapper implements Disposable {
     private ServerCapabilities serverCapabilities;
     private volatile @Nullable Alarm stopAlarm = null;
     private ServerStatus serverStatus;
-    private boolean disposed;
+    private volatile boolean disposed;
     private LanguageServerException serverError;
     private Long currentProcessId;
     private List<String> currentProcessCommandLines;
@@ -178,7 +178,7 @@ public class LanguageServerWrapper implements Disposable {
 
     private LSPClientFeatures clientFeatures;
     // error notification displayed when server start fails.
-    private @Nullable Notification errorNotification;
+    private volatile @Nullable Notification errorNotification;
     private @Nullable TracingMessageConsumer tracing;
     private volatile @Nullable ConcurrentLinkedQueue<LSPTrace> traces;
     private @Nullable Alarm traceFlushAlarm;
@@ -790,7 +790,13 @@ public class LanguageServerWrapper implements Disposable {
                 errorNotification.expire();
             }
             // Show start server error notification.
-            errorNotification = showNotificationError(this, "Cannot start server", serverError);
+            var notification = showNotificationError(this, "Cannot start server", serverError);
+            errorNotification = notification;
+            if (isDisposed()) {
+                // A dispose while it was shown didn't see it, and its actions would keep this language server
+                errorNotification = null;
+                notification.expire();
+            }
         }
     }
 

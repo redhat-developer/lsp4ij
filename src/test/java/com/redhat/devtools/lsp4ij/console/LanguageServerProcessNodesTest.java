@@ -593,6 +593,29 @@ public class LanguageServerProcessNodesTest extends LSPCodeInsightFixtureTestCas
         assertTrue(notification.isExpired());
     }
 
+    public void testACannotStartNotificationShownWhileItsLanguageServerIsDisposedExpires() {
+        List<Notification> notifications = new CopyOnWriteArrayList<>();
+        definition.cannotStart = true;
+        var failing = instance("c");
+        project.getMessageBus().connect(getTestRootDisposable()).subscribe(Notifications.TOPIC, new Notifications() {
+            @Override
+            public void notify(@NotNull Notification notification) {
+                if ("Cannot start server".equals(notification.getSubtitle())) {
+                    notifications.add(notification);
+                    // As the notification is shown, before its language server has it
+                    Disposer.dispose(failing);
+                }
+            }
+        });
+
+        failing.restart();
+
+        PlatformTestUtil.waitWithEventsDispatching("The start must fail with a notification",
+                () -> !notifications.isEmpty() && failing.isDisposed(), TIMEOUT);
+        PlatformTestUtil.waitWithEventsDispatching("The notification must expire",
+                () -> notifications.get(0).isExpired(), TIMEOUT);
+    }
+
     public void testShowLogsForADefinitionSelectsItsFirstProcessNode() {
         startBoth();
         var action = new ShowErrorLogAction(definition, project);
