@@ -36,9 +36,9 @@ import com.redhat.devtools.lsp4ij.internal.PsiFileCancelChecker;
 import com.redhat.devtools.lsp4ij.internal.editor.EditorFeatureManager;
 import com.redhat.devtools.lsp4ij.internal.editor.EditorFeatureType;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
-import org.eclipse.lsp4j.WorkspaceFolder;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinitionListener;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerFileAssociation;
+import org.eclipse.lsp4j.WorkspaceFolder;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -587,7 +587,7 @@ public class LanguageServiceAccessor implements Disposable {
                     if (file == null) {
                         collectStartedInstances(serverDefinition, matchedServers, beforeStartingServerFilter);
                     } else if (instanceChoices.containsKey(serverDefinition)) {
-                        collectInstanceOfFile(serverDefinition, instanceChoices.get(serverDefinition), matchedServers, beforeStartingServerFilter);
+                        collectInstanceOfFile(file, serverDefinition, instanceChoices.get(serverDefinition), matchedServers, beforeStartingServerFilter);
                     }
                     continue;
                 }
@@ -773,11 +773,22 @@ public class LanguageServiceAccessor implements Disposable {
     /**
      * Adds the language server instance that serves a file, and creates it if needed.
      */
-    private void collectInstanceOfFile(@NotNull LanguageServerDefinition serverDefinition,
+    private void collectInstanceOfFile(@NotNull VirtualFile file,
+                                       @NotNull LanguageServerDefinition serverDefinition,
                                        @NotNull InstanceChoice choice,
                                        @NotNull Set<LanguageServerWrapper> matchedServers,
                                        @Nullable Predicate<LSPClientFeatures> beforeStartingServerFilter) {
-        var instance = choice.connected() != null ? choice.connected() : findInstance(serverDefinition, choice.root());
+        LanguageServerWrapper instance;
+        if (choice.connected() != null) {
+            // The choice was made before the monitor was entered, and a replacement can have removed the instance since.
+            // The file then goes to the instance that has it now, or to none, until the replacement connects it again
+            instance = startedServers.contains(choice.connected()) ? choice.connected() : findInstanceConnectedTo(file, serverDefinition);
+            if (instance == null) {
+                return;
+            }
+        } else {
+            instance = findInstance(serverDefinition, choice.root());
+        }
         boolean created = instance == null;
         if (created) {
             instance = LanguageServerWrapper.forInstanceRoot(project, serverDefinition, choice.root());
