@@ -157,6 +157,9 @@ class LSPFileListener extends AbstractLSPFileListener {
             // is sent when the last editor of the file has closed.
             return;
         }
+        // Counted before the disconnection, so that a connection asked for before the close does not connect the file
+        // after it. The setup participant counts it too, but the editor listeners are called in no defined order.
+        ConnectDocumentToLanguageServerSetupParticipant.countEditorClose(file);
         // Manage textDocument/didClose
         try {
             // Disconnect the given file from the current language servers

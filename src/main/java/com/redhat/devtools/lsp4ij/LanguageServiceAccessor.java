@@ -429,6 +429,9 @@ public class LanguageServiceAccessor implements Disposable {
         boolean readAccessAllowed = ApplicationManager.getApplication().isReadAccessAllowed();
         Document document = readAccessAllowed || (!writeAccessAllowed) ? LSPIJUtils.getDocument(psiFile) : null;
         var file = psiFile.getVirtualFile();
+        // A close of the file's last editor after this, as when a feature of the editor asks just as it closes,
+        // disconnects the file, which the connection made later must not connect again
+        int editorCloses = ConnectDocumentToLanguageServerSetupParticipant.getEditorCloses(file);
 
         // Try to get document, languageId information (used by didOpen) for each matched language server wrapper
         // since here we should be in Read Action allowed
@@ -462,7 +465,7 @@ public class LanguageServiceAccessor implements Disposable {
                                                         if (info == null) {
                                                             info = new LanguageServerWrapper.LSPFileConnectionInfo(document, null, null, !writeAccessAllowed);
                                                         }
-                                                        return scope == null ? wrapper.connect(file, info) : wrapper.connect(file, info, scope);
+                                                        return scope == null ? wrapper.connect(file, info, editorCloses) : wrapper.connect(file, info, scope);
                                                     }
                                                     return CompletableFuture.completedFuture(null);
                                                 }).thenAccept(server -> {

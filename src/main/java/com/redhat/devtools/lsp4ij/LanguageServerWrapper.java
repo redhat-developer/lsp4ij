@@ -872,7 +872,18 @@ public class LanguageServerWrapper implements Disposable {
         synchronized (documentsLock) {
             promoteConnection(toUri(file));
         }
-        return connectDocument(file, fileConnectionInfo, null);
+        return connectDocument(file, fileConnectionInfo, null, null);
+    }
+
+    /**
+     * Connects the file as {@link #connect(VirtualFile, LSPFileConnectionInfo)} does, for a connection asked for when
+     * the last editor of the file had closed the given number of times. A close of the file's last editor since then
+     * disconnects the file, which this connection then leaves disconnected: it gives no language server.
+     */
+    CompletableFuture<@Nullable LanguageServer> connect(@NotNull VirtualFile file,
+                                                        @NotNull LSPFileConnectionInfo fileConnectionInfo,
+                                                        int editorCloses) {
+        return connectDocument(file, fileConnectionInfo, null, editorCloses);
     }
 
     CompletableFuture<@Nullable LanguageServer> connect(@NotNull VirtualFile file,
@@ -890,7 +901,7 @@ public class LanguageServerWrapper implements Disposable {
             claim = new DocumentConnectionClaim(uri, connection, new AtomicBoolean());
         }
         scope.register(() -> releaseConnection(file, claim));
-        return connectDocument(file, info, claim);
+        return connectDocument(file, info, claim, null);
     }
 
     private void promoteConnection(@Nullable URI uri) {
@@ -903,6 +914,16 @@ public class LanguageServerWrapper implements Disposable {
     private boolean isCurrent(@Nullable DocumentConnectionClaim claim) {
         return claim == null || (!claim.released().get()
                 && scopedDocuments.get(claim.uri()) == claim.connection());
+    }
+
+    /**
+     * Returns true if the last editor of the file has closed since a connection was asked for, when it had closed the
+     * given number of times. A connection with no number is not checked. A close is counted before its disconnection
+     * takes documentsLock, so a caller that holds the lock and finds no new close connects the file before the close
+     * disconnects it.
+     */
+    private static boolean isEditorClosedSince(@NotNull VirtualFile file, @Nullable Integer editorCloses) {
+        return editorCloses != null && ConnectDocumentToLanguageServerSetupParticipant.getEditorCloses(file) != editorCloses;
     }
 
     private void releaseConnection(@NotNull VirtualFile file, @NotNull DocumentConnectionClaim claim) {
@@ -935,7 +956,8 @@ public class LanguageServerWrapper implements Disposable {
 
     private CompletableFuture<@Nullable LanguageServer> connectDocument(@NotNull VirtualFile file,
                                                                         @NotNull LSPFileConnectionInfo fileConnectionInfo,
-                                                                        @Nullable DocumentConnectionClaim claim) {
+                                                                        @Nullable DocumentConnectionClaim claim,
+                                                                        @Nullable Integer editorCloses) {
         removeStopTimer();
 
         URI fileUri = toUri(file);
@@ -947,7 +969,7 @@ public class LanguageServerWrapper implements Disposable {
         boolean waitForDidOpen = fileConnectionInfo.waitForDidOpen();
         DocumentContentSynchronizer connected;
         synchronized (documentsLock) {
-            if (!isCurrent(claim)) {
+            if (!isCurrent(claim) || isEditorClosedSince(file, editorCloses)) {
                 return CompletableFuture.completedFuture(null);
             }
             if (claim == null) {
@@ -1013,8 +1035,9 @@ public class LanguageServerWrapper implements Disposable {
             DocumentContentSynchronizer synchronizer;
             synchronized (documentsLock) {
                 // A stop which replaced the attempt after this check disconnects the document once this lock is
-                // released, as it disconnects every opened document
-                if (!isCurrent(claim) || currentInitializingContext != attempt) {
+                // released, as it disconnects every opened document. So does a close of the file's last editor.
+                if (!isCurrent(claim) || currentInitializingContext != attempt
+                        || isEditorClosedSince(file, editorCloses)) {
                     return CompletableFuture.completedFuture(null);
                 }
                 if (claim == null) {
