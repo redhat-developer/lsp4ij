@@ -26,17 +26,23 @@ import org.eclipse.lsp4j.DiagnosticSeverity;
 import org.eclipse.lsp4j.Position;
 import org.eclipse.lsp4j.Range;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
+import java.net.URI;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Verifies that the Project view's problem files follow the errors of a file as it opens and closes: LSP4IJ drops the
  * file's closed document when it opens, and clears its problem when it closes.
  */
 public class ClosedDocumentProblemTest extends LSPCodeInsightFixtureTestCase {
+
+    // set if the clear that testAClearMadeWhileTheProjectIsDisposedNeverRuns submits runs
+    private final AtomicBoolean clearRan = new AtomicBoolean();
 
     public ClosedDocumentProblemTest() {
         super("*.foo");
@@ -191,6 +197,41 @@ public class ClosedDocumentProblemTest extends LSPCodeInsightFixtureTestCase {
         } finally {
             notReporting.getServer().waitBeforeTearDown();
             LanguageServersRegistry.getInstance().removeServerDefinition(project, notReporting);
+        }
+    }
+
+    public void testAReportMadeWhileTheProjectIsDisposedNeverRuns() {
+        var project = myFixture.getProject();
+        var other = myFixture.addFileToProject("other.foo", "other").getVirtualFile();
+        // A language server is a child of its project, and stopping it as the project is disposed reports the files
+        // that it disconnects. That report waits for the write action which disposes the project, and must not run
+        // after it: the project's services are gone. The tear down disposes the project, then waits for the pending
+        // read actions and fails on one that failed
+        Disposer.register(project, () -> LSPDiagnosticUtils.reportProblem(other, null, project));
+    }
+
+    public void testAClearMadeWhileTheProjectIsDisposedNeverRuns() {
+        var project = myFixture.getProject();
+        // The clear's first step, before it submits any report, which is guarded on its own
+        var features = new LSPClientFeatures() {
+            @Override
+            public @Nullable VirtualFile findFileByUri(@NotNull String fileUri) {
+                clearRan.set(true);
+                return null;
+            }
+        };
+        // As for a report, the clear that stopping a language server submits as the project is disposed waits for the
+        // write action which disposes it, and must not run after it. The tear down checks that it didn't
+        Disposer.register(project, () -> LSPDiagnosticUtils.clearProblem(Set.of(URI.create("file:///cleared.foo")), features, project));
+    }
+
+    @Override
+    protected void tearDown() throws Exception {
+        try {
+            super.tearDown();
+        } finally {
+            // The tear down disposed the project and waited for the pending read actions, a clear's among them
+            assertFalse("a clear submitted as the project is disposed must not run after it", clearRan.get());
         }
     }
 

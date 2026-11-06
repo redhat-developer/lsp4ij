@@ -73,6 +73,10 @@ public class LSPDiagnosticUtils {
                     return null;
                 })
                 .coalesceBy(LSP4IJ_REPORT_PROBLEM_SOURCE, file, project)
+                // A report submitted as the project closes, as by the language servers that stop with it, must not
+                // run once the project is disposed. The project is disposed in a write action, so this check, made in
+                // the read action, holds until the report ends
+                .expireWhen(project::isDisposed)
                 .submit(AppExecutorUtil.getAppExecutorService());
     }
 
@@ -175,6 +179,8 @@ public class LSPDiagnosticUtils {
                     return null;
                 })
                 .coalesceBy(fileUris, clientFeatures, project)
+                // As the reports it submits, the clear never runs once the project is disposed
+                .expireWhen(project::isDisposed)
                 .submit(AppExecutorUtil.getAppExecutorService());
     }
 }
