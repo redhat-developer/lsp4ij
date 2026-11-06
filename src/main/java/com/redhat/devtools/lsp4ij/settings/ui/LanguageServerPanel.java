@@ -28,6 +28,7 @@ import com.intellij.ui.ContextHelpLabel;
 import com.intellij.ui.HyperlinkLabel;
 import com.intellij.ui.PortField;
 import com.intellij.ui.components.JBCheckBox;
+import com.intellij.ui.components.JBLabel;
 import com.intellij.ui.components.JBScrollPane;
 import com.intellij.ui.components.JBTabbedPane;
 import com.intellij.ui.components.JBTextField;
@@ -86,6 +87,8 @@ public class LanguageServerPanel implements Disposable {
     private HyperlinkLabel editJsonSchemaAction;
     private JBTextField serverName;
     private @Nullable EnvironmentVariablesComponent environmentVariables;
+    // the fields of a language server which LSP4IJ starts, hidden for one which runs already
+    private final List<JComponent> startedServerFields = new ArrayList<>();
     private CommandLineWidget commandLine;
     private TextFieldWithBrowseButton workingDir;
     private @Nullable TransportFields transportFields;
@@ -270,14 +273,16 @@ public class LanguageServerPanel implements Disposable {
             createServerNameField(serverTab);
         }
         if (uiConfiguration.isShowCommandLine()) {
+            // Standard input and output, or a socket, first: it decides which of the other fields are used
+            createTransportFields(serverTab);
             environmentVariables = new EnvironmentVariablesComponent();
             serverTab.addComponent(environmentVariables);
+            startedServerFields.add(environmentVariables);
             // Command line
             createCommandLineField(serverTab);
             // Working directory
             createWorkingDirField(serverTab);
-            // Standard input and output, or a socket
-            createTransportFields(serverTab);
+            updateCommandFields();
         }
     }
 
@@ -435,8 +440,10 @@ public class LanguageServerPanel implements Disposable {
         scrollPane.setMinimumSize(new Dimension(JBUIScale.scale(600), JBUIScale.scale(100)));
         JLabel previewCommandLabel = createLabelForComponent("", scrollPane);
         updatePreviewCommand(commandLine, previewCommandLabel, project);
-        builder.addLabeledComponent(LanguageServerBundle.message("language.server.command"), scrollPane, true);
+        var commandLabel = new JBLabel(LanguageServerBundle.message("language.server.command"));
+        builder.addLabeledComponent(commandLabel, scrollPane, true);
         builder.addComponent(previewCommandLabel, 0);
+        startedServerFields.addAll(List.of(commandLabel, scrollPane, previewCommandLabel));
     }
 
     private void createWorkingDirField(@NotNull FormBuilder builder) {
@@ -444,27 +451,28 @@ public class LanguageServerPanel implements Disposable {
         workingDir.addBrowseFolderListener(new TextBrowseFolderListener(FileChooserDescriptorFactory.createSingleFolderDescriptor(), project));
         JLabel previewWorkingDirLabel = createLabelForComponent("", workingDir);
         updatePreviewWorkingDir(workingDir, previewWorkingDirLabel, project);
-        builder.addLabeledComponent(LanguageServerBundle.message("language.server.workingDir"), workingDir);
+        var workingDirLabel = new JBLabel(LanguageServerBundle.message("language.server.workingDir"));
+        builder.addLabeledComponent(workingDirLabel, workingDir);
         builder.addComponent(previewWorkingDirLabel, 0);
+        startedServerFields.addAll(List.of(workingDirLabel, workingDir, previewWorkingDirLabel));
     }
 
     private void createTransportFields(@NotNull FormBuilder builder) {
         transportFields = new TransportFields();
         transportFields.addTo(builder);
         transportFields.addChangeListener(this::updateCommandFields);
-        updateCommandFields();
     }
 
     /**
-     * Enables the command line and working directory for a language server which LSP4IJ starts.
+     * Shows the environment variables, the command line and the working directory only for a language server which
+     * LSP4IJ starts. Hidden, they keep what was typed.
      */
     private void updateCommandFields() {
         boolean startsLanguageServer = getTransport().startsLanguageServer();
-        if (commandLine != null) {
-            commandLine.setEnabled(startsLanguageServer);
-        }
-        if (workingDir != null) {
-            workingDir.setEnabled(startsLanguageServer);
+        startedServerFields.forEach(field -> field.setVisible(startsLanguageServer));
+        if (!startedServerFields.isEmpty() && startedServerFields.get(0).getParent() instanceof JComponent form) {
+            form.revalidate();
+            form.repaint();
         }
     }
 

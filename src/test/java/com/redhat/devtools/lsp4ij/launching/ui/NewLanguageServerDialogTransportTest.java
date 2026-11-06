@@ -7,17 +7,24 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.launching.ui;
 
+import com.intellij.execution.configuration.EnvironmentVariablesComponent;
 import com.intellij.openapi.ui.DialogWrapper;
 import com.intellij.openapi.ui.ValidationInfo;
 import com.intellij.testFramework.fixtures.BasePlatformTestCase;
+import com.intellij.ui.components.JBRadioButton;
 import com.redhat.devtools.lsp4ij.LanguageServerBundle;
 import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
 import com.redhat.devtools.lsp4ij.launching.templates.LanguageServerTemplate;
 import com.redhat.devtools.lsp4ij.server.definition.launching.UserDefinedLanguageServerDefinition;
 import com.redhat.devtools.lsp4ij.server.definition.launching.UserDefinedTransport;
+import com.redhat.devtools.lsp4ij.settings.ui.CommandLineWidget;
 import com.redhat.devtools.lsp4ij.templates.ServerTemplate;
 import org.jetbrains.annotations.NotNull;
 
+import javax.swing.*;
+import java.awt.*;
+
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -82,6 +89,36 @@ public class NewLanguageServerDialogTransportTest extends BasePlatformTestCase {
         }
     }
 
+    public void testTheTransportComesFirstAndARunningLanguageServerHidesTheFieldsItDoesNotUse() {
+        var dialog = dialog(template("node server.js --stdio", RUNNING));
+        try {
+            // the server name field is in the dialog's form; without a window, its top is the topmost parent
+            Component top = dialog.getPreferredFocusedComponent();
+            while (top.getParent() != null) {
+                top = top.getParent();
+            }
+            List<Component> form = components(top);
+            var command = (CommandLineWidget) form.stream().filter(CommandLineWidget.class::isInstance).findFirst().orElseThrow();
+            var environment = form.stream().filter(EnvironmentVariablesComponent.class::isInstance).findFirst().orElseThrow();
+            var stdio = (JBRadioButton) form.stream()
+                    .filter(component -> component instanceof JBRadioButton button
+                            && LanguageServerBundle.message("language.server.transport.stdio").equals(button.getText()))
+                    .findFirst().orElseThrow();
+            assertTrue("the transport decides which fields follow it", form.indexOf(stdio) < form.indexOf(command));
+
+            var commandPane = SwingUtilities.getAncestorOfClass(JScrollPane.class, command);
+            assertFalse(commandPane.isVisible());
+            assertFalse(environment.isVisible());
+
+            stdio.doClick();
+            assertTrue(commandPane.isVisible());
+            assertTrue(environment.isVisible());
+            assertEquals("the hidden command was kept", "node server.js --stdio", command.getText());
+        } finally {
+            dialog.close(DialogWrapper.CANCEL_EXIT_CODE);
+        }
+    }
+
     public void testTheAddedLanguageServerHasTheTransport() {
         var dialog = dialog(template("", RUNNING));
         dialog.doOKAction();
@@ -97,6 +134,20 @@ public class NewLanguageServerDialogTransportTest extends BasePlatformTestCase {
         } finally {
             LanguageServersRegistry.getInstance().removeServerDefinition(getProject(), added);
         }
+    }
+
+    /**
+     * Returns the given component and all those inside it, each before those inside it, in the order they were added.
+     */
+    private static @NotNull List<Component> components(@NotNull Component component) {
+        var components = new ArrayList<Component>();
+        components.add(component);
+        if (component instanceof Container container) {
+            for (var child : container.getComponents()) {
+                components.addAll(components(child));
+            }
+        }
+        return components;
     }
 
     private @NotNull NewLanguageServerDialog dialog(@NotNull LanguageServerTemplate template) {
