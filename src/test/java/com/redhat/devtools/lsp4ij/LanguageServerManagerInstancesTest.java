@@ -14,6 +14,7 @@ import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.ModalityState;
 import com.intellij.openapi.application.impl.NonBlockingReadActionImpl;
 import com.intellij.openapi.command.WriteCommandAction;
+import com.intellij.openapi.editor.EditorFactory;
 import com.intellij.openapi.fileEditor.FileDocumentManager;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
@@ -475,30 +476,41 @@ public class LanguageServerManagerInstancesTest extends LSPCodeInsightFixtureTes
         var file = file("a/moved.instances").getVirtualFile();
         var bDirectory = myFixture.getTempDirFixture().findOrCreateDir("b");
         var cDirectory = myFixture.getTempDirFixture().findOrCreateDir("c");
-        openAndConnect(file);
-        // The file moves again as the instance of b is chosen for it, in an event of the UI thread before the one in
-        // which the choice connects the file: no instance has the file during that move, so none sees it
-        definition.instanceRootAsked = asked -> {
-            if (asked.equals(file) && bDirectory.equals(asked.getParent())) {
-                definition.instanceRootAsked = null;
-                ApplicationManager.getApplication().invokeLater(() -> {
-                    try {
-                        WriteCommandAction.writeCommandAction(myFixture.getProject()).run(() -> file.move(this, cDirectory));
-                    } catch (IOException e) {
-                        throw new UncheckedIOException(e);
-                    }
-                }, ModalityState.nonModal());
-            }
-        };
+        // In an editor without the features of a file editor, which would ask for the instance of the file too, and
+        // connect it to the one chosen then
+        var editor = EditorFactory.getInstance().createEditor(FileDocumentManager.getInstance().getDocument(file),
+                myFixture.getProject());
+        try {
+            var psiFile = myFixture.getPsiManager().findFile(file);
+            assertNotNull(psiFile);
+            assertEquals(1, waitFor(LanguageServiceAccessor.getInstance(myFixture.getProject())
+                    .getLanguageServers(psiFile, null, null)).size());
+            // The file moves again as the instance of b is chosen for it, in an event of the UI thread before the one
+            // in which the choice connects the file: no instance has the file during that move, so none sees it
+            definition.instanceRootAsked = asked -> {
+                if (asked.equals(file) && bDirectory.equals(asked.getParent())) {
+                    definition.instanceRootAsked = null;
+                    ApplicationManager.getApplication().invokeLater(() -> {
+                        try {
+                            WriteCommandAction.writeCommandAction(myFixture.getProject()).run(() -> file.move(this, cDirectory));
+                        } catch (IOException e) {
+                            throw new UncheckedIOException(e);
+                        }
+                    }, ModalityState.nonModal());
+                }
+            };
 
-        move(file, bDirectory);
+            move(file, bDirectory);
 
-        PlatformTestUtil.waitWithEventsDispatching("The file must move again", () -> cDirectory.equals(file.getParent()), TIMEOUT);
-        var instance = waitForTheInstanceConnectedTo(file);
-        assertEquals("c", instance.getInstanceRoot().getName());
-        var b = instanceOfRoot("b");
-        assertNotNull(b);
-        assertFalse(b.isConnectedTo(b.toUri(file)));
+            PlatformTestUtil.waitWithEventsDispatching("The file must move again", () -> cDirectory.equals(file.getParent()), TIMEOUT);
+            var instance = waitForTheInstanceConnectedTo(file);
+            assertEquals("c", instance.getInstanceRoot().getName());
+            var b = instanceOfRoot("b");
+            assertNotNull(b);
+            assertFalse(b.isConnectedTo(b.toUri(file)));
+        } finally {
+            EditorFactory.getInstance().releaseEditor(editor);
+        }
     }
 
     public void testAFileOfAMovedDirectoryGoesToTheInstanceOfItsNewPlace() throws Exception {
