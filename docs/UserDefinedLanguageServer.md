@@ -314,11 +314,12 @@ By default, one language server instance serves all workspace folders of a proje
 
 Files with the same root share an instance:
 
- * An instance starts when the first of its files is opened. The Language Servers view shows it as a process of its own, with the name of its root.
+ * An instance starts when the first of its files is opened. The Language Servers view shows it as a process of its own, with the path of its root in the project. Its node stays when the instance stops or is replaced, with its traces and logs, for the next instance of that root.
  * It's initialized with its root as `rootUri`.
- * A file without a root gets no instance, so this language server provides no features for it. With `"rootType": "NONE"` in `serverInstances`, no file has a root, so no instance starts.
- * With markers, the search doesn't stop at the project: a marker above the project's folder can make that folder the root.
+ * A file without a root gets no instance, so this language server provides no features for it. LSP4IJ says so once, when such a file is open in an editor.
+ * With markers, the search stops at the project: a file without a marker up to its topmost content root has that content root as its root, so no instance runs above the project.
  * All instances use the same command. If no working directory is configured, an instance runs in its root.
+ * Each instance needs a connection of its own. Over a socket, use an automatic port, and let LSP4IJ start the language server: the settings don't save `serverInstances` with a language server that runs already, or with a fixed port.
 
 Without `rootType` and `markers` next to `serverInstances`, the root is the only workspace folder of an instance. With them, they describe the workspace folders inside an instance:
 
@@ -333,7 +334,7 @@ Without `rootType` and `markers` next to `serverInstances`, the root is the only
 
 Here, each folder with a `pyproject.toml` has an instance, and that instance gets the source roots inside it. With `"lazy": true`, it gets them through `workspace/didChangeWorkspaceFolders` as their files are opened. A workspace folder that belongs to another instance, or that contains several, doesn't reach an instance. An instance that would be left without a folder gets its root, unless `rootType` next to `serverInstances` is `NONE`.
 
-In this example, `backend` and `frontend` each contain a `pyproject.toml` and source roots, so each has its own instance. `scripts/tool.py` has no marker above it, so it gets none:
+In this example, `backend` and `frontend` each contain a `pyproject.toml` and source roots, so each has its own instance. `scripts/tool.py` has no marker up to the project's folder, so that folder is its root, with an instance of its own:
 
 ![Several language server instances](./images/workspace-folders/ServerInstances.png)
 

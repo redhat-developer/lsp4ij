@@ -50,8 +50,8 @@ public class LanguageServerManager {
 
     /**
      * Returns the server status of the given language server id and null otherwise. For a definition with several
-     * language server instances, this is the status of the oldest one; {@link #getServerStatus(String, WorkspaceFolder)}
-     * gives the status of the instance with a given root.
+     * language server instances, this is the status of the one created first; a plugin that knows the root uses
+     * {@link #getServerStatus(String, WorkspaceFolder)}, which gives the status of the instance with that root.
      *
      * @param languageServerId the language server id.
      * @return the server status of the given language server id and null otherwise.
@@ -73,7 +73,7 @@ public class LanguageServerManager {
      */
     @NotNull
     private ServerStatus getServerStatus(@NotNull LanguageServerDefinition serverDefinition) {
-        // The started servers keep the order in which they were created, so this is the oldest instance
+        // The started servers keep the order in which they were created, so this is the instance created first
         for (var ls : LanguageServiceAccessor.getInstance(project).getStartedServers()) {
             if (serverDefinition.equals(ls.getServerDefinition())) {
                 return ls.getServerStatus();
@@ -374,7 +374,7 @@ public class LanguageServerManager {
     }
 
     /**
-     * Returns the language server instances of the given definition, the oldest first.
+     * Returns the language server instances of the given definition, in the order in which they were created.
      */
     private @NotNull List<LanguageServerWrapper> instancesOf(@NotNull LanguageServerDefinition serverDefinition) {
         return LanguageServiceAccessor.getInstance(project).getStartedServers()
@@ -387,9 +387,9 @@ public class LanguageServerManager {
 
     /**
      * Returns the initialized language server item from the given language server id and null otherwise. For a
-     * definition with several language server instances, this is the oldest one, which is started if it stopped;
-     * {@link #getLanguageServer(String, VirtualFile)} gives the instance that serves a file, and
-     * {@link #getLanguageServers(String)} gives all of them.
+     * definition with several language server instances, this is the one created first, which is started if it
+     * stopped; a plugin that knows the file uses {@link #getLanguageServer(String, VirtualFile)}, which gives the
+     * instance that serves it, and {@link #getLanguageServers(String)} gives all of them.
      *
      * @param languageServerId the language server id.
      * @return the initialized language server item from the given language server id and null otherwise.
@@ -400,7 +400,7 @@ public class LanguageServerManager {
             return CompletableFuture.completedFuture(null);
         }
         if (serverDefinition.hasServerInstances()) {
-            // Without a file, nothing tells which instance is meant: take the oldest one, and create none
+            // Without a file, nothing tells which instance is meant: take the one created first, and create none
             var instances = instancesOf(serverDefinition);
             return instances.isEmpty() ? CompletableFuture.completedFuture(null) : getInitializedServer(instances.get(0));
         }
@@ -456,8 +456,8 @@ public class LanguageServerManager {
 
     /**
      * Returns the initialized language server items of the given language server id: all instances of a definition
-     * with several, the oldest first, and the one language server of a definition without instances. Instances that
-     * stopped are started again.
+     * with several, in the order in which they were created, and the one language server of a definition without
+     * instances. Instances that stopped are started again, so this starts the process of each of them.
      *
      * @param languageServerId the language server id.
      * @return the initialized language server items of the given language server id.
