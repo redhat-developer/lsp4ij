@@ -16,6 +16,7 @@ import com.intellij.openapi.fileEditor.FileEditorManagerEvent;
 import com.intellij.openapi.fileEditor.FileEditorManagerListener;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.project.ProjectManagerListener;
+import com.intellij.openapi.util.Key;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiFile;
 import com.intellij.util.concurrency.AppExecutorUtil;
@@ -25,6 +26,7 @@ import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Manages the connection between open editor files and Language Servers:
@@ -38,6 +40,24 @@ import java.util.concurrent.CompletableFuture;
  * including the selection of the editors reopened when the project opens.
  */
 public class ConnectDocumentToLanguageServerSetupParticipant implements FileEditorManagerListener {
+
+    private static final Key<AtomicInteger> EDITOR_CLOSES = Key.create("lsp4ij.editorCloses");
+
+    /**
+     * Returns how many times the last editor of the file has closed. Each close disconnects the file, so a connection
+     * asked for before a close must not connect the file after it.
+     */
+    static int getEditorCloses(@NotNull VirtualFile file) {
+        var closes = file.getUserData(EDITOR_CLOSES);
+        return closes != null ? closes.get() : 0;
+    }
+
+    /**
+     * Counts a close of the last editor of the file, before the close disconnects the file.
+     */
+    static void countEditorClose(@NotNull VirtualFile file) {
+        file.putUserDataIfAbsent(EDITOR_CLOSES, new AtomicInteger()).incrementAndGet();
+    }
 
     /**
      * Connects the file of a selected tab to its language servers. The connection is released once it is made, as a
@@ -106,6 +126,10 @@ public class ConnectDocumentToLanguageServerSetupParticipant implements FileEdit
 
     @Override
     public void fileClosed(@NotNull FileEditorManager source, @NotNull VirtualFile file) {
+        if (!source.isFileOpen(file)) {
+            // Counted here, as a language server that is still starting has no file listener to count it
+            countEditorClose(file);
+        }
         var project = source.getProject();
         if (project.isDisposed()) {
             return;

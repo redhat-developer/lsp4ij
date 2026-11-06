@@ -8,16 +8,19 @@
 package com.redhat.devtools.lsp4ij;
 
 import com.intellij.codeInsight.codeVision.settings.CodeVisionSettings;
+import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.application.impl.NonBlockingReadActionImpl;
 import com.intellij.openapi.fileEditor.FileEditorManager;
 import com.intellij.openapi.fileEditor.FileEditorManagerEvent;
 import com.intellij.openapi.fileEditor.FileEditorManagerListener;
 import com.intellij.testFramework.IndexingTestUtil;
 import com.intellij.testFramework.PlatformTestUtil;
+import com.intellij.util.containers.ContainerUtil;
 import com.redhat.devtools.lsp4ij.fixtures.LSPCodeInsightFixtureTestCase;
 import com.redhat.devtools.lsp4ij.mock.MockLanguageServer;
 import org.eclipse.lsp4j.DidOpenTextDocumentParams;
 
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
@@ -132,6 +135,55 @@ public class SelectedEditorConnectionTest extends LSPCodeInsightFixtureTestCase 
         // the connection is made now, and its release, on the EDT, disconnects the file
         dispatchEventsFor(2);
         assertFalse("the closed file must end disconnected", isConnected("waiting.ts"));
+    }
+
+    public void testAFeatureThatAsksWhileItsEditorIsOpenDoesNotConnectTheFileAfterTheEditorCloses() throws Exception {
+        assertAFeatureConnectionAfterTheCloseLeavesTheFileDisconnected("open.ts", false);
+    }
+
+    public void testAFeatureThatAsksAsItsEditorClosesDoesNotConnectTheFileAfterTheClose() throws Exception {
+        // The editor is closed, and the close not yet told, as when the feature asks while the editor closes
+        assertAFeatureConnectionAfterTheCloseLeavesTheFileDisconnected("closing.ts", true);
+    }
+
+    /**
+     * A feature of the file's editor asks for the file's servers, as code vision does when the editor opens, and the
+     * connection runs after the close of the editor, which disconnected the file: it must not connect it again.
+     */
+    private void assertAFeatureConnectionAfterTheCloseLeavesTheFileDisconnected(String fileName,
+                                                                                boolean askAsTheEditorCloses)
+            throws Exception {
+        var project = myFixture.getProject();
+        var psiFile = myFixture.addFileToProject(fileName, "const value=1;");
+        var file = psiFile.getVirtualFile();
+        var editors = FileEditorManager.getInstance(project);
+        var opened = expectDidOpen(fileName);
+        editors.openFile(file, true);
+        PlatformTestUtil.waitWithEventsDispatching("selecting the tab must send its didOpen", opened::isDone, 10);
+        var wrapper = ContainerUtil.getOnlyItem(LanguageServiceAccessor.getInstance(project).getStartedServers());
+        // The server stops, which disconnects the file, so that the next connection of the file starts it again and
+        // waits for its initialize. No selection follows, so only the feature connects the file.
+        var stopped = wrapper.stop();
+        PlatformTestUtil.waitWithEventsDispatching("the server must stop", stopped::isDone, 10);
+        var initialize = MockLanguageServer.INSTANCE.holdInitialize();
+        CompletableFuture<List<LanguageServerItem>> servers;
+        try {
+            if (askAsTheEditorCloses) {
+                editors.closeFile(file);
+            }
+            servers = ReadAction.compute(() -> LanguageServiceAccessor.getInstance(project)
+                    .getLanguageServers(psiFile, null, null));
+            if (!askAsTheEditorCloses) {
+                editors.closeFile(file);
+            }
+            projectEditorListeners().fileClosed(editors, file);
+        } finally {
+            initialize.complete(null);
+        }
+
+        // The EDT is held until the connection has run, so nothing can disconnect the file again before the check
+        servers.get(10, TimeUnit.SECONDS);
+        assertNull("the file whose editor closed must stay disconnected", wrapper.getOpenedDocument(wrapper.toUri(file)));
     }
 
     private FileEditorManagerListener projectEditorListeners() {
