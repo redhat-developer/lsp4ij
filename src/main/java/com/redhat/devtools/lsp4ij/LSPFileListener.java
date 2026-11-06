@@ -23,6 +23,7 @@ import com.intellij.util.concurrency.AppExecutorUtil;
 import com.redhat.devtools.lsp4ij.features.files.AbstractLSPFileListener;
 import org.eclipse.lsp4j.*;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -110,16 +111,27 @@ class LSPFileListener extends AbstractLSPFileListener {
         var serverDefinition = languageServerWrapper.getServerDefinition();
         var project = languageServerWrapper.getProject();
         // A document that was closed meanwhile creates no instance
-        ReadAction.nonBlocking(() -> isOpenDocument(languageServerWrapper, file)
+        ReadAction.nonBlocking(() -> new InstanceOfMovedDocument(file.getUrl(), isOpenDocument(languageServerWrapper, file)
                         ? LanguageServiceAccessor.getInstance(project).getOrCreateInstanceOf(file, serverDefinition)
-                        : null)
+                        : null))
                 .expireWith(languageServerWrapper)
                 .submit(AppExecutorUtil.getAppExecutorService())
-                .onSuccess(instance -> {
-                    if (instance != null) {
-                        ApplicationManager.getApplication().invokeLater(() -> reconnectMovedDocument(instance, file), ModalityState.any());
+                .onSuccess(choice -> ApplicationManager.getApplication().invokeLater(() -> {
+                    if (!choice.url().equals(file.getUrl())) {
+                        // The document moved again before it was connected, so no instance saw that move: its new
+                        // place decides again
+                        reconnectMovedDocument(file);
+                    } else if (choice.instance() != null) {
+                        reconnectMovedDocument(choice.instance(), file);
                     }
-                });
+                }, ModalityState.any()));
+    }
+
+    /**
+     * The language server instance chosen for a moved document, or null if none serves it, and the URL of the
+     * document's place that it was chosen for.
+     */
+    private record InstanceOfMovedDocument(@NotNull String url, @Nullable LanguageServerWrapper instance) {
     }
 
     private void reconnectMovedDocument(@NotNull LanguageServerWrapper languageServer, @NotNull VirtualFile file) {

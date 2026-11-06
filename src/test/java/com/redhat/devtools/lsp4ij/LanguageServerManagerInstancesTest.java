@@ -10,6 +10,8 @@ package com.redhat.devtools.lsp4ij;
 import com.intellij.codeHighlighting.TextEditorHighlightingPassRegistrar;
 import com.intellij.codeInsight.daemon.impl.DaemonCodeAnalyzerImpl;
 import com.intellij.codeInsight.daemon.impl.HighlightInfo;
+import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.application.ModalityState;
 import com.intellij.openapi.application.impl.NonBlockingReadActionImpl;
 import com.intellij.openapi.command.WriteCommandAction;
 import com.intellij.openapi.fileEditor.FileDocumentManager;
@@ -52,6 +54,7 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -59,6 +62,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BooleanSupplier;
+import java.util.function.Consumer;
 
 /**
  * Tests the {@link LanguageServerManager} with a language server definition whose workspace folder strategy spreads
@@ -388,6 +392,36 @@ public class LanguageServerManagerInstancesTest extends LSPCodeInsightFixtureTes
         assertEquals(List.of(a), instances());
     }
 
+    public void testAFileMovedAgainBeforeItIsConnectedGoesToTheInstanceOfItsLastPlace() throws Exception {
+        var file = file("a/moved.instances").getVirtualFile();
+        var bDirectory = myFixture.getTempDirFixture().findOrCreateDir("b");
+        var cDirectory = myFixture.getTempDirFixture().findOrCreateDir("c");
+        openAndConnect(file);
+        // The file moves again as the instance of b is chosen for it, in an event of the UI thread before the one in
+        // which the choice connects the file: no instance has the file during that move, so none sees it
+        definition.instanceRootAsked = asked -> {
+            if (asked.equals(file) && bDirectory.equals(asked.getParent())) {
+                definition.instanceRootAsked = null;
+                ApplicationManager.getApplication().invokeLater(() -> {
+                    try {
+                        WriteCommandAction.writeCommandAction(myFixture.getProject()).run(() -> file.move(this, cDirectory));
+                    } catch (IOException e) {
+                        throw new UncheckedIOException(e);
+                    }
+                }, ModalityState.nonModal());
+            }
+        };
+
+        move(file, bDirectory);
+
+        PlatformTestUtil.waitWithEventsDispatching("The file must move again", () -> cDirectory.equals(file.getParent()), TIMEOUT);
+        var instance = waitForTheInstanceConnectedTo(file);
+        assertEquals("c", instance.getInstanceRoot().getName());
+        var b = instanceOfRoot("b");
+        assertNotNull(b);
+        assertFalse(b.isConnectedTo(b.toUri(file)));
+    }
+
     public void testAFileOfAMovedDirectoryGoesToTheInstanceOfItsNewPlace() throws Exception {
         var file = file("x/a/moved.instances").getVirtualFile();
         var old = openAndConnect(file);
@@ -520,6 +554,16 @@ public class LanguageServerManagerInstancesTest extends LSPCodeInsightFixtureTes
         PlatformTestUtil.dispatchAllEventsInIdeEventQueue();
     }
 
+    private @Nullable LanguageServerWrapper instanceOfRoot(@NotNull String name) {
+        for (var instance : instances()) {
+            var root = instance.getInstanceRoot();
+            if (root != null && name.equals(root.getName())) {
+                return instance;
+            }
+        }
+        return null;
+    }
+
     private static <T> T waitFor(@NotNull CompletableFuture<T> future) throws Exception {
         PlatformTestUtil.waitWithEventsDispatching("The language servers must answer", future::isDone, TIMEOUT);
         return future.get();
@@ -537,9 +581,26 @@ public class LanguageServerManagerInstancesTest extends LSPCodeInsightFixtureTes
      */
     private static final class InstancesStrategy implements WorkspaceFolderStrategy {
 
+        private final @NotNull InstancesDefinition definition;
+
+        InstancesStrategy(@NotNull InstancesDefinition definition) {
+            this.definition = definition;
+        }
+
         @Override
         public boolean hasServerInstances() {
             return true;
+        }
+
+        @Override
+        public @Nullable WorkspaceFolder getServerInstanceRoot(@NotNull VirtualFile file,
+                                                               @NotNull Project project,
+                                                               @NotNull FileUriSupport fileUriSupport) {
+            var asked = definition.instanceRootAsked;
+            if (asked != null) {
+                asked.accept(file);
+            }
+            return getWorkspaceFolderForFile(file, project, fileUriSupport);
         }
 
         @Override
@@ -611,6 +672,8 @@ public class LanguageServerManagerInstancesTest extends LSPCodeInsightFixtureTes
         final List<MockLanguageServer> servers = new CopyOnWriteArrayList<>();
         final AtomicInteger installations = new AtomicInteger();
         volatile boolean failingInstallation;
+        // Is given each file whose instance root the strategy is asked for
+        volatile @Nullable Consumer<VirtualFile> instanceRootAsked;
 
         InstancesDefinition() {
             super(ID, false);
@@ -638,7 +701,7 @@ public class LanguageServerManagerInstancesTest extends LSPCodeInsightFixtureTes
             var features = super.createClientFeatures().setWorkspaceFolderFeature(new LSPWorkspaceFolderFeature() {
                 @Override
                 protected @NotNull WorkspaceFolderStrategy createStrategy() {
-                    return new InstancesStrategy();
+                    return new InstancesStrategy(InstancesDefinition.this);
                 }
             });
             features.setServerInstaller(new CountingInstaller(installations, () -> failingInstallation));
