@@ -39,6 +39,7 @@ import java.util.function.Supplier;
 public class DAPConsoleView extends ConsoleViewImpl {
 
     private volatile @Nullable Consumer<String> inputHandler;
+    private volatile boolean stdioTransport;
 
     public DAPConsoleView(@NotNull Project project,
                           @NotNull GlobalSearchScope searchScope,
@@ -56,6 +57,16 @@ public class DAPConsoleView extends ConsoleViewImpl {
      */
     public void setInputHandler(@Nullable Consumer<String> inputHandler) {
         this.inputHandler = inputHandler;
+    }
+
+    /**
+     * Sets that the debug adapter talks over its process's stdio, so that the process output carries the DAP
+     * messages, which the console hides. Over a socket, the process output is the adapter's own, or the debugged
+     * program's, such as the output of the program that Delve runs, and the console prints it as it is: a blank line
+     * or a line which starts with '{' is then no DAP trace.
+     */
+    public void setStdioTransport() {
+        this.stdioTransport = true;
     }
 
     private static class DAPConsoleState extends ConsoleState.NotStartedStated {
@@ -141,7 +152,7 @@ public class DAPConsoleView extends ConsoleViewImpl {
 
     @Override
     public void print(@NotNull String text, @NotNull ConsoleViewContentType contentType) {
-        String applicableText = getApplicableText(text, contentType);
+        String applicableText = stdioTransport ? getApplicableText(text, contentType) : text;
         if (applicableText != null) {
             super.print(applicableText, contentType);
         }

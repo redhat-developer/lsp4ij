@@ -335,11 +335,15 @@ public class DAPDebugProcess extends XDebugProcess implements Disposable {
         return title.toString();
     }
 
-    private static TransportStreams getTransportStreams(@NotNull ExecutionResult executionResult,
-                                                        @Nullable String address,
-                                                        @Nullable Integer port) throws IOException {
+    static TransportStreams getTransportStreams(@NotNull ExecutionResult executionResult,
+                                                @Nullable String address,
+                                                @Nullable Integer port) throws IOException {
         if (port != null) {
             return new TransportStreams.SocketTransportStreams(address != null ? address : InetAddress.getLoopbackAddress().getHostAddress(), port);
+        }
+        if (executionResult.getExecutionConsole() instanceof DAPConsoleView console) {
+            // The process output carries the DAP messages, which the console hides
+            console.setStdioTransport();
         }
         var processHandler = executionResult.getProcessHandler();
         DAPProcessListener processListener = new DAPProcessListener();
