@@ -182,7 +182,8 @@ public abstract class LanguageServerDefinition implements LanguageServerFactory,
                                                            @NotNull Project project) {
         var strategy = getWorkspaceFolderStrategy();
         try {
-            return strategy.getServerInstanceRoot(file, project, Objects.requireNonNullElse(workspaceFolderUriSupport, FileUriSupport.DEFAULT));
+            var root = strategy.getServerInstanceRoot(file, project, getWorkspaceFolderUriSupport());
+            return root != null ? normalizeServerInstanceRoot(root) : null;
         } catch (ProcessCanceledException e) {
             throw e;
         } catch (Exception e) {
@@ -193,12 +194,30 @@ public abstract class LanguageServerDefinition implements LanguageServerFactory,
     }
 
     /**
+     * Returns the given root of a language server instance with the URI that LSP4IJ gives its directory, so that a
+     * directory has one instance however the URI of its root is written.
+     *
+     * @param root the root of a language server instance.
+     * @return the given root with the URI that LSP4IJ gives its directory, or the given root if it has no directory.
+     */
+    @ApiStatus.Internal
+    public @NotNull WorkspaceFolder normalizeServerInstanceRoot(@NotNull WorkspaceFolder root) {
+        getWorkspaceFolderStrategy();
+        String uri = FileUriSupport.normalize(root.getUri(), getWorkspaceFolderUriSupport());
+        return uri.equals(root.getUri()) ? root : new WorkspaceFolder(uri, root.getName());
+    }
+
+    /**
      * Drops the workspace folder strategy, for a definition whose strategy has changed.
      */
     @ApiStatus.Internal
     public void resetWorkspaceFolderStrategy() {
         workspaceFolderStrategy = null;
         workspaceFolderUriSupport = null;
+    }
+
+    private @NotNull FileUriSupport getWorkspaceFolderUriSupport() {
+        return Objects.requireNonNullElse(workspaceFolderUriSupport, FileUriSupport.DEFAULT);
     }
 
     /**

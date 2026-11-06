@@ -103,7 +103,8 @@ public class LanguageServerManager {
         if (!serverDefinition.hasServerInstances()) {
             return getServerStatus(serverDefinition);
         }
-        var instance = LanguageServiceAccessor.getInstance(project).findInstance(serverDefinition, instanceRoot);
+        var instance = LanguageServiceAccessor.getInstance(project)
+                .findInstance(serverDefinition, serverDefinition.normalizeServerInstanceRoot(instanceRoot));
         return instance != null ? instance.getServerStatus() : ServerStatus.none;
     }
 
@@ -198,9 +199,10 @@ public class LanguageServerManager {
             throw new LanguageServerException("Server definition '" + serverDefinition.getId() + "' cannot be forced to be enable.");
         }
         var accessor = LanguageServiceAccessor.getInstance(project);
+        var root = serverDefinition.normalizeServerInstanceRoot(instanceRoot);
         var instance = options.isForceStart()
-                ? accessor.getOrCreateInstance(serverDefinition, instanceRoot)
-                : accessor.findInstance(serverDefinition, instanceRoot);
+                ? accessor.getOrCreateInstance(serverDefinition, root)
+                : accessor.findInstance(serverDefinition, root);
         if (instance == null) {
             // As without a root: the instance starts if one of its files is open
             accessor.findAndStartLanguageServerIfNeeded(serverDefinition, false, project);
@@ -282,7 +284,8 @@ public class LanguageServerManager {
             stop(serverDefinition, options);
             return;
         }
-        var instance = LanguageServiceAccessor.getInstance(project).findInstance(serverDefinition, instanceRoot);
+        var instance = LanguageServiceAccessor.getInstance(project)
+                .findInstance(serverDefinition, serverDefinition.normalizeServerInstanceRoot(instanceRoot));
         if (instance == null) {
             return;
         }

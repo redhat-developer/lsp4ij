@@ -114,7 +114,9 @@ public interface WorkspaceFolderStrategy {
                                             @NotNull FileUriSupport fileUriSupport) {
         VirtualFile directory = FileUriSupport.findFileByUri(folder.getUri(), fileUriSupport);
         WorkspaceFolder root = directory != null ? getServerInstanceRoot(directory, project, fileUriSupport) : null;
-        return root != null && instanceRoot.getUri().equals(root.getUri());
+        // One directory can be written as several URIs
+        return root != null && (instanceRoot.getUri().equals(root.getUri())
+                || FileUriSupport.normalize(instanceRoot.getUri(), fileUriSupport).equals(FileUriSupport.normalize(root.getUri(), fileUriSupport)));
     }
 
     /**

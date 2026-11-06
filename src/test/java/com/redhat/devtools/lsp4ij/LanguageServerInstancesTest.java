@@ -493,6 +493,16 @@ public class LanguageServerInstancesTest extends LSPCodeInsightFixtureTestCase {
         }, TIMEOUT);
     }
 
+    public void testOneDirectoryIsOneInstanceHoweverTheStrategyWritesItsRoot() throws Exception {
+        definition.strategy.otherWayFor = "two.per-folder";
+
+        var one = instanceOf(file("a/one.per-folder"));
+        var two = instanceOf(file("a/two.per-folder"));
+
+        assertSame(one, two);
+        assertEquals(List.of(one), instances());
+    }
+
     public void testAStopWaitsForTheStopThatIsRunning() throws Exception {
         var instance = instanceOf(file("a/one.per-folder"));
         var shutdown = new CompletableFuture<Void>();
@@ -801,6 +811,8 @@ public class LanguageServerInstancesTest extends LSPCodeInsightFixtureTestCase {
         volatile boolean perFolder = true;
         volatile boolean noFolders = false;
         volatile boolean failing = false;
+        // The file whose folder is written with a trailing slash if it has none, and without one if it has
+        volatile @Nullable String otherWayFor;
         final List<VirtualFile> askedFiles = new CopyOnWriteArrayList<>();
 
         @Override
@@ -831,7 +843,11 @@ public class LanguageServerInstancesTest extends LSPCodeInsightFixtureTestCase {
             if (noFolders || parent == null || !List.of("a", "b").contains(parent.getName())) {
                 return null;
             }
-            return new WorkspaceFolder(FileUriSupport.toString(parent, fileUriSupport), parent.getName());
+            var uri = FileUriSupport.toString(parent, fileUriSupport);
+            if (file.getName().equals(otherWayFor)) {
+                uri = uri.endsWith("/") ? uri.substring(0, uri.length() - 1) : uri + "/";
+            }
+            return new WorkspaceFolder(uri, parent.getName());
         }
     }
 

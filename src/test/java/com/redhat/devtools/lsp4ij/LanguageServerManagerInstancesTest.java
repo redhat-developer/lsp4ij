@@ -234,6 +234,20 @@ public class LanguageServerManagerInstancesTest extends LSPCodeInsightFixtureTes
         assertEquals(1, definition.installations.get());
     }
 
+    public void testTheRootOfAnInstanceCanBeWrittenInAnotherWay() throws Exception {
+        var a = serverOf(file("a/one.instances"));
+        var root = a.getInstanceRoot();
+        var uri = root.getUri();
+        var otherWay = new WorkspaceFolder(uri.endsWith("/") ? uri.substring(0, uri.length() - 1) : uri + "/", root.getName());
+
+        assertEquals(ServerStatus.started, manager.getServerStatus(ID, otherWay));
+        manager.stop(ID, otherWay, new LanguageServerManager.StopOptions().setWillDisable(false));
+        waitForStatus(a, ServerStatus.stopped);
+        manager.start(ID, otherWay, new LanguageServerManager.StartOptions().setForceStart(true));
+        waitForStatus(a, ServerStatus.started);
+        assertEquals(List.of(a), instances());
+    }
+
     public void testAMovedFileGoesToTheInstanceOfItsNewRoot() throws Exception {
         var file = file("a/moved.instances").getVirtualFile();
         var a = openAndConnect(file);

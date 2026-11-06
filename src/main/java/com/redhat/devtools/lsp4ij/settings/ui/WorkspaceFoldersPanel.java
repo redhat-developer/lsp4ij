@@ -507,10 +507,23 @@ public class WorkspaceFoldersPanel extends JPanel implements Disposable {
         if (!strategy.hasServerInstances()) {
             return new FileLocation(null, folder);
         }
-        var instanceRoot = strategy.getServerInstanceRoot(file, project, FileUriSupport.DEFAULT);
+        var instanceRoot = getServerInstanceRoot(file);
         boolean inInstance = instanceRoot != null && folder != null
                 && strategy.belongsToServerInstance(folder, instanceRoot, project, FileUriSupport.DEFAULT);
         return new FileLocation(instanceRoot, inInstance ? folder : instanceRoot);
+    }
+
+    /**
+     * Returns the root of the instance of the given file or directory as the language server gets it: one directory is
+     * one instance, however the strategy writes its URI.
+     */
+    private @Nullable WorkspaceFolder getServerInstanceRoot(@NotNull VirtualFile file) {
+        var root = strategy.getServerInstanceRoot(file, project, FileUriSupport.DEFAULT);
+        if (root == null) {
+            return null;
+        }
+        String uri = FileUriSupport.normalize(root.getUri(), FileUriSupport.DEFAULT);
+        return uri.equals(root.getUri()) ? root : new WorkspaceFolder(uri, root.getName());
     }
 
     private @NotNull DefaultMutableTreeNode addFileNode(@NotNull VirtualFile file,
@@ -596,7 +609,7 @@ public class WorkspaceFoldersPanel extends JPanel implements Disposable {
             for (WorkspaceFolder folder : folders) {
                 if (strategy.hasServerInstances()) {
                     VirtualFile file = LSPIJUtils.findResourceFor(folder.getUri());
-                    var instanceRoot = file != null ? strategy.getServerInstanceRoot(file, project, FileUriSupport.DEFAULT) : null;
+                    var instanceRoot = file != null ? getServerInstanceRoot(file) : null;
                     if (instanceRoot != null) {
                         getOrCreateFolderNode(new FileLocation(instanceRoot, folder), strategy.sendAllFoldersOnInitialization());
                     }
