@@ -145,7 +145,9 @@ public class LanguageServerManager {
     }
 
     /**
-     * Start the given language server with the given start options.
+     * Start the given language server with the given start options. For a definition with several language server
+     * instances, an instance that a stop or too many failed starts switched off starts again only with
+     * {@link StartOptions#isWillEnable()}, as a definition that is switched off does.
      *
      * @param serverDefinition the language server to start.
      */
@@ -158,7 +160,8 @@ public class LanguageServerManager {
         boolean started = false;
         for (var ls : LanguageServiceAccessor.getInstance(project).getStartedServers()) {
             if (serverDefinition.equals(ls.getServerDefinition())) {
-                if (options.isForceRestart() || ls.getServerStatus() != ServerStatus.started) {
+                if ((ls.isEnabled() || options.isWillEnable())
+                        && (options.isForceRestart() || ls.getServerStatus() != ServerStatus.started)) {
                     ls.restart();
                 }
                 started = true;
@@ -176,12 +179,15 @@ public class LanguageServerManager {
      * {@link com.redhat.devtools.lsp4ij.features.workspaceFolder.WorkspaceFolderStrategy#hasServerInstances()}. The
      * instance is restarted if it isn't started, or if {@link StartOptions#isForceRestart()} is set. If there is no
      * instance with that root, {@link StartOptions#isForceStart()} creates and starts it; without it, the open files of
-     * the language server are connected, as {@link #start(String, StartOptions)} does. For a definition without
-     * instances, this is {@link #start(String, StartOptions)}.
+     * the language server are connected, as {@link #start(String, StartOptions)} does. An instance that a stop or too
+     * many failed starts switched off starts again only with {@link StartOptions#isWillEnable()}, as a definition that
+     * is switched off does. For a definition without instances, this is {@link #start(String, StartOptions)}.
      *
      * @param languageServerId the language server id.
      * @param instanceRoot     the root of the language server instance.
      * @param options          the start options.
+     * @throws LanguageServerException if the instance or its definition is switched off and the options don't switch it
+     *                                 on.
      */
     @ApiStatus.Experimental
     public void start(@NotNull String languageServerId,
@@ -207,6 +213,10 @@ public class LanguageServerManager {
             // As without a root: the instance starts if one of its files is open
             accessor.findAndStartLanguageServerIfNeeded(serverDefinition, false, project);
             return;
+        }
+        if (!instance.isEnabled() && !options.isWillEnable()) {
+            throw new LanguageServerException("The language server instance '" + root.getUri() + "' of '"
+                    + serverDefinition.getId() + "' cannot be forced to be enabled.");
         }
         if (options.isForceRestart() || instance.getServerStatus() != ServerStatus.started) {
             instance.restart();
@@ -246,10 +256,8 @@ public class LanguageServerManager {
     public void stop(@NotNull LanguageServerDefinition serverDefinition,
                      @NotNull StopOptions options) {
         // 1. Stop language server
-        boolean stopped = false;
         for (var ls : LanguageServiceAccessor.getInstance(project).getStartedServers()) {
             if (serverDefinition.equals(ls.getServerDefinition())) {
-                stopped = true;
                 if (options.isWillDisable()) {
                     ls.stopAndDisable();
                 } else {
@@ -257,16 +265,19 @@ public class LanguageServerManager {
                 }
             }
         }
-        if (options.isWillDisable() && !stopped) {
-            // 2. Disable language server
+        if (options.isWillDisable()) {
+            // 2. Disable language server, also when none ran. Instances are switched off one by one as they stop, so
+            // the definition itself keeps the instances of the other roots off
             serverDefinition.setEnabled(false, project);
         }
     }
 
     /**
      * Stops the language server instance with the given root, for a definition with several instances, see
-     * {@link com.redhat.devtools.lsp4ij.features.workspaceFolder.WorkspaceFolderStrategy#hasServerInstances()}. For a
-     * definition without instances, this is {@link #stop(String, StopOptions)}.
+     * {@link com.redhat.devtools.lsp4ij.features.workspaceFolder.WorkspaceFolderStrategy#hasServerInstances()}. With
+     * {@link StopOptions#isWillDisable()}, only that instance is switched off, and the others keep working; a restart
+     * of it, or {@link #start(String, WorkspaceFolder, StartOptions)} with {@link StartOptions#isWillEnable()}, switches
+     * it on again. For a definition without instances, this is {@link #stop(String, StopOptions)}.
      *
      * @param languageServerId the language server id.
      * @param instanceRoot     the root of the language server instance.

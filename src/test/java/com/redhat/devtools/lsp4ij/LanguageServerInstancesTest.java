@@ -19,6 +19,7 @@ import com.intellij.psi.PsiFile;
 import com.intellij.psi.PsiManager;
 import com.intellij.testFramework.IndexingTestUtil;
 import com.intellij.testFramework.PlatformTestUtil;
+import com.intellij.util.containers.ContainerUtil;
 import com.redhat.devtools.lsp4ij.client.LanguageClientImpl;
 import com.redhat.devtools.lsp4ij.client.features.FileUriSupport;
 import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
@@ -31,6 +32,7 @@ import com.redhat.devtools.lsp4ij.fixtures.LSPCodeInsightFixtureTestCase;
 import com.redhat.devtools.lsp4ij.mock.MockConnectionProvider;
 import com.redhat.devtools.lsp4ij.mock.MockLanguageServer;
 import com.redhat.devtools.lsp4ij.mock.MockLanguageServerDefinition;
+import com.redhat.devtools.lsp4ij.server.CannotStartProcessException;
 import com.redhat.devtools.lsp4ij.server.StreamConnectionProvider;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinitionListener;
 import com.redhat.devtools.lsp4ij.settings.LanguageServerSettings;
@@ -50,6 +52,7 @@ import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -263,15 +266,91 @@ public class LanguageServerInstancesTest extends LSPCodeInsightFixtureTestCase {
         assertTrue(disposedOnTheUiThread.get());
     }
 
-    public void testAChangedStrategyEnablesTheDefinitionAgain() throws Exception {
-        var instance = instanceOf(file("a/one.per-folder"));
-        instance.stopAndDisable();
+    public void testAChangedStrategySwitchesTheDefinitionOnAgain() throws Exception {
+        instanceOf(file("a/one.per-folder"));
+        LanguageServerManager.getInstance(myFixture.getProject())
+                .stop(definition.getId(), new LanguageServerManager.StopOptions().setWillDisable(true));
         assertFalse(definition.isEnabled(myFixture.getProject()));
 
         fireStrategyChanged();
 
         assertTrue(definition.isEnabled(myFixture.getProject()));
-        assertNotSame(instance, instanceOf(file("a/two.per-folder")));
+    }
+
+    public void testAChangedStrategySwitchesAStoppedInstanceOnAgain() throws Exception {
+        var instance = instanceOf(file("a/one.per-folder"));
+        instance.stopAndDisable();
+        assertFalse(instance.isEnabled());
+
+        fireStrategyChanged();
+
+        var replacement = instanceOf(file("a/two.per-folder"));
+        assertNotSame(instance, replacement);
+        assertTrue(replacement.isEnabled());
+    }
+
+    public void testAStopOfOneInstanceLeavesTheOthersWorking() throws Exception {
+        var a = instanceOf(file("a/one.per-folder"));
+        var b = instanceOf(file("b/one.per-folder"));
+
+        a.stopAndDisable();
+
+        assertFalse(a.isEnabled());
+        assertTrue(b.isEnabled());
+        assertTrue(definition.isEnabled(myFixture.getProject()));
+        // The other instance still answers, the stopped one gets no request, and its root no other instance
+        assertSameElements(wrappersOf(serversOf(file("b/two.per-folder"))), b);
+        assertEmpty(serversOf(file("a/two.per-folder")));
+        assertSameElements(instances(), a, b);
+    }
+
+    public void testARestartSwitchesAStoppedInstanceOnAgain() throws Exception {
+        var a = instanceOf(file("a/one.per-folder"));
+        a.stopAndDisable();
+        assertEmpty(serversOf(file("a/two.per-folder")));
+
+        a.restart();
+
+        waitUntilStarted(a);
+        assertTrue(a.isEnabled());
+        assertSameElements(wrappersOf(serversOf(file("a/two.per-folder"))), a);
+    }
+
+    public void testTooManyFailedStartsOfOneInstanceLeaveTheOthersWorking() throws Exception {
+        var b = instanceOf(file("b/one.per-folder"));
+        definition.failingRoot = "a";
+        var file = file("a/one.per-folder");
+
+        // Each request starts the instance again, until it gives up
+        LanguageServerWrapper a = null;
+        for (int i = 0; i < 30 && (a == null || a.isEnabled()); i++) {
+            try {
+                assertEmpty(serversOf(file));
+            } catch (ExecutionException e) {
+                // The request fails with the start
+                assertInstanceOf(e.getCause(), CannotStartProcessException.class);
+            }
+            a = ContainerUtil.find(instances(), instance -> instance.getInstanceRoot() != null
+                    && "a".equals(instance.getInstanceRoot().getName()));
+        }
+
+        assertNotNull(a);
+        assertFalse(a.isEnabled());
+        assertTrue(b.isEnabled());
+        assertTrue(definition.isEnabled(myFixture.getProject()));
+        assertSameElements(wrappersOf(serversOf(file("b/two.per-folder"))), b);
+    }
+
+    public void testAStopOfTheOneLanguageServerOfAProjectSwitchesTheDefinitionOff() throws Exception {
+        // Without instances, as before
+        definition.strategy.perFolder = false;
+        var languageServer = instanceOf(file("a/one.per-folder"));
+        assertNull(languageServer.getInstanceRoot());
+
+        languageServer.stopAndDisable();
+
+        assertFalse(definition.isEnabled(myFixture.getProject()));
+        assertFalse(languageServer.isEnabled());
     }
 
     public void testAChangedStrategyConnectsAnOpenFileToItsNewInstance() throws Exception {
@@ -998,6 +1077,8 @@ public class LanguageServerInstancesTest extends LSPCodeInsightFixtureTestCase {
         final List<WorkspaceFolder> languageClientRoots = new CopyOnWriteArrayList<>();
         // The client features that gave the strategy, which have no language server
         final AtomicInteger disposedWithoutLanguageServer = new AtomicInteger();
+        // The name of the root whose instance can't start
+        volatile @Nullable String failingRoot;
 
         PerFolderDefinition() {
             super("per-folder-server", false);
@@ -1014,6 +1095,14 @@ public class LanguageServerInstancesTest extends LSPCodeInsightFixtureTestCase {
         public @NotNull StreamConnectionProvider createConnectionProvider(@NotNull Project project,
                                                                           @NotNull WorkspaceFolder instanceRoot) {
             connectionFolders.add(instanceRoot);
+            if (instanceRoot.getName().equals(failingRoot)) {
+                return new MockConnectionProvider(new MockLanguageServer(PerFolderDefinition::capabilities)) {
+                    @Override
+                    public void start() throws CannotStartProcessException {
+                        throw new CannotStartProcessException("Cannot run program \"missing\"");
+                    }
+                };
+            }
             return super.createConnectionProvider(project, instanceRoot);
         }
 

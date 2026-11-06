@@ -1324,6 +1324,7 @@ Set this strategy with a workspace folder feature as described above. Then:
  * File events and file operations aren't limited to the workspace folders of an instance: each instance gets what it registered, as with a language server client per folder in VS Code.
  * A file that is moved or renamed goes to the instance of its new place, or to none if its new place has no root.
  * Requests without a file, such as workspace symbols, go to all instances, and start those that stopped.
+ * A stop that disables, as Stop in the Language Servers view does, or too many failed starts switch off one instance, and the others keep working. `restart()` switches it on again, and a changed configuration replaces it with one that is on.
  * The Language Servers view shows each instance as a process of its own, with the path of its root in the project. The node of an instance stays when the instance stops or is replaced, with its traces and logs, and the next instance of that root takes it over.
 
 By default, all instances run the same way. If each one needs its own command, for example the interpreter of its module, override the methods of the factory that get the root of the instance:
@@ -1371,7 +1372,7 @@ var status = manager.getServerStatus("myLanguageServerId", instanceRoot);
 manager.getLanguageServers("myLanguageServerId");
 ```
 
-The methods that only take the id mean the instance created first, so use the ones with the file or the root where you know them. With `forceStart`, `start("myLanguageServerId", options)` creates no instance, because without a file nothing tells which one: start each instance with its root instead. `install` runs the installer once for all instances.
+The methods that only take the id mean the instance created first, so use the ones with the file or the root where you know them. `stop` with the root of an instance and `willDisable` switches off that instance only, and `start` switches it on again only with `willEnable`, as for a definition that is switched off. `stop("myLanguageServerId", options)` with `willDisable` switches off the whole definition. With `forceStart`, `start("myLanguageServerId", options)` creates no instance, because without a file nothing tells which one: start each instance with its root instead. `install` runs the installer once for all instances.
 
 ## User-Defined Language Server Configuration
 

@@ -375,13 +375,25 @@ public class LanguageServerProcessNodesTest extends LSPCodeInsightFixtureTestCas
         assertEquals(1, serverNode().getChildCount());
     }
 
-    public void testStoppingOneInstanceShowsTheOthersAsDisabled() {
-        // Until enablement per instance, a stop disables the definition, and so all its instances
+    public void testStoppingOneInstanceLeavesTheOthersOn() {
         startBoth();
 
         first.stopAndDisable();
 
-        PlatformTestUtil.waitWithEventsDispatching("The other instance must show that it is disabled",
+        PlatformTestUtil.waitWithEventsDispatching("The stopped instance must show that it is off",
+                () -> "a: disabled".equals(processNode(first).getDisplayName()), TIMEOUT);
+        assertEquals("b: starting", processNode(second).getDisplayName());
+        assertNotSame(AllIcons.Actions.Cancel, processNode(second).getIcon());
+    }
+
+    public void testASwitchedOffDefinitionShowsOnAllItsInstances() {
+        startBoth();
+
+        definition.setEnabled(false, project);
+        // A status of any instance shows it on all of them
+        first.updateStatus(ServerStatus.stopped);
+
+        PlatformTestUtil.waitWithEventsDispatching("The other instance must show that its definition is off",
                 () -> "b: disabled".equals(processNode(second).getDisplayName()), TIMEOUT);
         assertEquals(AllIcons.Actions.Cancel, processNode(second).getIcon());
     }

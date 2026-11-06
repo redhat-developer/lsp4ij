@@ -319,6 +319,7 @@ Files with the same root share an instance:
  * A file without a root gets no instance, so this language server provides no features for it. LSP4IJ says so once, when such a file is open in an editor.
  * With markers, the search stops at the project: a file without a marker up to its topmost content root has that content root as its root, so no instance runs above the project.
  * All instances use the same command. If no working directory is configured, an instance runs in its root.
+ * Stop on an instance in the Language Servers view, or too many failed starts of it, switch off that instance only, and the others keep working. Restart switches it on again, and so does a changed configuration.
  * Each instance needs a connection of its own. Over a socket, use an automatic port, and let LSP4IJ start the language server: the settings don't save `serverInstances` with a language server that runs already, or with a fixed port.
 
 Without `rootType` and `markers` next to `serverInstances`, the root is the only workspace folder of an instance. With them, they describe the workspace folders inside an instance:

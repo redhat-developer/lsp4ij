@@ -33,6 +33,7 @@ import com.redhat.devtools.lsp4ij.lifecycle.LanguageServerLifecycleManager;
 import com.redhat.devtools.lsp4ij.mock.MockConnectionProvider;
 import com.redhat.devtools.lsp4ij.mock.MockLanguageServer;
 import com.redhat.devtools.lsp4ij.mock.MockLanguageServerDefinition;
+import com.redhat.devtools.lsp4ij.server.LanguageServerException;
 import com.redhat.devtools.lsp4ij.server.StreamConnectionProvider;
 import com.redhat.devtools.lsp4ij.templates.ServerMappingSettings;
 import org.eclipse.lsp4j.Diagnostic;
@@ -300,6 +301,63 @@ public class LanguageServerManagerInstancesTest extends LSPCodeInsightFixtureTes
         manager.start(ID, otherWay, new LanguageServerManager.StartOptions().setForceStart(true));
         waitForStatus(a, ServerStatus.started);
         assertEquals(List.of(a), instances());
+    }
+
+    public void testAStopWithARootSwitchesOffOnlyThatInstance() throws Exception {
+        var a = serverOf(file("a/one.instances"));
+        var b = serverOf(file("b/one.instances"));
+
+        manager.stop(ID, a.getInstanceRoot(), new LanguageServerManager.StopOptions().setWillDisable(true));
+        waitForStatus(a, ServerStatus.stopped);
+
+        assertFalse(a.isEnabled());
+        assertTrue(b.isEnabled());
+        assertEquals(ServerStatus.started, b.getServerStatus());
+        assertTrue(definition.isEnabled(myFixture.getProject()));
+        assertNull(waitFor(manager.getLanguageServer(ID, file("a/two.instances").getVirtualFile())));
+    }
+
+    public void testAStartWithTheRootOfASwitchedOffInstanceNeedsWillEnable() throws Exception {
+        var a = serverOf(file("a/one.instances"));
+        manager.stop(ID, a.getInstanceRoot(), new LanguageServerManager.StopOptions().setWillDisable(true));
+        waitForStatus(a, ServerStatus.stopped);
+
+        assertThrows(LanguageServerException.class,
+                () -> manager.start(ID, a.getInstanceRoot(), new LanguageServerManager.StartOptions().setWillEnable(false)));
+        assertFalse(a.isEnabled());
+
+        manager.start(ID, a.getInstanceRoot(), new LanguageServerManager.StartOptions().setWillEnable(true));
+        waitForStatus(a, ServerStatus.started);
+        assertTrue(a.isEnabled());
+    }
+
+    public void testAStartWithoutARootLeavesASwitchedOffInstanceOff() throws Exception {
+        var a = serverOf(file("a/one.instances"));
+        var b = serverOf(file("b/one.instances"));
+        manager.stop(ID, a.getInstanceRoot(), new LanguageServerManager.StopOptions().setWillDisable(true));
+        waitForStatus(a, ServerStatus.stopped);
+        stop(b);
+
+        manager.start(ID, new LanguageServerManager.StartOptions().setWillEnable(false));
+
+        waitForStatus(b, ServerStatus.started);
+        assertFalse(a.isEnabled());
+        assertEquals(ServerStatus.stopped, a.getServerStatus());
+
+        manager.start(ID, new LanguageServerManager.StartOptions().setWillEnable(true));
+        waitForStatus(a, ServerStatus.started);
+        assertTrue(a.isEnabled());
+    }
+
+    public void testAStopOfTheDefinitionKeepsTheInstancesOfOtherRootsOff() throws Exception {
+        var a = serverOf(file("a/one.instances"));
+
+        manager.stop(ID, new LanguageServerManager.StopOptions().setWillDisable(true));
+        waitForStatus(a, ServerStatus.stopped);
+
+        assertFalse(definition.isEnabled(myFixture.getProject()));
+        assertNull(waitFor(manager.getLanguageServer(ID, file("c/one.instances").getVirtualFile())));
+        assertTrue(instances().stream().noneMatch(instance -> instance.getServerStatus() == ServerStatus.started));
     }
 
     public void testAMovedFileGoesToTheInstanceOfItsNewRoot() throws Exception {

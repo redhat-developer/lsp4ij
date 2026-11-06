@@ -137,6 +137,8 @@ public class LanguageServerWrapper implements Disposable {
     protected final URI initialPath;
     private final @Nullable WorkspaceFolder instanceRoot;
     private volatile @Nullable String instanceLabel;
+    // An instance of a definition with several is switched off on its own
+    private volatile boolean instanceDisabled;
 
     // The last stop that runs in the background, for a stop that comes while it is running
     private CompletableFuture<Void> runningStop = CompletableFuture.completedFuture(null);
@@ -416,10 +418,21 @@ public class LanguageServerWrapper implements Disposable {
     }
 
     public boolean isEnabled() {
-        return !isDisposed() && serverDefinition.isEnabled(initialProject);
+        return !isDisposed() && !instanceDisabled && serverDefinition.isEnabled(initialProject);
     }
 
+    /**
+     * Switches this language server on or off. An instance of a definition with several is switched off on its own, as
+     * by a stop or too many failed starts, so that the other instances keep working. Switching it on also switches the
+     * definition on, which would keep it off otherwise.
+     */
     private void setEnabled(boolean enabled) {
+        if (instanceRoot != null) {
+            instanceDisabled = !enabled;
+            if (!enabled) {
+                return;
+            }
+        }
         this.serverDefinition.setEnabled(enabled, initialProject);
     }
 
