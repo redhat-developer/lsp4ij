@@ -107,7 +107,8 @@ experimental, whose `mode` is one of the [transports](./UserDefinedLanguageServe
 * `startAndAccept`: LSP4IJ listens on the port and starts the language server, which connects to it.
 
 The command of a language server which LSP4IJ starts takes the port as `${port}`, and a `port` of 0, or none, lets
-LSP4IJ choose a free one:
+LSP4IJ choose a free one. A value LSP4IJ can't use, such as an unknown `mode` or a `port` that isn't a number from 0 to
+65535, is shown as a warning in the New Language Server dialog, which says what LSP4IJ does instead:
 
 ```json
 {

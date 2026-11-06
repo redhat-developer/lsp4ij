@@ -11,6 +11,7 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonObject;
 import com.intellij.testFramework.LightPlatformTestCase;
+import com.redhat.devtools.lsp4ij.LanguageServerBundle;
 import com.redhat.devtools.lsp4ij.server.definition.launching.TransportSupport;
 import com.redhat.devtools.lsp4ij.server.definition.launching.UserDefinedLanguageServerDefinition;
 import com.redhat.devtools.lsp4ij.server.definition.launching.UserDefinedTransport;
@@ -108,8 +109,48 @@ public class LanguageServerSocketTemplateTest extends LightPlatformTestCase {
                         new TransportSupport(UserDefinedTransport.Mode.START_AND_ACCEPT, "--socket=${port}"),
                         new TransportSupport(UserDefinedTransport.Mode.ATTACH, null)),
                 template.getSupportedTransports());
+        assertEquals("the unknown mode is reported",
+                List.of(LanguageServerBundle.message("language.server.template.transports.mode", "pipe")), template.getProblems());
         // listing a socket doesn't make it the transport
         assertSame(UserDefinedTransport.STDIO, template.getTransport());
+    }
+
+    public void testWhatATemplateGivesWrongIsReportedInsteadOfDroppedSilently() {
+        var template = GSON.fromJson("""
+                {
+                  "id": "server",
+                  "name": "Server",
+                  "programArgs": { "default": "server" },
+                  "socket": { "mode": "atach", "port": "6005" },
+                  "transports": [ { "mode": "pipe" } ]
+                }""", LanguageServerTemplate.class);
+
+        assertSame(UserDefinedTransport.STDIO, template.getTransport());
+        assertEmpty(template.getSupportedTransports());
+        assertEquals(List.of(LanguageServerBundle.message("language.server.template.socket.mode", "atach"),
+                        LanguageServerBundle.message("language.server.template.socket.port", "\"6005\""),
+                        LanguageServerBundle.message("language.server.template.transports.mode", "pipe")),
+                template.getProblems());
+    }
+
+    public void testAPortOutOfRangeAndASocketWithoutAModeAreReported() {
+        var outOfRange = GSON.fromJson("""
+                {
+                  "id": "server",
+                  "name": "Server",
+                  "programArgs": { "default": "server --socket=${port}" },
+                  "socket": { "mode": "startAndAccept", "port": 70000 }
+                }""", LanguageServerTemplate.class);
+        assertEquals(new UserDefinedTransport(UserDefinedTransport.Mode.START_AND_ACCEPT, null, 0), outOfRange.getTransport());
+        assertEquals(List.of(LanguageServerBundle.message("language.server.template.socket.port", "70000")),
+                outOfRange.getProblems());
+
+        var noMode = GSON.fromJson("""
+                { "id": "server", "name": "Server", "programArgs": { "default": "server" }, "socket": { "port": 6005 } }""",
+                LanguageServerTemplate.class);
+        assertSame(UserDefinedTransport.STDIO, noMode.getTransport());
+        assertEquals(List.of(LanguageServerBundle.message("language.server.template.socket.mode.missing")),
+                noMode.getProblems());
     }
 
     public void testATemplateWithoutTransportsDoesNotSayWhichItsLanguageServerSupports() {

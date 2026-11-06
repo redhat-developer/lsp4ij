@@ -10,6 +10,7 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.settings.ui;
 
+import com.google.common.net.InetAddresses;
 import com.intellij.openapi.ui.ValidationInfo;
 import com.intellij.ui.PortField;
 import com.intellij.ui.components.JBLabel;
@@ -31,6 +32,7 @@ import java.text.DecimalFormat;
 import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Pattern;
 
 import static com.redhat.devtools.lsp4ij.LanguageServerBundle.message;
 
@@ -43,6 +45,8 @@ final class TransportFields {
 
     private static final int GAP = 12;
     private static final int MAX_PORT = 65_535;
+    private static final Pattern HOST_NAME =
+            Pattern.compile("[A-Za-z0-9_]([A-Za-z0-9_-]*[A-Za-z0-9_])?(\\.[A-Za-z0-9_]([A-Za-z0-9_-]*[A-Za-z0-9_])?)*\\.?");
 
     private final JBRadioButton stdio = new JBRadioButton(message("language.server.transport.stdio"));
     private final JBRadioButton socket = new JBRadioButton(message("language.server.transport.socket"));
@@ -185,14 +189,22 @@ final class TransportFields {
     }
 
     /**
-     * Returns an error when the port can't be used: a language server which runs already needs its port, since LSP4IJ
-     * can't choose one for it, and a fixed port isn't 0, which would be Auto once saved.
+     * Returns an error when the host or the port can't be used: the host of a language server which runs already is a
+     * plain host name or IP address, without a scheme or a port; such a language server needs its port, since LSP4IJ
+     * can't choose one for it; and a fixed port isn't 0, which would be Auto once saved.
      *
-     * @return the error of the port, or null if it can be used.
+     * @return the error of the host or port, or null if they can be used.
      */
     @Nullable
     ValidationInfo validate() {
-        if (!socket.isSelected() || port.getNumber() != 0) {
+        if (!socket.isSelected()) {
+            return null;
+        }
+        String hostText = host.getText().trim();
+        if (attach.isSelected() && !hostText.isEmpty() && !isHost(hostText)) {
+            return new ValidationInfo(message("language.server.validation.socket.host"), host);
+        }
+        if (port.getNumber() != 0) {
             return null;
         }
         if (attach.isSelected()) {
@@ -265,6 +277,14 @@ final class TransportFields {
         formatter.setMaximum(MAX_PORT);
         formatter.setCommitsOnValidEdit(true);
         editor.getTextField().setFormatterFactory(new DefaultFormatterFactory(formatter));
+    }
+
+    /**
+     * Returns true if the given text is an IP address, IPv6 too, or a host name: letters, digits, hyphens and
+     * underscores, in labels which dots separate. A scheme such as {@code http://}, a port, or a space fails it.
+     */
+    private static boolean isHost(@NotNull String text) {
+        return InetAddresses.isInetAddress(text) || HOST_NAME.matcher(text).matches();
     }
 
     private @NotNull JBRadioButton modeButton(@NotNull UserDefinedTransport.Mode mode) {

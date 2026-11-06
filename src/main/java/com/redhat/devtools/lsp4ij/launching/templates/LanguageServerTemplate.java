@@ -64,6 +64,7 @@ public class LanguageServerTemplate extends ServerTemplate {
     private Set<String> disablePromotionFor;
     private @NotNull UserDefinedTransport transport = UserDefinedTransport.STDIO;
     private @NotNull List<TransportSupport> supportedTransports = List.of();
+    private @NotNull List<String> problems = List.of();
     private Boolean promotable;
 
     /**
@@ -92,6 +93,20 @@ public class LanguageServerTemplate extends ServerTemplate {
 
     public void setSupportedTransports(@NotNull List<TransportSupport> supportedTransports) {
         this.supportedTransports = List.copyOf(supportedTransports);
+    }
+
+    /**
+     * Returns what LSP4IJ couldn't use in the template, such as a socket mode it doesn't know, each as a message which
+     * says what it does instead.
+     *
+     * @return the problems of the template, empty if it has none.
+     */
+    public @NotNull List<String> getProblems() {
+        return problems;
+    }
+
+    public void setProblems(@NotNull List<String> problems) {
+        this.problems = List.copyOf(problems);
     }
 
     public String getDescription() {

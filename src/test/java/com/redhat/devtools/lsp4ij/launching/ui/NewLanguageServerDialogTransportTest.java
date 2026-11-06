@@ -130,6 +130,22 @@ public class NewLanguageServerDialogTransportTest extends BasePlatformTestCase {
         }
     }
 
+    public void testWhatTheTemplateGivesWrongIsAWarningBelowTheFieldsWhichDoesNotBlockOk() {
+        var template = template("server --stdio", UserDefinedTransport.STDIO);
+        template.setProblems(List.of(LanguageServerBundle.message("language.server.template.socket.mode", "atach")));
+        var dialog = dialog(template);
+        try {
+            var warnings = dialog.doValidateAll().stream().filter(problem -> problem.warning).toList();
+
+            assertEquals(1, warnings.size());
+            assertEquals(LanguageServerBundle.message("language.server.template.socket.mode", "atach"), warnings.get(0).message);
+            assertNull("listed below the fields", warnings.get(0).component);
+            assertTrue(warnings.get(0).okEnabled);
+        } finally {
+            dialog.close(DialogWrapper.CANCEL_EXIT_CODE);
+        }
+    }
+
     public void testEveryProblemIsAlsoListedBelowTheFields() {
         var dialog = dialog(template("", new UserDefinedTransport(UserDefinedTransport.Mode.START_AND_ACCEPT, null, 0)));
         try {

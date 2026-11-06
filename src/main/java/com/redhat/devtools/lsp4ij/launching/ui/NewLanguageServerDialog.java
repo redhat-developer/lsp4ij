@@ -58,6 +58,8 @@ public class NewLanguageServerDialog extends DialogWrapper {
 
     private LanguageServerPanel languageServerPanel;
     private LanguageServerTemplate currentTemplate = null;
+    // what LSP4IJ couldn't use in the loaded template
+    private List<String> templateProblems = List.of();
 
     public NewLanguageServerDialog(@NotNull Project project) {
         super(project);
@@ -222,6 +224,7 @@ public class NewLanguageServerDialog extends DialogWrapper {
         languageServerPanel.setEnvData(template.getEnvData());
         languageServerPanel.setTransport(template.getTransport());
         languageServerPanel.setSupportedTransports(template.getSupportedTransports());
+        templateProblems = template.getProblems();
 
         // Update mappings
         var mappingsPanel = this.languageServerPanel.getMappingsPanel();
@@ -265,6 +268,8 @@ public class NewLanguageServerDialog extends DialogWrapper {
                 .filter(problem -> problem.component != null)
                 .map(problem -> new ValidationInfo(problem.message))
                 .forEach(listed::add);
+        // What LSP4IJ couldn't use in the template is told below the fields too, without blocking OK
+        templateProblems.forEach(problem -> listed.add(new ValidationInfo(problem).asWarning().withOKEnabled()));
         return listed;
     }
 

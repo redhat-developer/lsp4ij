@@ -175,6 +175,24 @@ public class TransportFieldsTest extends LightPlatformTestCase {
                 .noneMatch(label -> label.isVisible() && label.getText().startsWith("This language server takes")));
     }
 
+    public void testTheHostOfARunningLanguageServerIsAPlainHostNameOrIpAddress() {
+        radio("language.server.transport.socket").doClick();
+        radio("language.server.socket.attach").doClick();
+        port().setNumber(6005);
+
+        // they would only fail when the language server starts
+        for (String wrong : List.of("http://localhost", "tcp://127.0.0.1", "localhost:6005", "local host")) {
+            host().setText(wrong);
+            var error = fields.validate();
+            assertNotNull(wrong, error);
+            assertEquals(message("language.server.validation.socket.host"), error.message);
+        }
+        for (String right : List.of("localhost", "127.0.0.1", "::1", "my-server.example.com", "my_service")) {
+            host().setText(right);
+            assertNull(right, fields.validate());
+        }
+    }
+
     public void testATransportIsShownAsItIs() {
         for (var transport : new UserDefinedTransport[]{
                 UserDefinedTransport.STDIO,

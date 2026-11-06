@@ -14,12 +14,14 @@ package com.redhat.devtools.lsp4ij.launching.templates;
 import com.google.common.reflect.TypeToken;
 import com.google.gson.*;
 import com.redhat.devtools.lsp4ij.JSONUtils;
+import com.redhat.devtools.lsp4ij.LanguageServerBundle;
 import com.redhat.devtools.lsp4ij.server.definition.launching.TransportSupport;
 import com.redhat.devtools.lsp4ij.server.definition.launching.UserDefinedTransport;
 import com.redhat.devtools.lsp4ij.templates.ServerTemplateJsonDeserializer;
 import org.jetbrains.annotations.NotNull;
 
 import java.lang.reflect.Type;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -52,8 +54,11 @@ public class LanguageServerTemplateDeserializer extends ServerTemplateJsonDeseri
             languageServerTemplate.setWorkingDir(workingDir);
         }
         languageServerTemplate.setEnvData(deserializeEnvData(jsonObject));
-        languageServerTemplate.setTransport(deserializeTransport(jsonObject));
-        languageServerTemplate.setSupportedTransports(deserializeSupportedTransports(jsonObject));
+        // What can't be used is reported, instead of a silent fallback
+        var problems = new ArrayList<String>();
+        languageServerTemplate.setTransport(deserializeTransport(jsonObject, problems));
+        languageServerTemplate.setSupportedTransports(deserializeSupportedTransports(jsonObject, problems));
+        languageServerTemplate.setProblems(problems);
 
         boolean expandConfiguration = JSONUtils.getBoolean(jsonObject, EXPAND_CONFIGURATION_JSON_PROPERTY);
         languageServerTemplate.setExpandConfiguration(expandConfiguration);
@@ -71,23 +76,46 @@ public class LanguageServerTemplateDeserializer extends ServerTemplateJsonDeseri
 
     /**
      * Returns the transport of the "socket" object of the template, and the standard input and output without one.
+     * A mode which isn't known, or none, is the standard input and output, and a port which isn't a number from 0 to
+     * 65535 lets LSP4IJ choose a free one; each is added to the given problems.
      */
-    private static @NotNull UserDefinedTransport deserializeTransport(@NotNull JsonObject jsonObject) {
+    private static @NotNull UserDefinedTransport deserializeTransport(@NotNull JsonObject jsonObject,
+                                                                     @NotNull List<String> problems) {
         JsonObject socket = JSONUtils.getJsonObject(jsonObject, SOCKET_JSON_PROPERTY);
         if (socket == null) {
             return UserDefinedTransport.STDIO;
         }
-        Integer port = JSONUtils.getInteger(socket, SOCKET_PORT_JSON_PROPERTY);
-        return UserDefinedTransport.of(JSONUtils.getString(socket, SOCKET_MODE_JSON_PROPERTY),
-                JSONUtils.getString(socket, SOCKET_HOST_JSON_PROPERTY),
-                port != null ? port : 0);
+        String modeId = JSONUtils.getString(socket, SOCKET_MODE_JSON_PROPERTY);
+        var mode = UserDefinedTransport.Mode.fromId(modeId);
+        if (modeId == null) {
+            problems.add(LanguageServerBundle.message("language.server.template.socket.mode.missing"));
+        } else if (!mode.getId().equals(modeId)) {
+            problems.add(LanguageServerBundle.message("language.server.template.socket.mode", modeId));
+        }
+        return UserDefinedTransport.of(mode, JSONUtils.getString(socket, SOCKET_HOST_JSON_PROPERTY), port(socket, problems));
     }
 
     /**
-     * Returns the transports of the "transports" array of the template, without those of an unknown mode, and none
-     * without the array: the template doesn't say.
+     * Returns the port of the "socket" object, and 0, which lets LSP4IJ choose a free one, without a port.
      */
-    private static @NotNull List<TransportSupport> deserializeSupportedTransports(@NotNull JsonObject jsonObject) {
+    private static int port(@NotNull JsonObject socket, @NotNull List<String> problems) {
+        if (!socket.has(SOCKET_PORT_JSON_PROPERTY)) {
+            return 0;
+        }
+        Integer port = JSONUtils.getInteger(socket, SOCKET_PORT_JSON_PROPERTY);
+        if (port == null || port < 0 || port > 65_535) {
+            problems.add(LanguageServerBundle.message("language.server.template.socket.port", socket.get(SOCKET_PORT_JSON_PROPERTY)));
+            return 0;
+        }
+        return port;
+    }
+
+    /**
+     * Returns the transports of the "transports" array of the template, and none without the array: the template
+     * doesn't say. An entry of a mode which isn't known is skipped, and added to the given problems.
+     */
+    private static @NotNull List<TransportSupport> deserializeSupportedTransports(@NotNull JsonObject jsonObject,
+                                                                                @NotNull List<String> problems) {
         JsonArray transports = JSONUtils.getJsonArray(jsonObject, TRANSPORTS_JSON_PROPERTY);
         if (transports == null) {
             return List.of();
@@ -99,9 +127,11 @@ public class LanguageServerTemplateDeserializer extends ServerTemplateJsonDeseri
                     String id = JSONUtils.getString(transport, TRANSPORT_MODE_JSON_PROPERTY);
                     var mode = UserDefinedTransport.Mode.fromId(id);
                     // fromId reads an unknown mode as stdio
-                    return mode.getId().equals(id)
-                            ? Stream.of(new TransportSupport(mode, JSONUtils.getString(transport, TRANSPORT_ARGUMENT_JSON_PROPERTY)))
-                            : Stream.empty();
+                    if (!mode.getId().equals(id)) {
+                        problems.add(LanguageServerBundle.message("language.server.template.transports.mode", id));
+                        return Stream.empty();
+                    }
+                    return Stream.of(new TransportSupport(mode, JSONUtils.getString(transport, TRANSPORT_ARGUMENT_JSON_PROPERTY)));
                 })
                 .toList();
     }

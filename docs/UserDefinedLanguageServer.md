@@ -95,7 +95,8 @@ ways, which are experimental:
 
 * `Attach to a running language server`: the language server runs already and listens on `Host` and `Port`, as when it
   runs in a debugger or inside another application. LSP4IJ doesn't start it, so the environment variables, the
-  `Command` and the working directory are hidden, and stopping the language server only closes the connection. Without a host, LSP4IJ connects to the loopback address. An attach that gets no answer within 10 seconds fails.
+  `Command` and the working directory are hidden, and stopping the language server only closes the connection. Without a host, LSP4IJ connects to the loopback address; a host is a plain host name or IP address, without a scheme,
+  and the port has its own field. An attach that gets no answer within 10 seconds fails.
   The port is needed, since LSP4IJ can't choose it.
 * `Start the language server, LSP4IJ connects to it`: LSP4IJ starts the language server with the `Command`, and
   connects to the port once the language server accepts connections.
