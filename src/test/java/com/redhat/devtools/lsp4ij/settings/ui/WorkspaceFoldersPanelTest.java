@@ -38,6 +38,8 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Tests the preview of the workspace folders tab with one language server instance per folder.
@@ -269,6 +271,48 @@ public class WorkspaceFoldersPanelTest extends BasePlatformTestCase {
 
         assertNotEmpty(onTheUiThread);
         assertFalse(onTheUiThread.toString(), onTheUiThread.contains(true));
+    }
+
+    public void testAFileLocatedBeforeAChangedConfigurationIsLocatedAgain() throws IOException, InterruptedException {
+        var directory = localContentRoot().toNioPath();
+        Files.writeString(directory.resolve("outer-marker"), "");
+        Files.createDirectories(directory.resolve("inner"));
+        Files.writeString(directory.resolve("inner/inner-marker"), "");
+        var tested = localFile(Files.writeString(directory.resolve("inner/one.txt"), ""));
+        var located = new CountDownLatch(1);
+        var changed = new CountDownLatch(1);
+        var strategy = new ConfigurableWorkspaceFolderStrategy() {
+            @Override
+            public @Nullable WorkspaceFolder getServerInstanceRoot(@NotNull VirtualFile file,
+                                                                   @NotNull Project project,
+                                                                   @NotNull FileUriSupport fileUriSupport) {
+                var root = super.getServerInstanceRoot(file, project, fileUriSupport);
+                if (file.equals(tested) && located.getCount() > 0) {
+                    // The root is chosen with the configuration that the strategy has now, which changes meanwhile
+                    located.countDown();
+                    try {
+                        assertTrue(changed.await(TIMEOUT, TimeUnit.SECONDS));
+                    } catch (InterruptedException e) {
+                        throw new IllegalStateException(e);
+                    }
+                }
+                return root;
+            }
+        };
+        strategy.configure("{\"serverInstances\": {\"markers\": [\"outer-marker\"]}}");
+        Disposer.dispose(panel);
+        panel = new WorkspaceFoldersPanel(getProject(), strategy);
+        waitForThePreview();
+
+        var shown = panel.testFile(tested);
+        assertTrue(located.await(TIMEOUT, TimeUnit.SECONDS));
+        configure("{\"serverInstances\": {\"markers\": [\"inner-marker\"]}}");
+        changed.countDown();
+        PlatformTestUtil.waitWithEventsDispatching("The preview must show the file", shown::isDone, TIMEOUT);
+        waitForThePreview();
+
+        assertTrue(rows().toString(), rows().stream().anyMatch(row ->
+                row.contains(tested.getParent().getPath()) && row.contains("(own language server instance)")));
     }
 
     public void testAFolderWithoutTheRootOfAnInstanceGetsNone() throws IOException {

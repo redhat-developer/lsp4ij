@@ -94,6 +94,8 @@ public class WorkspaceFoldersPanel extends JPanel implements Disposable {
     private final Map<String, DefaultMutableTreeNode> folderNodes = new HashMap<>();
     private DefaultMutableTreeNode noRootNode;
     private final Set<VirtualFile> openedFiles = new HashSet<>();
+    // The configurations applied to the strategy, on the UI thread: a file located before one of them is located again
+    private int configurations;
 
     private JBCheckBox sendAtInitCheckbox;
 
@@ -488,6 +490,7 @@ public class WorkspaceFoldersPanel extends JPanel implements Disposable {
      */
     CompletableFuture<Void> testFile(@NotNull VirtualFile file) {
         CompletableFuture<Void> shown = new CompletableFuture<>();
+        int configuration = configurations;
         // Always run slow operation in background thread
         ApplicationManager.getApplication().executeOnPooledThread(() -> {
             FileLocation location;
@@ -501,7 +504,13 @@ public class WorkspaceFoldersPanel extends JPanel implements Disposable {
             // Update UI on EDT
             ApplicationManager.getApplication().invokeLater(() -> {
                 try {
-                    addTestedFile(file, location);
+                    if (configuration == configurations) {
+                        addTestedFile(file, location);
+                    } else {
+                        // The configuration changed as the file was located: the refresh locates it again
+                        openedFiles.add(file);
+                        updateWorkspaceFoldersDisplay();
+                    }
                 } finally {
                     shown.complete(null);
                 }
@@ -607,6 +616,7 @@ public class WorkspaceFoldersPanel extends JPanel implements Disposable {
             if (showJsonEditor && jsonEditor != null && strategy instanceof ConfigurableWorkspaceFolderStrategy) {
                 String jsonContent = jsonEditor.getText().trim();
                 ((ConfigurableWorkspaceFolderStrategy) strategy).configure(jsonContent);
+                configurations++;
             }
 
             // Update empty text based on strategy type
