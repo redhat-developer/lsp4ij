@@ -103,6 +103,8 @@ public final class MockLanguageServer implements LanguageServer {
 		initializeResult.setCapabilities(serverConfigurer.get());
 	}
 
+	private volatile CompletableFuture<Void> shutdownGate;
+
 	public <U> CompletableFuture<U> buildMaybeDelayedFuture(U value) {
 		if (delay > 0) {
 			CompletableFuture<U> future = CompletableFuture.runAsync(() -> {
@@ -300,7 +302,20 @@ public final class MockLanguageServer implements LanguageServer {
 	@Override
 	public CompletableFuture<Object> shutdown() {
 		this.started = false;
+		var gate = shutdownGate;
+		if (gate != null) {
+			return gate.thenApply(unused -> Collections.emptySet());
+		}
 		return buildMaybeDelayedFuture(Collections.emptySet());
+	}
+
+	/**
+	 * Answers shutdown only once the given gate completes, so that a test decides how long a shutdown takes.
+	 *
+	 * @param gate the gate.
+	 */
+	public void holdShutdown(CompletableFuture<Void> gate) {
+		this.shutdownGate = gate;
 	}
 
 	@Override

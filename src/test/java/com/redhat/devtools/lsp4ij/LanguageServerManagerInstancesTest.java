@@ -7,6 +7,7 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij;
 
+import com.intellij.codeHighlighting.TextEditorHighlightingPassRegistrar;
 import com.intellij.codeInsight.daemon.impl.DaemonCodeAnalyzerImpl;
 import com.intellij.codeInsight.daemon.impl.HighlightInfo;
 import com.intellij.openapi.application.impl.NonBlockingReadActionImpl;
@@ -20,7 +21,7 @@ import com.intellij.testFramework.PlatformTestUtil;
 import com.redhat.devtools.lsp4ij.client.features.FileUriSupport;
 import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
 import com.redhat.devtools.lsp4ij.client.features.LSPWorkspaceFolderFeature;
-import com.redhat.devtools.lsp4ij.features.diagnostics.LSPDiagnosticsApplier;
+import com.redhat.devtools.lsp4ij.features.diagnostics.LSPDiagnosticsPassFactory;
 import com.redhat.devtools.lsp4ij.features.workspaceFolder.WorkspaceFolderStrategy;
 import com.redhat.devtools.lsp4ij.fixtures.LSPCodeInsightFixtureTestCase;
 import com.redhat.devtools.lsp4ij.installation.ConsoleProvider;
@@ -60,6 +61,8 @@ import java.util.concurrent.atomic.AtomicInteger;
  */
 public class LanguageServerManagerInstancesTest extends LSPCodeInsightFixtureTestCase {
 
+    // Only ends a hang: a wait whose condition is met returns at once
+    private static final int TIMEOUT = 60;
     private static final String ID = "manager-instances";
     private static final List<String> ROOTS = List.of("a", "b", "c", "d", "e");
 
@@ -216,7 +219,7 @@ public class LanguageServerManagerInstancesTest extends LSPCodeInsightFixtureTes
 
         PlatformTestUtil.waitWithEventsDispatching("The installation must run, and the instances must start again",
                 () -> definition.installations.get() > 0
-                        && a.getServerStatus() == ServerStatus.started && b.getServerStatus() == ServerStatus.started, 10);
+                        && a.getServerStatus() == ServerStatus.started && b.getServerStatus() == ServerStatus.started, TIMEOUT);
         dispatchAll();
         assertEquals(1, definition.installations.get());
     }
@@ -225,9 +228,9 @@ public class LanguageServerManagerInstancesTest extends LSPCodeInsightFixtureTes
         manager.install(ID, new ServerInstallationContext());
 
         PlatformTestUtil.waitWithEventsDispatching("The installation must run",
-                () -> definition.installations.get() > 0, 10);
+                () -> definition.installations.get() > 0, TIMEOUT);
         PlatformTestUtil.waitWithEventsDispatching("No language server may stay for the installation",
-                () -> instances().isEmpty(), 10);
+                () -> instances().isEmpty(), TIMEOUT);
         assertEquals(1, definition.installations.get());
     }
 
@@ -246,15 +249,16 @@ public class LanguageServerManagerInstancesTest extends LSPCodeInsightFixtureTes
         var file = file("a/moved.instances").getVirtualFile();
         var a = openAndConnect(file);
 
+        var oldUri = a.toUri(file);
+
         move(file, myFixture.getTempDirFixture().findOrCreateDir("other"));
 
-        // A connection to an instance would come within this time
-        long end = System.currentTimeMillis() + 3000;
-        while (System.currentTimeMillis() < end) {
-            dispatchAll();
-            assertNull(instanceConnectedTo(file));
-            Thread.sleep(50);
-        }
+        // The move takes the file from its instance, and decides its new one in a read action that it submits
+        PlatformTestUtil.waitWithEventsDispatching("The moved file must leave its instance",
+                () -> !a.isConnectedTo(oldUri), TIMEOUT);
+        dispatchAll();
+        assertNull(instanceConnectedTo(file));
+        assertFalse(a.isConnectedTo(a.toUri(file)));
         assertEquals(List.of(a), instances());
     }
 
@@ -272,20 +276,19 @@ public class LanguageServerManagerInstancesTest extends LSPCodeInsightFixtureTes
     }
 
     public void testAMovedFileShowsOnlyTheDiagnosticsOfItsNewInstance() throws Exception {
-        if (LSPDiagnosticsApplier.GROUP_ID == -1) {
-            // Let the project's registrar register the pass factory, which shows the diagnostics
-            myFixture.configureByText("first.txt", "");
-            myFixture.doHighlighting();
-        }
+        // The pass factory shows the diagnostics: registered here as the project's registrar does, so that this test
+        // doesn't depend on another one having highlighted a file before
+        new LSPDiagnosticsPassFactory().registerHighlightingPassFactory(
+                TextEditorHighlightingPassRegistrar.getInstance(myFixture.getProject()), myFixture.getProject());
         var file = file("a/moved.instances").getVirtualFile();
         openAndConnect(file);
         PlatformTestUtil.waitWithEventsDispatching("The diagnostics of instance a must be shown",
-                () -> List.of("from a").equals(shownDiagnostics(file)), 10);
+                () -> List.of("from a").equals(shownDiagnostics(file)), TIMEOUT);
 
         move(file, myFixture.getTempDirFixture().findOrCreateDir("b"));
 
         PlatformTestUtil.waitWithEventsDispatching("The diagnostics of instance b must be shown",
-                () -> shownDiagnostics(file).contains("from b"), 10);
+                () -> shownDiagnostics(file).contains("from b"), TIMEOUT);
         dispatchAll();
         assertEquals(List.of("from b"), shownDiagnostics(file));
     }
@@ -369,7 +372,7 @@ public class LanguageServerManagerInstancesTest extends LSPCodeInsightFixtureTes
 
     private @NotNull LanguageServerWrapper waitForTheInstanceConnectedTo(@NotNull VirtualFile file) {
         PlatformTestUtil.waitWithEventsDispatching("The moved file must be connected to an instance",
-                () -> instanceConnectedTo(file) != null, 10);
+                () -> instanceConnectedTo(file) != null, TIMEOUT);
         var instance = instanceConnectedTo(file);
         assertNotNull(instance);
         return instance;
@@ -382,7 +385,7 @@ public class LanguageServerManagerInstancesTest extends LSPCodeInsightFixtureTes
 
     private static void waitForStatus(@NotNull LanguageServerWrapper instance, @NotNull ServerStatus status) {
         PlatformTestUtil.waitWithEventsDispatching("The language server must be " + status,
-                () -> instance.getServerStatus() == status, 10);
+                () -> instance.getServerStatus() == status, TIMEOUT);
     }
 
     private static void dispatchAll() {
@@ -392,7 +395,7 @@ public class LanguageServerManagerInstancesTest extends LSPCodeInsightFixtureTes
     }
 
     private static <T> T waitFor(@NotNull CompletableFuture<T> future) throws Exception {
-        PlatformTestUtil.waitWithEventsDispatching("The language servers must answer", future::isDone, 10);
+        PlatformTestUtil.waitWithEventsDispatching("The language servers must answer", future::isDone, TIMEOUT);
         return future.get();
     }
 

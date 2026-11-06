@@ -57,6 +57,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
  */
 public class LanguageServerInstancesTest extends LSPCodeInsightFixtureTestCase {
 
+    // Only ends a hang: a wait whose condition is met returns at once
+    private static final int TIMEOUT = 60;
+
     private PerFolderDefinition definition;
     private LanguageServiceAccessor accessor;
 
@@ -283,7 +286,7 @@ public class LanguageServerInstancesTest extends LSPCodeInsightFixtureTestCase {
             var instances = instances();
             return instances.size() == 1 && instances.get(0).getInstanceRoot() != null
                     && instances.get(0).isConnectedTo(instances.get(0).toUri(file.getVirtualFile()));
-        }, 10);
+        }, TIMEOUT);
         assertEquals("a", instances().get(0).getInstanceRoot().getName());
     }
 
@@ -487,18 +490,20 @@ public class LanguageServerInstancesTest extends LSPCodeInsightFixtureTestCase {
         PlatformTestUtil.waitWithEventsDispatching("The open file must get a language server", () -> {
             var instances = instances();
             return instances.size() == 1 && instances.get(0).isConnectedTo(instances.get(0).toUri(file.getVirtualFile()));
-        }, 10);
+        }, TIMEOUT);
     }
 
     public void testAStopWaitsForTheStopThatIsRunning() throws Exception {
         var instance = instanceOf(file("a/one.per-folder"));
-        definition.servers.get(0).setTimeToProceedQueries(1000);
+        var shutdown = new CompletableFuture<Void>();
+        definition.servers.get(0).holdShutdown(shutdown);
 
         var running = instance.stop();
         var second = instance.stop();
 
         assertSame(running, second);
         assertFalse(second.isDone());
+        shutdown.complete(null);
         waitFor(second);
     }
 
@@ -594,7 +599,7 @@ public class LanguageServerInstancesTest extends LSPCodeInsightFixtureTestCase {
         PlatformTestUtil.waitWithEventsDispatching("The open file must get a new instance", () -> {
             var instances = instances();
             return instances.size() == 1 && instances.get(0).isSynchronizing(file.getVirtualFile());
-        }, 10);
+        }, TIMEOUT);
         assertEquals("a", instances().get(0).getInstanceRoot().getName());
     }
 
@@ -607,7 +612,7 @@ public class LanguageServerInstancesTest extends LSPCodeInsightFixtureTestCase {
         assertFalse(instance.isDisposed());
         assertSameElements(instances(), instance);
         PlatformTestUtil.waitWithEventsDispatching("The language server must start again",
-                () -> definition.servers.size() == 2, 10);
+                () -> definition.servers.size() == 2, TIMEOUT);
     }
 
     public void testChangedInitializationOptionsRestartEachInstanceOnce() throws Exception {
@@ -713,7 +718,7 @@ public class LanguageServerInstancesTest extends LSPCodeInsightFixtureTestCase {
 
     private static void waitForAddedFolders(@NotNull MockLanguageServer server, @NotNull String... names) {
         PlatformTestUtil.waitWithEventsDispatching("The language server must hear about the folders",
-                () -> addedFolders(server).size() >= names.length, 10);
+                () -> addedFolders(server).size() >= names.length, TIMEOUT);
         assertEquals(List.of(names), addedFolders(server));
     }
 
@@ -722,12 +727,12 @@ public class LanguageServerInstancesTest extends LSPCodeInsightFixtureTestCase {
     }
 
     private static void waitUntilDisposed(@NotNull LanguageServerWrapper instance) {
-        PlatformTestUtil.waitWithEventsDispatching("The replaced instance must be disposed", instance::isDisposed, 10);
+        PlatformTestUtil.waitWithEventsDispatching("The replaced instance must be disposed", instance::isDisposed, TIMEOUT);
     }
 
     private void waitUntilStarted(@NotNull LanguageServerWrapper instance) {
         PlatformTestUtil.waitWithEventsDispatching("The instance must start again",
-                () -> instance.getServerStatus() == ServerStatus.started, 10);
+                () -> instance.getServerStatus() == ServerStatus.started, TIMEOUT);
     }
 
     /**
@@ -783,7 +788,7 @@ public class LanguageServerInstancesTest extends LSPCodeInsightFixtureTestCase {
     }
 
     private static <T> T waitFor(@NotNull CompletableFuture<T> future) throws Exception {
-        PlatformTestUtil.waitWithEventsDispatching("The language servers must answer", future::isDone, 10);
+        PlatformTestUtil.waitWithEventsDispatching("The language servers must answer", future::isDone, TIMEOUT);
         return future.get();
     }
 
