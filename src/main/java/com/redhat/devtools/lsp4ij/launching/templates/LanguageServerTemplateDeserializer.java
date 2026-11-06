@@ -14,13 +14,16 @@ package com.redhat.devtools.lsp4ij.launching.templates;
 import com.google.common.reflect.TypeToken;
 import com.google.gson.*;
 import com.redhat.devtools.lsp4ij.JSONUtils;
+import com.redhat.devtools.lsp4ij.server.definition.launching.TransportSupport;
 import com.redhat.devtools.lsp4ij.server.definition.launching.UserDefinedTransport;
 import com.redhat.devtools.lsp4ij.templates.ServerTemplateJsonDeserializer;
 import org.jetbrains.annotations.NotNull;
 
 import java.lang.reflect.Type;
+import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static com.redhat.devtools.lsp4ij.launching.templates.LanguageServerTemplate.*;
 
@@ -50,6 +53,7 @@ public class LanguageServerTemplateDeserializer extends ServerTemplateJsonDeseri
         }
         languageServerTemplate.setEnvData(deserializeEnvData(jsonObject));
         languageServerTemplate.setTransport(deserializeTransport(jsonObject));
+        languageServerTemplate.setSupportedTransports(deserializeSupportedTransports(jsonObject));
 
         boolean expandConfiguration = JSONUtils.getBoolean(jsonObject, EXPAND_CONFIGURATION_JSON_PROPERTY);
         languageServerTemplate.setExpandConfiguration(expandConfiguration);
@@ -77,6 +81,29 @@ public class LanguageServerTemplateDeserializer extends ServerTemplateJsonDeseri
         return UserDefinedTransport.of(JSONUtils.getString(socket, SOCKET_MODE_JSON_PROPERTY),
                 JSONUtils.getString(socket, SOCKET_HOST_JSON_PROPERTY),
                 port != null ? port : 0);
+    }
+
+    /**
+     * Returns the transports of the "transports" array of the template, without those of an unknown mode, and none
+     * without the array: the template doesn't say.
+     */
+    private static @NotNull List<TransportSupport> deserializeSupportedTransports(@NotNull JsonObject jsonObject) {
+        JsonArray transports = JSONUtils.getJsonArray(jsonObject, TRANSPORTS_JSON_PROPERTY);
+        if (transports == null) {
+            return List.of();
+        }
+        return transports.asList().stream()
+                .filter(JsonElement::isJsonObject)
+                .map(JsonElement::getAsJsonObject)
+                .flatMap(transport -> {
+                    String id = JSONUtils.getString(transport, TRANSPORT_MODE_JSON_PROPERTY);
+                    var mode = UserDefinedTransport.Mode.fromId(id);
+                    // fromId reads an unknown mode as stdio
+                    return mode.getId().equals(id)
+                            ? Stream.of(new TransportSupport(mode, JSONUtils.getString(transport, TRANSPORT_ARGUMENT_JSON_PROPERTY)))
+                            : Stream.empty();
+                })
+                .toList();
     }
 
     @Override

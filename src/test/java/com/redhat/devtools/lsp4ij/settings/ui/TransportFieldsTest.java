@@ -14,10 +14,12 @@ import com.intellij.ui.components.JBRadioButton;
 import com.intellij.ui.components.JBTextField;
 import com.intellij.util.ui.FormBuilder;
 import com.intellij.util.ui.UIUtil;
+import com.redhat.devtools.lsp4ij.server.definition.launching.TransportSupport;
 import com.redhat.devtools.lsp4ij.server.definition.launching.UserDefinedTransport;
 import org.jetbrains.annotations.NotNull;
 
 import javax.swing.*;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static com.redhat.devtools.lsp4ij.LanguageServerBundle.message;
@@ -130,6 +132,39 @@ public class TransportFieldsTest extends LightPlatformTestCase {
         assertTrue(label("language.server.socket.port.attach.hint").isVisible());
     }
 
+    public void testALanguageServerWhichTalksOnlyOverStdioCanNotBeGivenASocket() {
+        assertFalse(label("language.server.transport.stdio.only").isVisible());
+
+        fields.setSupportedTransports(List.of(new TransportSupport(UserDefinedTransport.Mode.STDIO, "--stdio")));
+
+        assertFalse(radio("language.server.transport.socket").isEnabled());
+        assertTrue(label("language.server.transport.stdio.only").isVisible());
+    }
+
+    public void testASocketWhichTheTemplateListsHasAHint() {
+        fields.setSupportedTransports(List.of(new TransportSupport(UserDefinedTransport.Mode.STDIO, "--stdio"),
+                new TransportSupport(UserDefinedTransport.Mode.START_AND_ACCEPT, "--socket=${port}")));
+        assertTrue(radio("language.server.transport.socket").isEnabled());
+        assertFalse(label("language.server.transport.stdio.only").isVisible());
+        String hint = message("language.server.socket.template.hint", "--socket=${port}",
+                message("language.server.socket.startAndAccept"));
+        assertFalse("only a socket has the hint", labelWithText(hint).isVisible());
+
+        radio("language.server.transport.socket").doClick();
+
+        assertTrue(labelWithText(hint).isVisible());
+    }
+
+    public void testWithoutAWordFromTheTemplateEveryTransportCanBeChosenWithoutAHint() {
+        fields.setSupportedTransports(List.of());
+        radio("language.server.transport.socket").doClick();
+
+        assertTrue(radio("language.server.transport.socket").isEnabled());
+        assertFalse(label("language.server.transport.stdio.only").isVisible());
+        assertTrue(UIUtil.findComponentsOfType(form, JBLabel.class).stream()
+                .noneMatch(label -> label.isVisible() && label.getText().startsWith("This language server takes")));
+    }
+
     public void testATransportIsShownAsItIs() {
         for (var transport : new UserDefinedTransport[]{
                 UserDefinedTransport.STDIO,
@@ -159,7 +194,10 @@ public class TransportFieldsTest extends LightPlatformTestCase {
     }
 
     private @NotNull JBLabel label(@NotNull String key) {
-        String text = message(key);
+        return labelWithText(message(key));
+    }
+
+    private @NotNull JBLabel labelWithText(@NotNull String text) {
         return UIUtil.findComponentsOfType(form, JBLabel.class).stream()
                 .filter(label -> text.equals(label.getText()))
                 .findFirst()

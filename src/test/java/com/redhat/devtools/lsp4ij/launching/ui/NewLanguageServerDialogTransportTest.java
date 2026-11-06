@@ -15,6 +15,7 @@ import com.intellij.ui.components.JBRadioButton;
 import com.redhat.devtools.lsp4ij.LanguageServerBundle;
 import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
 import com.redhat.devtools.lsp4ij.launching.templates.LanguageServerTemplate;
+import com.redhat.devtools.lsp4ij.server.definition.launching.TransportSupport;
 import com.redhat.devtools.lsp4ij.server.definition.launching.UserDefinedLanguageServerDefinition;
 import com.redhat.devtools.lsp4ij.server.definition.launching.UserDefinedTransport;
 import com.redhat.devtools.lsp4ij.settings.ui.CommandLineWidget;
@@ -92,12 +93,7 @@ public class NewLanguageServerDialogTransportTest extends BasePlatformTestCase {
     public void testTheTransportComesFirstAndARunningLanguageServerHidesTheFieldsItDoesNotUse() {
         var dialog = dialog(template("node server.js --stdio", RUNNING));
         try {
-            // the server name field is in the dialog's form; without a window, its top is the topmost parent
-            Component top = dialog.getPreferredFocusedComponent();
-            while (top.getParent() != null) {
-                top = top.getParent();
-            }
-            List<Component> form = components(top);
+            List<Component> form = form(dialog);
             var command = (CommandLineWidget) form.stream().filter(CommandLineWidget.class::isInstance).findFirst().orElseThrow();
             var environment = form.stream().filter(EnvironmentVariablesComponent.class::isInstance).findFirst().orElseThrow();
             var stdio = (JBRadioButton) form.stream()
@@ -114,6 +110,21 @@ public class NewLanguageServerDialogTransportTest extends BasePlatformTestCase {
             assertTrue(commandPane.isVisible());
             assertTrue(environment.isVisible());
             assertEquals("the hidden command was kept", "node server.js --stdio", command.getText());
+        } finally {
+            dialog.close(DialogWrapper.CANCEL_EXIT_CODE);
+        }
+    }
+
+    public void testTheTemplateOfALanguageServerWhichTalksOnlyOverStdioDisablesTheSocket() {
+        var template = template("server --stdio", UserDefinedTransport.STDIO);
+        template.setSupportedTransports(List.of(new TransportSupport(UserDefinedTransport.Mode.STDIO, "--stdio")));
+        var dialog = dialog(template);
+        try {
+            var socket = form(dialog).stream()
+                    .filter(component -> component instanceof JBRadioButton button
+                            && LanguageServerBundle.message("language.server.transport.socket").equals(button.getText()))
+                    .findFirst().orElseThrow();
+            assertFalse(socket.isEnabled());
         } finally {
             dialog.close(DialogWrapper.CANCEL_EXIT_CODE);
         }
@@ -157,6 +168,18 @@ public class NewLanguageServerDialogTransportTest extends BasePlatformTestCase {
      */
     private static @NotNull List<ValidationInfo> fieldProblems(@NotNull NewLanguageServerDialog dialog) {
         return dialog.doValidateAll().stream().filter(problem -> problem.component != null).toList();
+    }
+
+    /**
+     * Returns the components of the dialog's form. The server name field is in it, and without a window, the top of
+     * the form is the topmost parent of that field.
+     */
+    private static @NotNull List<Component> form(@NotNull NewLanguageServerDialog dialog) {
+        Component top = dialog.getPreferredFocusedComponent();
+        while (top.getParent() != null) {
+            top = top.getParent();
+        }
+        return components(top);
     }
 
     /**

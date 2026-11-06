@@ -11,9 +11,14 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonObject;
 import com.intellij.testFramework.LightPlatformTestCase;
+import com.redhat.devtools.lsp4ij.server.definition.launching.TransportSupport;
 import com.redhat.devtools.lsp4ij.server.definition.launching.UserDefinedLanguageServerDefinition;
 import com.redhat.devtools.lsp4ij.server.definition.launching.UserDefinedTransport;
 
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -85,6 +90,47 @@ public class LanguageServerSocketTemplateTest extends LightPlatformTestCase {
         assertSame(UserDefinedTransport.STDIO, template.getTransport());
     }
 
+    public void testATemplateListsTheTransportsItsLanguageServerSupports() {
+        var template = GSON.fromJson("""
+                {
+                  "id": "server",
+                  "name": "Server",
+                  "programArgs": { "default": "server --stdio" },
+                  "transports": [
+                    { "mode": "stdio", "argument": "--stdio" },
+                    { "mode": "startAndAccept", "argument": "--socket=${port}" },
+                    { "mode": "pipe" },
+                    { "mode": "attach" }
+                  ]
+                }""", LanguageServerTemplate.class);
+
+        assertEquals(List.of(new TransportSupport(UserDefinedTransport.Mode.STDIO, "--stdio"),
+                        new TransportSupport(UserDefinedTransport.Mode.START_AND_ACCEPT, "--socket=${port}"),
+                        new TransportSupport(UserDefinedTransport.Mode.ATTACH, null)),
+                template.getSupportedTransports());
+        // listing a socket doesn't make it the transport
+        assertSame(UserDefinedTransport.STDIO, template.getTransport());
+    }
+
+    public void testATemplateWithoutTransportsDoesNotSayWhichItsLanguageServerSupports() {
+        var template = GSON.fromJson("""
+                { "id": "server", "name": "Server", "programArgs": { "default": "server --stdio" } }""",
+                LanguageServerTemplate.class);
+
+        assertEmpty(template.getSupportedTransports());
+    }
+
+    public void testTheBundledTemplatesSayWhichTransportsTheirLanguageServersSupport() throws IOException {
+        // typescript-language-server requires --stdio and rejects --socket
+        assertEquals(List.of(new TransportSupport(UserDefinedTransport.Mode.STDIO, "--stdio")),
+                bundled("typescript-language-server").getSupportedTransports());
+        // the servers built on vscode-languageserver connect to the port of --socket
+        for (var name : List.of("vscode-css-language-server", "vscode-html-language-server", "vscode-eslint-language-server")) {
+            assertTrue(name, bundled(name).getSupportedTransports()
+                    .contains(new TransportSupport(UserDefinedTransport.Mode.START_AND_ACCEPT, "--socket=${port}")));
+        }
+    }
+
     public void testAnExportedSocketIsImportedAgain() {
         var definition = definition("server --port ${port}");
         var transport = new UserDefinedTransport(UserDefinedTransport.Mode.START_AND_CONNECT, null, 4389);
@@ -96,6 +142,14 @@ public class LanguageServerSocketTemplateTest extends LightPlatformTestCase {
 
         assertEquals(transport, template.getTransport());
         assertEquals("server --port ${port}", template.getProgramArgs());
+    }
+
+    private static LanguageServerTemplate bundled(String name) throws IOException {
+        var json = LanguageServerSocketTemplateTest.class.getResourceAsStream("/templates/lsp/" + name + "/template.json");
+        assertNotNull(name, json);
+        try (var reader = new InputStreamReader(json, StandardCharsets.UTF_8)) {
+            return GSON.fromJson(reader, LanguageServerTemplate.class);
+        }
     }
 
     private static UserDefinedLanguageServerDefinition definition(String commandLine) {

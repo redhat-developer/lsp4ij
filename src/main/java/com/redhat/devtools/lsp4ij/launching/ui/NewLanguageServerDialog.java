@@ -221,6 +221,7 @@ public class NewLanguageServerDialog extends DialogWrapper {
         languageServerPanel.setCommandLine(command);
         languageServerPanel.setEnvData(template.getEnvData());
         languageServerPanel.setTransport(template.getTransport());
+        languageServerPanel.setSupportedTransports(template.getSupportedTransports());
 
         // Update mappings
         var mappingsPanel = this.languageServerPanel.getMappingsPanel();

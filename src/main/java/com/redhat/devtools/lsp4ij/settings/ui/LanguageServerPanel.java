@@ -41,6 +41,7 @@ import com.redhat.devtools.lsp4ij.LanguageServerBundle;
 import com.redhat.devtools.lsp4ij.features.workspaceFolder.WorkspaceFolderStrategy;
 import com.redhat.devtools.lsp4ij.installation.CommandLineUpdater;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
+import com.redhat.devtools.lsp4ij.server.definition.launching.TransportSupport;
 import com.redhat.devtools.lsp4ij.server.definition.launching.UserDefinedTransport;
 import com.redhat.devtools.lsp4ij.settings.ErrorReportingKind;
 import com.redhat.devtools.lsp4ij.settings.ServerTrace;
@@ -561,6 +562,17 @@ public class LanguageServerPanel implements Disposable {
             return;
         }
         this.workingDir.setText(workingDir != null ? workingDir : "");
+    }
+
+    /**
+     * Shows what the template of the language server says of its transports.
+     *
+     * @param supportedTransports the transports which the template lists, empty if it lists none.
+     */
+    public void setSupportedTransports(@NotNull List<TransportSupport> supportedTransports) {
+        if (transportFields != null) {
+            transportFields.setSupportedTransports(supportedTransports);
+        }
     }
 
     /**

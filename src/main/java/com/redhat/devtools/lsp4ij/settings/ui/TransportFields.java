@@ -17,6 +17,7 @@ import com.intellij.ui.components.JBRadioButton;
 import com.intellij.ui.components.JBTextField;
 import com.intellij.util.ui.FormBuilder;
 import com.intellij.util.ui.JBUI;
+import com.redhat.devtools.lsp4ij.server.definition.launching.TransportSupport;
 import com.redhat.devtools.lsp4ij.server.definition.launching.UserDefinedTransport;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -59,11 +60,14 @@ final class TransportFields {
     private final JBLabel portLabel = new JBLabel(message("language.server.socket.port"));
     private final JBLabel portHint = new JBLabel(message("language.server.socket.port.hint", UserDefinedTransport.PORT_MACRO));
     private final JBLabel attachPortHint = new JBLabel(message("language.server.socket.port.attach.hint"));
+    private final JBLabel stdioOnlyHint = new JBLabel(message("language.server.transport.stdio.only"));
+    private final JBLabel templateSocketHint = new JBLabel();
     private final JPanel transportRow = row(GAP, stdio, socket);
     // Auto and Fixed have a row of their own, whose gaps hide with them, so the port lines up with the host without them
     private final JPanel portChoice = row(GAP, autoPort, fixedPort);
     private final JPanel portRow = row(0, portChoice, port);
     private final List<Runnable> changeListeners = new ArrayList<>();
+    private List<TransportSupport> supportedTransports = List.of();
 
     TransportFields() {
         group(stdio, socket);
@@ -74,6 +78,8 @@ final class TransportFields {
         portLabel.setLabelFor(port);
         portHint.setForeground(JBUI.CurrentTheme.ContextHelp.FOREGROUND);
         attachPortHint.setForeground(JBUI.CurrentTheme.ContextHelp.FOREGROUND);
+        stdioOnlyHint.setForeground(JBUI.CurrentTheme.ContextHelp.FOREGROUND);
+        templateSocketHint.setForeground(JBUI.CurrentTheme.ContextHelp.FOREGROUND);
         typedPortCommits();
         setTransport(UserDefinedTransport.STDIO);
         for (var button : List.of(stdio, socket, attach, startAndConnect, startAndAccept, autoPort, fixedPort)) {
@@ -89,9 +95,11 @@ final class TransportFields {
      */
     void addTo(@NotNull FormBuilder builder) {
         builder.addLabeledComponent(message("language.server.transport"), transportRow);
+        builder.addComponent(stdioOnlyHint, 0);
         builder.addLabeledComponent(socketLabel, attach);
         builder.addLabeledComponent(startAndConnectLabel, startAndConnect);
         builder.addLabeledComponent(startAndAcceptLabel, startAndAccept);
+        builder.addComponent(templateSocketHint, 0);
         builder.addLabeledComponent(hostLabel, host);
         builder.addLabeledComponent(portLabel, portRow);
         builder.addComponent(portHint, 0);
@@ -105,6 +113,18 @@ final class TransportFields {
      */
     void addChangeListener(@NotNull Runnable listener) {
         changeListeners.add(listener);
+    }
+
+    /**
+     * Shows what the template of the language server says of its transports: Socket is disabled for a language server
+     * which talks only over its standard input and output, and a hint names the mode, and the argument, of a socket
+     * which it supports. Without a word from the template, every transport can be chosen and no hint shows.
+     *
+     * @param supportedTransports the transports which the template lists, empty if it lists none.
+     */
+    void setSupportedTransports(@NotNull List<TransportSupport> supportedTransports) {
+        this.supportedTransports = List.copyOf(supportedTransports);
+        update();
     }
 
     /**
@@ -197,6 +217,16 @@ final class TransportFields {
         port.setEnabled(isAttach || fixedPort.isSelected());
         portHint.setVisible(isSocket && !isAttach);
         attachPortHint.setVisible(isAttach && port.getNumber() == 0);
+        var socketSupport = supportedTransports.stream()
+                .filter(transport -> transport.mode() != UserDefinedTransport.Mode.STDIO)
+                .findFirst();
+        boolean socketSupported = supportedTransports.isEmpty() || socketSupport.isPresent();
+        socket.setEnabled(socketSupported);
+        stdioOnlyHint.setVisible(!socketSupported);
+        socketSupport.ifPresent(transport -> templateSocketHint.setText(transport.argument() != null
+                ? message("language.server.socket.template.hint", transport.argument(), modeButton(transport.mode()).getText())
+                : message("language.server.socket.template.mode.hint", modeButton(transport.mode()).getText())));
+        templateSocketHint.setVisible(isSocket && socketSupport.isPresent());
         var parent = transportRow.getParent();
         if (parent != null) {
             parent.revalidate();
@@ -229,6 +259,15 @@ final class TransportFields {
         formatter.setMaximum(MAX_PORT);
         formatter.setCommitsOnValidEdit(true);
         editor.getTextField().setFormatterFactory(new DefaultFormatterFactory(formatter));
+    }
+
+    private @NotNull JBRadioButton modeButton(@NotNull UserDefinedTransport.Mode mode) {
+        return switch (mode) {
+            case STDIO -> stdio;
+            case ATTACH -> attach;
+            case START_AND_CONNECT -> startAndConnect;
+            case START_AND_ACCEPT -> startAndAccept;
+        };
     }
 
     private static void group(@NotNull AbstractButton... buttons) {

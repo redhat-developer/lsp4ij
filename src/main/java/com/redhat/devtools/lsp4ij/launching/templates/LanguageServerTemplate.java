@@ -12,10 +12,12 @@ package com.redhat.devtools.lsp4ij.launching.templates;
 
 import com.redhat.devtools.lsp4ij.LanguageServerBundle;
 import com.redhat.devtools.lsp4ij.internal.PluginUtils;
+import com.redhat.devtools.lsp4ij.server.definition.launching.TransportSupport;
 import com.redhat.devtools.lsp4ij.server.definition.launching.UserDefinedTransport;
 import com.redhat.devtools.lsp4ij.templates.ServerTemplate;
 import org.jetbrains.annotations.NotNull;
 
+import java.util.List;
 import java.util.Set;
 
 /**
@@ -45,6 +47,9 @@ public class LanguageServerTemplate extends ServerTemplate {
     public static final String SOCKET_MODE_JSON_PROPERTY = "mode";
     public static final String SOCKET_HOST_JSON_PROPERTY = "host";
     public static final String SOCKET_PORT_JSON_PROPERTY = "port";
+    public static final String TRANSPORTS_JSON_PROPERTY = "transports";
+    public static final String TRANSPORT_MODE_JSON_PROPERTY = "mode";
+    public static final String TRANSPORT_ARGUMENT_JSON_PROPERTY = "argument";
 
     private String description;
 
@@ -58,6 +63,7 @@ public class LanguageServerTemplate extends ServerTemplate {
 
     private Set<String> disablePromotionFor;
     private @NotNull UserDefinedTransport transport = UserDefinedTransport.STDIO;
+    private @NotNull List<TransportSupport> supportedTransports = List.of();
     private Boolean promotable;
 
     /**
@@ -72,6 +78,20 @@ public class LanguageServerTemplate extends ServerTemplate {
 
     public void setTransport(@NotNull UserDefinedTransport transport) {
         this.transport = transport;
+    }
+
+    /**
+     * Returns the transports which the language server supports, as the "transports" of the template list them, and
+     * none if the template doesn't say.
+     *
+     * @return the transports which the language server supports, empty if the template doesn't say.
+     */
+    public @NotNull List<TransportSupport> getSupportedTransports() {
+        return supportedTransports;
+    }
+
+    public void setSupportedTransports(@NotNull List<TransportSupport> supportedTransports) {
+        this.supportedTransports = List.copyOf(supportedTransports);
     }
 
     public String getDescription() {
