@@ -7,6 +7,9 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.settings.ui;
 
+import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.application.impl.NonBlockingReadActionImpl;
+import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.Disposer;
 import com.intellij.openapi.util.io.FileUtil;
 import com.intellij.openapi.vfs.LocalFileSystem;
@@ -19,8 +22,12 @@ import com.intellij.ui.components.JBCheckBox;
 import com.intellij.ui.treeStructure.Tree;
 import com.intellij.util.containers.ContainerUtil;
 import com.intellij.util.ui.UIUtil;
+import com.redhat.devtools.lsp4ij.LanguageServerBundle;
+import com.redhat.devtools.lsp4ij.client.features.FileUriSupport;
 import com.redhat.devtools.lsp4ij.features.workspaceFolder.ConfigurableWorkspaceFolderStrategy;
+import org.eclipse.lsp4j.WorkspaceFolder;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import javax.swing.tree.TreePath;
 import java.awt.Cursor;
@@ -30,11 +37,15 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
  * Tests the preview of the workspace folders tab with one language server instance per folder.
  */
 public class WorkspaceFoldersPanelTest extends BasePlatformTestCase {
+
+    // Only ends a hang: a wait whose condition is met returns at once
+    private static final int TIMEOUT = 60;
 
     private WorkspaceFoldersPanel panel;
 
@@ -42,6 +53,7 @@ public class WorkspaceFoldersPanelTest extends BasePlatformTestCase {
     protected void setUp() throws Exception {
         super.setUp();
         panel = new WorkspaceFoldersPanel(getProject(), new ConfigurableWorkspaceFolderStrategy());
+        waitForThePreview();
     }
 
     @Override
@@ -104,8 +116,8 @@ public class WorkspaceFoldersPanelTest extends BasePlatformTestCase {
 
         test(localFile(Files.writeString(directory.resolve("one.txt"), "")));
 
-        PlatformTestUtil.waitWithEventsDispatching("The preview must show the folder", () -> rows().stream().anyMatch(row ->
-                row.contains(folder.getPath()) && row.contains("(own language server instance)")), 5);
+        assertTrue(rows().toString(), rows().stream().anyMatch(row ->
+                row.contains(folder.getPath()) && row.contains("(own language server instance)")));
 
         // A changed configuration tests the file again
         configure(json);
@@ -146,8 +158,8 @@ public class WorkspaceFoldersPanelTest extends BasePlatformTestCase {
 
         test(file);
 
-        PlatformTestUtil.waitWithEventsDispatching("The preview must show the file", () -> rows().size() == 3, 5);
         var rows = rows();
+        assertEquals(rows.toString(), 3, rows.size());
         assertTrue(rows.toString(), rows.get(0).contains(localFile(directory).getPath()) && rows.get(0).contains("(own language server instance)"));
         assertTrue(rows.toString(), rows.get(1).contains(file.getParent().getPath()) && rows.get(1).contains("(workspace/didChangeWorkspaceFolders notification)"));
         assertTrue(rows.toString(), rows.get(2).contains("one.txt"));
@@ -163,8 +175,8 @@ public class WorkspaceFoldersPanelTest extends BasePlatformTestCase {
 
         test(file);
 
-        PlatformTestUtil.waitWithEventsDispatching("The preview must show the file", () -> rows().size() == 2, 5);
         var rows = rows();
+        assertEquals(rows.toString(), 2, rows.size());
         assertTrue(rows.toString(), rows.get(0).contains(file.getParent().getPath()) && rows.get(0).contains("(own language server instance)"));
         assertTrue(rows.toString(), rows.get(1).contains("one.txt"));
     }
@@ -177,7 +189,7 @@ public class WorkspaceFoldersPanelTest extends BasePlatformTestCase {
         var file = localFile(Files.writeString(directory.resolve("src/one.txt"), ""));
         usePanelWith("{\"serverInstances\": {\"markers\": [\"instance-marker\"]}, \"markers\": [\"folder-marker\"]}");
         test(file);
-        PlatformTestUtil.waitWithEventsDispatching("The preview must show the file", () -> rows().size() == 3, 5);
+        assertEquals(rows().toString(), 3, rows().size());
 
         panel.getWorkspaceFoldersTree().setSelectionRow(2);
         panel.removeSelectedFile();
@@ -207,8 +219,11 @@ public class WorkspaceFoldersPanelTest extends BasePlatformTestCase {
 
         test(file);
 
-        PlatformTestUtil.waitWithEventsDispatching("The preview must show the file", () -> rows().size() == 2, 5);
-        assertTrue(rows().toString(), rows().get(0).contains("(initialize request)"));
+        // With markers, the folder comes with the first file of it, as a refresh says too
+        assertEquals(rows().toString(), 2, rows().size());
+        assertTrue(rows().toString(), rows().get(0).contains("(workspace/didChangeWorkspaceFolders notification)"));
+        configure("{\"markers\": [\"folder-marker\"]}");
+        assertTrue(rows().toString(), rows().get(0).contains("(workspace/didChangeWorkspaceFolders notification)"));
     }
 
     public void testAFileWithoutARootGetsNoInstance() throws IOException {
@@ -216,8 +231,7 @@ public class WorkspaceFoldersPanelTest extends BasePlatformTestCase {
 
         test(localFileOutsideOfTheProject());
 
-        PlatformTestUtil.waitWithEventsDispatching("The preview must show the file",
-                () -> rows().stream().anyMatch(row -> row.contains("(No root: no language server instance)")), 5);
+        assertTrue(rows().toString(), rows().stream().anyMatch(row -> row.contains("(No root: no language server instance)")));
     }
 
     public void testAFileWithoutAFolderHasNoRootWithoutInstances() throws IOException {
@@ -225,8 +239,68 @@ public class WorkspaceFoldersPanelTest extends BasePlatformTestCase {
 
         test(localFileOutsideOfTheProject());
 
-        PlatformTestUtil.waitWithEventsDispatching("The preview must show the file",
-                () -> rows().stream().anyMatch(row -> row.contains("(No root)")), 5);
+        assertTrue(rows().toString(), rows().stream().anyMatch(row -> row.contains("(No root)")));
+    }
+
+    public void testTheRefreshAsksTheStrategyOffTheUiThread() throws IOException {
+        var directory = localDirectory();
+        Files.writeString(directory.resolve("instance-marker"), "");
+        var file = localFile(Files.writeString(directory.resolve("one.txt"), ""));
+        List<Boolean> onTheUiThread = new CopyOnWriteArrayList<>();
+        var json = "{\"serverInstances\": {\"markers\": [\"instance-marker\"]}}";
+        var strategy = new ConfigurableWorkspaceFolderStrategy() {
+            @Override
+            public @Nullable WorkspaceFolder getServerInstanceRoot(@NotNull VirtualFile file,
+                                                                   @NotNull Project project,
+                                                                   @NotNull FileUriSupport fileUriSupport) {
+                onTheUiThread.add(ApplicationManager.getApplication().isDispatchThread());
+                return super.getServerInstanceRoot(file, project, fileUriSupport);
+            }
+        };
+        strategy.configure(json);
+        Disposer.dispose(panel);
+        panel = new WorkspaceFoldersPanel(getProject(), strategy);
+        waitForThePreview();
+        test(file);
+        onTheUiThread.clear();
+
+        // A changed configuration tests the file again
+        configure(json);
+
+        assertNotEmpty(onTheUiThread);
+        assertFalse(onTheUiThread.toString(), onTheUiThread.contains(true));
+    }
+
+    public void testAFolderWithoutTheRootOfAnInstanceGetsNone() throws IOException {
+        var root = localContentRoot();
+        try {
+            // The project's directories are the workspace folders, and the source roots the roots of the instances
+            configure("{\"serverInstances\": {\"rootType\": \"SOURCE_ROOTS\"}, \"rootType\": \"PROJECT_BASE\"}");
+
+            var rows = rows();
+            int noInstance = ContainerUtil.indexOf(rows, row -> row.contains("(No root: no language server instance)"));
+            int folder = ContainerUtil.indexOf(rows, row -> row.contains(root.getPath()));
+            assertTrue(rows.toString(), noInstance >= 0 && folder > noInstance);
+        } finally {
+            PsiTestUtil.removeContentEntry(getModule(), root);
+        }
+    }
+
+    public void testTheInitializeModeSaysWhyItDoesNotApplyWithInstances() {
+        var checkBox = UIUtil.findComponentOfType(panel, JBCheckBox.class);
+        assertNotNull(checkBox);
+
+        configure("{\"serverInstances\": {\"rootType\": \"SOURCE_ROOTS\"}}");
+
+        assertFalse(checkBox.isEnabled());
+        assertEquals(LanguageServerBundle.message("language.server.workspaceFolders.sendAtInit.instances.tooltip"),
+                checkBox.getToolTipText());
+
+        configure("{\"rootType\": \"SOURCE_ROOTS\"}");
+
+        assertTrue(checkBox.isEnabled());
+        assertEquals(LanguageServerBundle.message("language.server.workspaceFolders.sendAtInit.tooltip"),
+                checkBox.getToolTipText());
     }
 
     /**
@@ -237,15 +311,28 @@ public class WorkspaceFoldersPanelTest extends BasePlatformTestCase {
         strategy.configure(json);
         Disposer.dispose(panel);
         panel = new WorkspaceFoldersPanel(getProject(), strategy);
+        waitForThePreview();
     }
 
     private void configure(@NotNull String json) {
         panel.setJsonConfiguration(json);
-        PlatformTestUtil.dispatchAllEventsInIdeEventQueue();
+        waitForThePreview();
     }
 
     private void test(@NotNull VirtualFile file) {
-        panel.testFile(file);
+        var shown = panel.testFile(file);
+        PlatformTestUtil.waitWithEventsDispatching("The preview must show the file", shown::isDone, TIMEOUT);
+        waitForThePreview();
+    }
+
+    /**
+     * Waits until the preview has computed where its folders and files go, which it does off the UI thread, and shows
+     * them.
+     */
+    private static void waitForThePreview() {
+        PlatformTestUtil.dispatchAllEventsInIdeEventQueue();
+        NonBlockingReadActionImpl.waitForAsyncTaskCompletion();
+        PlatformTestUtil.dispatchAllEventsInIdeEventQueue();
     }
 
     private int cursorOverTheRowOf(@NotNull VirtualFile folder) {
@@ -276,6 +363,12 @@ public class WorkspaceFoldersPanelTest extends BasePlatformTestCase {
         var root = localFile(localDirectory());
         PsiTestUtil.addContentRoot(getModule(), root);
         PsiTestUtil.addSourceRoot(getModule(), root);
+        return root;
+    }
+
+    private @NotNull VirtualFile localContentRoot() throws IOException {
+        var root = localFile(localDirectory());
+        PsiTestUtil.addContentRoot(getModule(), root);
         return root;
     }
 

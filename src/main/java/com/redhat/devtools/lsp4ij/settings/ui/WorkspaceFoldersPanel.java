@@ -17,11 +17,15 @@ import com.intellij.icons.AllIcons;
 import com.intellij.ide.BrowserUtil;
 import com.intellij.openapi.Disposable;
 import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.application.ModalityState;
+import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.editor.event.DocumentEvent;
 import com.intellij.openapi.editor.event.DocumentListener;
 import com.intellij.openapi.fileChooser.FileChooser;
 import com.intellij.openapi.fileChooser.FileChooserDescriptor;
+import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.util.Pair;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.ui.ColoredTreeCellRenderer;
 import com.intellij.ui.HyperlinkLabel;
@@ -32,6 +36,8 @@ import com.intellij.ui.components.JBLabel;
 import com.intellij.ui.components.JBScrollPane;
 import com.intellij.ui.treeStructure.Tree;
 import com.intellij.util.Alarm;
+import com.intellij.util.concurrency.AppExecutorUtil;
+import com.intellij.util.containers.ContainerUtil;
 import com.intellij.util.ui.JBUI;
 import com.intellij.util.ui.StatusText;
 import com.intellij.util.ui.UIUtil;
@@ -68,6 +74,7 @@ import java.net.URI;
 import java.nio.file.Paths;
 import java.util.*;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 
 /**
  * Panel for configuring workspace folders with testing capabilities.
@@ -473,25 +480,42 @@ public class WorkspaceFoldersPanel extends JPanel implements Disposable {
         return workspaceFoldersTree;
     }
 
-    void testFile(@NotNull VirtualFile file) {
+    /**
+     * Shows the given file in the preview, under the folder and instance it would have.
+     *
+     * @param file the file.
+     * @return a future that completes once the file is shown.
+     */
+    CompletableFuture<Void> testFile(@NotNull VirtualFile file) {
+        CompletableFuture<Void> shown = new CompletableFuture<>();
         // Always run slow operation in background thread
         ApplicationManager.getApplication().executeOnPooledThread(() -> {
-            var location = locate(file);
+            FileLocation location;
+            try {
+                location = locate(file);
+            } catch (Exception e) {
+                shown.completeExceptionally(e);
+                return;
+            }
 
             // Update UI on EDT
             ApplicationManager.getApplication().invokeLater(() -> {
-                addTestedFile(file, location);
-            });
+                try {
+                    addTestedFile(file, location);
+                } finally {
+                    shown.complete(null);
+                }
+            }, ModalityState.any());
         });
+        return shown;
     }
 
     private void addTestedFile(@NotNull VirtualFile file, @NotNull FileLocation location) {
         // Track opened file
         openedFiles.add(file);
 
-        // Inside an instance, the row has to say how the folder really gets there
-        boolean sentAtInit = !strategy.hasServerInstances() || strategy.sendAllFoldersOnInitialization();
-        var parentNode = addFileNode(file, location, sentAtInit);
+        // As the refresh says it, so a row reads the same before and after it
+        var parentNode = addFileNode(file, location, strategy.sendAllFoldersOnInitialization());
         workspaceFoldersTree.expandPath(new TreePath(parentNode.getPath()));
     }
 
@@ -531,15 +555,18 @@ public class WorkspaceFoldersPanel extends JPanel implements Disposable {
                                                         boolean sentAtInit) {
         var parentNode = location.folder() != null ? getOrCreateFolderNode(location, sentAtInit) : null;
         if (parentNode == null) {
-            // Add to "No root" node
-            if (noRootNode == null) {
-                noRootNode = new DefaultMutableTreeNode(getNoRootNodeKey());
-                treeModel.insertNodeInto(noRootNode, rootNode, rootNode.getChildCount());
-            }
-            parentNode = noRootNode;
+            parentNode = getOrCreateNoRootNode();
         }
         treeModel.insertNodeInto(new DefaultMutableTreeNode(new FileNodeData(file)), parentNode, parentNode.getChildCount());
         return parentNode;
+    }
+
+    private @NotNull DefaultMutableTreeNode getOrCreateNoRootNode() {
+        if (noRootNode == null) {
+            noRootNode = new DefaultMutableTreeNode(getNoRootNodeKey());
+            treeModel.insertNodeInto(noRootNode, rootNode, rootNode.getChildCount());
+        }
+        return noRootNode;
     }
 
     /**
@@ -575,11 +602,6 @@ public class WorkspaceFoldersPanel extends JPanel implements Disposable {
 
 
     private void updateWorkspaceFoldersDisplay() {
-        // Clear tree
-        rootNode.removeAllChildren();
-        folderNodes.clear();
-        noRootNode = null;
-
         try {
             // Apply JSON configuration if available
             if (showJsonEditor && jsonEditor != null && strategy instanceof ConfigurableWorkspaceFolderStrategy) {
@@ -590,13 +612,41 @@ public class WorkspaceFoldersPanel extends JPanel implements Disposable {
             // Update empty text based on strategy type
             updateEmptyText();
             if (sendAtInitCheckbox != null) {
-                sendAtInitCheckbox.setEnabled(!strategy.hasServerInstances());
+                boolean instances = strategy.hasServerInstances();
+                sendAtInitCheckbox.setEnabled(!instances);
+                sendAtInitCheckbox.setToolTipText(LanguageServerBundle.message(instances
+                        ? "language.server.workspaceFolders.sendAtInit.instances.tooltip"
+                        : "language.server.workspaceFolders.sendAtInit.tooltip"));
             }
+        } catch (Exception e) {
+            // On error, clear the tree
+            showPreview(null);
+            return;
+        }
 
-            // Get folders based on checkbox state (for preview/testing)
+        // Get folders based on checkbox state (for preview/testing)
+        boolean showInitFolders = isShowingInitFolders();
+        var files = List.copyOf(openedFiles);
+        // The strategy can do I/O for each folder and file, as for markers, so not on the UI thread
+        ReadAction.nonBlocking(() -> computePreview(showInitFolders, files))
+                .coalesceBy(this)
+                .expireWith(this)
+                .finishOnUiThread(ModalityState.any(), this::showPreview)
+                .submit(AppExecutorUtil.getAppExecutorService());
+    }
+
+    /**
+     * What the preview shows: the folders of the configuration and the tested files, each with its place in the tree.
+     */
+    private record Preview(@NotNull List<FileLocation> folders,
+                           @NotNull List<Pair<VirtualFile, FileLocation>> files,
+                           boolean instances,
+                           boolean sentAtInit) {
+    }
+
+    private @Nullable Preview computePreview(boolean showInitFolders, @NotNull List<VirtualFile> files) {
+        try {
             List<WorkspaceFolder> folders;
-            boolean showInitFolders = isShowingInitFolders();
-
             if (showInitFolders) {
                 // Show only what would be sent at initialization (respects lazy config)
                 folders = strategy.getInitialWorkspaceFolders(project, FileUriSupport.DEFAULT);
@@ -604,30 +654,55 @@ public class WorkspaceFoldersPanel extends JPanel implements Disposable {
                 // Show all available workspace folders (discovery/preview mode)
                 folders = strategy.getWorkspaceFolders(project, FileUriSupport.DEFAULT);
             }
-
-            // Add folders to tree
+            boolean instances = strategy.hasServerInstances();
+            List<FileLocation> folderLocations = new ArrayList<>(folders.size());
             for (WorkspaceFolder folder : folders) {
-                if (strategy.hasServerInstances()) {
-                    VirtualFile file = LSPIJUtils.findResourceFor(folder.getUri());
-                    var instanceRoot = file != null ? getServerInstanceRoot(file) : null;
-                    if (instanceRoot != null) {
-                        getOrCreateFolderNode(new FileLocation(instanceRoot, folder), strategy.sendAllFoldersOnInitialization());
-                    }
-                } else {
-                    getOrCreateFolderNode(folder, rootNode, strategy.sendAllFoldersOnInitialization(), false);
-                }
+                VirtualFile directory = instances ? LSPIJUtils.findResourceFor(folder.getUri()) : null;
+                folderLocations.add(new FileLocation(directory != null ? getServerInstanceRoot(directory) : null, folder));
             }
-
             // Re-test opened files with new configuration
-            for (VirtualFile openedFile : openedFiles) {
-                addFileNode(openedFile, locate(openedFile), strategy.sendAllFoldersOnInitialization());
+            List<Pair<VirtualFile, FileLocation>> fileLocations = new ArrayList<>(files.size());
+            for (VirtualFile file : files) {
+                fileLocations.add(Pair.create(file, locate(file)));
             }
-
-            treeModel.reload();
-            expandAll();
+            return new Preview(folderLocations, fileLocations, instances, strategy.sendAllFoldersOnInitialization());
+        } catch (ProcessCanceledException e) {
+            throw e;
         } catch (Exception e) {
             // On error, clear the tree
-            treeModel.reload();
+            return null;
+        }
+    }
+
+    private void showPreview(@Nullable Preview preview) {
+        // Clear tree
+        rootNode.removeAllChildren();
+        folderNodes.clear();
+        noRootNode = null;
+
+        if (preview != null) {
+            // Add folders to tree
+            for (FileLocation location : preview.folders()) {
+                if (!preview.instances()) {
+                    getOrCreateFolderNode(location.folder(), rootNode, preview.sentAtInit(), false);
+                } else if (location.instanceRoot() != null) {
+                    getOrCreateFolderNode(location, preview.sentAtInit());
+                } else {
+                    // A folder without the root of an instance gets none, as a file there
+                    getOrCreateFolderNode(location.folder(), getOrCreateNoRootNode(), preview.sentAtInit(), false);
+                }
+            }
+            for (var file : preview.files()) {
+                addFileNode(file.getFirst(), file.getSecond(), preview.sentAtInit());
+            }
+        }
+
+        treeModel.reload();
+        expandAll();
+
+        if (preview != null && !openedFiles.equals(ContainerUtil.map2Set(preview.files(), file -> file.getFirst()))) {
+            // A file was tested or removed while this preview was computed: the next one shows it as it is
+            updateWorkspaceFoldersDisplay();
         }
     }
 
