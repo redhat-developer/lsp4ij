@@ -141,6 +141,10 @@ public class LanguageServerView implements Disposable {
             if (settings == null) {
                 return true;
             }
+            // An environment variable which IntelliJ drops is still a change, so that Apply can say why it isn't saved
+            if (languageServerPanel.validateEnvironmentVariables() != null) {
+                return true;
+            }
             if (!(isEquals(getDisplayName(), settings.getServerName())
                     && isEquals(this.getCommandLine(), settings.getCommandLine())
                     && isEquals(this.getWorkingDir(), settings.getWorkingDir())

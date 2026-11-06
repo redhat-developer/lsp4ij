@@ -55,6 +55,7 @@ import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 import java.awt.*;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -727,12 +728,49 @@ public class LanguageServerPanel implements Disposable {
             problems.add(new ValidationInfo(
                     LanguageServerBundle.message("new.language.server.dialog.validation.commandLine.must.be.set"), commandLine));
         }
+        var environmentProblem = validateEnvironmentVariables();
+        if (environmentProblem != null) {
+            problems.add(environmentProblem);
+        }
         var transportProblem = validateTransport();
         if (transportProblem != null) {
             problems.add(transportProblem);
         }
         problems.addAll(validateJsonFields());
         return problems;
+    }
+
+    /**
+     * Returns a problem when an environment variable isn't written as {@code NAME=value}. IntelliJ's field drops such
+     * an entry without a word, and its text without any {@code =} entirely.
+     *
+     * @return the problem of the environment variables, or null if each is written as {@code NAME=value}.
+     */
+    public @Nullable ValidationInfo validateEnvironmentVariables() {
+        if (environmentVariables == null) {
+            return null;
+        }
+        var field = environmentVariables.getComponent();
+        String text = field.getText();
+        // Split as EnvVariablesTable.parseEnvsFromText does: by lines, or else by the semicolons that aren't escaped
+        return Arrays.stream(text.split(text.contains("\n") ? "\n" : "(?<!\\\\);"))
+                .map(String::trim)
+                .filter(entry -> !entry.isEmpty() && !isNameAndValue(entry))
+                .findFirst()
+                .map(entry -> new ValidationInfo(
+                        LanguageServerBundle.message("language.server.validation.environment.variable", entry), field))
+                .orElse(null);
+    }
+
+    /**
+     * Returns whether the entry has a name before its first {@code =} which isn't escaped, as IntelliJ's field reads it.
+     */
+    private static boolean isNameAndValue(@NotNull String entry) {
+        int equals = entry.indexOf('=');
+        while (equals > 0 && entry.charAt(equals - 1) == '\\') {
+            equals = entry.indexOf('=', equals + 1);
+        }
+        return equals > 0;
     }
 
     /**
