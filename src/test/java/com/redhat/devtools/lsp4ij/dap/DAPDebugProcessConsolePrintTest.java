@@ -48,6 +48,16 @@ public class DAPDebugProcessConsolePrintTest extends BasePlatformTestCase {
         assertEquals("", console.getEditor().getDocument().getText());
     }
 
+    public void testTheDebugAdaptersOutputIsFilteredUntilItsTransportIsChosen() {
+        // The transport is chosen once the adapter is ready, and a stdio adapter can write a DAP message before that
+        var console = console();
+
+        console.print(JSON_RESULT, ConsoleViewContentType.NORMAL_OUTPUT);
+        console.flushDeferredText();
+
+        assertEquals("", console.getEditor().getDocument().getText());
+    }
+
     public void testTheProcessOutputOfASocketDebugAdapterIsPrintedAsItIs() throws IOException {
         // 'dlv dap' talks over a socket, and the program it runs writes to Delve's own output, a line at a time:
         // fmt.Println("a"), fmt.Println(), fmt.Println("b") and fmt.Println(student{1, 2})

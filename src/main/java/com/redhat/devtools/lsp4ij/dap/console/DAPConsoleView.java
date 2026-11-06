@@ -39,7 +39,7 @@ import java.util.function.Supplier;
 public class DAPConsoleView extends ConsoleViewImpl {
 
     private volatile @Nullable Consumer<String> inputHandler;
-    private volatile boolean stdioTransport;
+    private volatile boolean socketTransport;
 
     public DAPConsoleView(@NotNull Project project,
                           @NotNull GlobalSearchScope searchScope,
@@ -60,13 +60,14 @@ public class DAPConsoleView extends ConsoleViewImpl {
     }
 
     /**
-     * Sets that the debug adapter talks over its process's stdio, so that the process output carries the DAP
-     * messages, which the console hides. Over a socket, the process output is the adapter's own, or the debugged
-     * program's, such as the output of the program that Delve runs, and the console prints it as it is: a blank line
-     * or a line which starts with '{' is then no DAP trace.
+     * Sets that the debug adapter talks over a socket, so that its process output carries no DAP messages: it is the
+     * adapter's own output, or the debugged program's, such as the output of the program that Delve runs, and the
+     * console prints it as it is, where a blank line or a line which starts with '{' is no DAP trace. Until then, the
+     * console hides the DAP messages, as the process output carries them for an adapter that talks over its process's
+     * stdio, also while the adapter starts, before its transport is chosen.
      */
-    public void setStdioTransport() {
-        this.stdioTransport = true;
+    public void setSocketTransport() {
+        this.socketTransport = true;
     }
 
     private static class DAPConsoleState extends ConsoleState.NotStartedStated {
@@ -152,7 +153,7 @@ public class DAPConsoleView extends ConsoleViewImpl {
 
     @Override
     public void print(@NotNull String text, @NotNull ConsoleViewContentType contentType) {
-        String applicableText = stdioTransport ? getApplicableText(text, contentType) : text;
+        String applicableText = socketTransport ? text : getApplicableText(text, contentType);
         if (applicableText != null) {
             super.print(applicableText, contentType);
         }
