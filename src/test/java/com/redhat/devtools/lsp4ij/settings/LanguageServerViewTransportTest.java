@@ -151,6 +151,16 @@ public class LanguageServerViewTransportTest extends BasePlatformTestCase {
         assertEquals("nothing is saved", ACCEPT, savedTransport());
     }
 
+    public void testAWorkspaceFolderConfigurationWithAValueOfTheWrongTypeIsSavedAsOneWithoutInstances() throws ConfigurationException {
+        var running = new UserDefinedTransport(UserDefinedTransport.Mode.ATTACH, "127.0.0.1", 6005);
+        view.setWorkspaceFolderStrategyConfiguration("{\"markers\": null}");
+        view.setTransport(running);
+
+        view.apply();
+
+        assertEquals(running, savedTransport());
+    }
+
     public void testInstancesCanNotShareAFixedPort() {
         view.setWorkspaceFolderStrategyConfiguration("{\"serverInstances\": {}}");
         view.setTransport(new UserDefinedTransport(UserDefinedTransport.Mode.START_AND_CONNECT, null, 4389));

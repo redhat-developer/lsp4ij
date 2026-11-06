@@ -847,7 +847,12 @@ public class LanguageServerPanel implements Disposable {
             return false;
         }
         var strategy = new ConfigurableWorkspaceFolderStrategy();
-        strategy.configure(configuration);
+        try {
+            strategy.configure(configuration);
+        } catch (RuntimeException e) {
+            // A value of the wrong type, which the JSON editor marks, gives no instances
+            return false;
+        }
         return strategy.hasServerInstances();
     }
 
