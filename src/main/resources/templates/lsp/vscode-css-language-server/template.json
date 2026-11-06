@@ -4,6 +4,16 @@
   "programArgs": {
     "default": "node $USER_HOME$/.lsp4ij/lsp/vscode-css-language-server/node_modules/vscode-langservers-extracted/lib/css-language-server/node/cssServerMain.js --stdio"
   },
+  "transports": [
+    {
+      "mode": "stdio",
+      "argument": "--stdio"
+    },
+    {
+      "mode": "startAndAccept",
+      "argument": "--socket=${port}"
+    }
+  ],
   "expandConfiguration": true,
   "fileTypeMappings": [
     {

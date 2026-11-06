@@ -21,4 +21,14 @@ public interface LanguageServerLogErrorHandler {
      * @param error the language server error.
      */
     void logError(String error);
+
+    /**
+     * Logs the given output of the language server which isn't an error, such as what it writes to its standard output
+     * when the connection carries the protocol. By default it is logged as an error, as before this method existed.
+     *
+     * @param message the language server's output.
+     */
+    default void logInfo(String message) {
+        logError(message);
+    }
 }

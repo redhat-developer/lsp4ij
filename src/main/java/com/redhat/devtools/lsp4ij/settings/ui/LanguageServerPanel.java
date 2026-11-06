@@ -28,18 +28,22 @@ import com.intellij.ui.ContextHelpLabel;
 import com.intellij.ui.HyperlinkLabel;
 import com.intellij.ui.PortField;
 import com.intellij.ui.components.JBCheckBox;
+import com.intellij.ui.components.JBLabel;
 import com.intellij.ui.components.JBScrollPane;
 import com.intellij.ui.components.JBTabbedPane;
 import com.intellij.ui.components.JBTextField;
 import com.intellij.ui.dsl.listCellRenderer.BuilderKt;
 import com.intellij.ui.scale.JBUIScale;
 import com.intellij.util.ui.FormBuilder;
+import com.intellij.util.ui.NamedColorUtil;
 import com.intellij.util.ui.UIUtil;
 import com.intellij.util.ui.components.BorderLayoutPanel;
 import com.redhat.devtools.lsp4ij.LanguageServerBundle;
 import com.redhat.devtools.lsp4ij.features.workspaceFolder.WorkspaceFolderStrategy;
 import com.redhat.devtools.lsp4ij.installation.CommandLineUpdater;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
+import com.redhat.devtools.lsp4ij.server.definition.launching.TransportSupport;
+import com.redhat.devtools.lsp4ij.server.definition.launching.UserDefinedTransport;
 import com.redhat.devtools.lsp4ij.settings.ErrorReportingKind;
 import com.redhat.devtools.lsp4ij.settings.ServerTrace;
 import com.redhat.devtools.lsp4ij.settings.UIConfiguration;
@@ -52,7 +56,11 @@ import javax.swing.*;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 import java.awt.*;
+import java.nio.file.Files;
+import java.nio.file.InvalidPathException;
+import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -85,8 +93,11 @@ public class LanguageServerPanel implements Disposable {
     private HyperlinkLabel editJsonSchemaAction;
     private JBTextField serverName;
     private @Nullable EnvironmentVariablesComponent environmentVariables;
+    // the fields of a language server which LSP4IJ starts, hidden for one which runs already
+    private final List<JComponent> startedServerFields = new ArrayList<>();
     private CommandLineWidget commandLine;
     private TextFieldWithBrowseButton workingDir;
+    private @Nullable TransportFields transportFields;
     private ServerMappingsPanel mappingsPanel;
     private @Nullable SchemaBackedJsonTextField configurationWidget;
     private String configurationSchemaContent;
@@ -189,6 +200,7 @@ public class LanguageServerPanel implements Disposable {
     private static void updatePreviewWorkingDir(@NotNull TextFieldWithBrowseButton workingDir,
                                                 @NotNull JLabel previewLabel,
                                                 @NotNull Project project) {
+        Color foreground = previewLabel.getForeground();
         workingDir.getTextField().getDocument().addDocumentListener(new DocumentListener() {
             @Override
             public void insertUpdate(DocumentEvent e) {
@@ -203,13 +215,19 @@ public class LanguageServerPanel implements Disposable {
                     return;
                 }
                 String preview = resolveCommandLine(text, project);
-                if (preview.equals(text)) {
+                // The language server can't start in a directory which doesn't exist. It is told, not refused: the
+                // directory can still come, as one which the installer creates when the language server starts
+                boolean missing = isMissingDirectory(preview);
+                previewLabel.setForeground(missing ? NamedColorUtil.getErrorForeground() : foreground);
+                if (preview.equals(text) && !missing) {
                     previewLabel.setToolTipText("");
                     previewLabel.setText("");
                 } else {
                     previewLabel.setToolTipText(preview);
                     String shortPreview = preview.length() > COMMAND_LENGTH_MAX ? preview.substring(0, COMMAND_LENGTH_MAX) + "..." : preview;
-                    previewLabel.setText(shortPreview);
+                    previewLabel.setText(missing
+                            ? LanguageServerBundle.message("language.server.workingDir.missing", shortPreview)
+                            : shortPreview);
                 }
             }
 
@@ -223,6 +241,20 @@ public class LanguageServerPanel implements Disposable {
                 updateLabel(previewLabel);
             }
         });
+    }
+
+    /**
+     * Returns true if the given working directory, with its macros resolved, is an absolute path where no directory
+     * is. A relative path, which the language server's process resolves against the IDE's, or text that isn't a
+     * path, is not checked.
+     */
+    private static boolean isMissingDirectory(@NotNull String directory) {
+        try {
+            Path path = Path.of(directory);
+            return path.isAbsolute() && !Files.isDirectory(path);
+        } catch (InvalidPathException e) {
+            return false;
+        }
     }
 
     private static JLabel createLabelForComponent(@NotNull @NlsContexts.Label String labelText, @NotNull JComponent component) {
@@ -268,12 +300,16 @@ public class LanguageServerPanel implements Disposable {
             createServerNameField(serverTab);
         }
         if (uiConfiguration.isShowCommandLine()) {
+            // Standard input and output, or a socket, first: it decides which of the other fields are used
+            createTransportFields(serverTab);
             environmentVariables = new EnvironmentVariablesComponent();
             serverTab.addComponent(environmentVariables);
+            startedServerFields.add(environmentVariables);
             // Command line
             createCommandLineField(serverTab);
             // Working directory
             createWorkingDirField(serverTab);
+            updateCommandFields();
         }
     }
 
@@ -431,8 +467,10 @@ public class LanguageServerPanel implements Disposable {
         scrollPane.setMinimumSize(new Dimension(JBUIScale.scale(600), JBUIScale.scale(100)));
         JLabel previewCommandLabel = createLabelForComponent("", scrollPane);
         updatePreviewCommand(commandLine, previewCommandLabel, project);
-        builder.addLabeledComponent(LanguageServerBundle.message("language.server.command"), scrollPane, true);
+        var commandLabel = new JBLabel(LanguageServerBundle.message("language.server.command"));
+        builder.addLabeledComponent(commandLabel, scrollPane, true);
         builder.addComponent(previewCommandLabel, 0);
+        startedServerFields.addAll(List.of(commandLabel, scrollPane, previewCommandLabel));
     }
 
     private void createWorkingDirField(@NotNull FormBuilder builder) {
@@ -440,8 +478,29 @@ public class LanguageServerPanel implements Disposable {
         workingDir.addBrowseFolderListener(new TextBrowseFolderListener(FileChooserDescriptorFactory.createSingleFolderDescriptor(), project));
         JLabel previewWorkingDirLabel = createLabelForComponent("", workingDir);
         updatePreviewWorkingDir(workingDir, previewWorkingDirLabel, project);
-        builder.addLabeledComponent(LanguageServerBundle.message("language.server.workingDir"), workingDir);
+        var workingDirLabel = new JBLabel(LanguageServerBundle.message("language.server.workingDir"));
+        builder.addLabeledComponent(workingDirLabel, workingDir);
         builder.addComponent(previewWorkingDirLabel, 0);
+        startedServerFields.addAll(List.of(workingDirLabel, workingDir, previewWorkingDirLabel));
+    }
+
+    private void createTransportFields(@NotNull FormBuilder builder) {
+        transportFields = new TransportFields();
+        transportFields.addTo(builder);
+        transportFields.addChangeListener(this::updateCommandFields);
+    }
+
+    /**
+     * Shows the environment variables, the command line and the working directory only for a language server which
+     * LSP4IJ starts. Hidden, they keep what was typed.
+     */
+    private void updateCommandFields() {
+        boolean startsLanguageServer = getTransport().startsLanguageServer();
+        startedServerFields.forEach(field -> field.setVisible(startsLanguageServer));
+        if (!startedServerFields.isEmpty() && startedServerFields.get(0).getParent() instanceof JComponent form) {
+            form.revalidate();
+            form.repaint();
+        }
     }
 
     private void createConfigurationField(@NotNull FormBuilder builder) {
@@ -528,6 +587,37 @@ public class LanguageServerPanel implements Disposable {
             return;
         }
         this.workingDir.setText(workingDir != null ? workingDir : "");
+    }
+
+    /**
+     * Shows what the template of the language server says of its transports.
+     *
+     * @param supportedTransports the transports which the template lists, empty if it lists none.
+     */
+    public void setSupportedTransports(@NotNull List<TransportSupport> supportedTransports) {
+        if (transportFields != null) {
+            transportFields.setSupportedTransports(supportedTransports);
+        }
+    }
+
+    /**
+     * Returns how LSP4IJ talks to the language server, as the server tab shows it.
+     *
+     * @return how LSP4IJ talks to the language server.
+     */
+    public @NotNull UserDefinedTransport getTransport() {
+        return transportFields != null ? transportFields.getTransport() : UserDefinedTransport.STDIO;
+    }
+
+    /**
+     * Shows how LSP4IJ talks to the language server in the server tab.
+     *
+     * @param transport how LSP4IJ talks to the language server.
+     */
+    public void setTransport(@NotNull UserDefinedTransport transport) {
+        if (transportFields != null) {
+            transportFields.setTransport(transport);
+        }
     }
 
     public ServerMappingsPanel getMappingsPanel() {
@@ -655,6 +745,96 @@ public class LanguageServerPanel implements Disposable {
                 false,
                 errors);
         return errors;
+    }
+
+    /**
+     * Returns every problem of the fields this panel shows, each on its field: an empty server name, no command for a
+     * language server which LSP4IJ starts, a port which can't be used, and content which isn't valid JSON. The New
+     * Language Server dialog and the settings page both check with it.
+     *
+     * @return every problem of the shown fields, empty if there is none.
+     */
+    public @NotNull List<ValidationInfo> validateFields() {
+        List<ValidationInfo> problems = new ArrayList<>();
+        if (serverName != null && serverName.getText().isBlank()) {
+            problems.add(new ValidationInfo(
+                    LanguageServerBundle.message("new.language.server.dialog.validation.serverName.must.be.set"), serverName));
+        }
+        // A language server which runs already is not started, so it needs no command
+        if (commandLine != null && commandLine.getText().isBlank() && getTransport().startsLanguageServer()) {
+            problems.add(new ValidationInfo(
+                    LanguageServerBundle.message("new.language.server.dialog.validation.commandLine.must.be.set"), commandLine));
+        }
+        var environmentProblem = validateEnvironmentVariables();
+        if (environmentProblem != null) {
+            problems.add(environmentProblem);
+        }
+        var transportProblem = validateTransport();
+        if (transportProblem != null) {
+            problems.add(transportProblem);
+        }
+        problems.addAll(validateJsonFields());
+        return problems;
+    }
+
+    /**
+     * Returns a problem when an environment variable isn't written as {@code NAME=value}. IntelliJ's field drops such
+     * an entry without a word, and its text without any {@code =} entirely. A language server which runs already
+     * hides the field, as LSP4IJ doesn't start it, so its environment variables are not checked.
+     *
+     * @return the problem of the environment variables, or null if each is written as {@code NAME=value} or isn't used.
+     */
+    public @Nullable ValidationInfo validateEnvironmentVariables() {
+        if (environmentVariables == null || !getTransport().startsLanguageServer()) {
+            return null;
+        }
+        var field = environmentVariables.getComponent();
+        String text = field.getText();
+        // Split as EnvVariablesTable.parseEnvsFromText does: by lines, or else by the semicolons that aren't escaped
+        return Arrays.stream(text.split(text.contains("\n") ? "\n" : "(?<!\\\\);"))
+                .map(String::trim)
+                .filter(entry -> !entry.isEmpty() && !isNameAndValue(entry))
+                .findFirst()
+                .map(entry -> new ValidationInfo(
+                        LanguageServerBundle.message("language.server.validation.environment.variable", entry), field))
+                .orElse(null);
+    }
+
+    /**
+     * Returns whether the entry has a name before its first {@code =} which isn't escaped, as IntelliJ's field reads it.
+     */
+    private static boolean isNameAndValue(@NotNull String entry) {
+        int equals = entry.indexOf('=');
+        while (equals > 0 && entry.charAt(equals - 1) == '\\') {
+            equals = entry.indexOf('=', equals + 1);
+        }
+        return equals > 0;
+    }
+
+    /**
+     * Returns an error when the transport can't be used: a language server which runs already needs its port, a fixed
+     * port isn't 0, and the command of a language server on a port which LSP4IJ chooses takes it as
+     * {@value UserDefinedTransport#PORT_MACRO}, or the language server never learns it.
+     *
+     * @return the error of the transport, or null if it can be used.
+     */
+    public @Nullable ValidationInfo validateTransport() {
+        if (transportFields == null) {
+            return null;
+        }
+        var error = transportFields.validate();
+        if (error != null) {
+            return error;
+        }
+        var transport = transportFields.getTransport();
+        if (transport.mode() != UserDefinedTransport.Mode.STDIO && transport.startsLanguageServer() && transport.port() == 0
+                // an empty command has an error of its own
+                && commandLine != null && !commandLine.getText().isBlank()
+                && !commandLine.getText().contains(UserDefinedTransport.PORT_MACRO)) {
+            return new ValidationInfo(LanguageServerBundle.message("language.server.validation.socket.port.macro",
+                    UserDefinedTransport.PORT_MACRO), commandLine);
+        }
+        return null;
     }
 
     private void addJsonError(@NotNull @PropertyKey(resourceBundle = BUNDLE) String fieldKey,

@@ -22,6 +22,7 @@ import com.redhat.devtools.lsp4ij.installation.CommandLineUpdater;
 import com.redhat.devtools.lsp4ij.installation.ServerInstaller;
 import com.redhat.devtools.lsp4ij.installation.definition.ServerInstallerDescriptor;
 import com.redhat.devtools.lsp4ij.installation.definition.ServerInstallerManager;
+import com.redhat.devtools.lsp4ij.server.SocketStreamConnectionProvider;
 import com.redhat.devtools.lsp4ij.server.StreamConnectionProvider;
 import com.redhat.devtools.lsp4ij.server.definition.ClientConfigurableLanguageServerDefinition;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
@@ -34,8 +35,10 @@ import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.net.InetAddress;
 import java.util.Map;
 
+import static com.redhat.devtools.lsp4ij.server.definition.launching.CommandUtils.createCommandLine;
 import static com.redhat.devtools.lsp4ij.server.definition.launching.CommandUtils.resolveCommandLine;
 
 /**
@@ -46,6 +49,7 @@ public class UserDefinedLanguageServerDefinition extends LanguageServerDefinitio
         ServerConfigurationContributor, ServerExperimentalContributor, ServerInitializationOptionsContributor {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(UserDefinedLanguageServerDefinition.class);
+    private static final String LOOPBACK_HOST = InetAddress.getLoopbackAddress().getHostAddress();
     private final String templateId;
     @SerializedName("displayName")
     private String name;
@@ -66,6 +70,7 @@ public class UserDefinedLanguageServerDefinition extends LanguageServerDefinitio
     private @Nullable ServerInstallerDescriptor serverInstallerDescriptor;
     private String installerConfigurationContent;
     private String workspaceFolderStrategyConfiguration;
+    private @NotNull UserDefinedTransport transport = UserDefinedTransport.STDIO;
 
     public UserDefinedLanguageServerDefinition(@NotNull String id,
                                                @Nullable String templateId,
@@ -132,14 +137,54 @@ public class UserDefinedLanguageServerDefinition extends LanguageServerDefinitio
 
     @Override
     public @NotNull StreamConnectionProvider createConnectionProvider(@NotNull Project project) {
-        String resolvedCommandLine = resolveCommandLine(commandLine, project);
         String resolvedWorkingDir = workingDir != null ? resolveCommandLine(workingDir, project) : null;
-        return new UserDefinedStreamConnectionProvider(resolvedCommandLine,
-                resolvedWorkingDir,
-                userEnvironmentVariables,
-                includeSystemEnvironmentVariables,
-                this,
-                project);
+        var transport = this.transport;
+        return switch (transport.mode()) {
+            case STDIO -> new UserDefinedStreamConnectionProvider(resolveCommandLine(commandLine, project),
+                    resolvedWorkingDir,
+                    userEnvironmentVariables,
+                    includeSystemEnvironmentVariables,
+                    this,
+                    project);
+            case ATTACH -> new UserDefinedSocketStreamConnectionProvider(SocketStreamConnectionProvider.Direction.CONNECT,
+                    transport.host() != null && !transport.host().isBlank() ? transport.host() : LOOPBACK_HOST,
+                    transport.port(),
+                    null,
+                    this,
+                    project);
+            case START_AND_CONNECT, START_AND_ACCEPT -> new UserDefinedSocketStreamConnectionProvider(
+                    transport.mode() == UserDefinedTransport.Mode.START_AND_CONNECT
+                            ? SocketStreamConnectionProvider.Direction.CONNECT
+                            : SocketStreamConnectionProvider.Direction.ACCEPT,
+                    LOOPBACK_HOST,
+                    transport.port(),
+                    // The command line takes the port, which LSP4IJ may only choose when it starts the language server
+                    port -> createCommandLine(resolveCommandLine(UserDefinedTransport.withPort(commandLine, port), project),
+                            resolvedWorkingDir,
+                            userEnvironmentVariables,
+                            includeSystemEnvironmentVariables),
+                    this,
+                    project);
+        };
+    }
+
+    /**
+     * Returns how LSP4IJ talks to the language server: over the standard input and output of its process, or over a
+     * socket.
+     *
+     * @return how LSP4IJ talks to the language server.
+     */
+    public @NotNull UserDefinedTransport getTransport() {
+        return transport;
+    }
+
+    /**
+     * Sets how LSP4IJ talks to the language server.
+     *
+     * @param transport how LSP4IJ talks to the language server.
+     */
+    public void setTransport(@NotNull UserDefinedTransport transport) {
+        this.transport = transport;
     }
 
     @Override

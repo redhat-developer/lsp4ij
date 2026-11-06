@@ -19,7 +19,9 @@ LSP4IJ is a free and open-source
  * [Language Server protocol (LSP)](https://microsoft.github.io/language-server-protocol/) client compatible with all flavours of IntelliJ.
  * [Debug Adapter Protocol](https://microsoft.github.io/debug-adapter-protocol/) support with [Debug Adapter Protocol Run/Debug configuration](./docs/dap/UserGuide.md).
 
-It allows you to integrate any `language server` that communicates with its client via `stdio`:
+It allows you to integrate any `language server` that communicates with its client via `stdio`, or over a TCP socket
+(experimental: see [SocketStreamConnectionProvider](./docs/DeveloperGuide.md#socketstreamconnectionprovider) and the
+[transport of a user-defined language server](./docs/UserDefinedLanguageServer.md#transport)):
 
 * by `developing an IntelliJ plugin` with LSP `extension points`:
   * [com.redhat.devtools.lsp4ij.server](./docs/DeveloperGuide.md#extension-point-declaration) extension point to define a language server.

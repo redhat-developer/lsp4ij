@@ -47,16 +47,20 @@ public class UICommandLineUpdater implements CommandLineUpdater {
 
     @Override
     public void setCommandLine(String commandLine) {
-        if (Objects.equals(commandLine, getCommandLine())) {
+        // The installer's command is written for the standard input and output, unless it takes the port
+        var transport = definition.getTransport().forInstalledCommand(commandLine);
+        if (Objects.equals(commandLine, getCommandLine()) && transport.equals(definition.getTransport())) {
             return;
         }
         definition.setCommandLine(commandLine);
+        definition.setTransport(transport);
 
         // Update command line settings
         String languageServerId = definition.getId();
         UserDefinedLanguageServerSettings.UserDefinedLanguageServerItemSettings settings = UserDefinedLanguageServerSettings.getInstance().getUserDefinedLanguageServerSettings(languageServerId);
         if (settings != null) {
             settings.setCommandLine(commandLine);
+            settings.setTransport(transport);
             UserDefinedLanguageServerSettings.getInstance().setUserDefinedLanguageServerSettings(languageServerId, settings);
         }
 

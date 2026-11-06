@@ -19,7 +19,9 @@ import com.intellij.openapi.components.State;
 import com.intellij.openapi.components.Storage;
 import com.intellij.util.containers.ContainerUtil;
 import com.intellij.util.xmlb.annotations.Tag;
+import com.intellij.util.xmlb.annotations.Transient;
 import com.intellij.util.xmlb.annotations.XCollection;
+import com.redhat.devtools.lsp4ij.server.definition.launching.UserDefinedTransport;
 import com.redhat.devtools.lsp4ij.templates.ServerMappingSettings;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -130,6 +132,14 @@ public class UserDefinedLanguageServerSettings implements PersistentStateCompone
 
         private String workspaceFolderStrategyConfiguration;
 
+        // How LSP4IJ talks to the language server, and the host and port of a socket. Settings saved without a mode
+        // talk over the standard input and output, as they did.
+        private @NotNull UserDefinedTransport.Mode transportMode = UserDefinedTransport.Mode.STDIO;
+
+        private String socketHost;
+
+        private int socketPort;
+
         @XCollection(elementTypes = ServerMappingSettings.class)
         private List<ServerMappingSettings> mappings;
 
@@ -175,6 +185,51 @@ public class UserDefinedLanguageServerSettings implements PersistentStateCompone
 
         public String getWorkingDir() {
             return workingDir;
+        }
+
+        public @NotNull UserDefinedTransport.Mode getTransportMode() {
+            return transportMode;
+        }
+
+        public void setTransportMode(@Nullable UserDefinedTransport.Mode transportMode) {
+            this.transportMode = transportMode != null ? transportMode : UserDefinedTransport.Mode.STDIO;
+        }
+
+        public String getSocketHost() {
+            return socketHost;
+        }
+
+        public void setSocketHost(String socketHost) {
+            this.socketHost = socketHost;
+        }
+
+        public int getSocketPort() {
+            return socketPort;
+        }
+
+        public void setSocketPort(int socketPort) {
+            this.socketPort = socketPort;
+        }
+
+        /**
+         * Returns how LSP4IJ talks to the language server, from the transport mode, socket host and socket port.
+         *
+         * @return how LSP4IJ talks to the language server.
+         */
+        @Transient
+        public @NotNull UserDefinedTransport getTransport() {
+            return UserDefinedTransport.of(transportMode, socketHost, socketPort);
+        }
+
+        /**
+         * Sets the transport mode, socket host and socket port from how LSP4IJ talks to the language server.
+         *
+         * @param transport how LSP4IJ talks to the language server.
+         */
+        public void setTransport(@NotNull UserDefinedTransport transport) {
+            this.transportMode = transport.mode();
+            this.socketHost = transport.host();
+            this.socketPort = transport.port();
         }
 
         public void setWorkingDir(String workingDir) {

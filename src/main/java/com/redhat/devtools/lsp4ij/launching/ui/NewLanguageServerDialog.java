@@ -58,6 +58,8 @@ public class NewLanguageServerDialog extends DialogWrapper {
 
     private LanguageServerPanel languageServerPanel;
     private LanguageServerTemplate currentTemplate = null;
+    // what LSP4IJ couldn't use in the loaded template
+    private List<String> templateProblems = List.of();
 
     public NewLanguageServerDialog(@NotNull Project project) {
         super(project);
@@ -96,7 +98,11 @@ public class NewLanguageServerDialog extends DialogWrapper {
 
             @Override
             public void setCommandLine(String commandLine) {
-                ApplicationManager.getApplication().invokeLater(() -> languageServerPanel.setCommandLine(commandLine));
+                ApplicationManager.getApplication().invokeLater(() -> {
+                    languageServerPanel.setCommandLine(commandLine);
+                    // The installer's command is written for the standard input and output, unless it takes the port
+                    languageServerPanel.setTransport(languageServerPanel.getTransport().forInstalledCommand(commandLine));
+                });
             }
         });
 
@@ -216,6 +222,9 @@ public class NewLanguageServerDialog extends DialogWrapper {
         String command = getCommandLine(template);
         languageServerPanel.setCommandLine(command);
         languageServerPanel.setEnvData(template.getEnvData());
+        languageServerPanel.setTransport(template.getTransport());
+        languageServerPanel.setSupportedTransports(template.getSupportedTransports());
+        templateProblems = template.getProblems();
 
         // Update mappings
         var mappingsPanel = this.languageServerPanel.getMappingsPanel();
@@ -251,36 +260,17 @@ public class NewLanguageServerDialog extends DialogWrapper {
 
     @Override
     protected @NotNull List<ValidationInfo> doValidateAll() {
-        List<ValidationInfo> validations = new ArrayList<>();
-        addValidationInfo(validateServerName(), validations);
-        addValidationInfo(validateCommand(), validations);
-        validations.addAll(this.languageServerPanel.validateJsonFields());
-        return validations;
-    }
-
-    private void addValidationInfo(ValidationInfo validationInfo, List<ValidationInfo> validations) {
-        if (validationInfo == null) {
-            return;
-        }
-        validations.add((validationInfo));
-    }
-
-    private ValidationInfo validateServerName() {
-        var serverName = this.languageServerPanel.getServerName();
-        if (serverName.getText().isBlank()) {
-            String errorMessage = LanguageServerBundle.message("new.language.server.dialog.validation.serverName.must.be.set");
-            return new ValidationInfo(errorMessage, serverName);
-        }
-        return null;
-    }
-
-    private ValidationInfo validateCommand() {
-        var commandLine = this.languageServerPanel.getCommandLineWidget();
-        if (commandLine != null && commandLine.getText().isBlank()) {
-            String errorMessage = LanguageServerBundle.message("new.language.server.dialog.validation.commandLine.must.be.set");
-            return new ValidationInfo(errorMessage, commandLine);
-        }
-        return null;
+        var problems = languageServerPanel.validateFields();
+        // A field shows its problem only as an outline, with the message on hover, so the messages are also listed
+        // below the fields, where the dialog shows the problems of no field
+        var listed = new ArrayList<>(problems);
+        problems.stream()
+                .filter(problem -> problem.component != null)
+                .map(problem -> new ValidationInfo(problem.message))
+                .forEach(listed::add);
+        // What LSP4IJ couldn't use in the template is told below the fields too, without blocking OK
+        templateProblems.forEach(problem -> listed.add(new ValidationInfo(problem).asWarning().withOKEnabled()));
+        return listed;
     }
 
     @Override
@@ -331,6 +321,7 @@ public class NewLanguageServerDialog extends DialogWrapper {
                 installerConfiguration,
                 workspaceFolderStrategyConfiguration);
         definition.setUrl(this.languageServerPanel.getServerUrl());
+        definition.setTransport(this.languageServerPanel.getTransport());
         LanguageServersRegistry.getInstance().addServerDefinition(project, definition, mappingSettings);
     }
 

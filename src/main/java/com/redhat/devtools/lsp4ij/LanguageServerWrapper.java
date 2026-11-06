@@ -466,7 +466,17 @@ public class LanguageServerWrapper implements Disposable {
                         initParams.setInitializationOptions(provider.getInitializationOptions(rootURI));
 
                         // Add error log
-                        provider.addLogErrorHandler(error -> ServerMessageHandler.logMessage(this.getServerDefinition(), new MessageParams(MessageType.Error, error), getProject()));
+                        provider.addLogErrorHandler(new LanguageServerLogErrorHandler() {
+                            @Override
+                            public void logError(String error) {
+                                ServerMessageHandler.logMessage(getServerDefinition(), new MessageParams(MessageType.Error, error), getProject());
+                            }
+
+                            @Override
+                            public void logInfo(String message) {
+                                ServerMessageHandler.logMessage(getServerDefinition(), new MessageParams(MessageType.Info, message), getProject());
+                            }
+                        });
                         provider.addUnexpectedServerStopHandler(() -> {
                             // There is an unexpected stop of the connection
                             // 1. the process was killed outside IntelliJ
