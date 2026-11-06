@@ -288,10 +288,12 @@ public final class LSPDiagnosticsApplier implements Disposable {
                 }
             }
         }
+        // setHighlightersToEditor gives each highlight the highlighter that it created or reused for it, so the other
+        // highlighters of the document need no visit
         List<RangeHighlighter> current = new ArrayList<>();
-        for (var highlighter : markup.getAllHighlighters()) {
-            var info = HighlightInfo.fromRangeHighlighter(highlighter);
-            if (info != null && applied.contains(info)) {
+        for (var info : data.highlights) {
+            var highlighter = info.getHighlighter();
+            if (highlighter != null) {
                 current.add(highlighter);
             }
         }
