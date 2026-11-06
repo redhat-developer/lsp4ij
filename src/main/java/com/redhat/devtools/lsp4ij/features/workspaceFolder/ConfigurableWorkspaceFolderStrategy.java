@@ -17,11 +17,15 @@ import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonSyntaxException;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.roots.ProjectRootManager;
+import com.intellij.openapi.vfs.VfsUtilCore;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.redhat.devtools.lsp4ij.client.features.FileUriSupport;
 import org.eclipse.lsp4j.WorkspaceFolder;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -56,6 +60,8 @@ import java.util.List;
  * </p>
  */
 public class ConfigurableWorkspaceFolderStrategy extends BaseWorkspaceFolderStrategy {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(ConfigurableWorkspaceFolderStrategy.class);
 
     private static final String PROP_ROOT_TYPE = "rootType";
     private static final String PROP_LAZY = "lazy";
@@ -138,7 +144,12 @@ public class ConfigurableWorkspaceFolderStrategy extends BaseWorkspaceFolderStra
     }
 
     private static @Nullable ConfigurableWorkspaceFolderStrategy createServerInstanceRule(@NotNull JsonObject config) {
-        if (!(config.get(PROP_SERVER_INSTANCES) instanceof JsonObject ruleConfig)) {
+        var value = config.get(PROP_SERVER_INSTANCES);
+        if (value == null) {
+            return null;
+        }
+        if (!(value instanceof JsonObject ruleConfig)) {
+            LOGGER.warn("'{}' is not an object, so there are no language server instances: {}", PROP_SERVER_INSTANCES, value);
             return null;
         }
         var rule = new ConfigurableWorkspaceFolderStrategy() {
@@ -146,14 +157,35 @@ public class ConfigurableWorkspaceFolderStrategy extends BaseWorkspaceFolderStra
             protected boolean isDirectoryItsOwnFolder() {
                 return true;
             }
+
+            @Override
+            protected @Nullable VirtualFile getMarkerSearchLimit(@NotNull VirtualFile file, @NotNull Project project) {
+                // An instance runs in its root, so a marker above the project must not make that directory its root
+                return getTopmostContentRoot(file, project);
+            }
         };
         try {
             rule.configure(ruleConfig.toString());
             return rule;
         } catch (RuntimeException e) {
             // A rule with values of the wrong type counts as no rule
+            LOGGER.warn("'{}' has a value of the wrong type, so there are no language server instances: {}", PROP_SERVER_INSTANCES, ruleConfig, e);
             return null;
         }
+    }
+
+    /**
+     * Returns the topmost content root of the project that contains the given file, and null if none does.
+     */
+    private static @Nullable VirtualFile getTopmostContentRoot(@NotNull VirtualFile file, @NotNull Project project) {
+        VirtualFile topmost = null;
+        for (VirtualFile contentRoot : ProjectRootManager.getInstance(project).getContentRoots()) {
+            if (VfsUtilCore.isAncestor(contentRoot, file, false)
+                    && (topmost == null || VfsUtilCore.isAncestor(contentRoot, topmost, true))) {
+                topmost = contentRoot;
+            }
+        }
+        return topmost;
     }
 
     @Override

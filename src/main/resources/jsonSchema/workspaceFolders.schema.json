@@ -28,7 +28,7 @@
           "type": "string",
           "title": "Root type",
           "description": "Type of roots to use as the roots of the instances",
-          "enum": ["PROJECT_BASE", "SOURCE_ROOTS", "NONE"],
+          "enum": ["PROJECT_BASE", "SOURCE_ROOTS"],
           "default": "PROJECT_BASE"
         },
         "markers": {

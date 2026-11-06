@@ -133,11 +133,13 @@ public abstract class BaseWorkspaceFolderStrategy implements WorkspaceFolderStra
         List<String> markers = getMarkers();
 
         if (markers != null && !markers.isEmpty()) {
+            VirtualFile limit = getMarkerSearchLimit(file, project);
             if (isLocal) {
                 // Marker-based discovery: walk up the directory tree looking for marker files
                 // Use NIO Path for better performance instead of VirtualFile.findChild()
                 Path filePath = Paths.get(file.getPath());
                 Path parentPath = startsAtItself(file) ? filePath : filePath.getParent();
+                Path limitPath = limit != null && limit.isInLocalFileSystem() ? Paths.get(limit.getPath()) : null;
 
                 while (parentPath != null) {
                     for (String marker : markers) {
@@ -152,6 +154,9 @@ public abstract class BaseWorkspaceFolderStrategy implements WorkspaceFolderStra
                             }
                         }
                     }
+                    if (parentPath.equals(limitPath)) {
+                        break;
+                    }
                     parentPath = parentPath.getParent();
                 }
             } else {
@@ -164,8 +169,15 @@ public abstract class BaseWorkspaceFolderStrategy implements WorkspaceFolderStra
                             return createWorkspaceFolder(parent, fileUriSupport);
                         }
                     }
+                    if (parent.equals(limit)) {
+                        break;
+                    }
                     parent = parent.getParent();
                 }
+            }
+            if (limit != null) {
+                // No marker up to where the search stops
+                return createWorkspaceFolder(limit, fileUriSupport);
             }
         } else {
             // Find the closest root containing this file
@@ -209,6 +221,18 @@ public abstract class BaseWorkspaceFolderStrategy implements WorkspaceFolderStra
             }
         }
 
+        return null;
+    }
+
+    /**
+     * Returns the directory at which the search for the markers of the given file stops, or null to search up to the
+     * root of the file system. A file without a marker up to that directory has it as its folder.
+     *
+     * @param file    the file or directory.
+     * @param project the project.
+     * @return the directory at which the search for markers stops, or null to search up to the root of the file system.
+     */
+    protected @Nullable VirtualFile getMarkerSearchLimit(@NotNull VirtualFile file, @NotNull Project project) {
         return null;
     }
 

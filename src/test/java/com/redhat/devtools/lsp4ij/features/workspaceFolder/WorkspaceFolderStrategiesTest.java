@@ -414,6 +414,74 @@ public class WorkspaceFolderStrategiesTest extends BasePlatformTestCase {
         assertNotEmpty(lazy.getWorkspaceFolders(getProject(), FileUriSupport.DEFAULT));
     }
 
+    public void testTheRootOfAnInstanceIsNoDirectoryAboveTheProject() throws IOException {
+        var outer = localDirectory();
+        localFile(outer, MARKER);
+        var file = localFile(outer, "project/src/one.txt");
+        var project = file.getParent().getParent();
+        PsiTestUtil.addContentRoot(getModule(), project);
+        try {
+            var strategy = new ConfigurableWorkspaceFolderStrategy();
+            strategy.configure("{\"serverInstances\": {\"markers\": [\"" + MARKER + "\"]}}");
+
+            // The search stops at the project, whose directory is the root without a marker in it
+            assertFolder(project, rootOf(strategy, file));
+        } finally {
+            PsiTestUtil.removeContentEntry(getModule(), project);
+        }
+    }
+
+    public void testTheRootOfAnInstanceIsTheNearestMarkerInTheProject() throws IOException {
+        var outer = localDirectory();
+        localFile(outer, MARKER);
+        localFile(outer, "project/src/" + MARKER);
+        var file = localFile(outer, "project/src/one.txt");
+        var project = file.getParent().getParent();
+        PsiTestUtil.addContentRoot(getModule(), project);
+        try {
+            var strategy = new ConfigurableWorkspaceFolderStrategy();
+            strategy.configure("{\"serverInstances\": {\"markers\": [\"" + MARKER + "\"]}}");
+
+            assertFolder(file.getParent(), rootOf(strategy, file));
+        } finally {
+            PsiTestUtil.removeContentEntry(getModule(), project);
+        }
+    }
+
+    public void testTheRootOfAnInstanceWithoutAMarkerIsTheTopmostContentRoot() throws IOException {
+        var file = localFile(localDirectory(), "project/module/one.txt");
+        var module = file.getParent();
+        var project = module.getParent();
+        PsiTestUtil.addContentRoot(getModule(), project);
+        PsiTestUtil.addContentRoot(getModule(), module);
+        try {
+            var strategy = new ConfigurableWorkspaceFolderStrategy();
+            strategy.configure("{\"serverInstances\": {\"markers\": [\"" + MARKER + "\"]}}");
+
+            assertFolder(project, rootOf(strategy, file));
+        } finally {
+            PsiTestUtil.removeContentEntry(getModule(), module);
+            PsiTestUtil.removeContentEntry(getModule(), project);
+        }
+    }
+
+    public void testTheWorkspaceFoldersStillComeFromAboveTheProject() throws IOException {
+        var outer = localDirectory();
+        localFile(outer, FOLDER_MARKER);
+        var file = localFile(outer, "project/src/one.txt");
+        var project = file.getParent().getParent();
+        PsiTestUtil.addContentRoot(getModule(), project);
+        try {
+            var strategy = new ConfigurableWorkspaceFolderStrategy();
+            strategy.configure("{\"markers\": [\"" + FOLDER_MARKER + "\"]}");
+
+            // Only the roots of instances stay in the project
+            assertFolder(outer, folderOf(strategy, file));
+        } finally {
+            PsiTestUtil.removeContentEntry(getModule(), project);
+        }
+    }
+
     private @Nullable WorkspaceFolder folderOf(@NotNull WorkspaceFolderStrategy strategy, @NotNull VirtualFile file) {
         return strategy.getWorkspaceFolderForFile(file, getProject(), FileUriSupport.DEFAULT);
     }
