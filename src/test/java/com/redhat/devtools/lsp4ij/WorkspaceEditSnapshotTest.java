@@ -25,6 +25,7 @@ import org.eclipse.lsp4j.jsonrpc.messages.Either;
 import java.net.URI;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -61,9 +62,37 @@ public class WorkspaceEditSnapshotTest extends LSPCodeInsightFixtureTestCase {
         return new WorkspaceEdit(Map.of(uri, List.of(replacement())));
     }
 
+    private static WorkspaceEdit versioned(String uri, int version) {
+        return new WorkspaceEdit(List.of(Either.forLeft(new TextDocumentEdit(
+                new VersionedTextDocumentIdentifier(uri, version), List.of(Either.forLeft(replacement()))))));
+    }
+
     private String validate(WorkspaceEditSnapshot snapshot, WorkspaceEdit edit) {
         return WriteCommandAction.writeCommandAction(myFixture.getProject())
                 .compute(() -> snapshot.validate(edit));
+    }
+
+    /**
+     * Waits until the notifications queued so far, as didOpen and didChange, have been dispatched.
+     */
+    private static void dispatched(LanguageServerItem server) throws Exception {
+        server.getServerWrapper().sendNotification(ls -> ls).get(30, TimeUnit.SECONDS);
+    }
+
+    /**
+     * Holds back the notifications queued after this call, such as didChange, until the returned latch is released.
+     */
+    private static CountDownLatch holdNotifications(LanguageServerItem server) {
+        var release = new CountDownLatch(1);
+        server.getServerWrapper().sendNotification(ls -> {
+            try {
+                release.await(30, TimeUnit.SECONDS);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+            return ls;
+        });
+        return release;
     }
 
     private void type(String text) {
@@ -76,6 +105,80 @@ public class WorkspaceEditSnapshotTest extends LSPCodeInsightFixtureTestCase {
         var snapshot = WorkspaceEditSnapshot.capture(server);
 
         assertNull(validate(snapshot, unversioned(uri(server, myFixture.getFile()))));
+    }
+
+    public void testAPlaceholderVersionAppliesToTheTextTheServerHad() throws Exception {
+        var server = open();
+        dispatched(server);
+        var snapshot = WorkspaceEditSnapshot.capture(server);
+        String uri = uri(server, myFixture.getFile());
+        int version = server.getServerWrapper().getOpenedDocument(URI.create(uri)).getSynchronizer().getVersion();
+        assertTrue("LSP4IJ numbers document versions from 1", version > 0);
+
+        // The edits of intellij-quarkus and Liberty Tools name their document with version 0
+        assertNull(validate(snapshot, versioned(uri, 0)));
+        assertNull(validate(snapshot, versioned(uri, -1)));
+        assertEquals(LanguageServerBundle.message("lsp.workspace.edit.version.changed", uri),
+                validate(snapshot, versioned(uri, version + 1)));
+
+        // As for an unversioned edit, the document must not have changed since the request
+        type("changed");
+        assertEquals(LanguageServerBundle.message("lsp.workspace.edit.document.changed", uri),
+                validate(snapshot, versioned(uri, 0)));
+    }
+
+    public void testAPlaceholderVersionIsRefusedForTextNotYetSent() throws Exception {
+        var server = open();
+        String uri = uri(server, myFixture.getFile());
+        // The typing below has not reached the server at capture, as for a request, such as
+        // codeAction/resolve, that does not wait for the document's changes
+        var release = holdNotifications(server);
+        WorkspaceEditSnapshot snapshot;
+        try {
+            type("changed");
+            snapshot = WorkspaceEditSnapshot.capture(server);
+        } finally {
+            release.countDown();
+        }
+        dispatched(server);
+
+        // The server may have answered for the text before the typing, and version 0 does not say
+        assertEquals(LanguageServerBundle.message("lsp.workspace.edit.version.changed", uri),
+                validate(snapshot, versioned(uri, 0)));
+        // Captured once the typing has been sent, the same edit applies
+        assertNull(validate(WorkspaceEditSnapshot.capture(server), versioned(uri, 0)));
+    }
+
+    public void testCancellingAFlushDoesNotMakeTheTextLookSent() throws Exception {
+        var server = open();
+        String uri = uri(server, myFixture.getFile());
+        var synchronizer = server.getServerWrapper().getOpenedDocument(URI.create(uri)).getSynchronizer();
+        var release = holdNotifications(server);
+        WorkspaceEditSnapshot snapshot;
+        try {
+            type("changed");
+            // a caller gives up waiting for the typing to be dispatched
+            assertTrue(synchronizer.flushPendingChanges().cancel(true));
+            snapshot = WorkspaceEditSnapshot.capture(server);
+        } finally {
+            release.countDown();
+        }
+        dispatched(server);
+
+        assertEquals(LanguageServerBundle.message("lsp.workspace.edit.version.changed", uri),
+                validate(snapshot, versioned(uri, 0)));
+    }
+
+    public void testAnIncomingEditWithAPlaceholderVersionIsRefused() throws Exception {
+        var server = open();
+        dispatched(server);
+        String uri = uri(server, myFixture.getFile());
+        // workspace/applyEdit follows no request of ours, so its version 0 can describe text that a change crossed,
+        // even when the text had been sent at receipt
+        var snapshot = WorkspaceEditSnapshot.capture(server.getServerWrapper(), () -> true);
+
+        assertEquals(LanguageServerBundle.message("lsp.workspace.edit.version.changed", uri),
+                validate(snapshot, versioned(uri, 0)));
     }
 
     public void testChangedAndRestoredTextStillInvalidatesRequest() throws Exception {
