@@ -23,12 +23,16 @@ import com.intellij.openapi.fileTypes.FileType;
 import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.project.ProjectManager;
+import com.intellij.openapi.roots.ProjectRootManager;
 import com.intellij.openapi.util.Disposer;
 import com.intellij.openapi.util.ModificationTracker;
 import com.intellij.openapi.util.SimpleModificationTracker;
 import com.intellij.openapi.vfs.VirtualFile;
+import com.intellij.openapi.vfs.VirtualFileManager;
 import com.intellij.psi.PsiFile;
 import com.intellij.psi.PsiManager;
+import com.intellij.psi.util.CachedValueProvider;
+import com.intellij.psi.util.CachedValuesManager;
 import com.intellij.util.concurrency.AppExecutorUtil;
 import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
 import com.redhat.devtools.lsp4ij.console.explorer.actions.EditServerAction;
@@ -120,8 +124,9 @@ public class LanguageServiceAccessor implements Disposable {
                     .filter(server -> event.serverDefinition.equals(server.getServerDefinition()))
                     .toList();
 
-            // Bump the modification trackers
+            // Bump the modification trackers, and the one of the instance roots that the lookups of a file remember
             languageServerWrappers.forEach(LanguageServerWrapper::incrementModificationCount);
+            incrementModificationCount();
             // A changed configuration can leave an open file without an instance again
             definitionsWithoutInstanceHint.remove(event.serverDefinition);
 
@@ -315,7 +320,7 @@ public class LanguageServiceAccessor implements Disposable {
             return false;
         }
         var matched = mappings.getMatched();
-        var instanceFilter = filter.and(instancesOf(file.getVirtualFile()));
+        var instanceFilter = filter.and(instancesOf(file));
         for (var startedServer : startedServers) {
             if (isMatchingStartedServer(file, startedServer, matched, instanceFilter)) {
                 return true;
@@ -343,7 +348,7 @@ public class LanguageServiceAccessor implements Disposable {
         }
 
         Set<LanguageServerDefinition> matchedServerDefinitions = mappings.getMatched();
-        var instanceFilter = instancesOf(file.getVirtualFile());
+        var instanceFilter = instancesOf(file);
         for (var startedServer : startedServers) {
             if (isMatchingStartedServer(file, startedServer, matchedServerDefinitions, instanceFilter)) {
                 processor.accept(startedServer);
@@ -765,14 +770,41 @@ public class LanguageServiceAccessor implements Disposable {
      * @param file the file, without a file, all language servers are kept.
      * @return the filter.
      */
-    private @NotNull Predicate<LanguageServerWrapper> instancesOf(@Nullable VirtualFile file) {
+    private @NotNull Predicate<LanguageServerWrapper> instancesOf(@NotNull PsiFile psiFile) {
+        var file = psiFile.getVirtualFile();
         if (file == null) {
             return ACCEPT_ALL_SERVERS;
         }
         Map<LanguageServerDefinition, InstanceChoice> choices = new HashMap<>();
         return server -> server.getInstanceRoot() == null
-                || choices.computeIfAbsent(server.getServerDefinition(), serverDefinition -> chooseInstance(file, serverDefinition))
-                .isFor(server);
+                || choices.computeIfAbsent(server.getServerDefinition(), serverDefinition -> {
+                    var connected = findInstanceConnectedTo(file, serverDefinition);
+                    return connected != null
+                            ? new InstanceChoice(connected, null)
+                            : new InstanceChoice(null, getRememberedServerInstanceRoot(psiFile, file, serverDefinition));
+                }).isFor(server);
+    }
+
+    /**
+     * Returns the root of the language server instance of a file that no instance has connected, for the lookups that
+     * run as the file is edited, on the UI thread. It is remembered until the files or the roots of the project, or a
+     * configuration, change, so that the strategy doesn't look for markers on disk at each key typed.
+     */
+    private @Nullable WorkspaceFolder getRememberedServerInstanceRoot(@NotNull PsiFile psiFile,
+                                                                     @NotNull VirtualFile file,
+                                                                     @NotNull LanguageServerDefinition serverDefinition) {
+        Map<LanguageServerDefinition, Optional<WorkspaceFolder>> roots = CachedValuesManager.getCachedValue(psiFile,
+                () -> CachedValueProvider.Result.create(
+                        new ConcurrentHashMap<LanguageServerDefinition, Optional<WorkspaceFolder>>(),
+                        VirtualFileManager.VFS_STRUCTURE_MODIFICATIONS, ProjectRootManager.getInstance(project),
+                        modificationTracker));
+        var root = roots.get(serverDefinition);
+        if (root == null) {
+            // Not in computeIfAbsent: the strategy can do I/O
+            root = Optional.ofNullable(serverDefinition.getServerInstanceRoot(file, project));
+            roots.putIfAbsent(serverDefinition, root);
+        }
+        return root.orElse(null);
     }
 
     private @Nullable LanguageServerWrapper findInstanceConnectedTo(@NotNull VirtualFile file,
@@ -1067,7 +1099,7 @@ public class LanguageServiceAccessor implements Disposable {
         MatchedLanguageServerDefinitions mappings = getMatchedLanguageServerDefinitions(file, true);
         if (mappings != MatchedLanguageServerDefinitions.NO_MATCH) {
             Set<LanguageServerDefinition> languageServerDefinitions = mappings.getMatched();
-            var instanceFilter = instancesOf(file.getVirtualFile());
+            var instanceFilter = instancesOf(file);
             Set<LanguageServerWrapper> languageServerWrappers = new HashSet<>(getStartedServers())
                     .stream()
                     .filter(languageServerWrapper -> languageServerDefinitions.contains(languageServerWrapper.getServerDefinition())

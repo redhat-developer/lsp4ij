@@ -847,24 +847,24 @@ public class LanguageServerInstancesTest extends LSPCodeInsightFixtureTestCase {
         assertEquals(3, definition.servers.size());
     }
 
-    public void testAPassOverTheInstancesAsksTheStrategyOnce() throws Exception {
+    public void testThePassesOverTheInstancesAskTheStrategyOnceForAFile() throws Exception {
         instanceOf(file("a/one.per-folder"));
-        instanceOf(file("b/one.per-folder"));
+        var b = instanceOf(file("b/one.per-folder"));
         var file = file("b/two.per-folder");
         var virtualFile = file.getVirtualFile();
-
         definition.strategy.askedFiles.clear();
-        assertTrue(accessor.hasAny(file, server -> true));
-        assertEquals(1, askedFor(virtualFile));
 
-        definition.strategy.askedFiles.clear();
-        accessor.processLanguageServers(file, server -> {
-        });
-        assertEquals(1, askedFor(virtualFile));
-
-        definition.strategy.askedFiles.clear();
+        // They run as the file is edited, on the UI thread, so the root of the file is remembered
+        assertTrue(accessor.hasAny(file, server -> server == b));
+        accessor.processLanguageServers(file, server -> assertSame(b, server));
         accessor.getModificationTrackers(file);
+        assertTrue(accessor.hasAny(file, server -> server == b));
         assertEquals(1, askedFor(virtualFile));
+
+        // Until the files of the project change, which can add or remove a marker
+        file("c/one.per-folder");
+        assertTrue(accessor.hasAny(file, server -> server == b));
+        assertEquals(2, askedFor(virtualFile));
     }
 
     public void testAConnectedFileNeedsNoStrategy() throws Exception {
