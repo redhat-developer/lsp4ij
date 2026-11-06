@@ -80,6 +80,9 @@ public class LanguageServiceAccessor implements Disposable {
     private final Set<LanguageServerWrapper> startedServers = new CopyOnWriteArraySet<>();
     // The definitions with instances that said once that an open file gets none, until their configuration changes
     private final Set<LanguageServerDefinition> definitionsWithoutInstanceHint = ConcurrentHashMap.newKeySet();
+    // How often the instances of each definition were replaced: the root of an instance chosen before a replacement
+    // can come from the configuration before it
+    private final Map<LanguageServerDefinition, Integer> replacements = new ConcurrentHashMap<>();
     private final LanguageServerDefinitionListener serverDefinitionListener = new LanguageServerDefinitionListener() {
 
         @Override
@@ -96,6 +99,7 @@ public class LanguageServiceAccessor implements Disposable {
             // Bump the accessor-level modification tracker
             modificationTracker.incModificationCount();
             event.serverDefinitions.forEach(definitionsWithoutInstanceHint::remove);
+            event.serverDefinitions.forEach(replacements::remove);
 
             // Dispose all servers which are removed
             // and remove code vision, inlay hints, folding from editors
@@ -647,6 +651,7 @@ public class LanguageServiceAccessor implements Disposable {
         }
         synchronized (startedServers) {
             languageServers.forEach(startedServers::remove);
+            replacements.merge(serverDefinition, 1, Integer::sum);
         }
         boolean refreshEditorFeature = !ApplicationManager.getApplication().isUnitTestMode();
         for (int i = 0; i < languageServers.size(); i++) {
@@ -671,9 +676,11 @@ public class LanguageServiceAccessor implements Disposable {
 
     /**
      * The language server instance of a file for a definition with several instances: the instance that has the file
-     * connected or provides it, which keeps it, or the root of the instance that serves it.
+     * connected or provides it, which keeps it, or the root of the instance that serves it, with how often the instances
+     * of the definition were replaced before the choice.
      */
-    private record InstanceChoice(@Nullable LanguageServerWrapper connected, @Nullable WorkspaceFolder root) {
+    private record InstanceChoice(@Nullable LanguageServerWrapper connected, @Nullable WorkspaceFolder root,
+                                  int replacements) {
 
         boolean isFor(@NotNull LanguageServerWrapper instance) {
             if (connected != null) {
@@ -715,7 +722,15 @@ public class LanguageServiceAccessor implements Disposable {
         if (choice.connected() != null) {
             return choice.connected();
         }
-        return choice.root() != null ? getOrCreateInstance(serverDefinition, choice.root()) : null;
+        if (choice.root() == null) {
+            return null;
+        }
+        synchronized (startedServers) {
+            // As for a request: a replacement after the choice connects the open files again
+            return choice.replacements() == replacementsOf(serverDefinition)
+                    ? getOrCreateInstance(serverDefinition, choice.root())
+                    : null;
+        }
     }
 
     /**
@@ -737,10 +752,16 @@ public class LanguageServiceAccessor implements Disposable {
 
     private @NotNull InstanceChoice chooseInstance(@NotNull VirtualFile file,
                                                    @NotNull LanguageServerDefinition serverDefinition) {
+        // Before the root: a replacement while the strategy is asked can make the root outdated
+        int replaced = replacementsOf(serverDefinition);
         var connected = findInstanceConnectedTo(file, serverDefinition);
         return connected != null
-                ? new InstanceChoice(connected, null)
-                : new InstanceChoice(null, serverDefinition.getServerInstanceRoot(file, project));
+                ? new InstanceChoice(connected, null, replaced)
+                : new InstanceChoice(null, serverDefinition.getServerInstanceRoot(file, project), replaced);
+    }
+
+    private int replacementsOf(@NotNull LanguageServerDefinition serverDefinition) {
+        return replacements.getOrDefault(serverDefinition, 0);
     }
 
     /**
@@ -778,10 +799,11 @@ public class LanguageServiceAccessor implements Disposable {
         Map<LanguageServerDefinition, InstanceChoice> choices = new HashMap<>();
         return server -> server.getInstanceRoot() == null
                 || choices.computeIfAbsent(server.getServerDefinition(), serverDefinition -> {
+                    int replaced = replacementsOf(serverDefinition);
                     var connected = findInstanceConnectedTo(file, serverDefinition);
                     return connected != null
-                            ? new InstanceChoice(connected, null)
-                            : new InstanceChoice(null, getRememberedServerInstanceRoot(psiFile, file, serverDefinition));
+                            ? new InstanceChoice(connected, null, replaced)
+                            : new InstanceChoice(null, getRememberedServerInstanceRoot(psiFile, file, serverDefinition), replaced);
                 }).isFor(server);
     }
 
@@ -834,6 +856,10 @@ public class LanguageServiceAccessor implements Disposable {
             if (instance == null) {
                 return;
             }
+        } else if (choice.replacements() != replacementsOf(serverDefinition)) {
+            // The root was chosen before a replacement, so it can come from the configuration before it: the
+            // replacement connects the open files again
+            return;
         } else {
             instance = findInstance(serverDefinition, choice.root());
         }

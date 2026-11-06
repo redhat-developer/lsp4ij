@@ -59,6 +59,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Consumer;
 
 /**
  * Tests a language server definition whose workspace folder strategy spreads the files over several instances. By
@@ -272,6 +273,40 @@ public class LanguageServerInstancesTest extends LSPCodeInsightFixtureTestCase {
         waitUntilDisposed(b);
         assertFalse(serverOfB.isRunning());
         assertEmpty(instances());
+    }
+
+    public void testARootChosenBeforeAReplacementGetsNoInstance() throws Exception {
+        var file = file("x/a/one.per-folder");
+        var twoLevels = new TwoLevelStrategy(file("base.txt").getVirtualFile().getParent(), true);
+        var chosen = new CountDownLatch(1);
+        var replaced = new CountDownLatch(1);
+        definition.strategy.afterAsked = asked -> {
+            if (asked.equals(file.getVirtualFile())) {
+                definition.strategy.afterAsked = null;
+                chosen.countDown();
+                try {
+                    assertTrue(replaced.await(TIMEOUT, TimeUnit.SECONDS));
+                } catch (InterruptedException e) {
+                    throw new IllegalStateException(e);
+                }
+            }
+        };
+        // The request chooses the root of the file on its own thread, which the strategy holds then
+        var servers = CompletableFuture.supplyAsync(
+                        () -> ReadAction.compute(() -> accessor.getLanguageServers(file, null, null)),
+                        AppExecutorUtil.getAppExecutorService())
+                .thenCompose(future -> future);
+        assertTrue(chosen.await(TIMEOUT, TimeUnit.SECONDS));
+
+        // As a changed configuration does, which gives the file another root and replaces the instances
+        definition.activeStrategy = twoLevels;
+        definition.resetWorkspaceFolderStrategy();
+        fireStrategyChanged();
+        replaced.countDown();
+
+        waitFor(servers);
+        assertTrue("No instance may have the root chosen with the configuration before", instances().stream()
+                .noneMatch(instance -> instance.getInstanceRoot() != null && "a".equals(instance.getInstanceRoot().getName())));
     }
 
     public void testAReplacedInstanceIsDisposedOnTheUiThread() throws Exception {
@@ -1030,6 +1065,8 @@ public class LanguageServerInstancesTest extends LSPCodeInsightFixtureTestCase {
         // The file whose folder is written with a trailing slash if it has none, and without one if it has
         volatile @Nullable String otherWayFor;
         final List<VirtualFile> askedFiles = new CopyOnWriteArrayList<>();
+        // Is given each file that the strategy is asked for, once its folder is chosen
+        volatile @Nullable Consumer<VirtualFile> afterAsked;
 
         @Override
         public boolean hasServerInstances() {
@@ -1055,6 +1092,15 @@ public class LanguageServerInstancesTest extends LSPCodeInsightFixtureTestCase {
             if (failing) {
                 throw new IllegalStateException("No workspace folder");
             }
+            var folder = folderOf(file, fileUriSupport);
+            var asked = afterAsked;
+            if (asked != null) {
+                asked.accept(file);
+            }
+            return folder;
+        }
+
+        private @Nullable WorkspaceFolder folderOf(@NotNull VirtualFile file, @NotNull FileUriSupport fileUriSupport) {
             var parent = file.getParent();
             if (noFolders || parent == null || !List.of("a", "b").contains(parent.getName())) {
                 return null;
