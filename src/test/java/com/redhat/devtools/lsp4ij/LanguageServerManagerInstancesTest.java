@@ -364,6 +364,27 @@ public class LanguageServerManagerInstancesTest extends LSPCodeInsightFixtureTes
         assertTrue(instances().stream().noneMatch(instance -> instance.getServerStatus() == ServerStatus.started));
     }
 
+    public void testAStartWithTheRootOfAnOpenFileWithoutInstanceSwitchesTheDefinitionOn() throws Exception {
+        var a = serverOf(file("a/one.instances"));
+        manager.stop(ID, new LanguageServerManager.StopOptions().setWillDisable(true));
+        waitForStatus(a, ServerStatus.stopped);
+        // The definition is switched off, so the file opened now gets no instance
+        myFixture.openFileInEditor(file("b/one.instances").getVirtualFile());
+        dispatchAll();
+        assertNull(instanceOfRoot("b"));
+
+        manager.start(ID, rootOf("b"), new LanguageServerManager.StartOptions().setWillEnable(true));
+
+        assertTrue(definition.isEnabled(myFixture.getProject()));
+        PlatformTestUtil.waitWithEventsDispatching("The instance of the open file must start", () -> {
+            var b = instanceOfRoot("b");
+            return b != null && b.getServerStatus() == ServerStatus.started;
+        }, TIMEOUT);
+        // The instance of a was switched off with the definition, and only a start with its root switches it on
+        assertFalse(a.isEnabled());
+        assertEquals(ServerStatus.stopped, a.getServerStatus());
+    }
+
     public void testAMovedFileGoesToTheInstanceOfItsNewRoot() throws Exception {
         var file = file("a/moved.instances").getVirtualFile();
         var a = openAndConnect(file);

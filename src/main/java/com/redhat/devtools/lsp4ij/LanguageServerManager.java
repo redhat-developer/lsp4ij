@@ -210,6 +210,11 @@ public class LanguageServerManager {
                 ? accessor.getOrCreateInstance(serverDefinition, root)
                 : accessor.findInstance(serverDefinition, root);
         if (instance == null) {
+            if (options.isWillEnable()) {
+                // The open files get no instance of a definition that is switched off, and there is no instance that a
+                // restart would switch on
+                serverDefinition.setEnabled(true, project);
+            }
             // As without a root: the instance starts if one of its files is open
             accessor.findAndStartLanguageServerIfNeeded(serverDefinition, false, project);
             return;
