@@ -156,6 +156,10 @@ public class LanguageServersRegistry implements Disposable {
             }
         }
         registeredFindUsagesProviders.clear();
+        // Disposes the client features that gave the workspace folder strategies, which can come from other plugins
+        for (var definition : serverDefinitions.values()) {
+            definition.resetWorkspaceFolderStrategy();
+        }
     }
 
     private void loadServersAndMappingsFromExtensionPoint() {
@@ -736,6 +740,8 @@ public class LanguageServersRegistry implements Disposable {
         removeAssociationsFor(definition);
         updateLanguages();
         notifyServerRemoved(Collections.singleton(definition));
+        // Disposes the client features that gave its workspace folder strategy, which come from the plugin that goes
+        definition.resetWorkspaceFolderStrategy();
     }
 
     private boolean hasLanguageAssociation(@NotNull LanguageServerDefinition definition, @NotNull Language language) {

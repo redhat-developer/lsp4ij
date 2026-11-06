@@ -13,7 +13,9 @@ import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.Disposer;
 import com.intellij.testFramework.fixtures.BasePlatformTestCase;
 import com.redhat.devtools.lsp4ij.LanguageServerFactory;
+import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
 import com.redhat.devtools.lsp4ij.client.LanguageClientImpl;
+import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
 import com.redhat.devtools.lsp4ij.mock.MockConnectionProvider;
 import com.redhat.devtools.lsp4ij.mock.MockLanguageServer;
 import com.redhat.devtools.lsp4ij.server.StreamConnectionProvider;
@@ -23,6 +25,7 @@ import org.jetbrains.annotations.NotNull;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Tests that a language server from the {@code server} extension point gets the root of a language server instance in
@@ -97,6 +100,27 @@ public class ExtensionServerInstancesTest extends BasePlatformTestCase {
     /**
      * Creates the extension as IntelliJ does from the {@code plugin.xml}: the platform creates the factory.
      */
+    public void testTheClientFeaturesOfTheStrategyGoWithAnUnloadedExtension() {
+        FactoryWithCountedClientFeatures.disposed.set(0);
+        var extension = extension(FactoryWithCountedClientFeatures.class);
+        extension.id = "unloaded-extension-instances";
+        var unload = Disposer.newDisposable();
+        try {
+            ServerExtensionPointBean.EP_NAME.getPoint().registerExtension(extension, unload);
+            var definition = LanguageServersRegistry.getInstance().getServerDefinition(extension.id);
+            assertNotNull(definition);
+            // Its strategy comes from client features without a language server
+            definition.hasServerInstances();
+            assertEquals(0, FactoryWithCountedClientFeatures.disposed.get());
+        } finally {
+            // As the plugin of the extension is unloaded
+            Disposer.dispose(unload);
+        }
+
+        assertNull(LanguageServersRegistry.getInstance().getServerDefinition(extension.id));
+        assertEquals(1, FactoryWithCountedClientFeatures.disposed.get());
+    }
+
     private static @NotNull ServerExtensionPointBean extension(@NotNull Class<? extends LanguageServerFactory> factory) {
         var extension = new ServerExtensionPointBean();
         extension.id = "extension-instances";
@@ -121,6 +145,22 @@ public class ExtensionServerInstancesTest extends BasePlatformTestCase {
         public @NotNull LanguageClientImpl createLanguageClient(@NotNull Project project) {
             client = new LanguageClientImpl(project);
             return client;
+        }
+    }
+
+    public static final class FactoryWithCountedClientFeatures extends FactoryWithoutRoot {
+
+        static final AtomicInteger disposed = new AtomicInteger();
+
+        @Override
+        public @NotNull LSPClientFeatures createClientFeatures() {
+            return new LSPClientFeatures() {
+                @Override
+                public void dispose() {
+                    super.dispose();
+                    disposed.incrementAndGet();
+                }
+            };
         }
     }
 
