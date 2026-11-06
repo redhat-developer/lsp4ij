@@ -194,6 +194,16 @@ public class ClosedDocumentProblemTest extends LSPCodeInsightFixtureTestCase {
         }
     }
 
+    public void testAReportMadeWhileTheProjectIsDisposedNeverRuns() {
+        var project = myFixture.getProject();
+        var other = myFixture.addFileToProject("other.foo", "other").getVirtualFile();
+        // A language server is a child of its project, and stopping it as the project is disposed reports the files
+        // that it disconnects. That report waits for the write action which disposes the project, and must not run
+        // after it: the project's services are gone. The tear down disposes the project, then waits for the pending
+        // read actions and fails on one that failed
+        Disposer.register(project, () -> LSPDiagnosticUtils.reportProblem(other, null, project));
+    }
+
     /**
      * Waits for the problem reports submitted so far. A clear submits a report of each of its files as it runs, so a
      * second wait takes the reports that the first one's clears submitted.
