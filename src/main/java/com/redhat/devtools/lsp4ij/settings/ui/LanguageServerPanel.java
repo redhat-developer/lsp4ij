@@ -35,6 +35,7 @@ import com.intellij.ui.components.JBTextField;
 import com.intellij.ui.dsl.listCellRenderer.BuilderKt;
 import com.intellij.ui.scale.JBUIScale;
 import com.intellij.util.ui.FormBuilder;
+import com.intellij.util.ui.NamedColorUtil;
 import com.intellij.util.ui.UIUtil;
 import com.intellij.util.ui.components.BorderLayoutPanel;
 import com.redhat.devtools.lsp4ij.LanguageServerBundle;
@@ -55,6 +56,9 @@ import javax.swing.*;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 import java.awt.*;
+import java.nio.file.Files;
+import java.nio.file.InvalidPathException;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -196,6 +200,7 @@ public class LanguageServerPanel implements Disposable {
     private static void updatePreviewWorkingDir(@NotNull TextFieldWithBrowseButton workingDir,
                                                 @NotNull JLabel previewLabel,
                                                 @NotNull Project project) {
+        Color foreground = previewLabel.getForeground();
         workingDir.getTextField().getDocument().addDocumentListener(new DocumentListener() {
             @Override
             public void insertUpdate(DocumentEvent e) {
@@ -210,13 +215,19 @@ public class LanguageServerPanel implements Disposable {
                     return;
                 }
                 String preview = resolveCommandLine(text, project);
-                if (preview.equals(text)) {
+                // The language server can't start in a directory which doesn't exist. It is told, not refused: the
+                // directory can still come, as one which the installer creates when the language server starts
+                boolean missing = isMissingDirectory(preview);
+                previewLabel.setForeground(missing ? NamedColorUtil.getErrorForeground() : foreground);
+                if (preview.equals(text) && !missing) {
                     previewLabel.setToolTipText("");
                     previewLabel.setText("");
                 } else {
                     previewLabel.setToolTipText(preview);
                     String shortPreview = preview.length() > COMMAND_LENGTH_MAX ? preview.substring(0, COMMAND_LENGTH_MAX) + "..." : preview;
-                    previewLabel.setText(shortPreview);
+                    previewLabel.setText(missing
+                            ? LanguageServerBundle.message("language.server.workingDir.missing", shortPreview)
+                            : shortPreview);
                 }
             }
 
@@ -230,6 +241,20 @@ public class LanguageServerPanel implements Disposable {
                 updateLabel(previewLabel);
             }
         });
+    }
+
+    /**
+     * Returns true if the given working directory, with its macros resolved, is an absolute path where no directory
+     * is. A relative path, which the language server's process resolves against the IDE's, or text that isn't a
+     * path, is not checked.
+     */
+    private static boolean isMissingDirectory(@NotNull String directory) {
+        try {
+            Path path = Path.of(directory);
+            return path.isAbsolute() && !Files.isDirectory(path);
+        } catch (InvalidPathException e) {
+            return false;
+        }
     }
 
     private static JLabel createLabelForComponent(@NotNull @NlsContexts.Label String labelText, @NotNull JComponent component) {

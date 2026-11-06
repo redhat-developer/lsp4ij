@@ -42,6 +42,9 @@ You can reinstall the server at any time (e.g. to fetch the latest version) usin
 The `Server tab` requires the `server name` and `command` fields to be set. A language server which runs already, and
 to which LSP4IJ attaches over a socket, needs no command, but its port (see [Transport](#transport)).
 
+Below the `Working Directory` field, a line shows the directory with its macros resolved, and says when no such directory
+exists yet: the language server can only start in one that exists, which its installer can still create.
+
 Here is a sample with the [typescript-language-server](https://github.com/typescript-language-server/typescript-language-server):
 
 ![New Language Server Dialog with TypeScript](images/user-defined-ls/typescript-language-server/select_template.png)
