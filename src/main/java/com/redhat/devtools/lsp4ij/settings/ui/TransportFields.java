@@ -22,7 +22,11 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import javax.swing.*;
+import javax.swing.text.DefaultFormatterFactory;
+import javax.swing.text.NumberFormatter;
 import java.net.InetAddress;
+import java.text.DecimalFormat;
+import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -36,6 +40,7 @@ import static com.redhat.devtools.lsp4ij.LanguageServerBundle.message;
 final class TransportFields {
 
     private static final int GAP = 12;
+    private static final int MAX_PORT = 65_535;
 
     private final JBRadioButton stdio = new JBRadioButton(message("language.server.transport.stdio"));
     private final JBRadioButton socket = new JBRadioButton(message("language.server.transport.socket"));
@@ -53,6 +58,7 @@ final class TransportFields {
     private final JBLabel hostLabel = new JBLabel(message("language.server.socket.host"));
     private final JBLabel portLabel = new JBLabel(message("language.server.socket.port"));
     private final JBLabel portHint = new JBLabel(message("language.server.socket.port.hint", UserDefinedTransport.PORT_MACRO));
+    private final JBLabel attachPortHint = new JBLabel(message("language.server.socket.port.attach.hint"));
     private final JPanel transportRow = row(GAP, stdio, socket);
     // Auto and Fixed have a row of their own, whose gaps hide with them, so the port lines up with the host without them
     private final JPanel portChoice = row(GAP, autoPort, fixedPort);
@@ -67,10 +73,13 @@ final class TransportFields {
         hostLabel.setLabelFor(host);
         portLabel.setLabelFor(port);
         portHint.setForeground(JBUI.CurrentTheme.ContextHelp.FOREGROUND);
+        attachPortHint.setForeground(JBUI.CurrentTheme.ContextHelp.FOREGROUND);
+        typedPortCommits();
         setTransport(UserDefinedTransport.STDIO);
         for (var button : List.of(stdio, socket, attach, startAndConnect, startAndAccept, autoPort, fixedPort)) {
             button.addItemListener(event -> update());
         }
+        port.addChangeListener(event -> update());
     }
 
     /**
@@ -86,6 +95,7 @@ final class TransportFields {
         builder.addLabeledComponent(hostLabel, host);
         builder.addLabeledComponent(portLabel, portRow);
         builder.addComponent(portHint, 0);
+        builder.addComponent(attachPortHint, 0);
     }
 
     /**
@@ -186,12 +196,39 @@ final class TransportFields {
         portChoice.setVisible(!isAttach);
         port.setEnabled(isAttach || fixedPort.isSelected());
         portHint.setVisible(isSocket && !isAttach);
+        attachPortHint.setVisible(isAttach && port.getNumber() == 0);
         var parent = transportRow.getParent();
         if (parent != null) {
             parent.revalidate();
             parent.repaint();
         }
         changeListeners.forEach(Runnable::run);
+    }
+
+    /**
+     * Makes the port field take each valid port as it is typed, not only once it loses the focus, so that validation
+     * never sees a port the user has already replaced, and shows no port, 0, as an empty field rather than as a port.
+     */
+    private void typedPortCommits() {
+        if (!(port.getEditor() instanceof JSpinner.DefaultEditor editor)) {
+            return;
+        }
+        var formatter = new NumberFormatter(new DecimalFormat("#")) {
+            @Override
+            public String valueToString(Object value) throws ParseException {
+                return value instanceof Number number && number.intValue() == 0 ? "" : super.valueToString(value);
+            }
+
+            @Override
+            public Object stringToValue(String text) throws ParseException {
+                return text == null || text.isBlank() ? 0 : super.stringToValue(text);
+            }
+        };
+        formatter.setValueClass(Integer.class);
+        formatter.setMinimum(0);
+        formatter.setMaximum(MAX_PORT);
+        formatter.setCommitsOnValidEdit(true);
+        editor.getTextField().setFormatterFactory(new DefaultFormatterFactory(formatter));
     }
 
     private static void group(@NotNull AbstractButton... buttons) {

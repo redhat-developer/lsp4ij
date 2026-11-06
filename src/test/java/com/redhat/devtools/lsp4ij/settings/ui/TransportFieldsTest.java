@@ -9,6 +9,7 @@ package com.redhat.devtools.lsp4ij.settings.ui;
 
 import com.intellij.testFramework.LightPlatformTestCase;
 import com.intellij.ui.PortField;
+import com.intellij.ui.components.JBLabel;
 import com.intellij.ui.components.JBRadioButton;
 import com.intellij.ui.components.JBTextField;
 import com.intellij.util.ui.FormBuilder;
@@ -101,6 +102,34 @@ public class TransportFieldsTest extends LightPlatformTestCase {
         assertNull(fields.validate());
     }
 
+    public void testATypedPortCountsBeforeTheFieldLosesTheFocus() {
+        radio("language.server.transport.socket").doClick();
+        radio("language.server.socket.port.fixed").doClick();
+        assertNotNull(fields.validate());
+
+        portText().setText("50070");
+
+        // no focus change commits it
+        assertNull(fields.validate());
+        assertEquals(50070, fields.getTransport().port());
+    }
+
+    public void testARunningLanguageServerWithoutAPortShowsAnEmptyFieldAndAHint() {
+        radio("language.server.transport.socket").doClick();
+        radio("language.server.socket.attach").doClick();
+
+        // no port isn't shown as the port 0
+        assertEquals("", portText().getText());
+        assertTrue(label("language.server.socket.port.attach.hint").isVisible());
+
+        portText().setText("6005");
+        assertFalse("the hint goes once there is a port", label("language.server.socket.port.attach.hint").isVisible());
+
+        portText().setText("");
+        assertEquals(0, port().getNumber());
+        assertTrue(label("language.server.socket.port.attach.hint").isVisible());
+    }
+
     public void testATransportIsShownAsItIs() {
         for (var transport : new UserDefinedTransport[]{
                 UserDefinedTransport.STDIO,
@@ -123,6 +152,18 @@ public class TransportFieldsTest extends LightPlatformTestCase {
 
     private @NotNull PortField port() {
         return UIUtil.findComponentOfType(form, PortField.class);
+    }
+
+    private @NotNull JFormattedTextField portText() {
+        return ((JSpinner.DefaultEditor) port().getEditor()).getTextField();
+    }
+
+    private @NotNull JBLabel label(@NotNull String key) {
+        String text = message(key);
+        return UIUtil.findComponentsOfType(form, JBLabel.class).stream()
+                .filter(label -> text.equals(label.getText()))
+                .findFirst()
+                .orElseThrow(() -> new AssertionError("No label " + text));
     }
 
     private @NotNull JBTextField host() {
