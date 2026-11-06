@@ -341,6 +341,15 @@ public class LanguageServerWrapper implements Disposable {
     }
 
     /**
+     * Stops the language server and removes the code vision, inlay hints and folding of its open editors, as
+     * {@link #stopAndDisable()} does, without switching it off: for a stop of its definition, which switches the
+     * definition off instead.
+     */
+    synchronized void stopAndRefreshEditorFeature() {
+        stopAndRefreshEditorFeature(true, false);
+    }
+
+    /**
      * Stop the language server, disable it and
      * remove IJ code vision, inlay hints, folding
      * for all opened editors which edit the files associated to the language server.

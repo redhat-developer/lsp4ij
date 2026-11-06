@@ -1372,7 +1372,7 @@ var status = manager.getServerStatus("myLanguageServerId", instanceRoot);
 manager.getLanguageServers("myLanguageServerId");
 ```
 
-The methods that only take the id mean the instance created first, so use the ones with the file or the root where you know them. `stop` with the root of an instance and `willDisable` switches off that instance only, and `start` switches it on again only with `willEnable`, as for a definition that is switched off. `stop("myLanguageServerId", options)` with `willDisable` switches off the whole definition. With `forceStart`, `start("myLanguageServerId", options)` creates no instance, because without a file nothing tells which one: start each instance with its root instead. `install` runs the installer once for all instances.
+The methods that only take the id mean the instance created first, so use the ones with the file or the root where you know them. `stop` with the root of an instance and `willDisable` switches off that instance only, and `start` switches it on again only with `willEnable`, as for a definition that is switched off. `stop("myLanguageServerId", options)` with `willDisable` switches off the whole definition, and switching the definition on again switches on all its instances but those that a stop with their root switched off. With `forceStart`, `start("myLanguageServerId", options)` creates no instance, because without a file nothing tells which one: start each instance with its root instead. `install` runs the installer once for all instances.
 
 ## User-Defined Language Server Configuration
 

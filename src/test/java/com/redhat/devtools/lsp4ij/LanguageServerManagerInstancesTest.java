@@ -380,9 +380,27 @@ public class LanguageServerManagerInstancesTest extends LSPCodeInsightFixtureTes
             var b = instanceOfRoot("b");
             return b != null && b.getServerStatus() == ServerStatus.started;
         }, TIMEOUT);
-        // The instance of a was switched off with the definition, and only a start with its root switches it on
-        assertFalse(a.isEnabled());
+        // The instance of a is switched on with the definition, and starts as a file of it is needed
         assertEquals(ServerStatus.stopped, a.getServerStatus());
+    }
+
+    public void testSwitchingTheDefinitionOnAfterItsStopSwitchesItsInstancesOn() throws Exception {
+        var a = serverOf(file("a/one.instances"));
+        var b = serverOf(file("b/one.instances"));
+        manager.stop(ID, b.getInstanceRoot(), new LanguageServerManager.StopOptions().setWillDisable(true));
+        waitForStatus(b, ServerStatus.stopped);
+
+        // As the settings do around an installation
+        manager.stop(ID);
+        waitForStatus(a, ServerStatus.stopped);
+        assertFalse(a.isEnabled());
+        definition.setEnabled(true, myFixture.getProject());
+
+        assertTrue(a.isEnabled());
+        assertSame(a, serverOf(file("a/two.instances")));
+        assertEquals(ServerStatus.started, a.getServerStatus());
+        // An instance that a stop with its root switched off stays off
+        assertFalse(b.isEnabled());
     }
 
     public void testAMovedFileGoesToTheInstanceOfItsNewRoot() throws Exception {

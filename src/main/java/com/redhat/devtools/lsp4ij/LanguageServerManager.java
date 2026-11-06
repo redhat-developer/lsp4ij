@@ -254,26 +254,30 @@ public class LanguageServerManager {
     }
 
     /**
-     * Stop the given language server with the given start options.
+     * Stop the given language server with the given start options. With {@link StopOptions#isWillDisable()}, the
+     * definition is switched off, which keeps all its language server instances off until it is switched on again; an
+     * instance that a stop with its root switched off stays off then.
      *
      * @param serverDefinition the language server to stop.
      */
     public void stop(@NotNull LanguageServerDefinition serverDefinition,
                      @NotNull StopOptions options) {
-        // 1. Stop language server
+        if (options.isWillDisable()) {
+            // 1. Disable language server, also when none runs, and so all its instances, which aren't switched off on
+            // their own: switching the definition on again, as after an installation, switches them on
+            serverDefinition.setEnabled(false, project);
+        }
+        // 2. Stop language server
         for (var ls : LanguageServiceAccessor.getInstance(project).getStartedServers()) {
             if (serverDefinition.equals(ls.getServerDefinition())) {
-                if (options.isWillDisable()) {
-                    ls.stopAndDisable();
-                } else {
+                if (!options.isWillDisable()) {
                     ls.stop();
+                } else if (ls.getInstanceRoot() != null) {
+                    ls.stopAndRefreshEditorFeature();
+                } else {
+                    ls.stopAndDisable();
                 }
             }
-        }
-        if (options.isWillDisable()) {
-            // 2. Disable language server, also when none ran. Instances are switched off one by one as they stop, so
-            // the definition itself keeps the instances of the other roots off
-            serverDefinition.setEnabled(false, project);
         }
     }
 
