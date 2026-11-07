@@ -62,15 +62,17 @@ Depending on your OS, the environment variables may not be accessible. To make s
 
 ##### Directory-specific environment variables
 
-On supported IntelliJ Platform versions (2024.3+ or any IDE version with a plugin providing the `commandLineEnvCustomizer` extension point), when a working directory is configured (such as project or workspace directories), directory-specific environment managers (such as [mise](https://mise.jdx.dev/), [direnv](https://direnv.net/), or other plugins integrating with IntelliJ's `commandLineEnvCustomizer` extension point) can automatically configure environment variables for the language server process based on directory-level configuration files (such as `.mise.toml` or `.envrc`). On older IDE versions where this extension point is unavailable, LSP4IJ gracefully falls back to standard environment resolution without error.
+Since IntelliJ 2025.1, a plugin can set up the environment of a process for its working directory (the
+`commandLineEnvCustomizer` extension point), as the [mise](https://mise.jdx.dev/) plugin does from a `mise.toml`, or a
+[direnv](https://direnv.net/) plugin from an `.envrc`. The language server's process gets that environment when it starts.
+When a working directory is set, LSP4IJ also looks up the language server's command in the `PATH` of that environment, so
+that the tool which the directory selects, such as its version of `node`, is the one that starts.
 
 > [!NOTE]
-> - **Platform requirement & graceful fallback**: Supported on IntelliJ 2024.3+ or any IDE version with plugins implementing `commandLineEnvCustomizer`. On older platforms, LSP4IJ falls back gracefully to standard process environment resolution.
-> - **Executable resolution**: Directory-specific environment variables (such as a modified `PATH`) are applied before executable lookup, ensuring executables managed by directory tools (e.g. mise shims or local virtual environments) can be resolved correctly.
-> - **Precedence**: Any user-defined environment variables explicitly configured in the `Environment variables` field take precedence over both directory-customized and system environment variables (`user-configured variables > directory customizers > parent environment`).
-> - **Tools not bundled**: LSP4IJ does not bundle `mise` or `direnv`. The respective CLI tools and their corresponding IntelliJ integration plugins (such as the IntelliJ mise plugin) must be installed separately.
-> - **`useMiseInAllCommandLines`**: In the IntelliJ mise plugin, the `useMiseInAllCommandLines` registry key / setting defaults to `false`. If you want mise to customize all command lines including language server processes, ensure this option is enabled.
-> - **Working directory required**: Environment customizers return early without modifying the environment if no valid working directory is present.
+> - **Set the working directory**: the environment is the one of that directory. Without one, the command is looked up in the IDE's `PATH`.
+> - **Precedence**: the directory's environment is applied when the process starts, after the environment variables configured here, so it wins over a variable that both set.
+> - **Tools not bundled**: LSP4IJ doesn't bundle mise or direnv. Install the tool and its IntelliJ plugin. The mise plugin customizes the processes of other plugins only with its `useMiseInAllCommandLines` setting, which is off by default.
+> - **IntelliJ 2024.x** has no such extension point: the environment and the lookup are as before.
 
 #### Macro syntax
 

@@ -36,15 +36,18 @@ The `Configuration` tab to specify the working directory and the file you want t
 
   ![DAP Configuration Type/Configuration](./images/DAP_config_type_configuration.png)
 
-Specifying a working directory sets the working directory for the debug adapter server process. On supported IntelliJ Platform versions (2024.3+ or any IDE version with a plugin providing the `commandLineEnvCustomizer` extension point), it also allows directory-specific environment managers (such as [mise](https://mise.jdx.dev/), [direnv](https://direnv.net/), or other plugins integrating with IntelliJ's `commandLineEnvCustomizer` extension point) to automatically configure environment variables for the DAP process based on directory-level configuration files (such as `.mise.toml` or `.envrc`). On older IDE versions where this extension point is unavailable, LSP4IJ gracefully falls back to standard environment resolution without error.
+The working directory is the one of the debug adapter's process. Since IntelliJ 2025.1, a plugin can set up the environment
+of a process for its working directory (the `commandLineEnvCustomizer` extension point), as the
+[mise](https://mise.jdx.dev/) plugin does from a `mise.toml`, or a [direnv](https://direnv.net/) plugin from an `.envrc`.
+The debug adapter's process gets that environment when it starts, and LSP4IJ looks up the debug adapter's command in its
+`PATH`, so that the tools which the directory selects, such as its version of `node`, are the ones that run.
 
 > [!NOTE]
-> - **Platform requirement & graceful fallback**: Supported on IntelliJ 2024.3+ or any IDE version with plugins implementing `commandLineEnvCustomizer`. On older platforms, LSP4IJ falls back gracefully to standard process environment resolution.
-> - **Executable resolution**: Directory-specific environment variables (such as a modified `PATH`) are applied before executable lookup, ensuring executables managed by directory tools (e.g. mise shims or local virtual environments) can be resolved correctly.
-> - **Precedence**: Any user-defined environment variables explicitly configured in the run configuration take precedence over both directory-customized and system environment variables (`user-configured variables > directory customizers > parent environment`).
-> - **Tools not bundled**: LSP4IJ does not bundle `mise` or `direnv`. The respective CLI tools and their corresponding IntelliJ integration plugins (such as the IntelliJ mise plugin) must be installed separately.
-> - **`useMiseInAllCommandLines`**: In the IntelliJ mise plugin, the `useMiseInAllCommandLines` registry key / setting defaults to `false`. If you want mise to customize all command lines including DAP processes, ensure this option is enabled.
-> - **Working directory required**: Environment customizers return early without modifying the environment if no valid working directory is specified.
+> - **The working directory selects the environment**: a configuration created from a file keeps the project's directory. For a file in a directory that selects other tools, such as a subdirectory with its own `mise.toml`, set the working directory to that directory. It is also the `${workspaceFolder}` of the launch configuration.
+> - **The debug adapter runs with them too**: its own command, such as `node`, is the directory's. A project pinned to a version that the debug adapter doesn't support can keep it from starting.
+> - **Precedence**: the directory's environment is applied when the process starts, after the environment variables of the run configuration, so it wins over a variable that both set.
+> - **Tools not bundled**: LSP4IJ doesn't bundle mise or direnv. Install the tool and its IntelliJ plugin. The mise plugin customizes the processes of other plugins only with its `useMiseInAllCommandLines` setting, which is off by default.
+> - **IntelliJ 2024.x** has no such extension point: the environment and the lookup are as before.
 
 ### IntelliJ macro expansion
 
