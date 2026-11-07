@@ -63,7 +63,7 @@ The debug adapter's process gets that environment when it starts, and LSP4IJ loo
 > - **Precedence**: the directory's environment is applied when the process starts, after the environment variables of the run configuration, so it wins over a variable that both set.
 > - **Windows**: a debug adapter's command without its extension, such as `node` or `npx`, is looked up with the extensions in `PATHEXT`, as Windows does, so that the directory's `node.exe` or `npx.cmd` starts.
 > - **Tools not bundled**: LSP4IJ doesn't bundle mise or direnv. Install the tool and its IntelliJ plugin. The mise plugin customizes the processes of other plugins only with its `useMiseInAllCommandLines` setting, which is off by default.
-> - **IntelliJ 2024.x** has no such extension point: the environment and the lookup are as before.
+> - **IntelliJ 2024.x** has no such extension point: the environment is as before, and the command is looked up in the IDE's `PATH`, on Windows with the extensions in `PATHEXT` as described above.
 
 ### IntelliJ macro expansion
 
