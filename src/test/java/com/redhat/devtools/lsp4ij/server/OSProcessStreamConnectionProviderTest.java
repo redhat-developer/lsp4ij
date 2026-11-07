@@ -13,9 +13,16 @@ import com.intellij.openapi.util.io.FileUtil;
 import com.intellij.testFramework.LightPlatformTestCase;
 import com.redhat.devtools.lsp4ij.server.definition.launching.CommandUtilsTest;
 
+import java.io.BufferedReader;
 import java.io.File;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -85,22 +92,44 @@ public class OSProcessStreamConnectionProviderTest extends LightPlatformTestCase
      */
     public void testStartLooksUpTheCommandInTheEnvironmentOfItsWorkingDirectory() throws Exception {
         Path directory = Files.createTempDirectory("tool-dir");
+        Path other = Files.createTempDirectory("other-tool-dir");
         OSProcessStreamConnectionProvider provider = null;
         try {
-            Path tool = CommandUtilsTest.createTool(directory);
+            Path tool = CommandUtilsTest.createTool(directory, "working-directory");
+            // The same command in the PATH given to the command line, as the IDE's PATH can have it
+            CommandUtilsTest.createTool(other, "given-path");
+            String givenPath = other + File.pathSeparator + Objects.requireNonNullElse(System.getenv("PATH"), "");
             provider = new OSProcessStreamConnectionProvider(CommandUtilsTest.withDirectoryInPath(
-                    new GeneralCommandLine(tool.getFileName().toString()), directory)
+                    new GeneralCommandLine(tool.getFileName().toString()).withEnvironment("PATH", givenPath), directory)
                     .withWorkDirectory(directory.toFile()));
 
             provider.start();
 
             assertEquals(tool.toFile().getCanonicalPath(), new File(provider.getCommandLine().getExePath()).getCanonicalPath());
+            // The tool of the working directory is the one that runs
+            assertEquals("working-directory", readLine(provider));
         } finally {
             if (provider != null) {
                 reap(provider);
             }
             FileUtil.delete(directory.toFile());
+            FileUtil.delete(other.toFile());
         }
+    }
+
+    /**
+     * Reads the first line that the process of the provider prints; the deadline only prevents a broken test from
+     * hanging CI.
+     */
+    private static String readLine(OSProcessStreamConnectionProvider provider) throws Exception {
+        var reader = new BufferedReader(new InputStreamReader(provider.getInputStream(), StandardCharsets.UTF_8));
+        return CompletableFuture.supplyAsync(() -> {
+            try {
+                return reader.readLine();
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+        }).get(30, TimeUnit.SECONDS);
     }
 
     /**

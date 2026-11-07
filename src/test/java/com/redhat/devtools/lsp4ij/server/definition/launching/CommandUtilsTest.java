@@ -416,8 +416,15 @@ public class CommandUtilsTest {
     }
 
     public static Path createTool(Path directory) throws Exception {
+        return createTool(directory, "ok");
+    }
+
+    /**
+     * Creates the tool {@code lsp4ij-tool} in the directory, which prints the output.
+     */
+    public static Path createTool(Path directory, String output) throws Exception {
         Path tool = directory.resolve(SystemInfo.isWindows ? "lsp4ij-tool.bat" : "lsp4ij-tool");
-        Files.writeString(tool, SystemInfo.isWindows ? "@echo off\r\necho ok" : "#!/bin/sh\necho ok");
+        Files.writeString(tool, SystemInfo.isWindows ? "@echo off\r\necho " + output : "#!/bin/sh\necho " + output);
         Assertions.assertTrue(tool.toFile().setExecutable(true));
         return tool;
     }
