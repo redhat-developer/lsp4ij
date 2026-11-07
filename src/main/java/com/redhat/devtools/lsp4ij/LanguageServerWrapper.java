@@ -25,6 +25,7 @@ import com.intellij.openapi.project.ProjectUtil;
 import com.intellij.openapi.util.Disposer;
 import com.intellij.openapi.util.io.FileUtil;
 import com.intellij.openapi.util.ModificationTracker;
+import com.intellij.openapi.util.Ref;
 import com.intellij.openapi.util.SimpleModificationTracker;
 import com.intellij.openapi.vfs.VfsUtilCore;
 import com.intellij.openapi.vfs.VirtualFile;
@@ -1151,61 +1152,74 @@ public class LanguageServerWrapper implements Disposable {
                     initializedServer = getInitializedServer();
                 }
             }
-            DocumentContentSynchronizer synchronizer;
-            synchronized (documentsLock) {
-                // A stop which replaced the attempt after this check disconnects the document once this lock is
-                // released, as it disconnects every opened document. So does a close of the file's last editor.
-                if (!isCurrent(claim) || currentInitializingContext != attempt
-                        || isEditorClosedSince(file, editorCloses)) {
-                    return CompletableFuture.completedFuture(null);
-                }
-                if ((chosenUrl != null && !chosenUrl.equals(file.getUrl())) || !fileUri.equals(toUri(file))) {
-                    // The file moved since the connection was asked for, or since this instance was chosen for it.
-                    // Opened with the URI of its earlier place, which the move found no document for, or on the
-                    // instance of its earlier place, it would stay with this language server. Its new place decides,
-                    // as the move connects an open file again, or as the next request asks
-                    return CompletableFuture.completedFuture(null);
-                }
-                if (claim == null) {
-                    promoteConnection(fileUri);
-                }
-                // Remove from closed documents and check if already opened
-                var closedDocument = closedDocuments.remove(fileUri);
-                boolean droppedErrors = closedDocument != null && closedDocument.hasErrors();
-
-                // Check again if file is already opened (within synchronized block)
-                var alreadyConnected = getConnectedSynchronizer(fileUri);
-                if (alreadyConnected != null) {
-                    synchronizer = alreadyConnected;
-                    reportProblemOfDroppedDocument(file, droppedErrors);
-                } else {
-
-                    // Mark the workspace folder as notified and queue its notification before the document's
-                    // didOpen, so that the server knows the folder first. Queuing does not wait.
-                    if (folderToNotify != null && workspaceFolderNotificationManager.markFolderAsNotified(folderToNotify)) {
-                        sendNotification(initializedServer, workspaceFolderNotificationManager.folderAddedNotification(folderToNotify));
+            var folder = folderToNotify;
+            var folderServer = initializedServer;
+            Ref<DocumentContentSynchronizer> registered = Ref.create();
+            // In a read action, taken before documentsLock, which the write action of a move takes too as it
+            // disconnects the document: a move of the file then comes either before the checks, which see its new
+            // place, or after the registration, which the move finds and takes along
+            CompletableFuture<@Nullable LanguageServer> done = ReadAction.compute(() -> {
+                synchronized (documentsLock) {
+                    // A stop which replaced the attempt after this check disconnects the document once this lock is
+                    // released, as it disconnects every opened document. So does a close of the file's last editor.
+                    if (!isCurrent(claim) || currentInitializingContext != attempt
+                            || isEditorClosedSince(file, editorCloses)) {
+                        return CompletableFuture.completedFuture(null);
                     }
-
-                    synchronizer = createDocumentContentSynchronizer(
-                            toUriString(fileUri), file, document, fileConnectionInfo);
-                    // Synchronizer usually is disposed when document editor is closed.
-                    // But in case of closing the project, it does not close all editors,
-                    // so to ensure synchronizer is disposed we also register it here
-                    Disposer.register(this, synchronizer);
-                    document.addDocumentListener(synchronizer, synchronizer);
-                    OpenedDocument data = new OpenedDocument(new LanguageServerItem(languageServer, this), file, synchronizer);
-                    // It replaces an opened document which held only the diagnostics published before the connection
-                    var replaced = LanguageServerWrapper.this.openedDocuments.put(fileUri, data);
-                    invalidateWorkspaceDiagnosticCache(fileUri);
-                    reportProblemOfDroppedDocument(file, droppedErrors || (replaced != null && replaced.hasErrors()));
-                    if (!waitForDidOpen) {
-                        return CompletableFuture.completedFuture(languageServer);
+                    if ((chosenUrl != null && !chosenUrl.equals(file.getUrl())) || !fileUri.equals(toUri(file))) {
+                        // The file moved since the connection was asked for, or since this instance was chosen for
+                        // it. Opened with the URI of its earlier place, which the move found no document for, or on
+                        // the instance of its earlier place, it would stay with this language server. Its new place
+                        // decides, as the move connects an open file again, or as the next request asks
+                        return CompletableFuture.completedFuture(null);
                     }
+                    if (claim == null) {
+                        promoteConnection(fileUri);
+                    }
+                    // Remove from closed documents and check if already opened
+                    var closedDocument = closedDocuments.remove(fileUri);
+                    boolean droppedErrors = closedDocument != null && closedDocument.hasErrors();
+
+                    // Check again if file is already opened (within synchronized block)
+                    DocumentContentSynchronizer synchronizer;
+                    var alreadyConnected = getConnectedSynchronizer(fileUri);
+                    if (alreadyConnected != null) {
+                        synchronizer = alreadyConnected;
+                        reportProblemOfDroppedDocument(file, droppedErrors);
+                    } else {
+
+                        // Mark the workspace folder as notified and queue its notification before the document's
+                        // didOpen, so that the server knows the folder first. Queuing does not wait.
+                        if (folder != null && workspaceFolderNotificationManager.markFolderAsNotified(folder)) {
+                            sendNotification(folderServer, workspaceFolderNotificationManager.folderAddedNotification(folder));
+                        }
+
+                        synchronizer = createDocumentContentSynchronizer(
+                                toUriString(fileUri), file, document, fileConnectionInfo);
+                        // Synchronizer usually is disposed when document editor is closed.
+                        // But in case of closing the project, it does not close all editors,
+                        // so to ensure synchronizer is disposed we also register it here
+                        Disposer.register(this, synchronizer);
+                        document.addDocumentListener(synchronizer, synchronizer);
+                        OpenedDocument data = new OpenedDocument(new LanguageServerItem(languageServer, this), file, synchronizer);
+                        // It replaces an opened document which held only the diagnostics published before the connection
+                        var replaced = LanguageServerWrapper.this.openedDocuments.put(fileUri, data);
+                        invalidateWorkspaceDiagnosticCache(fileUri);
+                        reportProblemOfDroppedDocument(file, droppedErrors || (replaced != null && replaced.hasErrors()));
+                        if (!waitForDidOpen) {
+                            return CompletableFuture.completedFuture(languageServer);
+                        }
+                    }
+                    registered.set(synchronizer);
+                    return null;
                 }
+            });
+            if (done != null) {
+                return done;
             }
             // After the lock: the didOpen can need the synchronized start(), and stop() takes that monitor
             // before documentsLock
-            return getLanguageServerWhenDidOpen(synchronizer, waitForDidOpen);
+            return getLanguageServerWhenDidOpen(registered.get(), waitForDidOpen);
         }, connectionExecutor);
     }
 

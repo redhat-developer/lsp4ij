@@ -12,6 +12,7 @@ import com.intellij.notification.Notifications;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.ModalityState;
 import com.intellij.openapi.application.ReadAction;
+import com.intellij.openapi.application.WriteAction;
 import com.intellij.openapi.application.impl.NonBlockingReadActionImpl;
 import com.intellij.openapi.command.WriteCommandAction;
 import com.intellij.openapi.progress.ProcessCanceledException;
@@ -509,6 +510,32 @@ public class LanguageServerInstancesTest extends LSPCodeInsightFixtureTestCase {
         assertFalse("The instance of the earlier place of the file must not get it",
                 a.isConnectedTo(a.toUri(file.getVirtualFile())));
         assertEmpty(result);
+    }
+
+    public void testTheConnectionOfADocumentWaitsForAWriteActionThatCanMoveTheFile() throws Exception {
+        var a = instanceOf(file("a/one.per-folder"));
+        var file = file("a/two.per-folder");
+        Queue<Runnable> waiting = new ConcurrentLinkedQueue<>();
+        a.setConnectionExecutor(waiting::add);
+        var uri = a.toUri(file.getVirtualFile());
+        var servers = accessor.getLanguageServers(file, null, null);
+        PlatformTestUtil.waitWithEventsDispatching("The connection must wait", () -> !waiting.isEmpty(), TIMEOUT);
+        a.setConnectionExecutor(AppExecutorUtil.getAppExecutorService());
+
+        // As the write action of a move, in which the move takes along the documents that are open
+        boolean connectedDuringTheWriteAction = WriteAction.compute(() -> {
+            waiting.forEach(AppExecutorUtil.getAppExecutorService()::execute);
+            var deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(1);
+            while (!a.isConnectedTo(uri) && System.nanoTime() < deadline) {
+                Thread.sleep(10);
+            }
+            return a.isConnectedTo(uri);
+        });
+
+        waitFor(servers);
+        assertFalse("The document must not be registered while a write action, as of a move, runs",
+                connectedDuringTheWriteAction);
+        assertTrue("The document must be registered once the write action is done", a.isConnectedTo(uri));
     }
 
     public void testAReplacedInstanceIsDisposedOnTheUiThread() throws Exception {
