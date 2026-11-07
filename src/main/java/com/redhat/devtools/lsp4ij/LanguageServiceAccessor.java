@@ -706,8 +706,8 @@ public class LanguageServiceAccessor implements Disposable {
      * connected or provides it, which keeps it, or the root of the instance that serves it, with how often the instances
      * of the definition were replaced before the choice, and the URL of the place of the file that it was made for.
      */
-    private record InstanceChoice(@Nullable LanguageServerWrapper connected, @Nullable WorkspaceFolder root,
-                                  int replacements, @NotNull String url) {
+    record InstanceChoice(@Nullable LanguageServerWrapper connected, @Nullable WorkspaceFolder root,
+                          int replacements, @NotNull String url) {
 
         boolean isFor(@NotNull LanguageServerWrapper instance) {
             if (connected != null) {
@@ -745,7 +745,18 @@ public class LanguageServiceAccessor implements Disposable {
     @Nullable
     LanguageServerWrapper getOrCreateInstanceOf(@NotNull VirtualFile file,
                                                 @NotNull LanguageServerDefinition serverDefinition) {
-        var choice = chooseInstance(file, serverDefinition);
+        return getOrCreateInstanceOf(file, serverDefinition, chooseInstance(file, serverDefinition));
+    }
+
+    /**
+     * Returns the language server instance of the given choice for a file: the one that has the file connected or
+     * provides it, or the one of its root, created if there is none. Returns null if no instance serves the file, or if
+     * the instances of the definition were replaced since the choice, which connects the open files again.
+     */
+    @Nullable
+    LanguageServerWrapper getOrCreateInstanceOf(@NotNull VirtualFile file,
+                                                @NotNull LanguageServerDefinition serverDefinition,
+                                                @NotNull InstanceChoice choice) {
         if (choice.connected() == null && choice.root() == null) {
             return null;
         }
@@ -780,8 +791,13 @@ public class LanguageServiceAccessor implements Disposable {
         }
     }
 
-    private @NotNull InstanceChoice chooseInstance(@NotNull VirtualFile file,
-                                                   @NotNull LanguageServerDefinition serverDefinition) {
+    /**
+     * Chooses the language server instance of the given file for a definition with several instances, without
+     * creating it. A strategy can do I/O, so don't call this method in a synchronized block.
+     */
+    @NotNull
+    InstanceChoice chooseInstance(@NotNull VirtualFile file,
+                                  @NotNull LanguageServerDefinition serverDefinition) {
         // Before the root: a replacement or a move while the strategy is asked can make the root outdated
         int replaced = replacementsOf(serverDefinition);
         var url = file.getUrl();

@@ -516,9 +516,9 @@ public class LanguageServerManagerInstancesTest extends LSPCodeInsightFixtureTes
             PlatformTestUtil.waitWithEventsDispatching("The file must move again", () -> cDirectory.equals(file.getParent()), TIMEOUT);
             var instance = waitForTheInstanceConnectedTo(file);
             assertEquals("c", instance.getInstanceRoot().getName());
-            var b = instanceOfRoot("b");
-            assertNotNull(b);
-            assertFalse(b.isConnectedTo(b.toUri(file)));
+            // A request without a file, as for the workspace symbols, would start an instance that stays for the
+            // place that the file left before it was connected
+            assertNull(instanceOfRoot("b"));
         } finally {
             EditorFactory.getInstance().releaseEditor(editor);
         }
