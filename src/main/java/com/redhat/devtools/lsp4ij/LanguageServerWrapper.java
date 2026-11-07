@@ -350,6 +350,16 @@ public class LanguageServerWrapper implements Disposable {
     }
 
     /**
+     * Starts the language server if it is switched on, in one step with {@link #stopAndDisable()}, which can switch it
+     * off meanwhile.
+     */
+    synchronized void startIfEnabled() {
+        if (isEnabled()) {
+            start();
+        }
+    }
+
+    /**
      * Stop the language server, disable it and
      * remove IJ code vision, inlay hints, folding
      * for all opened editors which edit the files associated to the language server.
