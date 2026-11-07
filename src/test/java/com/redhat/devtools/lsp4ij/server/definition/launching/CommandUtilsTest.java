@@ -337,14 +337,8 @@ public class CommandUtilsTest {
             createFile(directory, "lsp4ij-tool");
             Path bat = createTool(directory);
             // As a CommandLineEnvCustomizer does for the working directory of a process since 2025.1
-            GeneralCommandLine commandLine = new GeneralCommandLine("lsp4ij-tool") {
-                @Override
-                protected void setupEnvironment(@NotNull Map<String, String> environment) {
-                    super.setupEnvironment(environment);
-                    String path = environment.get("PATH");
-                    environment.put("PATH", path != null ? directory + File.pathSeparator + path : directory.toString());
-                }
-            };
+            GeneralCommandLine commandLine = withDirectoryInPath(new GeneralCommandLine("lsp4ij-tool"), directory)
+                    .withWorkDirectory(directory.toFile());
 
             CommandUtils.resolveExecutable(commandLine);
 
