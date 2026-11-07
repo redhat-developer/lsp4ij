@@ -413,6 +413,18 @@ public class LanguageServerWrapper implements Disposable {
      * which edit the files associated to the language server.
      */
     public synchronized void restart() {
+        restart(false);
+    }
+
+    /**
+     * Restarts this language server instance as {@link #restart()} does, but connects again only the open files that it
+     * serves, so that the other instances of its definition stay as they are, also when they are stopped.
+     */
+    synchronized void restartOnItsOwn() {
+        restart(true);
+    }
+
+    private synchronized void restart(boolean onItsOwn) {
         numberOfRestartAttempts = 0;
         serverError = null;
         setEnabled(true);
@@ -431,8 +443,12 @@ public class LanguageServerWrapper implements Disposable {
                     if (p.isDefault() || p.isDisposed()) {
                         return;
                     }
-                    LanguageServiceAccessor.getInstance(p).
-                            sendDidOpenAndRefreshEditorFeatureForOpenedFiles(serverDefinition, p);
+                    if (onItsOwn) {
+                        LanguageServiceAccessor.getInstance(p).sendDidOpenAndRefreshEditorFeatureForOpenedFiles(this);
+                    } else {
+                        LanguageServiceAccessor.getInstance(p).
+                                sendDidOpenAndRefreshEditorFeatureForOpenedFiles(serverDefinition, p);
+                    }
                 });
     }
 

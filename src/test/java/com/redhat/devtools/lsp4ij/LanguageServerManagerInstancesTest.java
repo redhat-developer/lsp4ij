@@ -203,6 +203,23 @@ public class LanguageServerManagerInstancesTest extends LSPCodeInsightFixtureTes
         assertEmpty(instances());
     }
 
+    public void testAStartWithARootStartsNoOtherStoppedInstance() throws Exception {
+        var aFile = file("a/one.instances").getVirtualFile();
+        var a = openAndConnect(aFile);
+        var b = openAndConnect(file("b/one.instances").getVirtualFile());
+        stop(a);
+        stop(b);
+
+        manager.start(ID, a.getInstanceRoot(), new LanguageServerManager.StartOptions());
+
+        // The restart of a connects its open files again, but not those of b, which would start b
+        waitForStatus(a, ServerStatus.started);
+        PlatformTestUtil.waitWithEventsDispatching("The open file of a must be connected again",
+                () -> a.isConnectedTo(a.toUri(aFile)), TIMEOUT);
+        dispatchAll();
+        assertEquals(ServerStatus.stopped, b.getServerStatus());
+    }
+
     public void testStopWithARootStopsOnlyThatInstance() throws Exception {
         var a = serverOf(file("a/one.instances"));
         var b = serverOf(file("b/one.instances"));

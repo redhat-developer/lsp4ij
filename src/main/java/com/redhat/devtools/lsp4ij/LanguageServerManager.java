@@ -224,7 +224,7 @@ public class LanguageServerManager {
                     + serverDefinition.getId() + "' cannot be forced to be enabled.");
         }
         if (options.isForceRestart() || instance.getServerStatus() != ServerStatus.started) {
-            instance.restart();
+            instance.restartOnItsOwn();
         }
     }
 

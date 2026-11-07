@@ -275,22 +275,40 @@ public class LanguageServiceAccessor implements Disposable {
      */
     void sendDidOpenAndRefreshEditorFeatureForOpenedFiles(@NotNull LanguageServerDefinition serverDefinition,
                                                           @NotNull Project project) {
+        sendDidOpenAndRefreshEditorFeatureForOpenedFiles(serverDefinition, project, null);
+    }
+
+    /**
+     * As {@link #sendDidOpenAndRefreshEditorFeatureForOpenedFiles(LanguageServerDefinition, Project)} does, for the open
+     * files that the given language server instance serves: the other instances of its definition don't start.
+     *
+     * @param instance the language server instance.
+     */
+    void sendDidOpenAndRefreshEditorFeatureForOpenedFiles(@NotNull LanguageServerWrapper instance) {
+        sendDidOpenAndRefreshEditorFeatureForOpenedFiles(instance.getServerDefinition(), instance.getProject(),
+                clientFeatures -> clientFeatures.getServerWrapper() == instance);
+    }
+
+    private void sendDidOpenAndRefreshEditorFeatureForOpenedFiles(@NotNull LanguageServerDefinition serverDefinition,
+                                                                  @NotNull Project project,
+                                                                  @Nullable Predicate<LSPClientFeatures> beforeStartingServerFilter) {
         VirtualFile[] files = FileEditorManager.getInstance(project).getOpenFiles();
         for (VirtualFile file : files) {
             // TODO : revisit that
             PsiFile psiFile = LSPIJUtils.getPsiFile(file, project);
             if (psiFile != null) {
-                sendDidOpenAndRefreshEditorFeatureFor(psiFile, serverDefinition);
+                sendDidOpenAndRefreshEditorFeatureFor(psiFile, serverDefinition, beforeStartingServerFilter);
             }
         }
     }
 
     private void sendDidOpenAndRefreshEditorFeatureFor(@NotNull PsiFile file,
-                                                       @NotNull LanguageServerDefinition serverDefinition) {
+                                                       @NotNull LanguageServerDefinition serverDefinition,
+                                                       @Nullable Predicate<LSPClientFeatures> beforeStartingServerFilter) {
         ReadAction.nonBlocking(() -> {
                     // Try to send a textDocument/didOpen notification if the file is associated to the language server definition
                     LanguageServiceAccessor.getInstance(project)
-                            .getLanguageServers(file, null, null, serverDefinition)
+                            .getLanguageServers(file, beforeStartingServerFilter, null, serverDefinition)
                             .thenAccept(servers -> {
                                 // textDocument/didOpen notification has been sent
                                 if (servers.isEmpty()) {
