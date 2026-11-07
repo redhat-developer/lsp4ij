@@ -40,15 +40,9 @@ import com.redhat.devtools.lsp4ij.server.LanguageServerException;
 import com.redhat.devtools.lsp4ij.server.StreamConnectionProvider;
 import com.redhat.devtools.lsp4ij.templates.ServerMappingSettings;
 import org.eclipse.lsp4j.Diagnostic;
-import org.eclipse.lsp4j.FileOperationFilter;
-import org.eclipse.lsp4j.FileOperationOptions;
-import org.eclipse.lsp4j.FileOperationPattern;
-import org.eclipse.lsp4j.FileOperationsServerCapabilities;
 import org.eclipse.lsp4j.Position;
 import org.eclipse.lsp4j.Range;
-import org.eclipse.lsp4j.ServerCapabilities;
 import org.eclipse.lsp4j.WorkspaceFolder;
-import org.eclipse.lsp4j.WorkspaceServerCapabilities;
 import org.eclipse.lsp4j.jsonrpc.MessageConsumer;
 import org.eclipse.lsp4j.jsonrpc.messages.Message;
 import org.jetbrains.annotations.NotNull;
@@ -799,7 +793,7 @@ public class LanguageServerManagerInstancesTest extends LSPCodeInsightFixtureTes
 
         @Override
         public @NotNull StreamConnectionProvider createConnectionProvider(@NotNull Project project) {
-            var server = new MockLanguageServer(InstancesDefinition::capabilities);
+            var server = new MockLanguageServer(MockLanguageServer::defaultServerCapabilities);
             servers.add(server);
             return new MockConnectionProvider(server);
         }
@@ -824,20 +818,6 @@ public class LanguageServerManagerInstancesTest extends LSPCodeInsightFixtureTes
             });
             features.setServerInstaller(new CountingInstaller(installations, () -> failingInstallation, () -> installationGate));
             return features;
-        }
-
-        /**
-         * LSP4IJ handles a renamed or moved file only for a language server that supports workspace/didRenameFiles.
-         */
-        private static ServerCapabilities capabilities() {
-            var operations = new FileOperationsServerCapabilities();
-            operations.setDidRename(new FileOperationOptions(List.of(
-                    new FileOperationFilter(new FileOperationPattern("**/*.instances")))));
-            var workspace = new WorkspaceServerCapabilities();
-            workspace.setFileOperations(operations);
-            var capabilities = MockLanguageServer.defaultServerCapabilities();
-            capabilities.setWorkspace(workspace);
-            return capabilities;
         }
     }
 }
