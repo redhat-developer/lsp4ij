@@ -2,11 +2,16 @@
   "id": "terraform-ls",
   "name": "Terraform Language Server",
   "executeOnStartServer": false,
+  "properties": {
+    "serverDist": "$USER_HOME$/.lsp4ij/lsp/terraform-ls"
+  },
   "check": {
-    "exec": {
-      "name": "Trying current command",
-      "command": "${server.command}",
-      "timeout": 2000
+    "fileExists": {
+      "name": "Check if terraform-ls is installed",
+      "file": {
+        "windows": "${serverDist}/terraform-ls.exe",
+        "default": "${serverDist}/terraform-ls"
+      }
     }
   },
   "run": {
@@ -30,7 +35,7 @@
         }
       },
       "output": {
-        "dir": "$USER_HOME$/.lsp4ij/lsp/terraform-ls",
+        "dir": "${serverDist}",
         "file": {
           "name": {
             "windows": "terraform-ls.exe",

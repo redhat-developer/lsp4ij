@@ -12,6 +12,8 @@ package com.redhat.devtools.lsp4ij.dap;
 
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.project.ProjectManagerListener;
+import com.intellij.xdebugger.XDebuggerManager;
+import com.redhat.devtools.lsp4ij.dap.breakpoints.DAPDataBreakpointType;
 import com.redhat.devtools.lsp4ij.dap.client.files.DAPFileRegistry;
 import org.jetbrains.annotations.NotNull;
 
@@ -19,9 +21,20 @@ import org.jetbrains.annotations.NotNull;
  * Manages the lifecycle of DAP (Debug Adapter Protocol) resources when projects are opened or closed.
  * <ul>
  *   <li>Cleans up DAP file cache when a project is closed to prevent memory leaks.</li>
+ *   <li>Removes the data breakpoints whose data id is valid only in their debug session before a project is saved
+ *   on close, as their session ends with it.</li>
  * </ul>
  */
 public class DAPProjectLifecycleListener implements ProjectManagerListener {
+
+    @Override
+    public void projectClosingBeforeSave(@NotNull Project project) {
+        // A debug session which still runs ends with the project, maybe after the project is saved. Without the
+        // debugger manager, the project has no breakpoints to save.
+        if (project.getServiceIfCreated(XDebuggerManager.class) != null) {
+            DAPDataBreakpointType.endSession(project, properties -> true);
+        }
+    }
 
     @Override
     public void projectClosing(@NotNull Project project) {

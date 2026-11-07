@@ -17,7 +17,7 @@ import com.intellij.openapi.project.Project;
 import com.intellij.ui.IdeBorderFactory;
 import com.intellij.util.ui.FormBuilder;
 import com.intellij.util.ui.JBUI;
-import com.intellij.util.ui.UI;
+import com.redhat.devtools.lsp4ij.settings.ui.DescriptionPanel;
 import com.redhat.devtools.lsp4ij.dap.DebugAdapterManager;
 import com.redhat.devtools.lsp4ij.dap.LaunchConfiguration;
 import com.redhat.devtools.lsp4ij.dap.configurations.DAPServerMappingsPanel;
@@ -63,7 +63,7 @@ public class DebugAdapterServerView implements Disposable {
         this.debugAdapterServer = debugAdapterServer;
         this.debugAdapterServerNameProvider = dapDescriptorFactoryNameProvider;
         isUserDefined = debugAdapterServer instanceof UserDefinedDebugAdapterServerDefinition;
-        JComponent descriptionPanel = createDescription(debugAdapterServer.getDescription());
+        JComponent descriptionPanel = DescriptionPanel.create(debugAdapterServer.getDescription());
         JPanel settingsPanel = createSettings(descriptionPanel, isUserDefined);
         if (!isUserDefined) {
             TitledBorder title = IdeBorderFactory.createTitledBorder(debugAdapterServer.getDisplayName());
@@ -251,27 +251,6 @@ public class DebugAdapterServerView implements Disposable {
         return builder.getPanel();
     }
 
-    private JComponent createDescription(String description) {
-        /**
-         * Normally comments are below the controls.
-         * Here we want the comments to precede the controls, we therefore create an empty, 0-sized panel.
-         */
-        JPanel titledComponent = UI.PanelFactory.grid().createPanel();
-        titledComponent.setMinimumSize(JBUI.emptySize());
-        titledComponent.setPreferredSize(JBUI.emptySize());
-        if (description == null) {
-            description = "";
-        }
-        description = description.trim();
-        if (!description.isBlank()) {
-            titledComponent = UI.PanelFactory.panel(titledComponent)
-                    .withComment(description)
-                    .resizeX(true)
-                    .resizeY(true)
-                    .createPanel();
-        }
-        return titledComponent;
-    }
 
     public void setEnvData(@Nullable EnvironmentVariablesData envData) {
         debugAdapterServerPanel.setEnvData(envData);

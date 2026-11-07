@@ -30,15 +30,34 @@ public class DAPValueGroup extends XValueGroup {
     private final @NotNull List<Variable> variables;
     private final @NotNull DAPStackFrame stackFrame;
     private final int parentVariablesReference;
+    private final boolean autoExpand;
 
     public DAPValueGroup(@NotNull DAPStackFrame stackFrame,
                          @NotNull String name,
                          @NotNull List<Variable> variables,
                          int parentVariablesReference) {
+        this(stackFrame, name, variables, parentVariablesReference, false);
+    }
+
+    /**
+     * @param autoExpand true if the group is expanded when it is shown, as the frame's local variables are, so that
+     *                   the debugger computes the values of its variables, and their inline values, without a click
+     */
+    public DAPValueGroup(@NotNull DAPStackFrame stackFrame,
+                         @NotNull String name,
+                         @NotNull List<Variable> variables,
+                         int parentVariablesReference,
+                         boolean autoExpand) {
         super(name);
         this.stackFrame = stackFrame;
         this.variables = variables;
         this.parentVariablesReference = parentVariablesReference;
+        this.autoExpand = autoExpand;
+    }
+
+    @Override
+    public boolean isAutoExpand() {
+        return autoExpand;
     }
 
     @Override

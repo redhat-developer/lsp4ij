@@ -18,7 +18,10 @@ import com.intellij.psi.PsiFile;
 import com.intellij.testFramework.fixtures.BasePlatformTestCase;
 import com.intellij.usages.ReadWriteAccessUsage;
 import com.intellij.usages.Usage;
+import com.intellij.usages.UsageGroup;
+import com.intellij.usages.UsageTarget;
 import com.intellij.usages.impl.rules.UsageType;
+import com.intellij.usages.impl.rules.UsageTypeGroupingRule;
 import com.redhat.devtools.lsp4ij.LanguageServerBundle;
 import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
 import com.redhat.devtools.lsp4ij.client.features.LSPUsageFeature;
@@ -100,6 +103,7 @@ public class LSPUsageReadWriteAccessTest extends BasePlatformTestCase {
 
         assertFalse(usage instanceof ReadWriteAccessUsage);
         assertEquals(LanguageServerBundle.message("usage.type.references"), usageType(reference).toString());
+        assertEquals(LanguageServerBundle.message("usage.type.references"), groupOf(usage));
     }
 
     public void testReadReference() {
@@ -110,6 +114,7 @@ public class LSPUsageReadWriteAccessTest extends BasePlatformTestCase {
         assertTrue(usage.isAccessedForReading());
         assertFalse(usage.isAccessedForWriting());
         assertSame(UsageType.READ, usageType(reference));
+        assertEquals(UsageType.READ.toString(), groupOf(usage));
     }
 
     public void testWriteReference() {
@@ -120,6 +125,7 @@ public class LSPUsageReadWriteAccessTest extends BasePlatformTestCase {
         assertFalse(usage.isAccessedForReading());
         assertTrue(usage.isAccessedForWriting());
         assertSame(UsageType.WRITE, usageType(reference));
+        assertEquals(UsageType.WRITE.toString(), groupOf(usage));
     }
 
     public void testReadWriteReferenceIsGroupedAsAWrite() {
@@ -130,6 +136,7 @@ public class LSPUsageReadWriteAccessTest extends BasePlatformTestCase {
         assertTrue(usage.isAccessedForReading());
         assertTrue(usage.isAccessedForWriting());
         assertSame(UsageType.WRITE, usageType(reference));
+        assertEquals(UsageType.WRITE.toString(), groupOf(usage));
     }
 
     public void testAccessDoesNotChangeTheGroupOfOtherKinds() {
@@ -149,6 +156,16 @@ public class LSPUsageReadWriteAccessTest extends BasePlatformTestCase {
 
     private static UsageType usageType(@NotNull LSPUsagePsiElement usage) {
         return new LSPUsageTypeProvider().getUsageType(usage);
+    }
+
+    /**
+     * Returns the group the usage view shows the usage in, as the usage type grouping rule finds it for the usage that
+     * {@link LSPUsageSearcher#toUsage} reports.
+     */
+    private static String groupOf(@NotNull Usage usage) {
+        List<UsageGroup> groups = new UsageTypeGroupingRule().getParentGroupsFor(usage, UsageTarget.EMPTY_ARRAY);
+        assertEquals(1, groups.size());
+        return groups.get(0).getPresentableGroupText();
     }
 
     private @NotNull LSPUsagePsiElement toReference(@NotNull PsiFile file,

@@ -1,11 +1,16 @@
 {
   "id": "codelldb",
   "name": "CodeLLDB",
+  "properties": {
+    "serverDist": "$USER_HOME$/.lsp4ij/dap/codelldb"
+  },
   "check": {
-    "exec": {
-      "name": "Trying current command",
-      "command": "${server.command}",
-      "timeout": 2000
+    "fileExists": {
+      "name": "Check if CodeLLDB is installed",
+      "file": {
+        "windows": "${serverDist}/extension/adapter/codelldb.exe",
+        "default": "${serverDist}/extension/adapter/codelldb"
+      }
     }
   },
   "run": {
@@ -28,7 +33,7 @@
         }
       },
       "output": {
-        "dir": "$USER_HOME$/.lsp4ij/dap/codelldb",
+        "dir": "${serverDist}",
         "file": {
           "name": {
             "windows": "extension/adapter/codelldb.exe",

@@ -27,7 +27,6 @@ group = prop("pluginGroup")
 version = prop("pluginVersion")
 
 val lsp4jVersion = prop("lsp4jVersion")
-val lsp4jDebugVersion = prop("lsp4jDebugVersion")
 val flexmarkVersion = prop("flexmarkVersion")
 
 val platformVersion = prop("platformVersion")
@@ -94,10 +93,10 @@ dependencies {
     implementation("org.eclipse.lsp4j:org.eclipse.lsp4j.jsonrpc:$lsp4jVersion") {
         exclude(group = "com.google.code.gson", module = "gson")
     }
-    implementation("org.eclipse.lsp4j:org.eclipse.lsp4j.debug:$lsp4jDebugVersion") {
+    implementation("org.eclipse.lsp4j:org.eclipse.lsp4j.debug:$lsp4jVersion") {
         exclude(group = "org.eclipse.lsp4j", module = "org.eclipse.lsp4j.jsonrpc.debug")
     }
-    implementation("org.eclipse.lsp4j:org.eclipse.lsp4j.jsonrpc.debug:$lsp4jDebugVersion") {
+    implementation("org.eclipse.lsp4j:org.eclipse.lsp4j.jsonrpc.debug:$lsp4jVersion") {
         exclude(group = "com.google.code.gson", module = "gson")
     }
 
@@ -185,7 +184,9 @@ intellijPlatform {
         ides {
             select {
                 types = listOf(IntelliJPlatformType.IntellijIdea)
-                channels = listOf(ProductRelease.Channel.RELEASE) // Only stable releases
+                // The latest release of each version, and the current EAP, so that an API that the coming
+                // version removes fails the verification before that version is released.
+                channels = listOf(ProductRelease.Channel.RELEASE, ProductRelease.Channel.EAP)
                 sinceBuild = "242" // From your minimum supported version
             }
         }

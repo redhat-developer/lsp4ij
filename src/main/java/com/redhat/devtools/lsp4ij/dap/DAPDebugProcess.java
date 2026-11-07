@@ -12,19 +12,24 @@ package com.redhat.devtools.lsp4ij.dap;
 
 import com.intellij.execution.ExecutionResult;
 import com.intellij.execution.process.ProcessHandler;
+import com.intellij.execution.ui.ConsoleView;
 import com.intellij.execution.ui.ConsoleViewContentType;
 import com.intellij.execution.ui.ExecutionConsole;
 import com.intellij.execution.ui.RunnerLayoutUi;
 import com.intellij.execution.ui.layout.PlaceInGrid;
 import com.intellij.icons.AllIcons;
 import com.intellij.openapi.Disposable;
+import com.intellij.openapi.actionSystem.ActionManager;
+import com.intellij.openapi.actionSystem.DefaultActionGroup;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.fileEditor.OpenFileDescriptor;
 import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.progress.ProgressIndicator;
 import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.progress.Task;
+import com.intellij.openapi.progress.util.ProgressIndicatorUtils;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.util.Key;
 import com.intellij.openapi.util.NlsContexts;
 import com.intellij.openapi.vfs.LocalFileSystem;
 import com.intellij.openapi.vfs.VirtualFile;
@@ -34,6 +39,7 @@ import com.intellij.util.ui.FormBuilder;
 import com.intellij.xdebugger.XDebugProcess;
 import com.intellij.xdebugger.XDebugSession;
 import com.intellij.xdebugger.XSourcePosition;
+import com.intellij.xdebugger.breakpoints.XBreakpoint;
 import com.intellij.xdebugger.breakpoints.XBreakpointHandler;
 import com.intellij.xdebugger.breakpoints.XBreakpointType;
 import com.intellij.xdebugger.breakpoints.XLineBreakpoint;
@@ -46,7 +52,9 @@ import com.intellij.xdebugger.frame.XSuspendContext;
 import com.intellij.xdebugger.stepping.XSmartStepIntoHandler;
 import com.intellij.xdebugger.ui.XDebugTabLayouter;
 import com.redhat.devtools.lsp4ij.dap.breakpoints.DAPBreakpointHandlerBase;
+import com.redhat.devtools.lsp4ij.dap.breakpoints.DAPDataBreakpointHandler;
 import com.redhat.devtools.lsp4ij.dap.breakpoints.DAPExceptionBreakpointsPanel;
+import com.redhat.devtools.lsp4ij.dap.breakpoints.DAPFunctionBreakpointHandler;
 import com.redhat.devtools.lsp4ij.dap.breakpoints.RunToCursorBreakpoint;
 import com.redhat.devtools.lsp4ij.dap.client.DAPClient;
 import com.redhat.devtools.lsp4ij.dap.client.DAPDropFrameHandler;
@@ -56,6 +64,7 @@ import com.redhat.devtools.lsp4ij.dap.client.files.DAPFileRegistry;
 import com.redhat.devtools.lsp4ij.dap.client.files.DAPSourceReferencePosition;
 import com.redhat.devtools.lsp4ij.dap.client.variables.DAPValueFormat;
 import com.redhat.devtools.lsp4ij.dap.configurations.DAPCommandLineState;
+import com.redhat.devtools.lsp4ij.dap.console.DAPConsoleView;
 import com.redhat.devtools.lsp4ij.dap.descriptors.DebugAdapterDescriptor;
 import com.redhat.devtools.lsp4ij.dap.disassembly.DAPAlternativeSourceHandler;
 import com.redhat.devtools.lsp4ij.dap.disassembly.DisassemblyFile;
@@ -64,10 +73,10 @@ import com.redhat.devtools.lsp4ij.dap.sources.LoadedSourcesPanel;
 import com.redhat.devtools.lsp4ij.dap.sources.ModulesPanel;
 import com.redhat.devtools.lsp4ij.dap.stepping.DAPSmartStepIntoHandler;
 import com.redhat.devtools.lsp4ij.dap.stepping.DAPStepIntoVariant;
+import com.redhat.devtools.lsp4ij.dap.stepping.DAPStepOnlyCurrentThreadAction;
 import com.redhat.devtools.lsp4ij.dap.threads.ThreadsPanel;
 import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
 import com.redhat.devtools.lsp4ij.internal.CompletableFutures;
-import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.awaitWithCheckCanceled;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import com.redhat.devtools.lsp4ij.settings.ServerTrace;
 import com.redhat.devtools.lsp4ij.settings.ui.InstallerPanel;
@@ -85,8 +94,10 @@ import javax.swing.*;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Supplier;
@@ -96,10 +107,36 @@ import java.util.function.Supplier;
  */
 public class DAPDebugProcess extends XDebugProcess implements Disposable {
 
+    /**
+     * The exit code of the debugged program, which the debug adapter reports with the DAP 'exited' event. It is put on
+     * the process handler of the session, which is the debug adapter's: the handler LSP4IJ creates shows it when the
+     * process ends, and a custom one can read it.
+     */
+    public static final Key<Integer> PROGRAM_EXIT_CODE = Key.create("lsp4ij.dap.programExitCode");
+
+    /**
+     * Keeps the exit code that a DAP session's 'exited' event reports on the session's process handler, under
+     * {@link #PROGRAM_EXIT_CODE}. The child sessions that 'startDebugging' starts share that process: the exit code of
+     * the session that started them wins, and a child's is kept only until that session reports one.
+     *
+     * @param processHandler the process handler of the debug session.
+     * @param exitCode       the exit code that the 'exited' event reports.
+     * @param childSession   true for a child session started with 'startDebugging', and false otherwise.
+     */
+    public static void keepProgramExitCode(@NotNull ProcessHandler processHandler, int exitCode, boolean childSession) {
+        if (childSession) {
+            processHandler.putUserDataIfAbsent(PROGRAM_EXIT_CODE, exitCode);
+        } else {
+            processHandler.putUserData(PROGRAM_EXIT_CODE, exitCode);
+        }
+    }
+
     private final @NotNull DAPCommandLineState dapState;
     private final @NotNull ExecutionResult executionResult;
     private final @NotNull XDebuggerEditorsProvider editorsProvider;
     private final @NotNull DAPBreakpointHandlerBase<?> breakpointHandler;
+    private final @NotNull DAPFunctionBreakpointHandler functionBreakpointHandler;
+    private final @NotNull DAPDataBreakpointHandler dataBreakpointHandler;
 
     private final @NotNull RunToCursorBreakpoint runToCursorBreakpoint;
     private final @NotNull DebugAdapterDescriptor serverDescriptor;
@@ -130,14 +167,21 @@ public class DAPDebugProcess extends XDebugProcess implements Disposable {
     // Smart Step Into
     private DAPSmartStepIntoHandler smartStepIntoHandler;
 
+    // Debug console: the evaluations of the lines typed in it, one after the other, guarded by consoleLock
+    private @NotNull CompletableFuture<?> consoleEvaluations = CompletableFuture.completedFuture(null);
+    // Debug console: whether what it printed last ends its line, so that a message of LSP4IJ's own starts a line
+    private final Object consoleLock = new Object();
+    private boolean consoleLineEnded = true;
+
     // Reset Frame
     private final @NotNull DAPDropFrameHandler dropFrameHandler;
 
     private @Nullable CompletableFuture<Void> connectToServerFuture;
-    private Status status;
+    private volatile Status status;
     private Supplier<TransportStreams> streamsSupplier;
     private DAPClient parentClient;
     private final @NotNull DAPValueFormat valueFormat = new DAPValueFormat();
+    private volatile boolean stepOnlyCurrentThread;
 
     public DAPDebugProcess(@NotNull DAPCommandLineState dapState,
                            @NotNull XDebugSession session,
@@ -152,6 +196,8 @@ public class DAPDebugProcess extends XDebugProcess implements Disposable {
         this.editorsProvider = serverDescriptor.createDebuggerEditorsProvider(dapState.getFileType(), this);
         this.breakpointHandler = serverDescriptor.createBreakpointHandler(session, project);
         this.forwardedBreakpointHandlers = createForwardedBreakpointHandlers(breakpointHandler, serverDescriptor, project);
+        this.functionBreakpointHandler = serverDescriptor.createFunctionBreakpointHandler(session, project);
+        this.dataBreakpointHandler = serverDescriptor.createDataBreakpointHandler(session, project);
         this.runToCursorBreakpoint = new RunToCursorBreakpoint(breakpointHandler);
         this.disassemblyBreakpointHandler = serverDescriptor.createDisassemblyBreakpointHandler(session, project);
         this.alternativeSourceHandler = new DAPAlternativeSourceHandler(this);
@@ -166,6 +212,14 @@ public class DAPDebugProcess extends XDebugProcess implements Disposable {
         Integer port = serverReadyFuture.getPort();
         String address = serverReadyFuture.getAddress();
         String taskTitle = getStartingServerTaskTitle(dapState.getFile(), dapState.getServerName(), address, port, dapState.getDebugMode());
+        // Resolved here (not inside the background task) because it accesses DataContext, which requires a read action
+        Map<String, Object> resolvedParams;
+        try {
+            resolvedParams = dapState.getDAPParameters();
+        } catch (Exception e) {
+            resolvedParams = new HashMap<>();
+        }
+        var dapParameters = resolvedParams;
 
         ProgressManager.getInstance().run(new Task.Backgroundable(project, taskTitle, true) {
 
@@ -181,7 +235,8 @@ public class DAPDebugProcess extends XDebugProcess implements Disposable {
                 try {
                     // Wait for DAP server is ready...
                     serverReadyFuture.track();
-                    awaitWithCheckCanceled(serverReadyFuture);
+                    // Throws a failure for the catch below to print, unlike CompletableFutures.awaitWithCheckCanceled
+                    ProgressIndicatorUtils.awaitWithCheckCanceled(serverReadyFuture);
                     if (CompletableFutures.isDoneNormally(serverReadyFuture)) {
                         // At this step the DAP server is started and ready to consume it with DAP clients
 
@@ -200,7 +255,7 @@ public class DAPDebugProcess extends XDebugProcess implements Disposable {
                         // 2. Connect DAP client to the DAP server by using Socket port or simple streams.
                         DebugMode debugMode = dapState.getDebugMode();
                         ServerTrace serverTrace = dapState.getServerTrace();
-                        var parameters = new HashMap<>(dapState.getDAPParameters());
+                        var parameters = new HashMap<>(dapParameters);
                         if (debugMode == DebugMode.LAUNCH) {
                             parameters.put("noDebug", !isDebug); // standard DAP parameter
                         }
@@ -208,7 +263,7 @@ public class DAPDebugProcess extends XDebugProcess implements Disposable {
                         connectToServerFuture = parentClient.connectToServer(indicator);
 
                         // Wait for DAP client is connecting to the DAP server...
-                        awaitWithCheckCanceled(connectToServerFuture);
+                        ProgressIndicatorUtils.awaitWithCheckCanceled(connectToServerFuture);
                         DAPDebugProcess.this.status = Status.STARTED;
 
                         // Refresh Threads panel
@@ -280,10 +335,14 @@ public class DAPDebugProcess extends XDebugProcess implements Disposable {
         return title.toString();
     }
 
-    private static TransportStreams getTransportStreams(@NotNull ExecutionResult executionResult,
-                                                        @Nullable String address,
-                                                        @Nullable Integer port) throws IOException {
+    static TransportStreams getTransportStreams(@NotNull ExecutionResult executionResult,
+                                                @Nullable String address,
+                                                @Nullable Integer port) throws IOException {
         if (port != null) {
+            if (executionResult.getExecutionConsole() instanceof DAPConsoleView console) {
+                // The DAP messages go through the socket, so the process output carries none
+                console.setSocketTransport();
+            }
             return new TransportStreams.SocketTransportStreams(address != null ? address : InetAddress.getLoopbackAddress().getHostAddress(), port);
         }
         var processHandler = executionResult.getProcessHandler();
@@ -307,7 +366,47 @@ public class DAPDebugProcess extends XDebugProcess implements Disposable {
     @Override
     public @NotNull ExecutionConsole createConsole() {
         // Override this method to avoid creating a new console and use the console from the execution result.
-        return executionResult.getExecutionConsole();
+        var console = executionResult.getExecutionConsole();
+        if (console instanceof DAPConsoleView dapConsole) {
+            // A line typed in the console is evaluated by the debug adapter, as VS Code's Debug Console does
+            dapConsole.setInputHandler(this::evaluateConsoleLine);
+        }
+        return console;
+    }
+
+    /**
+     * Sends a line typed in the debug console to the debug adapter as an evaluate request with the context repl, in
+     * the selected stack frame when the program is stopped, and prints its result, or the adapter's error, in the
+     * console. The lines are evaluated one after the other, so that the adapter gets them, and the console shows
+     * their results, in the order they were typed.
+     *
+     * @param line the typed line, without its line end.
+     */
+    private void evaluateConsoleLine(@NotNull String line) {
+        DAPStackFrame frame = getCurrentDapStackFrame();
+        DAPClient client = frame != null ? frame.getClient() : parentClient;
+        if (client == null) {
+            // Typed before the debug session made its client: the line is not dropped silently
+            print(DAPClient.CONSOLE_LINE_NOT_SENT, ConsoleViewContentType.ERROR_OUTPUT);
+            return;
+        }
+        Integer frameId = frame != null ? frame.getFrameId() : null;
+        synchronized (consoleLock) {
+            consoleEvaluations = consoleEvaluations
+                    .handle((ignored, previousError) -> null)
+                    // A line still queued when the session stops is not sent to the debug adapter it terminates
+                    .thenCompose(ignored -> status == Status.STOPPING || status == Status.STOPPED ?
+                            CompletableFuture.completedFuture(null) : client.evaluateConsoleLine(line, frameId))
+                    .whenComplete((result, error) -> {
+                        if (error != null) {
+                            Throwable cause = error instanceof CompletionException && error.getCause() != null ?
+                                    error.getCause() : error;
+                            print(cause.getMessage(), ConsoleViewContentType.ERROR_OUTPUT);
+                        } else if (result != null) {
+                            printText(result, ConsoleViewContentType.NORMAL_OUTPUT, true, true);
+                        }
+                    });
+        }
     }
 
     @Override
@@ -417,28 +516,96 @@ public class DAPDebugProcess extends XDebugProcess implements Disposable {
         return streamsSupplier;
     }
 
+    /**
+     * Prints a message of LSP4IJ's own to the debug console, on a line of its own.
+     *
+     * @param message the message.
+     * @param type    the console content type.
+     */
     public void print(@Nullable String message, @NotNull ConsoleViewContentType type) {
+        printText(message, type, true, false);
+    }
+
+    /**
+     * Prints the output of a DAP 'output' event to the debug console as the debug adapter sent it. An output event
+     * can carry part of a line, such as a prompt that the program then waits on, or a line that the program writes
+     * in pieces, so no line end is added to it.
+     *
+     * @param output the output.
+     * @param type   the console content type.
+     */
+    public void printOutput(@Nullable String output, @NotNull ConsoleViewContentType type) {
+        printText(output, type, false, false);
+    }
+
+    /**
+     * Returns the text that the debug console prints for the given message, or null to print nothing.
+     *
+     * @param message    the message.
+     * @param ownMessage true for a message of LSP4IJ's own, which goes on a line of its own, and false for a debug
+     *                   adapter's output, which is printed as it was sent.
+     * @param lineEnded  true if what the console printed last ends its line.
+     * @return the text to print, or null for an empty message.
+     */
+    static @Nullable String getConsoleText(@Nullable String message, boolean ownMessage, boolean lineEnded) {
         if (StringUtils.isEmpty(message)) {
-            return;
+            return null;
         }
-        if (message.charAt(message.length() - 1) != '\n') {
-            message += "\n";
+        if (!ownMessage) {
+            return message;
         }
-        final String text = message;
+        String text = lineEnded ? message : "\n" + message;
+        return text.charAt(text.length() - 1) == '\n' ? text : text + "\n";
+    }
+
+    /**
+     * @param unfiltered true for text which is not the debug adapter's process output, such as an evaluation's result,
+     *                   which the console's filter of DAP traces must not hide.
+     */
+    private void printText(@Nullable String message, @NotNull ConsoleViewContentType type, boolean ownMessage,
+                           boolean unfiltered) {
+        synchronized (consoleLock) {
+            final String text = getConsoleText(message, ownMessage, consoleLineEnded);
+            if (text == null) {
+                return;
+            }
+            consoleLineEnded = text.charAt(text.length() - 1) == '\n';
+            printOnEdt(text, type, unfiltered);
+        }
+    }
+
+    private void printOnEdt(@NotNull String text, @NotNull ConsoleViewContentType type, boolean unfiltered) {
         AppUIUtil.invokeOnEdt(() -> {
             var consoleView = getSession().getConsoleView();
             if (consoleView == null) {
                 return;
 
             }
-            consoleView.print(text, type);
+            printOnConsole(consoleView, text, type, unfiltered);
         });
+    }
+
+    /**
+     * Prints the text on the console, past the filter of DAP traces of a {@link DAPConsoleView} when it is not the
+     * debug adapter's process output.
+     */
+    static void printOnConsole(@NotNull ConsoleView consoleView,
+                               @NotNull String text,
+                               @NotNull ConsoleViewContentType type,
+                               boolean unfiltered) {
+        if (unfiltered && consoleView instanceof DAPConsoleView dapConsoleView) {
+            dapConsoleView.printUnfiltered(text, type);
+        } else {
+            consoleView.print(text, type);
+        }
     }
 
     @Override
     public XBreakpointHandler<?> @NotNull [] getBreakpointHandlers() {
         java.util.List<XBreakpointHandler<?>> handlers = new java.util.ArrayList<>();
         handlers.add(breakpointHandler);
+        handlers.add(functionBreakpointHandler);
+        handlers.add(dataBreakpointHandler);
         handlers.add(disassemblyBreakpointHandler);
         // Forward native line breakpoints (JS, Python, …) on DAP-mapped files while this session runs.
         handlers.addAll(forwardedBreakpointHandlers);
@@ -447,6 +614,39 @@ public class DAPDebugProcess extends XDebugProcess implements Disposable {
 
     public @NotNull DAPBreakpointHandlerBase<?> getBreakpointHandler() {
         return breakpointHandler;
+    }
+
+    /**
+     * Returns the handler of the function breakpoints, which it sends with 'setFunctionBreakpoints'.
+     *
+     * @return the handler of the function breakpoints.
+     */
+    public @NotNull DAPFunctionBreakpointHandler getFunctionBreakpointHandler() {
+        return functionBreakpointHandler;
+    }
+
+    /**
+     * Returns the handler of the data breakpoints, which it sends with 'setDataBreakpoints'.
+     *
+     * @return the handler of the data breakpoints.
+     */
+    public @NotNull DAPDataBreakpointHandler getDataBreakpointHandler() {
+        return dataBreakpointHandler;
+    }
+
+    /**
+     * Returns the IntelliJ breakpoint, a line, a function or a data breakpoint, of the given DAP breakpoint id, and
+     * null otherwise.
+     *
+     * @param id the DAP breakpoint id.
+     * @return the IntelliJ breakpoint of the given DAP breakpoint id, and null otherwise.
+     */
+    public @Nullable XBreakpoint<?> findBreakpointById(@Nullable Integer id) {
+        XBreakpoint<?> breakpoint = breakpointHandler.findBreakpointById(id);
+        if (breakpoint == null) {
+            breakpoint = functionBreakpointHandler.findBreakpointById(id);
+        }
+        return breakpoint != null ? breakpoint : dataBreakpointHandler.findBreakpointById(id);
     }
 
     /**
@@ -746,6 +946,48 @@ public class DAPDebugProcess extends XDebugProcess implements Disposable {
         return parentClient != null && parentClient.isSupportsValueFormattingOptionsInSessions();
     }
 
+    /**
+     * Returns true if a step resumes only the thread that steps, while the other threads stay stopped, and false if
+     * it resumes every thread. It applies to the DAP servers that support single thread execution requests.
+     *
+     * @return true if a step resumes only the thread that steps, and false if it resumes every thread.
+     */
+    public boolean isStepOnlyCurrentThread() {
+        return stepOnlyCurrentThread;
+    }
+
+    /**
+     * Sets whether a step resumes only the thread that steps, while the other threads stay stopped.
+     *
+     * @param stepOnlyCurrentThread true if a step resumes only the thread that steps, and false if it resumes every
+     *                              thread.
+     */
+    public void setStepOnlyCurrentThread(boolean stepOnlyCurrentThread) {
+        this.stepOnlyCurrentThread = stepOnlyCurrentThread;
+    }
+
+    /**
+     * Returns true if the DAP server of this debug session, or that of a child session, supports single thread
+     * execution requests, and false otherwise.
+     *
+     * @return true if the DAP server of this debug session, or that of a child session, supports single thread
+     * execution requests, and false otherwise.
+     */
+    public boolean isSupportsSingleThreadExecutionRequests() {
+        return parentClient != null && parentClient.isSupportsSingleThreadExecutionRequestsInSessions();
+    }
+
+    @Override
+    public void registerAdditionalActions(@NotNull DefaultActionGroup leftToolbar,
+                                          @NotNull DefaultActionGroup topToolbar,
+                                          @NotNull DefaultActionGroup settings) {
+        super.registerAdditionalActions(leftToolbar, topToolbar, settings);
+        var stepOnlyCurrentThreadAction = ActionManager.getInstance().getAction(DAPStepOnlyCurrentThreadAction.ID);
+        if (stepOnlyCurrentThreadAction != null) {
+            settings.add(stepOnlyCurrentThreadAction);
+        }
+    }
+
     public @Nullable DisassemblyFile getDisassemblyFile() {
         if (parentClient == null || !parentClient.canDisassemble()) {
             return null;
@@ -771,6 +1013,8 @@ public class DAPDebugProcess extends XDebugProcess implements Disposable {
             parentClient.terminate();
         }
         breakpointHandler.dispose();
+        functionBreakpointHandler.dispose();
+        dataBreakpointHandler.dispose();
         disassemblyBreakpointHandler.dispose();
         getAlternativeSourceHandler().dispose();
         var disassemblyFile = getDisassemblyFile();

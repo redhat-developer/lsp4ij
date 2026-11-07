@@ -18,13 +18,16 @@ import com.intellij.lang.Language;
 import com.intellij.openapi.Disposable;
 import com.intellij.openapi.fileTypes.FileNameMatcher;
 import com.intellij.openapi.fileTypes.FileType;
+import com.intellij.openapi.options.ConfigurationException;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.project.ProjectManager;
 import com.intellij.openapi.util.Disposer;
+import com.intellij.openapi.util.text.HtmlBuilder;
+import com.intellij.openapi.util.text.HtmlChunk;
 import com.intellij.ui.IdeBorderFactory;
 import com.intellij.util.ui.FormBuilder;
 import com.intellij.util.ui.JBUI;
-import com.intellij.util.ui.UI;
+import com.redhat.devtools.lsp4ij.settings.ui.DescriptionPanel;
 import com.redhat.devtools.lsp4ij.LanguageServerManager;
 import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
@@ -34,6 +37,7 @@ import com.redhat.devtools.lsp4ij.launching.ui.UICommandLineUpdater;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerFileAssociation;
 import com.redhat.devtools.lsp4ij.server.definition.launching.UserDefinedLanguageServerDefinition;
+import com.redhat.devtools.lsp4ij.server.definition.launching.UserDefinedTransport;
 import com.redhat.devtools.lsp4ij.settings.ui.LanguageServerPanel;
 import com.redhat.devtools.lsp4ij.settings.ui.ServerMappingsPanel;
 import com.redhat.devtools.lsp4ij.templates.ServerMappingSettings;
@@ -76,7 +80,7 @@ public class LanguageServerView implements Disposable {
         this.languageServerNameProvider = languageServerNameProvider;
         this.project = project;
         boolean isLaunchConfiguration = languageServerDefinition instanceof UserDefinedLanguageServerDefinition;
-        JComponent descriptionPanel = createDescription(languageServerDefinition.getDescription());
+        JComponent descriptionPanel = DescriptionPanel.create(languageServerDefinition.getDescription());
         JPanel settingsPanel = createSettings(descriptionPanel, isLaunchConfiguration);
         if (!isLaunchConfiguration) {
             TitledBorder title = IdeBorderFactory.createTitledBorder(languageServerDefinition.getDisplayName());
@@ -137,9 +141,14 @@ public class LanguageServerView implements Disposable {
             if (settings == null) {
                 return true;
             }
+            // An environment variable which IntelliJ drops is still a change, so that Apply can say why it isn't saved
+            if (languageServerPanel.validateEnvironmentVariables() != null) {
+                return true;
+            }
             if (!(isEquals(getDisplayName(), settings.getServerName())
                     && isEquals(this.getCommandLine(), settings.getCommandLine())
                     && isEquals(this.getWorkingDir(), settings.getWorkingDir())
+                    && this.getTransport().equals(settings.getTransport())
                     && Objects.equals(this.getUserEnvironmentVariables(), settings.getUserEnvironmentVariables())
                     && this.isIncludeSystemEnvironmentVariables() == settings.isIncludeSystemEnvironmentVariables()
                     && Objects.deepEquals(this.getMappings(), settings.getMappings())
@@ -225,6 +234,7 @@ public class LanguageServerView implements Disposable {
             if (userSettings != null) {
                 this.setCommandLine(userSettings.getCommandLine());
                 this.setWorkingDir(userSettings.getWorkingDir());
+                this.setTransport(userSettings.getTransport());
                 this.setEnvData(EnvironmentVariablesData.create(
                         userSettings.getUserEnvironmentVariables(),
                         userSettings.isIncludeSystemEnvironmentVariables()));
@@ -306,8 +316,23 @@ public class LanguageServerView implements Disposable {
 
     /**
      * Update the proper language server settings and language server definition from the UI fields.
+     *
+     * @throws ConfigurationException if a JSON field is not valid JSON, or the transport can't be used, in which case
+     *                                nothing is saved.
      */
-    public void apply() {
+    public void apply() throws ConfigurationException {
+        // The same checks as the New Language Server dialog, every problem listed
+        var problems = languageServerPanel.validateFields();
+        if (problems.size() == 1) {
+            throw new ConfigurationException(problems.get(0).message);
+        }
+        if (!problems.isEmpty()) {
+            throw new ConfigurationException(new HtmlBuilder()
+                    .appendWithSeparators(HtmlChunk.br(), problems.stream().map(problem -> HtmlChunk.text(problem.message)).toList())
+                    .wrapWithHtmlBody()
+                    .toString());
+        }
+
         String languageServerId = languageServerDefinition.getId();
 
         // Update commons settings
@@ -350,7 +375,8 @@ public class LanguageServerView implements Disposable {
                                     getMappings(),
                                     getClientConfigurationContent(),
                                     getInstallerConfigurationContent(),
-                                    getWorkspaceFolderStrategyConfiguration()),
+                                    getWorkspaceFolderStrategyConfiguration(),
+                                    getTransport()),
                             false);
             if (projectSettingsChangedEvent != null) {
                 // Settings has changed, fire the event
@@ -466,27 +492,6 @@ public class LanguageServerView implements Disposable {
         return configuration;
     }
 
-    private JComponent createDescription(String description) {
-        /**
-         * Normally comments are below the controls.
-         * Here we want the comments to precede the controls, we therefore create an empty, 0-sized panel.
-         */
-        JPanel titledComponent = UI.PanelFactory.grid().createPanel();
-        titledComponent.setMinimumSize(JBUI.emptySize());
-        titledComponent.setPreferredSize(JBUI.emptySize());
-        if (description == null) {
-            description = "";
-        }
-        description = description.trim();
-        if (!description.isBlank()) {
-            titledComponent = UI.PanelFactory.panel(titledComponent)
-                    .withComment(description)
-                    .resizeX(true)
-                    .resizeY(true)
-                    .createPanel();
-        }
-        return titledComponent;
-    }
 
     public JComponent getComponent() {
         return myMainPanel;
@@ -548,6 +553,14 @@ public class LanguageServerView implements Disposable {
 
     public void setWorkingDir(@Nullable String workingDir) {
         languageServerPanel.setWorkingDir(workingDir);
+    }
+
+    public @NotNull UserDefinedTransport getTransport() {
+        return languageServerPanel.getTransport();
+    }
+
+    public void setTransport(@NotNull UserDefinedTransport transport) {
+        languageServerPanel.setTransport(transport);
     }
 
     public String getServerUrl() {

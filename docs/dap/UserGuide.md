@@ -30,6 +30,21 @@ The `Mappings` tab to specify the files which can be debugged to allow adding/re
 
 ![DAP Configuration Type/Mappings](./images/DAP_config_type_mappings.png)
 
+The mappings also decide which native line breakpoints are forwarded to the DAP server, see
+[Forwarding native line breakpoints](#forwarding-native-line-breakpoints).
+
+A file matches when one of the mappings applies to it. There are three kinds of mappings:
+
+- `Language`: an [IntelliJ Language](https://plugins.jetbrains.com/docs/intellij/custom-language-support.html).
+- `File type`: an [IntelliJ File type](https://www.jetbrains.com/help/idea/creating-and-registering-file-types.html).
+  It only applies when your IDE knows this file type, which depends on the IDE and its plugins.
+  A file type your IDE doesn't know is shown as `(Unknown)`.
+- `File name patterns`: patterns for the file name, such as `*.go` or `go.mod`. They work in every IDE.
+
+The `Language Id` column is free text. Language servers use this value as the LSP
+[TextDocumentItem#languageId](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocumentItem),
+and the LSP specification lists the common values there. DAP servers don't use it, so you can leave it empty here.
+
 ### Configuration tab
 
 The `Configuration` tab to specify the working directory and the file you want to run/debug:
@@ -89,6 +104,22 @@ When a file can be debugged using a DAP server specified in the [Mappings tab](#
 
 ![DAP Breakpoint set](./images/DAP_breakpoint_set.png)
 
+### Forwarding native line breakpoints
+
+For a mapped file, LSP4IJ contributes its own `DAP Breakpoint` type. However, when the file's language
+already has its own debugger (for example the bundled JavaScript or Python debugger), the IDE may
+create that debugger's native line breakpoint in the gutter instead of a `DAP Breakpoint`.
+
+While a DAP session is running, LSP4IJ forwards native line breakpoints in files that match the
+[Mappings tab](#mappings-tab) to the DAP server, so they are hit like a `DAP Breakpoint`:
+
+- There is nothing to configure, and you don't need to add a second breakpoint on the same line.
+- The breakpoint keeps its native type in the gutter.
+- The language's own debugger is not affected outside a DAP session.
+
+When a `DAP Breakpoint` and a native line breakpoint are on the same line, only the `DAP Breakpoint` is
+sent to the DAP server. The native breakpoint is shown as ignored for this debug session.
+
 ### Verify breakpoint
 
 When the DAP server starts, breakpoints are sent to it, and it responds with the status of those breakpoints — 
@@ -108,6 +139,12 @@ Conditional breakpoints are also supported. Here is an example of a conditional 
 
 ![DAP Conditional Breakpoint](./images/DAP_conditional_breakpoint.png)
 
+### Hit condition
+
+A breakpoint also has a `Hit condition`, in the `Breakpoints` dialog (`Run | View Breakpoints...`), which the DAP server
+reads, such as `3` or `>= 3`, to stop only at some hits of the breakpoint. It is sent to the DAP server with the
+breakpoint; a DAP server which doesn't support hit conditions (`supportsHitConditionalBreakpoints`) ignores it.
+
 ### Logpoint
 
 A breakpoint whose `Suspend` option is unchecked logs instead of stopping. Its `"Breakpoint hit" message` and
@@ -116,6 +153,47 @@ A breakpoint whose `Suspend` option is unchecked logs instead of stopping. Its `
 the DAP server writes to the console without stopping the program; the expression is evaluated by the DAP server.
 A DAP server which doesn't support logpoints stops at it: LSP4IJ then evaluates the expression in the stopped frame,
 logs it, and resumes the program. A breakpoint which suspends logs its expression when it stops.
+
+### Function breakpoints
+
+When the DAP server supports
+[function breakpoints](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_SetFunctionBreakpoints)
+(`supportsFunctionBreakpoints`), a breakpoint can be set on a function by its name rather than on a line. In the
+`Breakpoints` dialog (`Run | View Breakpoints...`), click `+`, choose `DAP Function Breakpoint`, and enter the name of
+the function as the DAP server names it, such as `main` or `Point.move`.
+
+A function breakpoint has the `Condition`, `Suspend` and logging options of a line breakpoint, and a `Hit condition`,
+which the DAP server reads, such as `3` or `>= 3`; its name and hit condition can be changed in the dialog. The enabled
+function breakpoints are sent to the DAP server when the debug session starts, and all of them again whenever one is
+added, changed or removed. The dialog shows each as verified or not, as the DAP server answers. When the DAP server
+names the function breakpoint where the program stopped (`hitBreakpointIds` of its `stopped` event), the program stops
+at it as at a line breakpoint. A DAP function breakpoint has no log message, so one whose `Suspend` option is unchecked
+stops, and LSP4IJ logs and resumes the program.
+
+### Data breakpoints
+
+When the DAP server supports
+[data breakpoints](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_SetDataBreakpoints)
+(`supportsDataBreakpoints`), a breakpoint can stop the program when a value changes rather than at a line. While the
+program is stopped, right-click a variable in the `Variables` or `Watches` view and choose `Break on Value Change`.
+LSP4IJ asks the DAP server which data the variable is
+([dataBreakpointInfo](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_DataBreakpointInfo)),
+by the variable's name and its container. When the DAP server can't watch it, the debug tool window shows the reason
+which the DAP server gives, and no breakpoint is added. Otherwise a `DAP Data Breakpoint` is added, named as the DAP
+server describes the data, such as `Counter.count`; it stops at writes when the DAP server offers them, and at the
+first access type which it offers otherwise.
+
+A data breakpoint has the `Condition`, `Suspend` and logging options of a line breakpoint, and a `Hit condition`, which
+the DAP server reads; the hit condition can be changed in the `Breakpoints` dialog. The enabled data breakpoints are
+sent to the DAP server which named their data, all of them again whenever one is added, changed or removed, and the
+dialog shows each as verified or not, as the DAP server answers. When the DAP server names the data breakpoint where the
+program stopped (`hitBreakpointIds` of its `stopped` event), the program stops at it, and the `description` of the
+`stopped` event, which says what changed, such as `Counter.count changed from 0 to 2`, is shown where it stopped.
+
+The DAP server says whether the data of a data breakpoint stays the same in a later debug session (`canPersist`). When
+it doesn't, as for most DAP servers, the data breakpoint is removed when its debug session ends, so that it is neither
+saved with the project nor sent to a later debug session. When it does, the data breakpoint is kept, and sent to the
+later debug sessions of the same DAP server.
 
 ### Exception breakpoint
 
@@ -142,6 +220,16 @@ Take a sample JavaScript file containing an error:
 
 In this example, no breakpoints are defined. 
 However, when you start the DAP server, it stops at the line with the line error:
+
+![DAP exception breakpoint / Syntax error](./images/DAP_exception_breakpoint_sample_stop.png)
+
+This happens because `Caught Exceptions` is selected.
+
+Where the program stops at an exception, an error hint shows the exception. When the DAP server supports the
+[ExceptionInfo](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_ExceptionInfo) request
+(`supportsExceptionInfoRequest`), the hint shows the exception's id, or its type name when it has no id, its
+description, and the first 10 lines of its stack trace. Otherwise, or when the DAP server doesn't answer within a
+second, the hint shows the `text` and `description` of the `stopped` event.
 
 ###  Smart Step Into
 
@@ -171,9 +259,15 @@ Here's a demo with [Python Debugpy](./user-defined-dap/python-debugpy.md) which 
 
 ![DAP Smart Step Into](./images/DAP_SmartStepIntoDemo.gif)
 
-![DAP exception breakpoint / Syntax error](./images/DAP_exception_breakpoint_sample_stop.png)
+### Step only the current thread
 
-This happens because `Caught Exceptions` is selected.
+A step resumes every thread of the program while the stepping thread runs to its next stop. When the DAP server
+supports single thread execution requests (`supportsSingleThreadExecutionRequests`), the settings of the debug
+session's toolbar have `Step Only the Current Thread`, as the Java debugger's `Resume only the current thread`
+option. When it is selected, `Step Over`, `Step Into`, `Smart Step Into` and `Step Out` send
+[singleThread](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_Next), so the DAP server
+resumes only the thread that steps while the other threads stay stopped. `Resume Program` still resumes every thread.
+The choice holds for the debug session.
 
 ## Reset Frame
 
@@ -191,15 +285,23 @@ and the program stays stopped where it was.
 
 ## Inline value
 
-The values of the variables are displayed inline, but this is not perfect because a DAP server generally cannot handle variable positions (only their values). 
-To retrieve the variable positions, LSP4IJ uses the syntax highlighting information from the editor (TextMate or others).
+The values of the variables are displayed inline, but a DAP server gives only their values, not their positions.
+
+When a language server of the stopped file supports
+[textDocument/inlineValue](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_inlineValue)
+(`inlineValueProvider`), LSP4IJ asks it where the variables are, up to the stopped line, and shows the value of each
+variable that it names at the last line where it names it, before or on the stopped line (see
+[implementation details](../LSPSupport.md#inline-value)).
+
+Otherwise, and for the variables that the language server doesn't name, LSP4IJ uses the syntax highlighting information
+from the editor (TextMate or others), which is not perfect.
+
+The debugger computes inline values only for the variables it shows, so the group of the frame's local variables (the
+scope that the DAP server presents as `locals`, or else its first scope) is expanded when the frame is shown.
 
 Here a de demo with JavaScript:
 
 ![DAP inline value](./images/DAP_inline_value_demo.gif)
-
-Theoretically, inline values should be handled by a language server via [textDocument/inlineValue](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_inlineValue)
-but as no language servers seems implement this LSP request for the moment LSP4IJ doesn't use this strategy.
 
 ## Evaluate expression
 
@@ -215,6 +317,15 @@ completion should be available in the expression editor by consuming the
 
 ![Completion](images/DAP_debugging_completion.png)
 
+### Debug console
+
+A line typed in the debug session's `Console` is sent to the DAP server as an
+[Evaluate request](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_Evaluate) with the
+context `repl`, as VS Code's Debug Console sends it: in the selected stack frame when the program is stopped, and
+without a frame when it runs. The console prints its result, or the DAP server's error. The lines are sent one after
+the other, in the order they were typed, an empty line too, so that a DAP server which takes the program's input over
+the debug connection can take each line as the program's input while it runs.
+
 ## Hexadecimal values
 
 When the DAP server supports value formatting (`supportsValueFormattingOptions`), the context menu of the Variables and
@@ -229,7 +340,8 @@ A variable with more than 100 indexed children, such as a large array, whose
 (`indexedVariables`), shows its first 100 and a `...` node with how many more there are. Opening the node asks the
 DAP server for the next 100 ([`variables`](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_Variables)
 with `filter` `indexed`, `start` and `count`), so a large variable is read a page at a time. Its named children, when
-it says it has any (`namedVariables`), are asked for first.
+it says it has any (`namedVariables`), are asked for first. As DAP specifies, a page with fewer children than asked for
+is the last one, as when an array has shrunk since the DAP server described it.
 
 ## Lazy variables
 

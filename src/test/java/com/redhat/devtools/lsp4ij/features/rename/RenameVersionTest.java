@@ -25,6 +25,7 @@ import org.eclipse.lsp4j.VersionedTextDocumentIdentifier;
 import org.eclipse.lsp4j.WorkspaceEdit;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
 
+import java.net.URI;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -93,15 +94,19 @@ public class RenameVersionTest extends LSPCodeInsightFixtureTestCase {
     public void testOutdatedRenameIsRefused() throws Exception {
         var servers = open();
         var file = myFixture.getFile();
-        String uri = servers.get(0).getServerWrapper().toUri(file.getVirtualFile()).toString();
-        // The opened document is at version 1; this response describes an older version.
-        var text = new TextDocumentEdit(new VersionedTextDocumentIdentifier(uri, 0),
+        var wrapper = servers.get(0).getServerWrapper();
+        String uri = wrapper.toUri(file.getVirtualFile()).toString();
+        int opened = wrapper.getOpenedDocument(URI.create(uri)).getSynchronizer().getVersion();
+        WriteCommandAction.runWriteCommandAction(myFixture.getProject(), () ->
+                myFixture.getEditor().getDocument().insertString(6, "!"));
+        // This response describes the version the document was opened with, before the typing.
+        var text = new TextDocumentEdit(new VersionedTextDocumentIdentifier(uri, opened),
                 List.of(Either.forLeft(replacement())));
         MockLanguageServer.INSTANCE.setRenameProcessor(params -> new WorkspaceEdit(List.of(Either.forLeft(text))));
 
         LSPRenameRefactoringDialog.doRename(renameParams(uri, servers), file, myFixture.getEditor());
 
-        assertEquals("before", myFixture.getEditor().getDocument().getText());
+        assertEquals("before!", myFixture.getEditor().getDocument().getText());
         assertEquals(LanguageServerBundle.message("lsp.workspace.edit.version.changed", uri), error.get());
     }
 

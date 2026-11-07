@@ -20,6 +20,8 @@ The [LSPClientFeatures](https://github.com/redhat-developer/lsp4ij/blob/main/src
 - [LSP hover feature](#lsp-hover-feature)
 - [LSP implementation feature](#lsp-implementation-feature)
 - [LSP inlayHint feature](#lsp-inlayHint-feature)
+- [LSP inlineValue feature](#lsp-inlineValue-feature)
+- [LSP linkedEditingRange feature](#lsp-linkededitingrange-feature)
 - [LSP progress feature](#lsp-progress-feature) 
 - [LSP references feature](#lsp-references-feature)
 - [LSP rename feature](#lsp-rename-feature)
@@ -576,6 +578,25 @@ Integrates the LSP [`textDocument/selectionRange`](https://microsoft.github.io/l
 | boolean isEnabled(PsiFile file)   | Returns `true` if the LSP feature is enabled for the given file and `false` otherwise.                                                                                                                                             | `true`                      |
 | boolean isSupported(PsiFile file) | Returns `true` if the LSP feature is supported for the given file and `false` otherwise. <br/>This supported state is called after starting the language server, which matches the file and user with the LSP server capabilities. | Check the server capability |
 
+## LSP InlineValue Feature
+
+| API                               | Description                                                                                                                                                                                                                        | Default Behaviour           |
+|-----------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------------------|
+| boolean isEnabled(PsiFile file)   | Returns `true` if the LSP feature is enabled for the given file and `false` otherwise.                                                                                                                                             | `true`                      |
+| boolean isSupported(PsiFile file) | Returns `true` if the LSP feature is supported for the given file and `false` otherwise. <br/>This supported state is called after starting the language server, which matches the file and user with the LSP server capabilities. | Check the server capability |
+
+The inline value feature gives the positions of the values which a DAP debug session shows inline in the editor.
+
+## LSP LinkedEditingRange Feature
+
+| API                               | Description                                                                                                                                                                                                                        | Default Behaviour           |
+|-----------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------------------|
+| boolean isEnabled(PsiFile file)   | Returns `true` if the LSP feature is enabled for the given file and `false` otherwise.                                                                                                                                             | `true`                      |
+| boolean isSupported(PsiFile file) | Returns `true` if the LSP feature is supported for the given file and `false` otherwise. <br/>This supported state is called after starting the language server, which matches the file and user with the LSP server capabilities. | Check the server capability |
+
+The linked editing range feature edits the ranges which the language server links at the caret together while typing,
+once linked editing is turned on in `Settings | Editor | General | Smart Keys`. It is off by default.
+
 ## LSP Progress Feature
 
 | API                                                             | Description                                                     | Default Behaviour |
@@ -639,7 +660,8 @@ implement specific behavior based on whether an element is a declaration or refe
 comment, etc., based on the reported semantic tokens. This is implemented via a custom `FileViewProviderFactory` and
 `FileViewProvider`. LSP4IJ includes default implementations of these for TextMate files and plain text files associated
 with abstract files types which otherwise lack PSI element structure, and it provides a simple way for other file types
-to gain access to the same features.
+to gain access to the same features. A file type without a language that a plugin maps to a language server gets the
+default implementation too, unless the plugin registers a `FileViewProviderFactory` for it.
 
 #### LSPSemanticTokensFileViewProviderFactory
 

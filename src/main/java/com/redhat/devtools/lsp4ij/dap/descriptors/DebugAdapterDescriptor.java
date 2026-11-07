@@ -13,10 +13,10 @@ package com.redhat.devtools.lsp4ij.dap.descriptors;
 import com.intellij.execution.ExecutionException;
 import com.intellij.execution.configurations.GeneralCommandLine;
 import com.intellij.execution.configurations.RunConfigurationOptions;
+import com.intellij.execution.process.NopProcessHandler;
 import com.intellij.execution.process.OSProcessHandler;
 import com.intellij.execution.process.ProcessHandler;
 import com.intellij.execution.process.ProcessHandlerFactory;
-import com.intellij.execution.process.ProcessTerminatedListener;
 import com.intellij.execution.runners.ExecutionEnvironment;
 import com.intellij.openapi.fileTypes.FileType;
 import com.intellij.openapi.project.Project;
@@ -33,6 +33,8 @@ import com.redhat.devtools.lsp4ij.dap.DAPDebuggerEditorsProvider;
 import com.redhat.devtools.lsp4ij.dap.DebugMode;
 import com.redhat.devtools.lsp4ij.dap.breakpoints.DAPBreakpointHandler;
 import com.redhat.devtools.lsp4ij.dap.breakpoints.DAPBreakpointHandlerBase;
+import com.redhat.devtools.lsp4ij.dap.breakpoints.DAPDataBreakpointHandler;
+import com.redhat.devtools.lsp4ij.dap.breakpoints.DAPFunctionBreakpointHandler;
 import com.redhat.devtools.lsp4ij.dap.client.DAPClient;
 import com.redhat.devtools.lsp4ij.dap.client.LaunchUtils;
 import com.redhat.devtools.lsp4ij.dap.configurations.DAPRunConfigurationOptions;
@@ -90,6 +92,21 @@ public abstract class DebugAdapterDescriptor implements DebuggableFile {
     public abstract ProcessHandler startServer() throws ExecutionException;
 
     /**
+     * Start the process of a debug session in the given debug mode. A launch starts the Debug Adapter server
+     * ({@link #startServer()}). An attach starts no process by default: the client connects to a Debug Adapter that
+     * already runs, at the address and port of {@link #getServerReadyConfig(DebugMode)}. A descriptor whose Debug
+     * Adapter is reached through its process, as one that carries the session over another connection is, overrides
+     * this to start that process for an attach too.
+     *
+     * @param debugMode the debug mode of the session.
+     * @return the process of the session.
+     * @throws ExecutionException
+     */
+    public ProcessHandler startServer(@NotNull DebugMode debugMode) throws ExecutionException {
+        return debugMode == DebugMode.ATTACH ? new NopProcessHandler() : startServer();
+    }
+
+    /**
      * Start the Debug Adapter server with the given command line.
      *
      * @param commandLine the command line which starts the DAP server.
@@ -100,7 +117,7 @@ public abstract class DebugAdapterDescriptor implements DebuggableFile {
         OSProcessHandler processHandler =
                 ProcessHandlerFactory.getInstance()
                         .createColoredProcessHandler(commandLine);
-        ProcessTerminatedListener.attach(processHandler);
+        DAPProcessTerminatedListener.attach(processHandler);
         Integer port = commandLine.getUserData(SERVER_PORT);
         if (port != null) {
             processHandler.putUserData(SERVER_PORT, port);
@@ -337,6 +354,14 @@ public abstract class DebugAdapterDescriptor implements DebuggableFile {
 
     public @NotNull DAPBreakpointHandlerBase<?> createBreakpointHandler(@NotNull XDebugSession session, Project project) {
         return new DAPBreakpointHandler(session, this, project);
+    }
+
+    public @NotNull DAPFunctionBreakpointHandler createFunctionBreakpointHandler(@NotNull XDebugSession session, Project project) {
+        return new DAPFunctionBreakpointHandler(session, this, project);
+    }
+
+    public @NotNull DAPDataBreakpointHandler createDataBreakpointHandler(@NotNull XDebugSession session, Project project) {
+        return new DAPDataBreakpointHandler(session, this, project);
     }
 
     public @NotNull DisassemblyBreakpointHandlerBase<?> createDisassemblyBreakpointHandler(@NotNull XDebugSession session, Project project) {

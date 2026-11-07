@@ -30,6 +30,14 @@ public class DocumentLinkCapabilityRegistry extends TextDocumentServerCapability
     private static final @NotNull Predicate<@NotNull ServerCapabilities> SERVER_CAPABILITIES_PREDICATE = sc ->
             sc.getDocumentLinkProvider() != null;
 
+    private static final @NotNull Predicate<@NotNull ServerCapabilities> RESOLVE_SERVER_CAPABILITIES_PREDICATE = sc -> {
+        var documentLinkProvider = sc.getDocumentLinkProvider();
+        return documentLinkProvider != null && hasCapability(documentLinkProvider.getResolveProvider());
+    };
+
+    private static final @Nullable Predicate<@NotNull DocumentLinkRegistrationOptions> RESOLVE_REGISTRATION_OPTIONS_PREDICATE = o ->
+            hasCapability(o.getResolveProvider());
+
     public DocumentLinkCapabilityRegistry(@NotNull LSPClientFeatures clientFeatures) {
         super(clientFeatures);
     }
@@ -61,6 +69,16 @@ public class DocumentLinkCapabilityRegistry extends TextDocumentServerCapability
      */
     public boolean isDocumentLinkSupported(@NotNull PsiFile file) {
         return super.isSupported(file, SERVER_CAPABILITIES_PREDICATE);
+    }
+
+    /**
+     * Returns true if the language server can support documentLink/resolve and false otherwise.
+     *
+     * @param file the Psi file.
+     * @return true if the language server can support documentLink/resolve and false otherwise.
+     */
+    public boolean isResolveDocumentLinkSupported(@NotNull PsiFile file) {
+        return super.isSupported(file, RESOLVE_SERVER_CAPABILITIES_PREDICATE, RESOLVE_REGISTRATION_OPTIONS_PREDICATE);
     }
 
 }

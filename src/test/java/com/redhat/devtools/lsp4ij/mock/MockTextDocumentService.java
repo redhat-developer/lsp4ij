@@ -29,8 +29,9 @@ import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
+import java.util.function.Predicate;
 
 /**
  * This class is a copy/paste from <a href="https://github.com/eclipse/lsp4e/blob/master/org.eclipse.lsp4e.tests.mock/src/org/eclipse/lsp4e/tests/mock/MockTextDocumentService.java">...</a>
@@ -38,29 +39,51 @@ import java.util.function.Function;
 public class MockTextDocumentService implements TextDocumentService {
 
     private CompletionList mockCompletionList;
+    private final List<CompletionParams> completionRequests = new CopyOnWriteArrayList<>();
     private CompletionItem mockCompletionItem;
     private Either<List<InlineCompletionItem>, InlineCompletionList> mockInlineCompletion;
     private Hover mockHover;
     private List<? extends Location> mockDefinitionLocations;
     private List<? extends LocationLink> mockTypeDefinitions;
+    private List<? extends Location> mockImplementations;
+    private final List<ImplementationParams> implementationRequests = new CopyOnWriteArrayList<>();
     private List<? extends TextEdit> mockFormattingTextEdits;
     private SignatureHelp mockSignatureHelp;
     private List<CodeLens> mockCodeLenses;
     private List<DocumentLink> mockDocumentLinks;
+    private Function<DocumentLink, CompletableFuture<DocumentLink>> documentLinkResolveProcessor;
+    private final List<DocumentLink> documentLinkResolveRequests = new CopyOnWriteArrayList<>();
+    private List<InlayHint> mockInlayHints;
+    private Function<InlayHint, CompletableFuture<InlayHint>> inlayHintResolveProcessor;
+    private final List<InlayHint> inlayHintResolveRequests = new CopyOnWriteArrayList<>();
     private Map<Position, List<? extends DocumentHighlight>> mockDocumentHighlights;
     private LinkedEditingRanges mockLinkedEditingRanges;
+    private final List<LinkedEditingRangeParams> linkedEditingRangeRequests = new CopyOnWriteArrayList<>();
     private List<SelectionRange> mockSelectionRanges;
 
-    private CompletableFuture<DidOpenTextDocumentParams> didOpenCallback;
+    private record DidOpenExpectation(CompletableFuture<DidOpenTextDocumentParams> future,
+                                      Predicate<DidOpenTextDocumentParams> filter) {}
+
+    // Set by the test thread and read by the thread that reads the messages, so the future and its filter
+    // are published together
+    private final AtomicReference<DidOpenExpectation> didOpenExpectation = new AtomicReference<>();
+
+    /**
+     * A didOpen or didClose this server read, with the full URI of its document.
+     */
+    public record OpenCloseNotification(boolean open, URI uri) {}
+
+    private final List<OpenCloseNotification> openCloseNotifications = new CopyOnWriteArrayList<>();
     private CompletableFuture<DidSaveTextDocumentParams> didSaveCallback;
     private CompletableFuture<DidCloseTextDocumentParams> didCloseCallback;
     private List<TextEdit> mockWillSaveWaitUntilTextEdits;
-    private volatile long willSaveWaitUntilDelayMs;
+    private volatile CompletableFuture<Void> willSaveWaitUntilGate = CompletableFuture.completedFuture(null);
     private ConcurrentLinkedQueue<DidChangeTextDocumentParams> didChangeEvents = new ConcurrentLinkedQueue<>();
 
     private Function<?, ? extends CompletableFuture<?>> _futureFactory;
     private List<LanguageClient> remoteProxies;
     private Location[] mockReferences = new Location[0];
+    private final List<ReferenceParams> referenceRequests = new CopyOnWriteArrayList<>();
     private List<Diagnostic> publishDiagnostics;
     private DocumentDiagnosticReport pullDiagnostics;
     private List<Either<Command, CodeAction>> mockCodeActions;
@@ -72,8 +95,12 @@ public class MockTextDocumentService implements TextDocumentService {
     private List<DocumentSymbol> documentSymbols;
     private SemanticTokens mockSemanticTokens;
     private List<FoldingRange> foldingRanges;
+    private List<InlineValue> mockInlineValues;
+    private final List<InlineValueParams> inlineValueRequests = new CopyOnWriteArrayList<>();
     public int codeActionRequests = 0;
     public volatile CodeActionParams lastCodeActionParams;
+    // Completes when the replies to textDocument/codeAction may be sent
+    private volatile CompletableFuture<Void> codeActionGate = CompletableFuture.completedFuture(null);
     private Function<CompletionItem, CompletableFuture<CompletionItem>> resolveCompletionItemProcessor;
 
     public <U> MockTextDocumentService(Function<U, CompletableFuture<U>> futureFactory) {
@@ -95,6 +122,7 @@ public class MockTextDocumentService implements TextDocumentService {
 
     @Override
     public CompletableFuture<Either<List<CompletionItem>, CompletionList>> completion(CompletionParams position) {
+        completionRequests.add(position);
         return futureFactory(Either.forRight(mockCompletionList));
     }
 
@@ -130,6 +158,7 @@ public class MockTextDocumentService implements TextDocumentService {
 
     @Override
     public CompletableFuture<List<? extends Location>> references(ReferenceParams params) {
+        referenceRequests.add(params);
         return futureFactory(Arrays.asList(this.mockReferences));
     }
 
@@ -141,8 +170,16 @@ public class MockTextDocumentService implements TextDocumentService {
     }
 
     @Override
-    public CompletableFuture<LinkedEditingRanges> linkedEditingRange(LinkedEditingRangeParams position) {
+    public CompletableFuture<LinkedEditingRanges> linkedEditingRange(LinkedEditingRangeParams params) {
+        linkedEditingRangeRequests.add(params);
         return CompletableFuture.completedFuture(mockLinkedEditingRanges);
+    }
+
+    /**
+     * @return the textDocument/linkedEditingRange requests received since the last reset, in order
+     */
+    public List<LinkedEditingRangeParams> getLinkedEditingRangeRequests() {
+        return linkedEditingRangeRequests;
     }
 
     @Override
@@ -158,6 +195,29 @@ public class MockTextDocumentService implements TextDocumentService {
     @Override
     public CompletableFuture<List<DocumentLink>> documentLink(DocumentLinkParams params) {
         return CompletableFuture.completedFuture(mockDocumentLinks);
+    }
+
+    @Override
+    public CompletableFuture<DocumentLink> documentLinkResolve(DocumentLink params) {
+        documentLinkResolveRequests.add(params);
+        if (documentLinkResolveProcessor != null) {
+            return documentLinkResolveProcessor.apply(params);
+        }
+        return CompletableFuture.completedFuture(params);
+    }
+
+    @Override
+    public CompletableFuture<List<InlayHint>> inlayHint(InlayHintParams params) {
+        return CompletableFuture.completedFuture(mockInlayHints);
+    }
+
+    @Override
+    public CompletableFuture<InlayHint> resolveInlayHint(InlayHint unresolved) {
+        inlayHintResolveRequests.add(unresolved);
+        if (inlayHintResolveProcessor != null) {
+            return inlayHintResolveProcessor.apply(unresolved);
+        }
+        return CompletableFuture.completedFuture(unresolved);
     }
 
     @Override
@@ -185,7 +245,20 @@ public class MockTextDocumentService implements TextDocumentService {
                     })
                     .toList();
         }
-        return futureFactory(filteredCodeActions);
+        var codeActions = filteredCodeActions;
+        return codeActionGate.thenCompose(ignored -> futureFactory(codeActions));
+    }
+
+    /**
+     * Holds the replies to textDocument/codeAction requests until the returned future is completed, which the caller
+     * must do.
+     *
+     * @return the future that releases the held and later textDocument/codeAction replies when completed.
+     */
+    public CompletableFuture<Void> holdCodeActions() {
+        CompletableFuture<Void> gate = new CompletableFuture<>();
+        codeActionGate = gate;
+        return gate;
     }
 
     @Override
@@ -236,9 +309,11 @@ public class MockTextDocumentService implements TextDocumentService {
     public void didOpen(DidOpenTextDocumentParams params) {
         String opened = params.getTextDocument().getUri();
         MockLanguageServer.INSTANCE.record("didOpen:" + opened.substring(opened.lastIndexOf('/') + 1));
-        if (didOpenCallback != null) {
-            didOpenCallback.complete(params);
-            didOpenCallback = null;
+        openCloseNotifications.add(new OpenCloseNotification(true, URI.create(opened)));
+        var expectation = didOpenExpectation.get();
+        if (expectation != null && expectation.filter().test(params)
+                && didOpenExpectation.compareAndSet(expectation, null)) {
+            expectation.future().complete(params);
         }
         String uri = params.getTextDocument().getUri();
         if (this.publishDiagnostics != null && !this.publishDiagnostics.isEmpty()) {
@@ -267,6 +342,7 @@ public class MockTextDocumentService implements TextDocumentService {
 
     @Override
     public void didClose(DidCloseTextDocumentParams params) {
+        openCloseNotifications.add(new OpenCloseNotification(false, URI.create(params.getTextDocument().getUri())));
         if (didCloseCallback != null) {
             didCloseCallback.complete(params);
             didCloseCallback = null;
@@ -291,15 +367,18 @@ public class MockTextDocumentService implements TextDocumentService {
     public CompletableFuture<List<TextEdit>> willSaveWaitUntil(WillSaveTextDocumentParams params) {
         MockLanguageServer.INSTANCE.record("willSaveWaitUntil");
         List<TextEdit> edits = mockWillSaveWaitUntilTextEdits != null ? mockWillSaveWaitUntilTextEdits : List.of();
-        long delay = willSaveWaitUntilDelayMs;
-        if (delay <= 0) {
-            return CompletableFuture.completedFuture(edits);
-        }
-        return CompletableFuture.supplyAsync(() -> edits, CompletableFuture.delayedExecutor(delay, TimeUnit.MILLISECONDS));
+        return willSaveWaitUntilGate.thenApply(ignored -> edits);
     }
 
-    public void setWillSaveWaitUntilDelayMs(long delayMs) {
-        this.willSaveWaitUntilDelayMs = delayMs;
+    /**
+     * Holds the replies to willSaveWaitUntil requests until the returned future is completed, which the caller must do.
+     *
+     * @return the future that releases the held and later willSaveWaitUntil replies when completed.
+     */
+    public CompletableFuture<Void> holdWillSaveWaitUntil() {
+        CompletableFuture<Void> gate = new CompletableFuture<>();
+        willSaveWaitUntilGate = gate;
+        return gate;
     }
 
     @Override
@@ -314,12 +393,26 @@ public class MockTextDocumentService implements TextDocumentService {
     }
 
     @Override
+    public CompletableFuture<Either<List<? extends Location>, List<? extends LocationLink>>> implementation(
+            ImplementationParams params) {
+        implementationRequests.add(params);
+        return CompletableFuture.completedFuture(Either.forLeft(this.mockImplementations));
+    }
+
+    @Override
     public CompletableFuture<CodeAction> resolveCodeAction(CodeAction unresolved) {
         return CompletableFuture.completedFuture(mockResolvedCodeAction);
     }
 
     public void setMockCompletionList(CompletionList completionList) {
         this.mockCompletionList = completionList;
+    }
+
+    /**
+     * @return the textDocument/completion requests received since the last reset, in order
+     */
+    public List<CompletionParams> getCompletionRequests() {
+        return completionRequests;
     }
 
     public void setMockInlineCompletion(Either<List<InlineCompletionItem>, InlineCompletionList> inlineCompletion) {
@@ -331,7 +424,24 @@ public class MockTextDocumentService implements TextDocumentService {
     }
 
     public void setDidOpenCallback(CompletableFuture<DidOpenTextDocumentParams> didOpenExpectation) {
-        this.didOpenCallback = didOpenExpectation;
+        setDidOpenCallback(didOpenExpectation, params -> true);
+    }
+
+    /**
+     * Completes the given future with the next didOpen that the filter accepts. A didOpen it rejects leaves the
+     * future pending.
+     */
+    public void setDidOpenCallback(CompletableFuture<DidOpenTextDocumentParams> didOpenExpectation,
+                                   Predicate<DidOpenTextDocumentParams> filter) {
+        this.didOpenExpectation.set(new DidOpenExpectation(didOpenExpectation, filter));
+    }
+
+    /**
+     * @return the didOpen and didClose notifications this server read, in the order it read them, which is the
+     * order they were sent in. Each is recorded before the callback it completes.
+     */
+    public List<OpenCloseNotification> getOpenCloseNotifications() {
+        return openCloseNotifications;
     }
 
     public List<DidChangeTextDocumentParams> getDidChangeEvents() {
@@ -362,6 +472,13 @@ public class MockTextDocumentService implements TextDocumentService {
         this.mockReferences = locations;
     }
 
+    /**
+     * @return the textDocument/references requests received since the last reset, in order
+     */
+    public List<ReferenceParams> getReferenceRequests() {
+        return referenceRequests;
+    }
+
     public void setMockFormattingTextEdits(List<? extends TextEdit> formattingTextEdits) {
         this.mockFormattingTextEdits = formattingTextEdits;
     }
@@ -370,25 +487,65 @@ public class MockTextDocumentService implements TextDocumentService {
         this.mockDocumentLinks = documentLinks;
     }
 
+    public void setDocumentLinkResolveProcessor(Function<DocumentLink, CompletableFuture<DocumentLink>> documentLinkResolveProcessor) {
+        this.documentLinkResolveProcessor = documentLinkResolveProcessor;
+    }
+
+    /**
+     * @return the documentLink/resolve requests received since the last reset, in order
+     */
+    public List<DocumentLink> getDocumentLinkResolveRequests() {
+        return documentLinkResolveRequests;
+    }
+
+    public void setMockInlayHints(List<InlayHint> inlayHints) {
+        this.mockInlayHints = inlayHints;
+    }
+
+    public void setInlayHintResolveProcessor(Function<InlayHint, CompletableFuture<InlayHint>> inlayHintResolveProcessor) {
+        this.inlayHintResolveProcessor = inlayHintResolveProcessor;
+    }
+
+    /**
+     * @return the inlayHint/resolve requests received since the last reset, in order
+     */
+    public List<InlayHint> getInlayHintResolveRequests() {
+        return inlayHintResolveRequests;
+    }
+
     public void reset() {
         this.mockCompletionList = new CompletionList();
+        this.completionRequests.clear();
         this.mockCompletionItem = null;
         this.mockDefinitionLocations = Collections.emptyList();
         this.mockTypeDefinitions = Collections.emptyList();
+        this.mockImplementations = Collections.emptyList();
+        this.implementationRequests.clear();
         this.mockHover = null;
         this.mockCodeLenses = null;
         this.mockReferences = null;
+        this.referenceRequests.clear();
         this.remoteProxies = new ArrayList<>();
         this.mockCodeActions = new ArrayList<>();
         this.mockResolvedCodeAction = new CodeAction();
         this.diagnosticRequests.clear();
+        this.mockInlineValues = null;
+        this.inlineValueRequests.clear();
+        this.mockLinkedEditingRanges = null;
+        this.linkedEditingRangeRequests.clear();
         this.renameProcessor = null;
         this.prepareRenameProcessor = null;
         this.documentSymbols = Collections.emptyList();
         this.foldingRanges = new ArrayList<>();
         this.codeActionRequests = 0;
         this.lastCodeActionParams = null;
+        this.codeActionGate = CompletableFuture.completedFuture(null);
         this.resolveCompletionItemProcessor = null;
+        this.documentLinkResolveProcessor = null;
+        this.documentLinkResolveRequests.clear();
+        this.mockInlayHints = null;
+        this.inlayHintResolveProcessor = null;
+        this.inlayHintResolveRequests.clear();
     }
 
     public void setResolveCompletionItemProcessor(Function<CompletionItem, CompletableFuture<CompletionItem>> resolveCompletionItemProcessor) {
@@ -448,6 +605,17 @@ public class MockTextDocumentService implements TextDocumentService {
 
     public void setMockTypeDefinitions(List<? extends LocationLink> mockTypeDefinitions) {
         this.mockTypeDefinitions = mockTypeDefinitions;
+    }
+
+    public void setMockImplementations(List<? extends Location> mockImplementations) {
+        this.mockImplementations = mockImplementations;
+    }
+
+    /**
+     * @return the textDocument/implementation requests received since the last reset, in order
+     */
+    public List<ImplementationParams> getImplementationRequests() {
+        return implementationRequests;
     }
 
     public void setDocumentSymbols(List<DocumentSymbol> symbols) {
@@ -532,6 +700,20 @@ public class MockTextDocumentService implements TextDocumentService {
     @Override
     public CompletableFuture<List<FoldingRange>> foldingRange(FoldingRangeRequestParams params) {
         return CompletableFuture.completedFuture(this.foldingRanges);
+    }
+
+    public void setMockInlineValues(List<InlineValue> inlineValues) {
+        this.mockInlineValues = inlineValues;
+    }
+
+    public List<InlineValueParams> getInlineValueRequests() {
+        return inlineValueRequests;
+    }
+
+    @Override
+    public CompletableFuture<List<InlineValue>> inlineValue(InlineValueParams params) {
+        inlineValueRequests.add(params);
+        return CompletableFuture.completedFuture(this.mockInlineValues);
     }
 
 }

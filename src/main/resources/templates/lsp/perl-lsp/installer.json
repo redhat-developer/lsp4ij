@@ -2,11 +2,16 @@
   "id": "perl-lsp-installer",
   "name": "perl-lsp",
   "executeOnStartServer": false,
+  "properties": {
+    "serverDist": "$USER_HOME$/.lsp4ij/lsp/perl-lsp"
+  },
   "check": {
-    "exec": {
-      "name": "Trying current command",
-      "command": "${server.command}",
-      "timeout": 2000
+    "fileExists": {
+      "name": "Check if perl-lsp is installed",
+      "file": {
+        "windows": "${serverDist}/perllsp.exe",
+        "default": "${serverDist}/perllsp"
+      }
     }
   },
   "run": {
@@ -40,7 +45,7 @@
         }
       },
       "output": {
-        "dir": "$USER_HOME$/.lsp4ij/lsp/perl-lsp",
+        "dir": "${serverDist}",
         "file": {
           "name": {
             "windows": "perllsp.exe",

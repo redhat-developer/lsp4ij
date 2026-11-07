@@ -92,6 +92,10 @@ public class LSPClientFeatures implements Disposable, FileUriSupport {
 
     private LSPInlayHintFeature inlayHintFeature;
 
+    private LSPInlineValueFeature inlineValueFeature;
+
+    private LSPLinkedEditingRangeFeature linkedEditingRangeFeature;
+
     private LSPProgressFeature progressFeature;
 
     private LSPReferencesFeature referencesFeature;
@@ -1082,6 +1086,70 @@ public class LSPClientFeatures implements Disposable, FileUriSupport {
     }
 
     /**
+     * Returns the LSP inlineValue feature.
+     *
+     * @return the LSP inlineValue feature.
+     */
+    @NotNull
+    public final LSPInlineValueFeature getInlineValueFeature() {
+        if (inlineValueFeature == null) {
+            initInlineValueFeature();
+        }
+        return inlineValueFeature;
+    }
+
+    private synchronized void initInlineValueFeature() {
+        if (inlineValueFeature != null) {
+            return;
+        }
+        setInlineValueFeature(new LSPInlineValueFeature());
+    }
+
+    /**
+     * Initialize the LSP inlineValue feature.
+     *
+     * @param inlineValueFeature the LSP inlineValue feature.
+     * @return the LSP client features.
+     */
+    public final LSPClientFeatures setInlineValueFeature(@NotNull LSPInlineValueFeature inlineValueFeature) {
+        inlineValueFeature.setClientFeatures(this);
+        this.inlineValueFeature = inlineValueFeature;
+        return this;
+    }
+
+    /**
+     * Returns the LSP linkedEditingRange feature.
+     *
+     * @return the LSP linkedEditingRange feature.
+     */
+    @NotNull
+    public final LSPLinkedEditingRangeFeature getLinkedEditingRangeFeature() {
+        if (linkedEditingRangeFeature == null) {
+            initLinkedEditingRangeFeature();
+        }
+        return linkedEditingRangeFeature;
+    }
+
+    private synchronized void initLinkedEditingRangeFeature() {
+        if (linkedEditingRangeFeature != null) {
+            return;
+        }
+        setLinkedEditingRangeFeature(new LSPLinkedEditingRangeFeature());
+    }
+
+    /**
+     * Initialize the LSP linkedEditingRange feature.
+     *
+     * @param linkedEditingRangeFeature the LSP linkedEditingRange feature.
+     * @return the LSP client features.
+     */
+    public final LSPClientFeatures setLinkedEditingRangeFeature(@NotNull LSPLinkedEditingRangeFeature linkedEditingRangeFeature) {
+        linkedEditingRangeFeature.setClientFeatures(this);
+        this.linkedEditingRangeFeature = linkedEditingRangeFeature;
+        return this;
+    }
+
+    /**
      * Returns the LSP progress feature.
      *
      * @return the LSP progress feature.
@@ -1545,6 +1613,12 @@ public class LSPClientFeatures implements Disposable, FileUriSupport {
         if (inlayHintFeature != null) {
             inlayHintFeature.dispose();
         }
+        if (inlineValueFeature != null) {
+            inlineValueFeature.dispose();
+        }
+        if (linkedEditingRangeFeature != null) {
+            linkedEditingRangeFeature.dispose();
+        }
         if (referencesFeature != null) {
             referencesFeature.dispose();
         }
@@ -1625,6 +1699,12 @@ public class LSPClientFeatures implements Disposable, FileUriSupport {
         }
         if (inlineCompletionFeature != null) {
             inlineCompletionFeature.setServerCapabilities(serverCapabilities);
+        }
+        if (inlineValueFeature != null) {
+            inlineValueFeature.setServerCapabilities(serverCapabilities);
+        }
+        if (linkedEditingRangeFeature != null) {
+            linkedEditingRangeFeature.setServerCapabilities(serverCapabilities);
         }
         if (referencesFeature != null) {
             referencesFeature.setServerCapabilities(serverCapabilities);
@@ -1713,6 +1793,12 @@ public class LSPClientFeatures implements Disposable, FileUriSupport {
             // register 'textDocument/inlineCompletion' capability
             case LSPRequestConstants.TEXT_DOCUMENT_INLINE_COMPLETION ->
                     getInlineCompletionFeature().getInlineCompletionCapabilityRegistry();
+            // register 'textDocument/inlineValue' capability
+            case LSPRequestConstants.TEXT_DOCUMENT_INLINE_VALUE ->
+                    getInlineValueFeature().getInlineValueCapabilityRegistry();
+            // register 'textDocument/linkedEditingRange' capability
+            case LSPRequestConstants.TEXT_DOCUMENT_LINKED_EDITING_RANGE ->
+                    getLinkedEditingRangeFeature().getLinkedEditingRangeCapabilityRegistry();
             // register 'textDocument/callHierarchy' capability
             case LSPRequestConstants.TEXT_DOCUMENT_CALL_HIERARCHY ->
                     getCallHierarchyFeature().getCallHierarchyCapabilityRegistry();

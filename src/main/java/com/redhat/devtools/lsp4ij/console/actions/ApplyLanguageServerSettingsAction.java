@@ -15,7 +15,9 @@ import com.intellij.openapi.actionSystem.ActionUpdateThread;
 import com.intellij.openapi.actionSystem.AnAction;
 import com.intellij.openapi.actionSystem.AnActionEvent;
 import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.options.ConfigurationException;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.ui.Messages;
 import com.intellij.openapi.ui.popup.Balloon;
 import com.intellij.openapi.ui.popup.BalloonBuilder;
 import com.intellij.openapi.ui.popup.JBPopupFactory;
@@ -54,7 +56,11 @@ public class ApplyLanguageServerSettingsAction extends AnAction {
 
     @Override
     public void actionPerformed(@NotNull AnActionEvent e) {
-        languageServerView.apply();
+        try {
+            languageServerView.apply();
+        } catch (ConfigurationException ex) {
+            Messages.showErrorDialog(e.getProject(), ex.getLocalizedMessage(), ex.getTitle());
+        }
     }
 
     @Override

@@ -16,6 +16,7 @@ import com.intellij.notification.Notification;
 import com.intellij.openapi.Disposable;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.ModalityState;
+import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.fileEditor.FileEditorManager;
 import com.intellij.openapi.fileEditor.FileEditorManagerListener;
@@ -58,10 +59,12 @@ import org.eclipse.lsp4j.jsonrpc.Launcher;
 import org.eclipse.lsp4j.jsonrpc.MessageConsumer;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
 import org.eclipse.lsp4j.jsonrpc.messages.Message;
+import org.eclipse.lsp4j.jsonrpc.json.StreamMessageConsumer;
 import org.eclipse.lsp4j.services.LanguageServer;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.jetbrains.annotations.TestOnly;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -168,6 +171,9 @@ public class LanguageServerWrapper implements Disposable {
     private volatile @Nullable ConcurrentLinkedQueue<LSPTrace> traces;
     private @Nullable Alarm traceFlushAlarm;
     private volatile @Nullable InitializingContext currentInitializingContext;
+    // Where the connection of a document runs once its start attempt is initialized: the executor that
+    // thenComposeAsync uses by default, which a test can replace to run the connection when it chooses
+    private @NotNull Executor connectionExecutor = CompletableFuture.completedFuture(null).defaultExecutor();
     private @NotNull TextDocumentSyncOptions syncOptions;
 
     /* Backwards compatible constructor */
@@ -271,17 +277,18 @@ public class LanguageServerWrapper implements Disposable {
         // instances of this class for each test
         this.listener.shutdownNow();
 
-        // Wait briefly for threads to actually exit.
+        // Wait briefly for threads to actually exit. All waits share one 2-second deadline.
+        long deadlineNanos = System.nanoTime() + TimeUnit.SECONDS.toNanos(2);
         try {
-            if (!this.dispatcher.awaitTermination(2, TimeUnit.SECONDS)) {
+            if (!this.dispatcher.awaitTermination(Math.max(0L, deadlineNanos - System.nanoTime()), TimeUnit.NANOSECONDS)) {
                 LOGGER.warn("Dispatcher executor for language server '{}' did not terminate within 2s; classloader unload may be blocked",
                         serverDefinition.getId());
             }
-            if (!this.messageWriter.awaitTermination(2, TimeUnit.SECONDS)) {
+            if (!this.messageWriter.awaitTermination(Math.max(0L, deadlineNanos - System.nanoTime()), TimeUnit.NANOSECONDS)) {
                 LOGGER.warn("Message writer executor for language server '{}' did not terminate within 2s; classloader unload may be blocked",
                         serverDefinition.getId());
             }
-            if (!this.listener.awaitTermination(2, TimeUnit.SECONDS)) {
+            if (!this.listener.awaitTermination(Math.max(0L, deadlineNanos - System.nanoTime()), TimeUnit.NANOSECONDS)) {
                 LOGGER.warn("Listener executor for language server '{}' did not terminate within 2s; classloader unload may be blocked",
                         serverDefinition.getId());
             }
@@ -369,6 +376,12 @@ public class LanguageServerWrapper implements Disposable {
      * @throws LanguageServerException thrown when the language server cannot be started
      */
     public synchronized void start() throws LanguageServerException {
+        if (isDisposed()) {
+            // A disposed language server is not enabled (isEnabled()) and never starts again: nothing would stop the
+            // connection it created, and no one would read what it answered. getInitializedServer() and connect()
+            // then give no language server, as for one that cannot start.
+            return;
+        }
         // Check for errors in LSP messages
         // launcherFuture manages request/reponse LSP messages from the server
         if (serverError == null) {
@@ -437,7 +450,7 @@ public class LanguageServerWrapper implements Disposable {
             // We cannot use 'dispatcher' (single thread executor) as it's reserved for ordered notification dispatch.
             // See: https://github.com/redhat-developer/lsp4ij/issues/1442
             CompletableFuture<InitializingContext> startFuture = new CompletableFuture<>();
-            ApplicationManager.getApplication().executeOnPooledThread(() -> {
+            Runnable startTask = () -> {
                 try {
                         var initializingContext = context;
                         // Starting process...
@@ -453,7 +466,17 @@ public class LanguageServerWrapper implements Disposable {
                         initParams.setInitializationOptions(provider.getInitializationOptions(rootURI));
 
                         // Add error log
-                        provider.addLogErrorHandler(error -> ServerMessageHandler.logMessage(this.getServerDefinition(), new MessageParams(MessageType.Error, error), getProject()));
+                        provider.addLogErrorHandler(new LanguageServerLogErrorHandler() {
+                            @Override
+                            public void logError(String error) {
+                                ServerMessageHandler.logMessage(getServerDefinition(), new MessageParams(MessageType.Error, error), getProject());
+                            }
+
+                            @Override
+                            public void logInfo(String message) {
+                                ServerMessageHandler.logMessage(getServerDefinition(), new MessageParams(MessageType.Info, message), getProject());
+                            }
+                        });
                         provider.addUnexpectedServerStopHandler(() -> {
                             // There is an unexpected stop of the connection
                             // 1. the process was killed outside IntelliJ
@@ -496,7 +519,7 @@ public class LanguageServerWrapper implements Disposable {
                 } catch (Exception e) {
                     startFuture.completeExceptionally(e);
                 }
-            });
+            };
             this.initializeFuture = startFuture
                     .thenApply(initializingContext -> {
                         var languageClient = serverDefinition.createLanguageClient(initialProject);
@@ -510,30 +533,46 @@ public class LanguageServerWrapper implements Disposable {
                         }
 
                         var provider = initializingContext.provider;
-                        UnaryOperator<MessageConsumer> wrapper = consumer -> (message -> {
-                            if (isDisposed()) {
-                                return;
-                            }
-                            logMessage(message, consumer);
-                            try {
-                                // To avoid having some lock problem when message is written in the stream output
-                                // (when there are a lot of messages to write it)
-                                // we consume the message in async mode
-                                CompletableFuture.runAsync(() -> consumer.consume(message), messageWriter)
-                                        .exceptionally(e -> {
-                                            // Log in the LSP console the error
-                                            getLanguageServerLifecycleManager().onError(this, e);
-                                            return null;
-                                        });
-                            } catch (Throwable e) {
-                                // Log in the LSP console the error
-                                getLanguageServerLifecycleManager().onError(this, e);
-                                throw e;
-                            }
-                            if (provider != null && isActive()) {
-                                provider.handleMessage(message, this.languageServer, rootURI);
-                            }
-                        });
+                        // wrapMessages applies this wrapper to both directions:
+                        // outgoing (StreamMessageConsumer) and incoming (RemoteEndpoint).
+                        // Separate by direction so incoming server requests are never
+                        // blocked behind a slow outgoing write.
+                        // wrapMessages applies this wrapper to both directions:
+                        // outgoing (StreamMessageConsumer) and incoming (RemoteEndpoint).
+                        // Outgoing: single FIFO queue preserves message ordering
+                        // (didOpen before didChange before didClose, requests after
+                        // their preceding notifications).
+                        // Incoming: handle on the listener thread so server-initiated
+                        // requests (e.g. workspace/configuration) are never blocked
+                        // behind a slow outgoing notification write that saturates
+                        // the pipe.
+                        UnaryOperator<MessageConsumer> wrapper = consumer -> {
+                            boolean outgoing = consumer instanceof StreamMessageConsumer;
+                            return message -> {
+                                if (isDisposed()) {
+                                    return;
+                                }
+                                logMessage(message, consumer);
+                                try {
+                                    if (outgoing) {
+                                        CompletableFuture.runAsync(
+                                                        () -> consumer.consume(message), messageWriter)
+                                                .exceptionally(e -> {
+                                                    getLanguageServerLifecycleManager().onError(this, e);
+                                                    return null;
+                                                });
+                                    } else {
+                                        consumer.consume(message);
+                                    }
+                                } catch (Throwable e) {
+                                    getLanguageServerLifecycleManager().onError(this, e);
+                                    throw e;
+                                }
+                                if (provider != null && isActive()) {
+                                    provider.handleMessage(message, this.languageServer, rootURI);
+                                }
+                            };
+                        };
 
                         Launcher<LanguageServer> launcher = getClientFeatures().createLauncherBuilder() //
                                 .setLocalService(languageClient)//
@@ -551,44 +590,60 @@ public class LanguageServerWrapper implements Disposable {
                     })
                     .thenCompose(initializingContext -> initServer(rootURI, initializingContext))
                     .thenApply(initializingContext -> {
-                        serverError = null;
-                        if (errorNotification != null) {
-                            // Close the current error notification
-                            // displayed when server start fails.
-                            errorNotification.expire();
-                            errorNotification = null;
+                        synchronized (this) {
+                            // An attempt that a stop replaced while it initialized must not clear the error that the
+                            // current attempt restarts for, set the capabilities of its own server, nor send that
+                            // server, which the stop is shutting down, initialized
+                            requireCurrent(initializingContext);
+                            serverError = null;
+                            if (errorNotification != null) {
+                                // Close the current error notification
+                                // displayed when server start fails.
+                                errorNotification.expire();
+                                errorNotification = null;
+                            }
+                            serverCapabilities = initializingContext.initializeResult.getCapabilities();
+                            syncOptions = createSyncOptions();
+                            getClientFeatures().setServerCapabilities(serverCapabilities);
+                            this.initiallySupportsWorkspaceFolders = supportsWorkspaceFolders(serverCapabilities);
+                            initializingContext.languageServer.initialized(new InitializedParams());
                         }
-                        serverCapabilities = initializingContext.initializeResult.getCapabilities();
-                        syncOptions = createSyncOptions();
-                        getClientFeatures().setServerCapabilities(serverCapabilities);
-                        this.initiallySupportsWorkspaceFolders = supportsWorkspaceFolders(serverCapabilities);
                         return initializingContext;
                     })
                     .thenApply(initializingContext -> {
-                        initializingContext.languageServer.initialized(new InitializedParams());
+                        synchronized (this) {
+                            // An attempt that a stop replaced while it initialized must not install its connection, which
+                            // the stop is shutting down, over the current attempt's
+                            requireCurrent(initializingContext);
+                            messageBusConnection = ApplicationManager.getApplication().getMessageBus().connect(this);
+                            messageBusConnection.subscribe(FileEditorManagerListener.FILE_EDITOR_MANAGER, fileListener);
+
+                            fileOperationsManager = new FileOperationsManager(this);
+                            fileOperationsManager.setServerCapabilities(serverCapabilities);
+
+                            workspaceFolderNotificationManager = new WorkspaceFolderNotificationManager(this);
+
+                            this.lspStreamProvider = initializingContext.provider;
+                            this.languageClient = initializingContext.languageClient;
+                            this.languageServer = initializingContext.languageServer;
+                            this.launcherFuture = initializingContext.launcherFuture;
+
+                            updateStatus(ServerStatus.started);
+                        }
+                        initializingContext.languageClient.updateWorkspaceDiagnosticProviders();
                         return initializingContext;
                     })
-                    .thenApply(initializingContext -> {
-                        messageBusConnection = ApplicationManager.getApplication().getMessageBus().connect(this);
-                        messageBusConnection.subscribe(FileEditorManagerListener.FILE_EDITOR_MANAGER, fileListener);
-
-                        fileOperationsManager = new FileOperationsManager(this);
-                        fileOperationsManager.setServerCapabilities(serverCapabilities);
-
-                        workspaceFolderNotificationManager = new WorkspaceFolderNotificationManager(this);
-
-                        this.lspStreamProvider = initializingContext.provider;
-                        this.languageClient = initializingContext.languageClient;
-                        this.languageServer = initializingContext.languageServer;
-                        this.launcherFuture = initializingContext.launcherFuture;
-
-                        updateStatus(ServerStatus.started);
-                        languageClient.updateWorkspaceDiagnosticProviders();
-                        return initializingContext;
-                    })
-                    .thenRun(() -> {
+                    .thenAccept(initializingContext -> {
                         for (VirtualFile fileToReconnect : filesToReconnect) {
-                            connect(fileToReconnect, new LSPFileConnectionInfo(null, null, null, true));
+                            synchronized (this) {
+                                // A stop after the install must not have the reconnection start the server again. The
+                                // stop takes this monitor too, so it comes before the check or after the connect call,
+                                // which takes documentsLock after this monitor, as the stop does
+                                if (currentInitializingContext != initializingContext) {
+                                    return;
+                                }
+                                connect(fileToReconnect, new LSPFileConnectionInfo(null, null, null, true));
+                            }
                         }
                     })
                     .exceptionally(e -> {
@@ -606,6 +661,34 @@ public class LanguageServerWrapper implements Disposable {
                         stop(context);
                         return null;
                     });
+            // Submitted only now that initializeFuture is set: a start which fails at once runs the failure handler
+            // above, which fails initializeFuture and then stops the server, clearing it
+            ApplicationManager.getApplication().executeOnPooledThread(startTask);
+        }
+    }
+
+    /**
+     * Sets where the connection of a document runs once its start attempt is initialized, so that a test can run it
+     * when it chooses, as after a stop.
+     *
+     * @param connectionExecutor the executor.
+     */
+    @TestOnly
+    void setConnectionExecutor(@NotNull Executor connectionExecutor) {
+        this.connectionExecutor = connectionExecutor;
+    }
+
+    /**
+     * Throws a {@link CancellationException} unless the given start attempt is still the current one. A stop, or a
+     * stop and a newer start, replaces an attempt, but cancels only the last stage of its start chain, so the stages
+     * before it still run when the attempt's initialize reply comes. The caller holds this wrapper's monitor, which
+     * stop() takes to replace the attempt.
+     *
+     * @param initializingContext the start attempt.
+     */
+    private void requireCurrent(@NotNull InitializingContext initializingContext) {
+        if (currentInitializingContext != initializingContext) {
+            throw new CancellationException("The start attempt was replaced by a stop or a newer start");
         }
     }
 
@@ -669,15 +752,14 @@ public class LanguageServerWrapper implements Disposable {
         getLanguageServerLifecycleManager().logLSPMessage(message, consumer, this);
     }
 
-    private void removeStopTimer(boolean stopping) {
+    /**
+     * Cancels the stop scheduled after the last document disconnected, if any. The status is left as it is: a pending
+     * stop doesn't change it.
+     */
+    private void removeStopTimer() {
         Alarm stopAlarm = this.stopAlarm;
         if (stopAlarm != null) {
-            if (stopAlarm.getActiveRequestCount() > 0) {
-                stopAlarm.cancelAllRequests();
-                if (!stopping) {
-                    updateStatus(ServerStatus.started);
-                }
-            }
+            stopAlarm.cancelAllRequests();
         }
     }
 
@@ -700,16 +782,38 @@ public class LanguageServerWrapper implements Disposable {
         }
     }
 
+    /**
+     * Schedules the stop of the language server after lastDocumentDisconnectedTimeout. The status stays as it is until
+     * the stop runs: the server is still running and usable while the stop is pending, and a document that connects or
+     * a lease cancels it.
+     */
     private void startStopTimer() {
-        updateStatus(ServerStatus.stopping);
         int delayMs = (int) TimeUnit.SECONDS.toMillis(serverDefinition.getLastDocumentDisconnectedTimeout());
-        getStopAlarm().addRequest(() -> {
-            try {
-                stop();
-            } catch (Throwable t) {
-                LOGGER.error("Failed to stop language server {}", serverDefinition.getId(), t);
-            }
-        }, delayMs);
+        getStopAlarm().addRequest(this::stopIfNotKeptAlive, delayMs);
+    }
+
+    /**
+     * Stops the language server once the delay after its last document disconnected has passed, unless something keeps
+     * it alive by then, such as {@link LSPClientFeatures#keepServerAlive()}, which is asked again here. A check that
+     * fails keeps the server, as a yes does: it is not stopped on an error, and stops when its last document or lease
+     * goes next.
+     */
+    void stopIfNotKeptAlive() {
+        boolean keptAlive;
+        try {
+            keptAlive = keepAlive();
+        } catch (RuntimeException e) {
+            LOGGER.error("Failed to check whether language server {} is kept alive", serverDefinition.getId(), e);
+            keptAlive = true;
+        }
+        if (keptAlive) {
+            return;
+        }
+        try {
+            stop();
+        } catch (Throwable t) {
+            LOGGER.error("Failed to stop language server {}", serverDefinition.getId(), t);
+        }
     }
 
     private @NotNull Alarm getStopAlarm() {
@@ -768,7 +872,18 @@ public class LanguageServerWrapper implements Disposable {
         synchronized (documentsLock) {
             promoteConnection(toUri(file));
         }
-        return connectDocument(file, fileConnectionInfo, null);
+        return connectDocument(file, fileConnectionInfo, null, null);
+    }
+
+    /**
+     * Connects the file as {@link #connect(VirtualFile, LSPFileConnectionInfo)} does, for a connection asked for when
+     * the last editor of the file had closed the given number of times. A close of the file's last editor since then
+     * disconnects the file, which this connection then leaves disconnected: it gives no language server.
+     */
+    CompletableFuture<@Nullable LanguageServer> connect(@NotNull VirtualFile file,
+                                                        @NotNull LSPFileConnectionInfo fileConnectionInfo,
+                                                        int editorCloses) {
+        return connectDocument(file, fileConnectionInfo, null, editorCloses);
     }
 
     CompletableFuture<@Nullable LanguageServer> connect(@NotNull VirtualFile file,
@@ -786,7 +901,7 @@ public class LanguageServerWrapper implements Disposable {
             claim = new DocumentConnectionClaim(uri, connection, new AtomicBoolean());
         }
         scope.register(() -> releaseConnection(file, claim));
-        return connectDocument(file, info, claim);
+        return connectDocument(file, info, claim, null);
     }
 
     private void promoteConnection(@Nullable URI uri) {
@@ -799,6 +914,16 @@ public class LanguageServerWrapper implements Disposable {
     private boolean isCurrent(@Nullable DocumentConnectionClaim claim) {
         return claim == null || (!claim.released().get()
                 && scopedDocuments.get(claim.uri()) == claim.connection());
+    }
+
+    /**
+     * Returns true if the last editor of the file has closed since a connection was asked for, when it had closed the
+     * given number of times. A connection with no number is not checked. A close is counted before its disconnection
+     * takes documentsLock, so a caller that holds the lock and finds no new close connects the file before the close
+     * disconnects it.
+     */
+    private static boolean isEditorClosedSince(@NotNull VirtualFile file, @Nullable Integer editorCloses) {
+        return editorCloses != null && ConnectDocumentToLanguageServerSetupParticipant.getEditorCloses(file) != editorCloses;
     }
 
     private void releaseConnection(@NotNull VirtualFile file, @NotNull DocumentConnectionClaim claim) {
@@ -831,8 +956,9 @@ public class LanguageServerWrapper implements Disposable {
 
     private CompletableFuture<@Nullable LanguageServer> connectDocument(@NotNull VirtualFile file,
                                                                         @NotNull LSPFileConnectionInfo fileConnectionInfo,
-                                                                        @Nullable DocumentConnectionClaim claim) {
-        removeStopTimer(false);
+                                                                        @Nullable DocumentConnectionClaim claim,
+                                                                        @Nullable Integer editorCloses) {
+        removeStopTimer();
 
         URI fileUri = toUri(file);
         if (fileUri == null) {
@@ -843,7 +969,7 @@ public class LanguageServerWrapper implements Disposable {
         boolean waitForDidOpen = fileConnectionInfo.waitForDidOpen();
         DocumentContentSynchronizer connected;
         synchronized (documentsLock) {
-            if (!isCurrent(claim)) {
+            if (!isCurrent(claim) || isEditorClosedSince(file, editorCloses)) {
                 return CompletableFuture.completedFuture(null);
             }
             if (claim == null) {
@@ -857,16 +983,28 @@ public class LanguageServerWrapper implements Disposable {
             return getLanguageServerWhenDidOpen(connected, waitForDidOpen);
         }
 
-        // start language server if needed
-        start();
+        // start language server if needed, and take the start attempt that the connection is for
+        InitializingContext attempt;
+        CompletableFuture<Void> initialized;
+        synchronized (this) {
+            start();
+            attempt = currentInitializingContext;
+            initialized = this.initializeFuture;
+        }
 
-        if (this.initializeFuture == null) {
+        if (initialized == null) {
             // The "initialize" future is not initialized, return null as language server.
             return CompletableFuture.completedFuture(null);
         }
 
-        return initializeFuture.thenComposeAsync(theVoid -> {
+        return initialized.thenComposeAsync(theVoid -> {
             // Here, the "initialize" future is initialized
+
+            // A stop, as by stopAndDisable(), can replace the attempt before this runs: the connection is then
+            // dropped, so that it neither starts the server again nor connects the document to a stopped server
+            if (currentInitializingContext != attempt) {
+                return CompletableFuture.completedFuture(null);
+            }
 
             // Here the file is not already connected
             // To connect the file, we need the document instance to add LSP document listener to manage didOpen, didChange, etc.
@@ -883,23 +1021,37 @@ public class LanguageServerWrapper implements Disposable {
             }
 
             // Before the lock: getInitializedServer() calls the synchronized start(), and stop() takes that
-            // monitor before documentsLock
-            var initializedServer = folderToNotify != null ? getInitializedServer() : null;
+            // monitor before documentsLock. Under that monitor, a stop comes before the check or after the call, so
+            // that the call does not start the server again.
+            CompletableFuture<LanguageServer> initializedServer = null;
+            if (folderToNotify != null) {
+                synchronized (this) {
+                    if (currentInitializingContext != attempt) {
+                        return CompletableFuture.completedFuture(null);
+                    }
+                    initializedServer = getInitializedServer();
+                }
+            }
             DocumentContentSynchronizer synchronizer;
             synchronized (documentsLock) {
-                if (!isCurrent(claim)) {
+                // A stop which replaced the attempt after this check disconnects the document once this lock is
+                // released, as it disconnects every opened document. So does a close of the file's last editor.
+                if (!isCurrent(claim) || currentInitializingContext != attempt
+                        || isEditorClosedSince(file, editorCloses)) {
                     return CompletableFuture.completedFuture(null);
                 }
                 if (claim == null) {
                     promoteConnection(fileUri);
                 }
                 // Remove from closed documents and check if already opened
-                closedDocuments.remove(fileUri);
+                var closedDocument = closedDocuments.remove(fileUri);
+                boolean droppedErrors = closedDocument != null && closedDocument.hasErrors();
 
                 // Check again if file is already opened (within synchronized block)
                 var alreadyConnected = getConnectedSynchronizer(fileUri);
                 if (alreadyConnected != null) {
                     synchronizer = alreadyConnected;
+                    reportProblemOfDroppedDocument(file, droppedErrors);
                 } else {
 
                     // Mark the workspace folder as notified and queue its notification before the document's
@@ -916,8 +1068,10 @@ public class LanguageServerWrapper implements Disposable {
                     Disposer.register(this, synchronizer);
                     document.addDocumentListener(synchronizer, synchronizer);
                     OpenedDocument data = new OpenedDocument(new LanguageServerItem(languageServer, this), file, synchronizer);
-                    LanguageServerWrapper.this.openedDocuments.put(fileUri, data);
+                    // It replaces an opened document which held only the diagnostics published before the connection
+                    var replaced = LanguageServerWrapper.this.openedDocuments.put(fileUri, data);
                     invalidateWorkspaceDiagnosticCache(fileUri);
+                    reportProblemOfDroppedDocument(file, droppedErrors || (replaced != null && replaced.hasErrors()));
                     if (!waitForDidOpen) {
                         return CompletableFuture.completedFuture(languageServer);
                     }
@@ -926,7 +1080,23 @@ public class LanguageServerWrapper implements Disposable {
             // After the lock: the didOpen can need the synchronized start(), and stop() takes that monitor
             // before documentsLock
             return getLanguageServerWhenDidOpen(synchronizer, waitForDidOpen);
-        });
+        }, connectionExecutor);
+    }
+
+    /**
+     * Reports the file to the problems of the Project view again when the connection of the file dropped a document of
+     * it which had errors: its closed document, or an opened document which held only published diagnostics. The file
+     * is a problem file for those errors, and no update of the new opened document reports a change unless that one
+     * gets errors. The report, which runs later, reads what the language servers hold for the file, so it is made once
+     * the new opened document is installed.
+     *
+     * @param file          the file.
+     * @param droppedErrors whether a dropped document of the file had errors.
+     */
+    private void reportProblemOfDroppedDocument(@NotNull VirtualFile file, boolean droppedErrors) {
+        if (droppedErrors && getClientFeatures().getDiagnosticFeature().canReportProblem(file)) {
+            LSPDiagnosticUtils.reportProblem(file, null, getProject());
+        }
     }
 
     /**
@@ -1070,7 +1240,7 @@ public class LanguageServerWrapper implements Disposable {
     private void maybeShutdown() {
         if (!keepAlive()) {
             if (this.serverDefinition.getLastDocumentDisconnectedTimeout() != 0 && !ApplicationManager.getApplication().isUnitTestMode()) {
-                removeStopTimer(true);
+                removeStopTimer();
                 startStopTimer();
             } else {
                 stop();
@@ -1084,6 +1254,8 @@ public class LanguageServerWrapper implements Disposable {
 
     void incrementKeepAlive() {
         keepAliveCounter.incrementAndGet();
+        // A lease taken while the last document's stop is pending keeps the server, as a document that connects does
+        removeStopTimer();
     }
 
     void decrementKeepAlive() {
@@ -2056,7 +2228,7 @@ public class LanguageServerWrapper implements Disposable {
         boolean current = initializingContext != null && initializingContext.equals(currentInitializingContext);
         try {
             updateStatus(ServerStatus.stopping);
-            removeStopTimer(true);
+            removeStopTimer();
             if (languageClient != null) {
                 languageClient.dispose();
             }
@@ -2101,6 +2273,9 @@ public class LanguageServerWrapper implements Disposable {
                 synchronized (documentsLock) {
                     scopedDocuments.clear();
                 }
+                disposeFileSupports(this.openedDocuments.values().stream()
+                        .map(OpenedDocument::getFile)
+                        .toList());
                 while (!this.openedDocuments.isEmpty()) {
                     disconnect(this.openedDocuments.keySet().iterator().next(), false);
                 }
@@ -2120,6 +2295,32 @@ public class LanguageServerWrapper implements Disposable {
                 }
             }
         }
+    }
+
+    /**
+     * Disposes the LSP file support of the given files, which were connected to the stopped language server: it
+     * cancels their pending LSP requests and drops their cached results. LSP4J does not complete the requests which are
+     * still pending when the connection closes, so without this they would never complete, and each file would return
+     * them from its cache, even after a restart, until it is modified.
+     *
+     * @param files the files which were connected to the stopped language server.
+     */
+    private void disposeFileSupports(@NotNull List<VirtualFile> files) {
+        Project project = getProject();
+        if (files.isEmpty() || project.isDisposed()) {
+            return;
+        }
+        // stop() holds the monitor of this wrapper, so it must not wait for a read action to find the Psi files
+        ReadAction.nonBlocking(() -> {
+                    for (VirtualFile file : files) {
+                        PsiFile psiFile = LSPIJUtils.getPsiFile(file, project);
+                        if (psiFile != null && LSPFileSupport.hasSupport(psiFile)) {
+                            LSPFileSupport.getSupport(psiFile).dispose();
+                        }
+                    }
+                })
+                .expireWith(project)
+                .submit(AppExecutorUtil.getAppExecutorService());
     }
 
     private void shutdownAll(LanguageServer languageServerInstance, StreamConnectionProvider provider, Future<?> serverFuture) {
@@ -2195,11 +2396,18 @@ public class LanguageServerWrapper implements Disposable {
         }
         this.disposed = true;
         fileListener.disposeFileSystemWatchers();
-        stopAndRefreshEditorFeature(refreshEditorFeature, false);
-        stopDispatcher();
-        if (clientFeatures != null) {
-            clientFeatures.dispose();
-            clientFeatures = null;
+        try {
+            // A language server that never started has nothing to stop, and no status to report
+            if (currentInitializingContext != null || getServerStatus() != ServerStatus.none) {
+                stopAndRefreshEditorFeature(refreshEditorFeature, false);
+            }
+        } finally {
+            // Also when the stop fails, as when the connection fails to stop: the executors would keep their threads
+            stopDispatcher();
+            if (clientFeatures != null) {
+                clientFeatures.dispose();
+                clientFeatures = null;
+            }
         }
     }
 

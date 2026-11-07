@@ -33,6 +33,7 @@ import com.redhat.devtools.lsp4ij.console.explorer.TracingMessageConsumer;
 import com.redhat.devtools.lsp4ij.dap.DAPDebugProcess;
 import com.redhat.devtools.lsp4ij.dap.DebugMode;
 import com.redhat.devtools.lsp4ij.dap.TransportStreams;
+import com.redhat.devtools.lsp4ij.dap.breakpoints.DAPDataBreakpointHandler;
 import com.redhat.devtools.lsp4ij.dap.client.variables.DAPValueFormat;
 import com.redhat.devtools.lsp4ij.dap.descriptors.DebugAdapterDescriptor;
 import com.redhat.devtools.lsp4ij.dap.disassembly.DisassemblyFile;
@@ -123,6 +124,9 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
     // Whether the loaded sources and modules were asked for. They are asked for at the first stop, and then follow the
     // 'loadedSource' and 'module' events: asking at each stop would get all of them again at each step.
     private final AtomicBoolean loadedSourcesAndModulesAsked = new AtomicBoolean();
+    // Whether the last request that resumed the program was a step that resumed only its thread. A breakpoint which
+    // doesn't suspend then resumes only the stopped thread, so the threads the step kept stopped stay stopped.
+    private volatile boolean singleThreadResumed;
 
     public DAPClient(@NotNull DAPDebugProcess debugProcess,
                      @NotNull Map<String, Object> dapParameters,
@@ -225,6 +229,26 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
                                 .initialize(getDebugProtocolServer(), getCapabilities());
                     })
                     .thenCompose(v -> {
+                        // client sends a setFunctionBreakpoints request
+                        // if supportsFunctionBreakpoints returns true
+                        monitor.checkCanceled();
+                        monitor.setFraction(55d / 100d);
+                        monitor.setText2("Sending function breakpoints");
+                        return debugProcess
+                                .getFunctionBreakpointHandler()
+                                .initialize(getDebugProtocolServer(), getCapabilities());
+                    })
+                    .thenCompose(v -> {
+                        // client sends a setDataBreakpoints request
+                        // if supportsDataBreakpoints returns true
+                        monitor.checkCanceled();
+                        monitor.setFraction(57d / 100d);
+                        monitor.setText2("Sending data breakpoints");
+                        return debugProcess
+                                .getDataBreakpointHandler()
+                                .initialize(getDebugProtocolServer(), getCapabilities());
+                    })
+                    .thenCompose(v -> {
                         // client sends a setExceptionBreakpoints request
                         // if one or more exceptionBreakpointFilters have been defined
                         // (or if supportsConfigurationDoneRequest is not true)
@@ -313,11 +337,17 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
     }
 
     @Override
-    public void output(OutputEventArguments args) {
-        String output = args.getOutput();
-        if (!StringUtils.isEmpty(output)) {
-            debugProcess.print(output, getContentType(args.getCategory()));
+    public void exited(ExitedEventArguments args) {
+        // The process of the session is the debug adapter's, which ends with its own exit code: keep the program's
+        var processHandler = debugProcess.getProcessHandler();
+        if (processHandler != null) {
+            DAPDebugProcess.keepProgramExitCode(processHandler, args.getExitCode(), parentClient != null);
         }
+    }
+
+    @Override
+    public void output(OutputEventArguments args) {
+        debugProcess.printOutput(args.getOutput(), getContentType(args.getCategory()));
     }
 
     private static ConsoleViewContentType getContentType(String category) {
@@ -347,8 +377,12 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
             var breakpoint = args.getBreakpoint();
             if (breakpoint != null) {
                 // breakpoint with a given id changed (ex: verified changed)
-                // update the Intellij Breakpoint with those information.
+                // update the Intellij Breakpoint, a line, a function or a data breakpoint, with those information.
                 debugProcess.getBreakpointHandler()
+                        .updateBreakpoint(breakpoint, null);
+                debugProcess.getFunctionBreakpointHandler()
+                        .updateBreakpoint(breakpoint, null);
+                debugProcess.getDataBreakpointHandler()
                         .updateBreakpoint(breakpoint, null);
             }
         }
@@ -393,7 +427,7 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
     /**
      * Suspends the session where the given thread stopped. When a breakpoint stopped it, the session is told which
      * one; otherwise, the session is suspended at the top frame, and an exception which stopped the thread is shown
-     * there.
+     * there. What a data breakpoint saw change, as the stopped event describes it, is shown where the program stopped.
      *
      * @param server        the debug adapter.
      * @param args          the stopped event.
@@ -412,15 +446,21 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
         StackFrame topFrame = frames[0];
         DAPSuspendContext context = getSuspendContext(threads, stoppedThread, frames);
         var breakpointHandler = debugProcess.getBreakpointHandler();
-        XBreakpoint<?> breakpoint = getStopBreakpoint(args, breakpointHandler::findBreakpointById, () -> breakpointHandler.findBreakpoint(topFrame));
+        XBreakpoint<?> breakpoint = getStopBreakpoint(args, debugProcess::findBreakpointById, () -> breakpointHandler.findBreakpoint(topFrame));
         if (breakpoint != null) {
-            breakpointReached(getSession(), server, breakpoint, context, topFrame.getId(), stoppedThread.getId())
+            breakpointReached(getSession(), server, breakpoint, context, topFrame.getId(), stoppedThread.getId(),
+                    singleThreadResumed ? Boolean.TRUE : null)
                     .exceptionally(this::reportBreakpointFailure);
+            if (breakpoint.getSuspendPolicy() != SuspendPolicy.NONE) {
+                showDataBreakpointHint(getProject(), context, args, DAPClient::showInformationHint);
+            }
             return;
         }
         getSession().positionReached(context);
         if (StoppedEventArgumentsReason.EXCEPTION.equals(args.getReason())) {
             showExceptionHint(getProject(), context, server, getCapabilities(), args, DAPClient::showErrorHint);
+        } else {
+            showDataBreakpointHint(getProject(), context, args, DAPClient::showInformationHint);
         }
     }
 
@@ -508,7 +548,40 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
                                                                @NotNull IDebugProtocolServer server,
                                                                @NotNull Capabilities capabilities,
                                                                @NotNull StoppedEventArguments args,
-                                                               @NotNull ErrorHintDisplay display) {
+                                                               @NotNull HintDisplay display) {
+        return showStopHint(project, context, () -> getExceptionHint(server, capabilities, args), display);
+    }
+
+    /**
+     * Shows the hint of a data breakpoint stop where the program stopped, in an editor of the top frame's file, with
+     * the stopped event's description of what changed, such as {@code Counter.count changed from 0 to 2}. A stop of
+     * another reason, or with no description, shows nothing.
+     *
+     * @param project the project.
+     * @param context the suspend context of the stop.
+     * @param args    the stopped event.
+     * @param display shows the text of the hint in the editor, at the offset where the program stopped.
+     * @return the future, completed once the display of the hint is scheduled, if there is one.
+     */
+    static CompletableFuture<@Nullable Void> showDataBreakpointHint(@NotNull Project project,
+                                                                    @NotNull XSuspendContext context,
+                                                                    @NotNull StoppedEventArguments args,
+                                                                    @NotNull HintDisplay display) {
+        String description = args.getDescription();
+        if (!StoppedEventArgumentsReason.DATA_BREAKPOINT.equals(args.getReason()) || StringUtils.isBlank(description)) {
+            return CompletableFuture.completedFuture(null);
+        }
+        return showStopHint(project, context, () -> CompletableFuture.completedFuture(description), display);
+    }
+
+    /**
+     * Shows a hint where the program stopped, in an editor of the top frame's file, with the text which the given
+     * supplier computes. When no editor shows the file, the text is not computed.
+     */
+    private static CompletableFuture<@Nullable Void> showStopHint(@NotNull Project project,
+                                                                  @NotNull XSuspendContext context,
+                                                                  @NotNull Supplier<CompletableFuture<String>> hintText,
+                                                                  @NotNull HintDisplay display) {
         var stack = context.getActiveExecutionStack();
         var topFrame = stack != null ? stack.getTopFrame() : null;
         var position = topFrame != null ? topFrame.getSourcePosition() : null;
@@ -525,17 +598,17 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
         // has occurred before computing the error hint position.
         // TODO: remove this timer by detecting that scroll editor is finished
         // to display the error hint
-        return getExceptionHint(server, capabilities, args)
+        return hintText.get()
                 .thenAccept(hint -> AppExecutorUtil.getAppScheduledExecutorService().schedule(
                         () -> ApplicationManager.getApplication().invokeLater(() -> display.show(editor, hint, offset)),
                         1, TimeUnit.SECONDS));
     }
 
     /**
-     * Shows the text of an error hint in an editor, at an offset.
+     * Shows the text of a hint in an editor, at an offset.
      */
     @FunctionalInterface
-    interface ErrorHintDisplay {
+    interface HintDisplay {
         void show(@NotNull Editor editor, @NotNull String text, int offset);
     }
 
@@ -611,12 +684,14 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
      * A breakpoint which doesn't suspend is sent as a logpoint, so a debug adapter which supports logpoints doesn't
      * stop at it; one which doesn't support them stops, and is resumed here once IntelliJ has logged.
      *
-     * @param session    the debug session.
-     * @param server     the debug adapter.
-     * @param breakpoint the IntelliJ breakpoint where the program stopped.
-     * @param context    the suspend context of the stop.
-     * @param frameId    the DAP frame where the program stopped.
-     * @param threadId   the DAP thread which stopped.
+     * @param session      the debug session.
+     * @param server       the debug adapter.
+     * @param breakpoint   the IntelliJ breakpoint where the program stopped.
+     * @param context      the suspend context of the stop.
+     * @param frameId      the DAP frame where the program stopped.
+     * @param threadId     the DAP thread which stopped.
+     * @param singleThread true to resume only the stopped thread, when a step resumed it alone, and null to resume
+     *                     every thread.
      * @return the future, completed once the session is told and the program resumed if it must be.
      */
     static CompletableFuture<@Nullable Void> breakpointReached(@NotNull XDebugSession session,
@@ -624,7 +699,8 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
                                                                @NotNull XBreakpoint<?> breakpoint,
                                                                @NotNull XSuspendContext context,
                                                                int frameId,
-                                                               int threadId) {
+                                                               int threadId,
+                                                               @Nullable Boolean singleThread) {
         return evaluateLogExpression(server, breakpoint, frameId)
                 .thenCompose(logged -> {
                     if (session.breakpointReached(breakpoint, logged, context)) {
@@ -633,6 +709,7 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
                     // The breakpoint doesn't suspend: resume the program
                     ContinueArguments args = new ContinueArguments();
                     args.setThreadId(threadId);
+                    args.setSingleThread(singleThread);
                     return server.continue_(args).thenAccept(response -> {
                     });
                 });
@@ -688,7 +765,31 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
             // The editor was closed between the stop and the hint
             return;
         }
-        JComponent label = HintUtil.createErrorLabel(hintText);
+        doShowHint(editor, HintUtil.createErrorLabel(hintText), offset);
+    }
+
+    static void showInformationHint(@NotNull Editor editor, @NotNull String text, int offset) {
+        if (ApplicationManager.getApplication().isUnitTestMode()) {
+            return;
+        }
+        String html = toHintHtml(text);
+        if (ApplicationManager.getApplication().isDispatchThread()) {
+            doShowInformationHint(editor, html, offset);
+        } else {
+            ApplicationManager.getApplication()
+                    .invokeLater(() -> doShowInformationHint(editor, html, offset));
+        }
+    }
+
+    private static void doShowInformationHint(@NotNull Editor editor, @NotNull String hintText, int offset) {
+        if (editor.isDisposed()) {
+            // The editor was closed between the stop and the hint
+            return;
+        }
+        doShowHint(editor, HintUtil.createInformationLabel(hintText), offset);
+    }
+
+    private static void doShowHint(@NotNull Editor editor, @NotNull JComponent label, int offset) {
         LightweightHint hint = new LightweightHint(label);
         final VisualPosition pos1 = editor.offsetToVisualPosition(offset);
         final Point p = getHintPosition(hint, editor, pos1, HintManager.DEFAULT);
@@ -793,28 +894,67 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
         }
         ContinueArguments args = new ContinueArguments();
         args.setThreadId(threadId);
+        singleThreadResumed = false;
         return debugProtocolServer
                 .continue_(args);
     }
 
     public void next(int threadId, @Nullable SteppingGranularity granularity) {
-        if (debugProtocolServer == null) {
+        var server = debugProtocolServer;
+        if (server == null) {
             return;
         }
+        var singleThread = singleThreadStep();
+        singleThreadResumed = singleThread != null;
+        next(server, threadId, granularity, singleThread);
+    }
+
+    /**
+     * Sends 'next', Step Over, for the given thread.
+     *
+     * @param server       the DAP server.
+     * @param threadId     the thread which steps.
+     * @param granularity  the granularity of the step, or null for the DAP server's default.
+     * @param singleThread true to resume only the thread which steps, and null to resume every thread.
+     */
+    static void next(@NotNull IDebugProtocolServer server,
+                     int threadId,
+                     @Nullable SteppingGranularity granularity,
+                     @Nullable Boolean singleThread) {
         NextArguments args = new NextArguments();
         args.setThreadId(threadId);
         args.setGranularity(granularity);
-        debugProtocolServer.next(args);
+        args.setSingleThread(singleThread);
+        server.next(args);
     }
 
     public void stepOut(int threadId, SteppingGranularity granularity) {
-        if (debugProtocolServer == null) {
+        var server = debugProtocolServer;
+        if (server == null) {
             return;
         }
+        var singleThread = singleThreadStep();
+        singleThreadResumed = singleThread != null;
+        stepOut(server, threadId, granularity, singleThread);
+    }
+
+    /**
+     * Sends 'stepOut', Step Out, for the given thread.
+     *
+     * @param server       the DAP server.
+     * @param threadId     the thread which steps.
+     * @param granularity  the granularity of the step, or null for the DAP server's default.
+     * @param singleThread true to resume only the thread which steps, and null to resume every thread.
+     */
+    static void stepOut(@NotNull IDebugProtocolServer server,
+                        int threadId,
+                        @Nullable SteppingGranularity granularity,
+                        @Nullable Boolean singleThread) {
         StepOutArguments args = new StepOutArguments();
         args.setThreadId(threadId);
         args.setGranularity(granularity);
-        debugProtocolServer.stepOut(args);
+        args.setSingleThread(singleThread);
+        server.stepOut(args);
     }
 
     public void stepIn(int threadId, SteppingGranularity granularity) {
@@ -822,14 +962,56 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
     }
 
     public void stepIn(int threadId, @Nullable Integer targetId, @Nullable SteppingGranularity granularity) {
-        if (debugProtocolServer == null) {
+        var server = debugProtocolServer;
+        if (server == null) {
             return;
         }
+        var singleThread = singleThreadStep();
+        singleThreadResumed = singleThread != null;
+        stepIn(server, threadId, targetId, granularity, singleThread);
+    }
+
+    /**
+     * Sends 'stepIn', Step Into, or Smart Step Into with a target, for the given thread.
+     *
+     * @param server       the DAP server.
+     * @param threadId     the thread which steps.
+     * @param targetId     the target to step into, from 'stepInTargets', or null.
+     * @param granularity  the granularity of the step, or null for the DAP server's default.
+     * @param singleThread true to resume only the thread which steps, and null to resume every thread.
+     */
+    static void stepIn(@NotNull IDebugProtocolServer server,
+                       int threadId,
+                       @Nullable Integer targetId,
+                       @Nullable SteppingGranularity granularity,
+                       @Nullable Boolean singleThread) {
         StepInArguments args = new StepInArguments();
         args.setThreadId(threadId);
         args.setTargetId(targetId);
         args.setGranularity(granularity);
-        debugProtocolServer.stepIn(args);
+        args.setSingleThread(singleThread);
+        server.stepIn(args);
+    }
+
+    /**
+     * Returns the value of a step request's 'singleThread': true when the user chose to step only the current thread
+     * and the DAP server supports single thread execution requests, and null, which leaves it out, otherwise.
+     */
+    private @Nullable Boolean singleThreadStep() {
+        return singleThreadStep(debugProcess.isStepOnlyCurrentThread(), getCapabilities());
+    }
+
+    /**
+     * Returns the value of a step request's 'singleThread'.
+     *
+     * @param stepOnlyCurrentThread true if the user chose to step only the current thread.
+     * @param capabilities          the capabilities of the DAP server.
+     * @return true when the user chose to step only the current thread and the DAP server supports single thread
+     * execution requests, and null otherwise.
+     */
+    static @Nullable Boolean singleThreadStep(boolean stepOnlyCurrentThread, @NotNull Capabilities capabilities) {
+        return stepOnlyCurrentThread && Boolean.TRUE.equals(capabilities.getSupportsSingleThreadExecutionRequests())
+                ? Boolean.TRUE : null;
     }
 
     /**
@@ -877,18 +1059,59 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
         return debugProtocolServer.stepInTargets(args);
     }
 
+    /**
+     * What the debug console shows for a typed line that it cannot send, since the debug session is not connected to
+     * the debug adapter yet.
+     */
+    public static final String CONSOLE_LINE_NOT_SENT = "The line was not sent: the debug adapter is not connected yet.";
+
     public CompletableFuture<EvaluateResponse> evaluate(@NotNull String expression,
                                                         @Nullable Integer frameId,
                                                         @NotNull String context) {
         if (debugProtocolServer == null) {
             return CompletableFuture.completedFuture(null);
         }
+        return evaluate(debugProtocolServer, expression, frameId, context, getValueFormat());
+    }
+
+    private static CompletableFuture<EvaluateResponse> evaluate(@NotNull IDebugProtocolServer server,
+                                                                @NotNull String expression,
+                                                                @Nullable Integer frameId,
+                                                                @NotNull String context,
+                                                                @Nullable ValueFormat format) {
         EvaluateArguments args = new EvaluateArguments();
         args.setExpression(expression);
         args.setFrameId(frameId);
         args.setContext(context);
-        args.setFormat(getValueFormat());
-        return debugProtocolServer.evaluate(args);
+        args.setFormat(format);
+        return server.evaluate(args);
+    }
+
+    /**
+     * Evaluates a line typed in the debug console, as VS Code's Debug Console does: an evaluate request with the
+     * context repl, in the given stack frame when the program is stopped. A debug adapter which takes a running
+     * program's input over the debug connection can take the line as the program's input.
+     *
+     * @param line    the typed line, without its line end.
+     * @param frameId the selected stack frame, or null when the program runs.
+     * @return the text the console shows for the line: its result, or null when there is none, as when the program
+     * took the line as its input; it fails with the debug adapter's error, or with {@link #CONSOLE_LINE_NOT_SENT}
+     * when the client is not connected to the debug adapter yet.
+     */
+    public CompletableFuture<@Nullable String> evaluateConsoleLine(@NotNull String line, @Nullable Integer frameId) {
+        return evaluateConsoleLine(debugProtocolServer, line, frameId, getValueFormat());
+    }
+
+    static CompletableFuture<@Nullable String> evaluateConsoleLine(@Nullable IDebugProtocolServer server,
+                                                                   @NotNull String line,
+                                                                   @Nullable Integer frameId,
+                                                                   @Nullable ValueFormat format) {
+        if (server == null) {
+            return CompletableFuture.failedFuture(new IllegalStateException(CONSOLE_LINE_NOT_SENT));
+        }
+        return evaluate(server, line, frameId, EvaluateArgumentsContext.REPL, format)
+                .thenApply(response -> response != null && !StringUtils.isBlank(response.getResult()) ?
+                        response.getResult() : null);
     }
 
     public CompletableFuture<CompletionsResponse> completion(@NotNull String text,
@@ -1139,6 +1362,35 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
      * @return true if the debug adapter, or that of a child session, supports value formatting options, and false
      * otherwise.
      */
+    /**
+     * Returns true if the DAP server supports single thread execution requests, whose 'singleThread' resumes only the
+     * thread of a step, and false otherwise.
+     *
+     * @return true if the DAP server supports single thread execution requests, and false otherwise.
+     */
+    public boolean isSupportsSingleThreadExecutionRequests() {
+        return Boolean.TRUE.equals(getCapabilities().getSupportsSingleThreadExecutionRequests());
+    }
+
+    /**
+     * Returns true if the DAP server of this client, or that of a child session, supports single thread execution
+     * requests, and false otherwise.
+     *
+     * @return true if the DAP server of this client, or that of a child session, supports single thread execution
+     * requests, and false otherwise.
+     */
+    public boolean isSupportsSingleThreadExecutionRequestsInSessions() {
+        if (isSupportsSingleThreadExecutionRequests()) {
+            return true;
+        }
+        for (DAPClient child : List.copyOf(childrenClient)) {
+            if (child.isSupportsSingleThreadExecutionRequestsInSessions()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     public boolean isSupportsValueFormattingOptionsInSessions() {
         if (isSupportsValueFormattingOptions()) {
             return true;
@@ -1163,6 +1415,24 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
 
     public boolean canDisassemble() {
         return Boolean.TRUE.equals(getCapabilities().getSupportsDisassembleRequest());
+    }
+
+    /**
+     * Returns true if the debug adapter supports data breakpoints and false otherwise.
+     *
+     * @return true if the debug adapter supports data breakpoints and false otherwise.
+     */
+    public boolean isSupportsDataBreakpoints() {
+        return DAPDataBreakpointHandler.isSupportsDataBreakpoints(getCapabilities());
+    }
+
+    /**
+     * Returns the handler of the data breakpoints of the debug session.
+     *
+     * @return the handler of the data breakpoints of the debug session.
+     */
+    public @NotNull DAPDataBreakpointHandler getDataBreakpointHandler() {
+        return debugProcess.getDataBreakpointHandler();
     }
 
     @NotNull

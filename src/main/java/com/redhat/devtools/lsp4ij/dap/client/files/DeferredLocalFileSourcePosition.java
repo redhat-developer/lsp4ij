@@ -15,7 +15,6 @@ import com.intellij.openapi.application.ApplicationManager;
 import static com.redhat.devtools.lsp4ij.internal.ApplicationUtils.runCancellableReadAction;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.fileEditor.FileDocumentManager;
-import com.intellij.openapi.vfs.LocalFileSystem;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.testFramework.LightVirtualFile;
 import org.jetbrains.annotations.NotNull;
@@ -101,8 +100,8 @@ public final class DeferredLocalFileSourcePosition extends DeferredSourcePositio
         if (resolvedFile != null) {
             return;
         }
-        VirtualFile file = LocalFileSystem.getInstance().findFileByPath(filePath.toString());
-        if (file == null || !file.isValid()) {
+        VirtualFile file = LocalSourceFiles.findFile(filePath);
+        if (file == null) {
             return;
         }
         int resolvedOffset = runCancellableReadAction(() -> computeOffset(file, line), ApplicationManager.getApplication());

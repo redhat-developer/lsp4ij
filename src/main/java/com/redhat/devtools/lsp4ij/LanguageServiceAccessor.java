@@ -20,6 +20,7 @@ import com.intellij.openapi.fileTypes.FileType;
 import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.project.ProjectManager;
+import com.intellij.openapi.util.Disposer;
 import com.intellij.openapi.util.ModificationTracker;
 import com.intellij.openapi.util.SimpleModificationTracker;
 import com.intellij.openapi.vfs.VirtualFile;
@@ -86,10 +87,17 @@ public class LanguageServiceAccessor implements Disposable {
                     .stream()
                     .filter(server -> event.serverDefinitions.contains(server.getServerDefinition()))
                     .toList();
-            serversToDispose.forEach(wrapper -> wrapper.dispose(!ApplicationManager.getApplication().isUnitTestMode())); // dispose by removing code vision, inlay hints, folding from editors
-            // Remove all servers which are removed from the cache
-            synchronized (startedServers) {
-                serversToDispose.forEach(startedServers::remove);
+            for (var wrapper : serversToDispose) {
+                try {
+                    // dispose by removing code vision, inlay hints, folding from editors
+                    disposeLoggingFailure(wrapper, !ApplicationManager.getApplication().isUnitTestMode());
+                } finally {
+                    // Remove each server from the cache once it had its dispose: a cancellation ends the loop, and the
+                    // servers it never reached stay started, for a later removal or close to dispose
+                    synchronized (startedServers) {
+                        startedServers.remove(wrapper);
+                    }
+                }
             }
         }
 
@@ -421,6 +429,9 @@ public class LanguageServiceAccessor implements Disposable {
         boolean readAccessAllowed = ApplicationManager.getApplication().isReadAccessAllowed();
         Document document = readAccessAllowed || (!writeAccessAllowed) ? LSPIJUtils.getDocument(psiFile) : null;
         var file = psiFile.getVirtualFile();
+        // A close of the file's last editor after this, as when a feature of the editor asks just as it closes,
+        // disconnects the file, which the connection made later must not connect again
+        int editorCloses = ConnectDocumentToLanguageServerSetupParticipant.getEditorCloses(file);
 
         // Try to get document, languageId information (used by didOpen) for each matched language server wrapper
         // since here we should be in Read Action allowed
@@ -454,7 +465,7 @@ public class LanguageServiceAccessor implements Disposable {
                                                         if (info == null) {
                                                             info = new LanguageServerWrapper.LSPFileConnectionInfo(document, null, null, !writeAccessAllowed);
                                                         }
-                                                        return scope == null ? wrapper.connect(file, info) : wrapper.connect(file, info, scope);
+                                                        return scope == null ? wrapper.connect(file, info, editorCloses) : wrapper.connect(file, info, scope);
                                                     }
                                                     return CompletableFuture.completedFuture(null);
                                                 }).thenAccept(server -> {
@@ -555,7 +566,15 @@ public class LanguageServiceAccessor implements Disposable {
                 if (!useExistingServer) {
                     // There are none started servers which matches the file, create and add it.
                     LanguageServerWrapper wrapper = new LanguageServerWrapper(project, serverDefinition);
-                    if (beforeStartingServerFilter == null || beforeStartingServerFilter.test(wrapper.getClientFeatures())) {
+                    boolean accepted = false;
+                    try {
+                        accepted = beforeStartingServerFilter == null || beforeStartingServerFilter.test(wrapper.getClientFeatures());
+                    } finally {
+                        if (!accepted) {
+                            Disposer.dispose(wrapper);
+                        }
+                    }
+                    if (accepted) {
                         startedServers.add(wrapper);
                         matchedServers.add(wrapper);
                     }
@@ -715,12 +734,36 @@ public class LanguageServiceAccessor implements Disposable {
 
     private void disposeAllServers() {
         synchronized (startedServers) {
-            startedServers.forEach(ls -> {
-                if (project.equals(ls.getProject())) {
-                    ls.dispose();
+            for (var servers = startedServers.iterator(); servers.hasNext(); ) {
+                var ls = servers.next();
+                try {
+                    if (project.equals(ls.getProject())) {
+                        disposeLoggingFailure(ls, false);
+                    }
+                } finally {
+                    // Forget each server once it had its dispose: a cancellation ends the loop, and the servers it
+                    // never reached stay started, for a later close to dispose
+                    servers.remove();
                 }
-            });
-            startedServers.clear();
+            }
+        }
+    }
+
+    /**
+     * Disposes the given language server, and logs a failure of its dispose, for instance as its connection fails to
+     * stop, so that it neither keeps the other servers from being disposed nor stays among the started servers.
+     *
+     * @param wrapper              the language server to dispose.
+     * @param refreshEditorFeature true if the code vision, inlay hints and folding of its opened editors must be
+     *                             removed and false otherwise.
+     */
+    private static void disposeLoggingFailure(@NotNull LanguageServerWrapper wrapper, boolean refreshEditorFeature) {
+        try {
+            wrapper.dispose(refreshEditorFeature);
+        } catch (ProcessCanceledException cancellation) {
+            throw cancellation;
+        } catch (Exception e) {
+            LOGGER.warn("Error while disposing the language server '{}'.", wrapper.getServerDefinition().getId(), e);
         }
     }
 

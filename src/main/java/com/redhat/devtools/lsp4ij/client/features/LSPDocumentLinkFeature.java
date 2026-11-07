@@ -40,6 +40,16 @@ public class LSPDocumentLinkFeature extends AbstractLSPDocumentFeature {
         return getDocumentLinkCapabilityRegistry().isDocumentLinkSupported(file);
     }
 
+    /**
+     * Returns true if the language server can support documentLink/resolve and false otherwise.
+     *
+     * @param file the Psi file.
+     * @return true if the language server can support documentLink/resolve and false otherwise.
+     */
+    public boolean isResolveDocumentLinkSupported(@NotNull PsiFile file) {
+        return getDocumentLinkCapabilityRegistry().isResolveDocumentLinkSupported(file);
+    }
+
     public DocumentLinkCapabilityRegistry getDocumentLinkCapabilityRegistry() {
         if (documentLinkCapabilityRegistry == null) {
             initDocumentLinkCapabilityRegistry();

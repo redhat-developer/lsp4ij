@@ -16,9 +16,11 @@ import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiFile;
 import com.intellij.testFramework.PlatformTestUtil;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
+import com.redhat.devtools.lsp4ij.LanguageServerWrapper;
 import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
 import com.redhat.devtools.lsp4ij.ServerStatus;
 import com.redhat.devtools.lsp4ij.client.features.FileUriSupport;
+import com.redhat.devtools.lsp4ij.features.codeAction.CodeActionData;
 import com.redhat.devtools.lsp4ij.fixtures.LSPCodeInsightFixtureTestCase;
 import com.redhat.devtools.lsp4ij.mock.MockLanguageServer;
 import org.eclipse.lsp4j.*;
@@ -73,7 +75,7 @@ public class LSPLazyCodeActionsTest extends LSPCodeInsightFixtureTestCase {
         MockLanguageServer.INSTANCE.setCodeActions(List.of(Either.forRight(quickFix)));
 
         var codeActions = new LSPLazyCodeActions(List.of(diagnostic), file.getVirtualFile(), languageServer);
-        var codeAction = codeActions.getCodeActionAt(0);
+        var codeAction = load(codeActions);
 
         assertNotNull(codeAction);
         assertTrue(codeAction.isLeft());
@@ -141,7 +143,7 @@ public class LSPLazyCodeActionsTest extends LSPCodeInsightFixtureTestCase {
         }
         MockLanguageServer.INSTANCE.setTimeToProceedQueries(0);
 
-        var codeAction = codeActions.getCodeActionAt(0);
+        var codeAction = load(codeActions);
 
         assertNotNull(codeAction);
         assertTrue(codeAction.isLeft());
@@ -189,12 +191,35 @@ public class LSPLazyCodeActionsTest extends LSPCodeInsightFixtureTestCase {
             // The request cancelled before it was sent fails the pending load; only the next load matters here.
         }
 
-        var codeAction = codeActions.getCodeActionAt(0);
+        var codeAction = load(codeActions);
 
         assertNotNull(codeAction);
         assertTrue(codeAction.isLeft());
         // The request cancelled while the server initialized must not be sent; only the new load's request is.
         assertEquals(1, textDocumentService.codeActionRequests);
+    }
+
+    public void testCodeActionsOfADisposedLanguageServerAreNone() throws Exception {
+        PsiFile file = myFixture.configureByText("test.ts", "const foo = 1;");
+        // A language server of the file's definition that is disposed, as one whose definition was removed, gives no
+        // server; the quick fixes made for its diagnostics then have no code actions, and their request no failure
+        var definition = getLanguageServer(file).getServerWrapper().getServerDefinition();
+        var disposed = new LanguageServerWrapper(myFixture.getProject(), definition);
+        disposed.dispose();
+        var codeActions = new LSPLazyCodeActions(List.of(createDiagnostic()), file.getVirtualFile(),
+                new LanguageServerItem(null, disposed));
+
+        assertEquals(Either.forRight(Boolean.FALSE), load(codeActions));
+    }
+
+    /**
+     * Loads the first code action as the highlighting passes do, off the EDT, which never waits for the language
+     * server's answer.
+     */
+    private static Either<CodeActionData, Boolean> load(LSPLazyCodeActions codeActions) throws Exception {
+        return ApplicationManager.getApplication()
+                .executeOnPooledThread(() -> codeActions.getCodeActionAt(0))
+                .get(10, TimeUnit.SECONDS);
     }
 
     private LanguageServerItem getLanguageServer(PsiFile file) throws Exception {

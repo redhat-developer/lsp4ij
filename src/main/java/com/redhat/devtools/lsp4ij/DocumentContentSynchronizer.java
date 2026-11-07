@@ -270,6 +270,8 @@ public class DocumentContentSynchronizer implements DocumentListener, Disposable
      * <p>
      * Before the document is opened, the server has no document for such a request, so this opens it;
      * the didOpen is followed by the pending changes, and the future completes once both are dispatched.
+     * <p>
+     * Cancelling the returned future doesn't cancel the notifications, or make them look dispatched.
      *
      * @return a CompletableFuture that completes when all didChange notifications have been dispatched
      */
@@ -281,9 +283,10 @@ public class DocumentContentSynchronizer implements DocumentListener, Disposable
         if (beforeOpen) {
             var open = getDidOpenFuture();
             var sent = openSent;
-            return sent != null ? sent : open.thenApply(ls -> null);
+            return sent != null ? sent.copy() : open.thenApply(ls -> null);
         }
-        return sendDidChangeEvents();
+        // A copy, so that a caller who cancels it leaves the dispatch tracked, as isCurrentTextSent reads it
+        return sendDidChangeEvents().copy();
     }
 
     /**
@@ -308,7 +311,7 @@ public class DocumentContentSynchronizer implements DocumentListener, Disposable
     CompletableFuture<Void> getChangesSent() {
         synchronized (changeEvents) {
             if (changeEvents.isEmpty()) {
-                return lastDidChangeFuture;
+                return lastDidChangeFuture.copy();
             }
         }
         return CompletableFuture.supplyAsync(this::sendDidChangeEvents)
@@ -324,7 +327,7 @@ public class DocumentContentSynchronizer implements DocumentListener, Disposable
      */
     @NotNull
     CompletableFuture<Void> getLastChangeSent() {
-        return lastDidChangeFuture;
+        return lastDidChangeFuture.copy();
     }
 
     /**
@@ -599,9 +602,26 @@ public class DocumentContentSynchronizer implements DocumentListener, Disposable
      */
     boolean isCurrentVersion(int expectedVersion) {
         synchronized (changeEvents) {
-            return version == expectedVersion && changeEvents.isEmpty()
-                    && document.getModificationStamp() == synchronizedModificationStamp;
+            return version == expectedVersion && isCurrentTextAssigned();
         }
+    }
+
+    /**
+     * Returns whether the current buffer has been handed to the server's connection: no change is pending, and the
+     * notification with the current text, didOpen or didChange, has been dispatched to the connection, which writes
+     * its messages in order. A request sent after this returns true reaches the server after that text, even one
+     * that does not wait for the document's changes. A message from the server can still cross that text.
+     */
+    boolean isCurrentTextSent() {
+        synchronized (changeEvents) {
+            var open = didOpenNotification;
+            return isCurrentTextAssigned() && lastDidChangeFuture.isDone() && (open == null || open.isDone());
+        }
+    }
+
+    // The caller holds changeEvents
+    private boolean isCurrentTextAssigned() {
+        return changeEvents.isEmpty() && document.getModificationStamp() == synchronizedModificationStamp;
     }
 
     @Override

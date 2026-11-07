@@ -23,6 +23,7 @@ import org.eclipse.lsp4j.TextEdit;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
 
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -67,18 +68,21 @@ public class WillSaveTest extends LSPCodeInsightFixtureTestCase {
         serverAsks(false, true);
         MockLanguageServer.INSTANCE.getTextDocumentService().setWillSaveWaitUntilCallback(
                 List.of(new TextEdit(new Range(new Position(0, 0), new Position(0, 0)), "late ")));
-        MockLanguageServer.INSTANCE.getTextDocumentService().setWillSaveWaitUntilDelayMs(5000);
+        var answers = holdAnswers();
         var file = open("text");
 
-        for (int save = 1; save <= 4; save++) {
-            type(" " + save);
-            long start = System.nanoTime();
-            save();
-            assertTrue("the save must not wait much longer than the willSaveWaitUntil budget",
-                    TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start) < 4000);
-            // ends the UI event, as between two saves by the user
-            PlatformTestUtil.dispatchAllEventsInIdeEventQueue();
-            assertFalse("edits that come too late must be dropped", VfsUtilCore.loadText(file.getVirtualFile()).startsWith("late"));
+        try {
+            for (int save = 1; save <= 4; save++) {
+                type(" " + save);
+                save();
+                assertFalse("the save must stop waiting for the server when the willSaveWaitUntil budget ends",
+                        answers.isDone());
+                // ends the UI event, as between two saves by the user
+                PlatformTestUtil.dispatchAllEventsInIdeEventQueue();
+                assertFalse("edits that come too late must be dropped", VfsUtilCore.loadText(file.getVirtualFile()).startsWith("late"));
+            }
+        } finally {
+            answers.complete(null);
         }
         PlatformTestUtil.waitWithEventsDispatching("the server must be told of the saves",
                 () -> received().stream().filter("didSave"::equals).count() == 4, 10);
@@ -88,7 +92,7 @@ public class WillSaveTest extends LSPCodeInsightFixtureTestCase {
 
     public void testTheDocumentsSavedTogetherShareTheBudget() throws Exception {
         serverAsks(true, true);
-        MockLanguageServer.INSTANCE.getTextDocumentService().setWillSaveWaitUntilDelayMs(5000);
+        var answers = holdAnswers();
         open("text");
         var other = myFixture.addFileToProject("other.foo", "other");
         LanguageServiceAccessor.getInstance(myFixture.getProject()).getLanguageServers(other, null, null).get(30, TimeUnit.SECONDS);
@@ -97,15 +101,18 @@ public class WillSaveTest extends LSPCodeInsightFixtureTestCase {
         type("more ");
         WriteCommandAction.runWriteCommandAction(myFixture.getProject(), () -> otherDocument.insertString(0, "more "));
 
-        long start = System.nanoTime();
-        FileDocumentManager.getInstance().saveAllDocuments();
-
-        assertTrue("Save All must wait once for a slow server, not once per document",
-                TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start) < 2500);
+        try {
+            FileDocumentManager.getInstance().saveAllDocuments();
+            assertFalse("Save All must stop waiting for the server when the willSaveWaitUntil budget ends",
+                    answers.isDone());
+        } finally {
+            answers.complete(null);
+        }
         PlatformTestUtil.waitWithEventsDispatching("the server must be told of both saves",
                 () -> received().stream().filter("didSave"::equals).count() == 2, 10);
         assertEquals(2, received().stream().filter("willSave:Manual"::equals).count());
-        assertEquals("the second document finds the budget used up", 1,
+        // a save waits only for the willSaveWaitUntil it sends, and the second document finds the budget used up
+        assertEquals("Save All must wait once for a slow server, not once per document", 1,
                 received().stream().filter("willSaveWaitUntil"::equals).count());
     }
 
@@ -134,6 +141,13 @@ public class WillSaveTest extends LSPCodeInsightFixtureTestCase {
             capabilities.setTextDocumentSync(sync);
             return capabilities;
         });
+    }
+
+    // the server answers willSaveWaitUntil only once the returned future is completed; the minute only bounds a save
+    // that would wait for the answer, which then fails the test instead of hanging it
+    private static CompletableFuture<Void> holdAnswers() {
+        return MockLanguageServer.INSTANCE.getTextDocumentService().holdWillSaveWaitUntil()
+                .completeOnTimeout(null, 1, TimeUnit.MINUTES);
     }
 
     private PsiFile open(String text) throws Exception {

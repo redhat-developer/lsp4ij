@@ -92,6 +92,7 @@ public abstract class DAPBreakpointHandlerBase<B extends XBreakpoint<?>> extends
 
     private static void addSourceBreakpoint(@NotNull XSourcePosition sourcePosition,
                                             @Nullable XExpression conditionExpression,
+                                            @Nullable String hitCondition,
                                             @Nullable String logMessage,
                                             @NotNull Map<Source, List<SourceBreakpoint>> targetBreakpoints) {
         Source source = toDAPSource(sourcePosition);
@@ -102,6 +103,10 @@ public abstract class DAPBreakpointHandlerBase<B extends XBreakpoint<?>> extends
             // Breakpoint with condition
             sourceBreakpoint.setCondition(conditionExpression.getExpression());
         }
+        if (hitCondition != null) {
+            // Breakpoint with hit condition
+            sourceBreakpoint.setHitCondition(hitCondition);
+        }
         if (logMessage != null) {
             // Logpoint: the debug adapter logs the message instead of stopping
             sourceBreakpoint.setLogMessage(logMessage);
@@ -109,6 +114,20 @@ public abstract class DAPBreakpointHandlerBase<B extends XBreakpoint<?>> extends
         List<SourceBreakpoint> sourceBreakpoints = targetBreakpoints
                 .computeIfAbsent(source, s -> new ArrayList<>());
         sourceBreakpoints.add(sourceBreakpoint);
+    }
+
+    /**
+     * Returns the hit condition of a DAP breakpoint, and null if it has none.
+     *
+     * @param breakpoint the IntelliJ breakpoint.
+     * @return the hit condition of a DAP breakpoint, and null if it has none.
+     */
+    private static @Nullable String getHitCondition(@NotNull XBreakpoint<?> breakpoint) {
+        if (breakpoint.getProperties() instanceof DAPBreakpointProperties properties
+                && StringUtils.isNotBlank(properties.getHitCondition())) {
+            return properties.getHitCondition();
+        }
+        return null;
     }
 
     /**
@@ -160,7 +179,7 @@ public abstract class DAPBreakpointHandlerBase<B extends XBreakpoint<?>> extends
         for (B breakpoint : breakpoints) {
             var sourcePosition = breakpoint.getSourcePosition();
             if (sourcePosition != null && !isShadowed(breakpoint, dapBreakpointLines)) {
-                addSourceBreakpoint(sourcePosition, breakpoint.getConditionExpression(), getLogMessage(breakpoint), targetBreakpoints);
+                addSourceBreakpoint(sourcePosition, breakpoint.getConditionExpression(), getHitCondition(breakpoint), getLogMessage(breakpoint), targetBreakpoints);
                 targetIJBreakpoints.computeIfAbsent(toDAPSource(sourcePosition), s -> new ArrayList<>()).add(breakpoint);
             }
         }
@@ -168,13 +187,13 @@ public abstract class DAPBreakpointHandlerBase<B extends XBreakpoint<?>> extends
         // The registered temporary breakpoint, as of "Run to Cursor", stays in each request for its source
         XSourcePosition registered = getRegisteredTemporaryBreakpoint();
         if (registered != null) {
-            addSourceBreakpoint(registered, null, null, targetBreakpoints);
+            addSourceBreakpoint(registered, null, null, null, targetBreakpoints);
             targetIJBreakpoints.computeIfAbsent(toDAPSource(registered), s -> new ArrayList<>()).add(null);
         }
 
         if (temporaryBreakpoint != null) {
             if (temporaryBreakpoint.add()) {
-                addSourceBreakpoint(temporaryBreakpoint.sourcePosition(), null, null, targetBreakpoints);
+                addSourceBreakpoint(temporaryBreakpoint.sourcePosition(), null, null, null, targetBreakpoints);
                 targetIJBreakpoints.computeIfAbsent(toDAPSource(temporaryBreakpoint.sourcePosition()), s -> new ArrayList<>()).add(null);
             } else {
                 // Removed IntelliJ breakpoint
@@ -316,12 +335,12 @@ public abstract class DAPBreakpointHandlerBase<B extends XBreakpoint<?>> extends
                 // The breakpoint is not sent anymore: forget the DAP id it had before
                 breakpoint.putUserData(DAP_BREAKPOINT_ID, null);
                 // Not an error: the inactive dependent icon instead of the invalid one
-                debugSession.updateBreakpointPresentation(lineBreakpoint,
+                updateBreakpointPresentation(breakpoint,
                         lineBreakpoint.getType().getInactiveDependentIcon(), DAPBundle.message("dap.breakpoints.shadowed"));
             }
         } else if (shadowedBreakpoints.remove(breakpoint)) {
             // Reset the presentation; the response of the debug adapter updates it when the breakpoint is sent
-            debugSession.updateBreakpointPresentation(lineBreakpoint, null, null);
+            updateBreakpointPresentation(breakpoint, null, null);
         }
     }
 

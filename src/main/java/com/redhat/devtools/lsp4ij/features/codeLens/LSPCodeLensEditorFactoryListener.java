@@ -26,6 +26,7 @@ import org.jetbrains.annotations.Nullable;
 import java.awt.*;
 
 import static com.redhat.devtools.lsp4ij.internal.ApplicationUtils.runCancellableReadAction;
+import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.isDoneNormally;
 
 /**
  * Listens to editor events and manages the context for unresolved code lenses.
@@ -98,8 +99,7 @@ public class LSPCodeLensEditorFactoryListener implements EditorFactoryListener {
                 lastViewportLine);
     }
 
-    private static boolean updateViewportLinesAndRefreshCodeVision(@NotNull CodeLensDataResult result,
-                                                                   @NotNull Rectangle newRect,
+    private static boolean updateViewportLinesAndRefreshCodeVision(@NotNull Rectangle newRect,
                                                                    @NotNull LSPCodeLensSupport codeLensSupport,
                                                                    @NotNull UnresolvedCodeLensViewportContext context,
                                                                    boolean forceReadAction) {
@@ -118,8 +118,15 @@ public class LSPCodeLensEditorFactoryListener implements EditorFactoryListener {
             context.updateViewportLines(newRect);
         }
 
-        // Step 2: Refresh code visions
-        updateViewportLinesAndRefreshCodeVision(result, codeLensSupport, context);
+        // Step 2: Refresh code visions, if there are code lenses. They are read once the viewport is updated: a request
+        // that ended meanwhile resolved the code lenses of the viewport it read, which can be the previous one. A
+        // request that failed, as when the language server cannot start, has no code lenses, and getNow() would throw
+        // its failure on the UI thread.
+        var resultFuture = codeLensSupport.getFuture();
+        var result = isDoneNormally(resultFuture) ? resultFuture.getNow(null) : null;
+        if (result != null) {
+            updateViewportLinesAndRefreshCodeVision(result, codeLensSupport, context);
+        }
         return true;
     }
 
@@ -171,28 +178,21 @@ public class LSPCodeLensEditorFactoryListener implements EditorFactoryListener {
                 return;
             }
 
-            // Get valid LSP codelens future.
-            var resultFuture = codeLensSupport.getFuture();
-            if (resultFuture != null && resultFuture.isDone()) {
-                var result = resultFuture.getNow(null);
-                if (result == null) {
-                    return;
-                }
-
-                // call of context.updateViewportLines requires EDT+ReadAction
-                if (!updateViewportLinesAndRefreshCodeVision(result, newRect, codeLensSupport, context, false)) {
-                    // Use NonBlockingReadAction to safely read PSI and file data
-                    ReadAction.nonBlocking(() -> {
-                                return null;
-                            })
-                            .expireWhen(() -> editor.isDisposed())
-                            .coalesceBy(editor, LSPCodeLensEditorFactoryListener.this)
-                            .finishOnUiThread(ModalityState.any(), unused -> {
-                                // Refresh Code visions by forcing ReadAction if needed
-                                updateViewportLinesAndRefreshCodeVision(result, newRect, codeLensSupport, context, true);
-                            })
-                            .submit(AppExecutorUtil.getAppExecutorService());
-                }
+            // The viewport is updated also while there are no code lenses, as while the request runs or after it
+            // failed, since the code lenses of a later result are resolved in it.
+            // call of context.updateViewportLines requires EDT+ReadAction
+            if (!updateViewportLinesAndRefreshCodeVision(newRect, codeLensSupport, context, false)) {
+                // Use NonBlockingReadAction to safely read PSI and file data
+                ReadAction.nonBlocking(() -> {
+                            return null;
+                        })
+                        .expireWhen(() -> editor.isDisposed())
+                        .coalesceBy(editor, LSPCodeLensEditorFactoryListener.this)
+                        .finishOnUiThread(ModalityState.any(), unused -> {
+                            // Refresh Code visions by forcing ReadAction if needed
+                            updateViewportLinesAndRefreshCodeVision(newRect, codeLensSupport, context, true);
+                        })
+                        .submit(AppExecutorUtil.getAppExecutorService());
             }
         });
     }

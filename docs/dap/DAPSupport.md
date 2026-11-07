@@ -10,7 +10,7 @@ Current state of [Events](https://microsoft.github.io/debug-adapter-protocol//sp
 * ✅ [Breakpoint](https://microsoft.github.io/debug-adapter-protocol//specification.html#Events_Breakpoint).
 * ❌ [Capabilities](https://microsoft.github.io/debug-adapter-protocol//specification.html#Events_Capabilities).
 * ❌ [Continued](https://microsoft.github.io/debug-adapter-protocol//specification.html#Events_Continued).
-* ❌ [Exited](https://microsoft.github.io/debug-adapter-protocol//specification.html#Events_Exited).
+* ✅ [Exited](https://microsoft.github.io/debug-adapter-protocol//specification.html#Events_Exited): the console shows the exit code of the debugged program when the debug adapter's process ends.
 * ✅ [Initialized](https://microsoft.github.io/debug-adapter-protocol//specification.html#Events_Initialized).
 * ✅ [Invalidated](https://microsoft.github.io/debug-adapter-protocol//specification.html#Events_Invalidated).
 * ✅ [LoadedSource](https://microsoft.github.io/debug-adapter-protocol//specification.html#Events_LoadedSource).
@@ -23,7 +23,7 @@ Current state of [Events](https://microsoft.github.io/debug-adapter-protocol//sp
 * ❌ [ProgressUpdate](https://microsoft.github.io/debug-adapter-protocol//specification.html#Events_ProgressUpdate).
 * ✅ [Stopped](https://microsoft.github.io/debug-adapter-protocol//specification.html#Events_Stopped).
 * ✅ [Terminated](https://microsoft.github.io/debug-adapter-protocol//specification.html#Events_Terminated).
-* ❌ [Thread](https://microsoft.github.io/debug-adapter-protocol//specification.html#Events_Thread).
+* ✅ [Thread](https://microsoft.github.io/debug-adapter-protocol//specification.html#Events_Thread).
  
 ## Requests
 
@@ -31,10 +31,11 @@ Current state of [Requests](https://microsoft.github.io/debug-adapter-protocol//
 
 * ✅ [Attach](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_Attach).
 * ❌ [BreakpointLocations](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_BreakpointLocations).
+* ❌ [Cancel](https://microsoft.github.io/debug-adapter-protocol//specification.html#Base_Protocol_Cancel).
 * ✅ [Completions](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_Completions) (see [user guide](./UserGuide.md#completion)).
 * ✅ [ConfigurationDone](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_ConfigurationDone).
 * ✅ [Continue](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_Continue).
-* ❌ [DataBreakpointInfo](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_DataBreakpointInfo).
+* ✅ [DataBreakpointInfo](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_DataBreakpointInfo) (see [user guide](./UserGuide.md#data-breakpoints)).
 * ✅ [Disassemble](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_Disassemble) (see [user guide](./UserGuide.md#disassemble)).
 * ✅ [Disconnect](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_Disconnect).
 * ✅ [Evaluate](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_Evaluate) (see [user guide](./UserGuide.md#evaluate-expression)).
@@ -54,10 +55,10 @@ Current state of [Requests](https://microsoft.github.io/debug-adapter-protocol//
 * ❌ [ReverseContinue](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_ReverseContinue).
 * ✅ [Scopes](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_Scopes).
 * ✅ [SetBreakpoints](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_SetBreakpoints) (see [user guide](./UserGuide.md#adding-breakpoint)).
-* ❌ [SetDataBreakpoints](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_SetDataBreakpoints).
+* ✅ [SetDataBreakpoints](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_SetDataBreakpoints), with the `supportsDataBreakpoints` capability and the [DataBreakpoint](https://microsoft.github.io/debug-adapter-protocol//specification.html#Types_DataBreakpoint) type (see [user guide](./UserGuide.md#data-breakpoints)).
 * ✅ [SetExceptionBreakpoints](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_SetExceptionBreakpoints) (see [user guide](./UserGuide.md#exception-breakpoint))
 * ❌ [SetExpression](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_SetExpression).
-* ❌ [SetFunctionBreakpoints](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_SetFunctionBreakpoints).
+* ✅ [SetFunctionBreakpoints](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_SetFunctionBreakpoints), with the `supportsFunctionBreakpoints` capability and the [FunctionBreakpoint](https://microsoft.github.io/debug-adapter-protocol//specification.html#Types_FunctionBreakpoint) type (see [user guide](./UserGuide.md#function-breakpoints)).
 * ✅ [SetInstructionBreakpoints](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_SetInstructionBreakpoints) (see [user guide](./UserGuide.md#disassemble)).
 * ✅ [SetVariable](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_SetVariable).
 * ✅ [Source](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_Source).

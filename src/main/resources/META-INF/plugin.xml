@@ -396,6 +396,9 @@
         <installerTaskFactory
                 type="configureServer"
                 factoryClass="com.redhat.devtools.lsp4ij.installation.definition.tasks.ConfigureServerTaskFactory"/>
+        <installerTaskFactory
+                type="fileExists"
+                factoryClass="com.redhat.devtools.lsp4ij.installation.definition.tasks.FileExistsTaskFactory"/>
     </extensions>
 
     <extensions defaultExtensionNs="com.intellij">
@@ -596,6 +599,9 @@
         <codeInsight.declarativeInlayProviderFactory
                 id="LSPDeclarativeInlayHintProvidersFactory"
                 implementation="com.redhat.devtools.lsp4ij.features.inlayhint.LSPDeclarativeInlayHintProvidersFactory"/>
+        <config.inlaySettingsProvider
+                id="LSPInlayHintsSettingsProvider"
+                implementation="com.redhat.devtools.lsp4ij.features.inlayhint.LSPInlayHintsSettingsProvider"/>
 
         <codeInsight.inlayActionHandler
                 handlerId="LSP4IJ"
@@ -723,7 +729,7 @@
                 language=""
                 implementationClass="com.redhat.devtools.lsp4ij.features.semanticTokens.viewProvider.LSPSemanticTokenDocumentationProvider"/>
 
-        <!-- We cannot register one for plain text abstract file types, so we have to do that dynamically. Do so when a project is opened. -->
+        <!-- We cannot register one for plain text files of a file type without a language, so we have to do that dynamically. Do so when a project is opened. -->
         <postStartupActivity
                 implementation="com.redhat.devtools.lsp4ij.features.semanticTokens.viewProvider.LSPSemanticTokensStructurelessFileViewProviderRegistrar$ProjectOpenedListener"/>
     </extensions>
@@ -805,6 +811,16 @@
                 id="LSPRenameHandler"
                 implementation="com.redhat.devtools.lsp4ij.features.rename.LSPRenameHandler"
                 order="first"/>
+
+        <!-- LSP textDocument/linkedEditingRange request support -->
+        <editorFactoryListener
+                implementation="com.redhat.devtools.lsp4ij.features.linkedEditingRange.LSPLinkedEditingRangeEditorFactoryListener"/>
+        <!-- turns linked editing on or off, in Settings | Editor | General | Smart Keys -->
+        <applicationService
+                serviceImplementation="com.redhat.devtools.lsp4ij.settings.LSPEditorOptions"/>
+        <editorSmartKeysConfigurable
+                id="editor.preferences.lsp4ij"
+                instance="com.redhat.devtools.lsp4ij.settings.LSPSmartKeysConfigurable"/>
 
         <!-- LSP workspace/willRenameFiles for rename and move refactorings, sent before their write action -->
         <renamePsiElementProcessor
@@ -1099,7 +1115,7 @@
     <applicationListeners>
         <listener
                 topic="com.intellij.openapi.project.ProjectManagerListener"
-                class="com.redhat.devtools.lsp4ij.ConnectDocumentToLanguageServerSetupParticipant"/>
+                class="com.redhat.devtools.lsp4ij.ConnectDocumentToLanguageServerSetupParticipant$ProjectClosingListener"/>
         <listener
                 topic="com.intellij.openapi.fileEditor.FileDocumentManagerListener"
                 class="com.redhat.devtools.lsp4ij.LSPDocumentSaveListener"/>
@@ -1108,6 +1124,8 @@
     </applicationListeners>
 
     <projectListeners>
+        <listener topic="com.intellij.openapi.fileEditor.FileEditorManagerListener"
+                  class="com.redhat.devtools.lsp4ij.ConnectDocumentToLanguageServerSetupParticipant"/>
         <listener topic="com.intellij.codeInsight.lookup.LookupManagerListener"
                   class="com.redhat.devtools.lsp4ij.features.completion.LSPCompletionContributor$LSPLookupManagerListener"/>
         <listener class="com.redhat.devtools.lsp4ij.client.indexing.ProjectIndexingOnlyDumbStrategy"
@@ -1150,6 +1168,10 @@
                 implementation="com.redhat.devtools.lsp4ij.dap.configurations.DAPConfigurationType"/>
         <xdebugger.breakpointType
                 implementation="com.redhat.devtools.lsp4ij.dap.breakpoints.DAPBreakpointType"/>
+        <xdebugger.breakpointType
+                implementation="com.redhat.devtools.lsp4ij.dap.breakpoints.DAPFunctionBreakpointType"/>
+        <xdebugger.breakpointType
+                implementation="com.redhat.devtools.lsp4ij.dap.breakpoints.DAPDataBreakpointType"/>
         <completion.contributor id="DAPCompletionProcessor"
                                 language="any"
                                 implementationClass="com.redhat.devtools.lsp4ij.dap.completion.DAPCompletionProcessor"/>
@@ -1216,6 +1238,17 @@
                 description="Ask the DAP server for numbers in hexadecimal">
             <add-to-group group-id="XDebugger.ValueGroup" anchor="last"/>
         </action>
+        <action id="DAP.BreakOnValueChange"
+                class="com.redhat.devtools.lsp4ij.dap.client.variables.DAPBreakOnValueChangeAction"
+                text="Break on Value Change"
+                description="Stop the program when the DAP server sees this value change">
+            <add-to-group group-id="XDebugger.ValueGroup" anchor="last"/>
+        </action>
+        <!-- Added to the settings of a DAP debug session by DAPDebugProcess.registerAdditionalActions -->
+        <action id="DAP.StepOnlyCurrentThread"
+                class="com.redhat.devtools.lsp4ij.dap.stepping.DAPStepOnlyCurrentThreadAction"
+                text="Step Only the Current Thread"
+                description="Resume only the thread that steps, while the other threads stay stopped"/>
     </actions>
 
 </idea-plugin>

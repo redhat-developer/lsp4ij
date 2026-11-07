@@ -15,14 +15,28 @@ import org.eclipse.lsp4j.debug.Variable;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.concurrent.CompletableFuture;
+
 /**
  * Interface for resolving source positions of debug variables.
  */
 public interface DebugVariablePositionProvider {
 
     /**
+     * Loads what this provider needs to configure the context and which may take time, such as the answer of a
+     * language server. This method is called without a read action, before
+     * {@link #configureContext(DebugVariableContext)}, which is called once the returned future is done.
+     *
+     * @param context the provider context
+     * @return the future which is done once this provider has loaded what it needs.
+     */
+    default @NotNull CompletableFuture<Void> loadContext(@NotNull DebugVariableContext context) {
+        return CompletableFuture.completedFuture(null);
+    }
+
+    /**
      * Configures the context for this provider.
-     * This method should be called before resolving positions.
+     * This method should be called before resolving positions. It is called in a read action, so it must not wait.
      *
      * @param context the provider context
      */

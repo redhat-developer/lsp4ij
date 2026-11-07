@@ -11,7 +11,9 @@
 package com.redhat.devtools.lsp4ij.dap.client.variables.providers;
 
 import com.intellij.openapi.editor.Editor;
+import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.util.TextRange;
+import com.intellij.openapi.util.UserDataHolderBase;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.xdebugger.XDebuggerUtil;
 import com.intellij.xdebugger.XSourcePosition;
@@ -20,18 +22,26 @@ import com.redhat.devtools.lsp4ij.dap.client.DAPStackFrame;
 import org.eclipse.lsp4j.debug.Variable;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.CancellationException;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 
 /**
  * The {@code DebugVariableContext} class encapsulates the context information
  * necessary for registering and retrieving variable positions and ranges during debugging.
  * It provides methods to configure variable positions and ranges for a given stack frame
  * and manages the association between variable names and their corresponding positions/ranges.
+ * A provider can keep its own data for the stack frame in the context's user data.
  */
-public class DebugVariableContext {
+public class DebugVariableContext extends UserDataHolderBase {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(DebugVariableContext.class);
 
     private final DAPStackFrame stackFrame;
     private final Map<String, TextRange> variableRanges;
@@ -60,6 +70,42 @@ public class DebugVariableContext {
     }
 
     /**
+     * Loads, without a read action, what the variable position providers need to configure the context.
+     * This method invokes {@link DebugVariablePositionProvider#loadContext(DebugVariableContext)} for each registered
+     * provider. The returned future never fails: a provider which fails to load configures the context without it.
+     *
+     * @return the future which is done once each provider has loaded what it needs.
+     */
+    public @NotNull CompletableFuture<Void> loadContext() {
+        return CompletableFuture.allOf(providers
+                .stream()
+                .map(this::loadContext)
+                .toArray(CompletableFuture[]::new));
+    }
+
+    private @NotNull CompletableFuture<Void> loadContext(@NotNull DebugVariablePositionProvider provider) {
+        try {
+            return provider.loadContext(this)
+                    .exceptionally(error -> {
+                        if (!isCancellation(error)) {
+                            LOGGER.warn("Error while loading the debug variable positions of '{}'", provider.getClass().getName(), error);
+                        }
+                        return null;
+                    });
+        } catch (ProcessCanceledException e) {
+            throw e;
+        } catch (Exception e) {
+            LOGGER.warn("Error while loading the debug variable positions of '{}'", provider.getClass().getName(), e);
+            return CompletableFuture.completedFuture(null);
+        }
+    }
+
+    private static boolean isCancellation(@NotNull Throwable error) {
+        return error instanceof CancellationException
+                || (error instanceof CompletionException && error.getCause() instanceof CancellationException);
+    }
+
+    /**
      * Configures the context for variable position providers.
      * This method invokes {@link DebugVariablePositionProvider#configureContext(DebugVariableContext)}
      * for each registered provider to initialize variable positions and ranges.
@@ -68,6 +114,15 @@ public class DebugVariableContext {
         for (var provider : providers) {
             provider.configureContext(this);
         }
+    }
+
+    /**
+     * Returns the stack frame of this debug variable context.
+     *
+     * @return the stack frame of this debug variable context.
+     */
+    public @NotNull DAPStackFrame getStackFrame() {
+        return stackFrame;
     }
 
     /**

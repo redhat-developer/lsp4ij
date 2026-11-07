@@ -19,7 +19,6 @@ import com.intellij.psi.ElementDescriptionLocation;
 import com.intellij.psi.ElementDescriptionProvider;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
-import com.intellij.psi.codeStyle.NameUtil;
 import com.intellij.usageView.UsageViewLongNameLocation;
 import com.intellij.usageView.UsageViewShortNameLocation;
 import com.intellij.usageView.UsageViewTypeLocation;
@@ -31,6 +30,10 @@ import com.redhat.devtools.lsp4ij.features.semanticTokens.viewProvider.LSPSemant
 import com.redhat.devtools.lsp4ij.features.semanticTokens.viewProvider.LSPSemanticTokenPsiElement;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.function.IntPredicate;
 
 /**
  * {@link ElementDescriptionProvider} implementation used to show information about the target in the "Find Usages" view.
@@ -65,7 +68,7 @@ public class LSPUsageElementDescriptionProvider implements ElementDescriptionPro
             if (element instanceof LSPSemanticTokenPsiElement semanticTokenElement) {
                 String tokenType = semanticTokenElement.getType();
                 if (StringUtil.isNotEmpty(tokenType)) {
-                    return StringUtil.join(NameUtil.splitNameIntoWords(tokenType), String::toLowerCase, " ");
+                    return StringUtil.join(splitIntoWords(tokenType), String::toLowerCase, " ");
                 }
             }
 
@@ -97,5 +100,58 @@ public class LSPUsageElementDescriptionProvider implements ElementDescriptionPro
         }
 
         return null;
+    }
+
+    /**
+     * Splits a semantic token type into words, as {@code NameUtil.splitNameIntoWords} did for ASCII names before
+     * IntelliJ scheduled it for removal: at underscores, at the start of a capitalized word, around a run of capitals
+     * and around a run of digits. Any other character that isn't a letter or a digit is a word of its own. For
+     * instance, {@code enumMember} is "enum" and "Member", and {@code HTMLElement2} is "HTML", "Element" and "2".
+     * Like {@code NameUtil}, it reads code points, so a letter outside the Basic Multilingual Plane is one letter.
+     */
+    static @NotNull List<String> splitIntoWords(@NotNull String tokenType) {
+        List<String> words = new ArrayList<>();
+        for (String part : tokenType.split("_")) {
+            int start = 0;
+            while (start < part.length()) {
+                int end = endOfWord(part, start);
+                words.add(part.substring(start, end));
+                start = end;
+            }
+        }
+        return words;
+    }
+
+    private static int endOfWord(@NotNull String text, int start) {
+        int first = text.codePointAt(start);
+        int afterFirst = start + Character.charCount(first);
+        if (!Character.isLetterOrDigit(first)) {
+            return afterFirst;
+        }
+        int end = skip(text, start, Character::isDigit);
+        if (end > start) {
+            return end;
+        }
+        end = skip(text, start, Character::isUpperCase);
+        if (end > afterFirst) {
+            // A run of capitals is a word, except for its last capital when a lower-case letter follows it
+            return end < text.length() && Character.isLowerCase(text.codePointAt(end)) ? text.offsetByCodePoints(end, -1) : end;
+        }
+        return skip(text, afterFirst, codePoint -> Character.isLetter(codePoint) && !Character.isUpperCase(codePoint));
+    }
+
+    /**
+     * Returns the index of the first code point from {@code start} on that doesn't match, or the length of the text.
+     */
+    private static int skip(@NotNull String text, int start, @NotNull IntPredicate matches) {
+        int end = start;
+        while (end < text.length()) {
+            int codePoint = text.codePointAt(end);
+            if (!matches.test(codePoint)) {
+                break;
+            }
+            end += Character.charCount(codePoint);
+        }
+        return end;
     }
 }

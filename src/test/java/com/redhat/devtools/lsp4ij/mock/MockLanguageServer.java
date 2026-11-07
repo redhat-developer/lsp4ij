@@ -49,6 +49,7 @@ public final class MockLanguageServer implements LanguageServer {
 	private final InitializeResult initializeResult = new InitializeResult();
 	private volatile long delay = 0;
 	private volatile CompletableFuture<Void> initializeGate = CompletableFuture.completedFuture(null);
+	private volatile InitializeParams initializeParams;
 	private volatile boolean started;
 
 	private final List<LanguageClient> remoteProxies = new ArrayList<>();
@@ -148,6 +149,7 @@ public final class MockLanguageServer implements LanguageServer {
 
 	@Override
 	public CompletableFuture<InitializeResult> initialize(InitializeParams params) {
+		initializeParams = params;
 		notifications.add("initialize");
 		return initializeGate.thenCompose(ignored -> buildMaybeDelayedFuture(initializeResult));
 	}
@@ -155,6 +157,13 @@ public final class MockLanguageServer implements LanguageServer {
 	@Override
 	public void initialized(InitializedParams params) {
 		notifications.add("initialized");
+	}
+
+	/**
+	 * @return the params of the last initialize request this server received, and null before the first
+	 */
+	public InitializeParams getInitializeParams() {
+		return initializeParams;
 	}
 
 	/**
@@ -316,6 +325,16 @@ public final class MockLanguageServer implements LanguageServer {
 
 	public void setResolvedCodeAction(CodeAction codeAction) {
 		this.textDocumentService.setResolvedCodeAction(codeAction);
+	}
+
+	/**
+	 * Holds the replies to textDocument/codeAction requests until the returned future is completed, which the caller
+	 * must do.
+	 *
+	 * @return the future that releases the held and later textDocument/codeAction replies when completed.
+	 */
+	public CompletableFuture<Void> holdCodeActions() {
+		return this.textDocumentService.holdCodeActions();
 	}
 
 	public void setSignatureHelp(SignatureHelp signatureHelp) {

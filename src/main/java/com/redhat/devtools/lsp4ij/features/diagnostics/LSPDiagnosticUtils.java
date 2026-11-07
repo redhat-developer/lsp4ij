@@ -73,6 +73,10 @@ public class LSPDiagnosticUtils {
                     return null;
                 })
                 .coalesceBy(LSP4IJ_REPORT_PROBLEM_SOURCE, file, project)
+                // A report submitted as the project closes, as by the language servers that stop with it, must not
+                // run once the project is disposed. The project is disposed in a write action, so this check, made in
+                // the read action, holds until the report ends
+                .expireWhen(project::isDisposed)
                 .submit(AppExecutorUtil.getAppExecutorService());
     }
 
@@ -103,6 +107,10 @@ public class LSPDiagnosticUtils {
                 .getStartedServers();
         for (var ls : servers) {
             var clientFeatures = ls.getClientFeatures();
+            if (!clientFeatures.getDiagnosticFeature().canReportProblem(file)) {
+                // A server that doesn't report the file's problems has no say in its mark
+                continue;
+            }
             URI fileUri = FileUriSupport.getFileUri(file, clientFeatures);
             OpenedDocument openedDocument = ls.getOpenedDocument(fileUri);
             if (openedDocument != null && openedDocument.hasErrors()) {
@@ -144,20 +152,35 @@ public class LSPDiagnosticUtils {
         return false;
     }
 
+    /**
+     * Clears the problem of the given files in the Project View, once a language server no longer holds their
+     * documents, unless a language server that reports their problems still holds errors for them when the clear
+     * runs.
+     * <p>
+     * Each file is cleared by a report of it, made from the errors held when it runs: an unconditional clear could
+     * run after the report of errors published since, such as for the document of a file that just closed, and leave
+     * the file with errors unmarked. Reports of a file share their coalescing key, so they run one after another and
+     * the last one submitted runs last.
+     *
+     * @param fileUris       the URIs of the files.
+     * @param clientFeatures the client features of the language server which held their documents.
+     * @param project        the project.
+     */
     public static void clearProblem(@NotNull Set<URI> fileUris,
                                     @NotNull LSPClientFeatures clientFeatures,
                                     @NotNull Project project) {
-        WolfTheProblemSolver wolf = WolfTheProblemSolver.getInstance(project);
         ReadAction.nonBlocking((Callable<Void>) () -> {
                     for (URI fileUri : fileUris) {
                         VirtualFile file = FileUriSupport.findFileByUri(fileUri.toASCIIString(), clientFeatures);
                         if (file != null && clientFeatures.getDiagnosticFeature().canReportProblem(file)) {
-                            wolf.clearProblemsFromExternalSource(file, LSP4IJ_REPORT_PROBLEM_SOURCE);
+                            reportProblem(file, null, project);
                         }
                     }
                     return null;
                 })
                 .coalesceBy(fileUris, clientFeatures, project)
+                // As the reports it submits, the clear never runs once the project is disposed
+                .expireWhen(project::isDisposed)
                 .submit(AppExecutorUtil.getAppExecutorService());
     }
 }

@@ -267,6 +267,10 @@ public class WorkspaceFoldersPanel extends JPanel implements Disposable {
     }
 
     private void setupDragAndDrop(Component component) {
+        if (GraphicsEnvironment.isHeadless()) {
+            // A drop target needs a display, which a headless IDE, such as the tests on a CI server, doesn't have
+            return;
+        }
         new DropTarget(component, new DropTargetAdapter() {
             @Override
             public void drop(DropTargetDropEvent dtde) {

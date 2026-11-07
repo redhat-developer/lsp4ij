@@ -1,11 +1,13 @@
 {
   "id": "vscode-js-debug-installer",
   "name": "vscode-js-debug",
+  "properties": {
+    "serverDist": "$USER_HOME$/.lsp4ij/dap/vscode-js-debug"
+  },
   "check": {
-    "exec": {
-      "name": "Trying current command",
-      "command": "${server.command}",
-      "timeout": 2000
+    "fileExists": {
+      "name": "Check if vscode-js-debug is installed",
+      "file": "${serverDist}/js-debug/src/dapDebugServer.js"
     }
   },
   "run": {
@@ -19,7 +21,7 @@
       },
       "url": "https://github.com/microsoft/vscode-js-debug/releases/download/v1.100.1/js-debug-dap-v1.100.1.tar.gz",
       "output": {
-        "dir": "$USER_HOME$/.lsp4ij/dap/vscode-js-debug"
+        "dir": "${serverDist}"
       },
       "onSuccess": {
         "configureServer": {

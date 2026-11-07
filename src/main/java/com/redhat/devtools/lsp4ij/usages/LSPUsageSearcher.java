@@ -41,6 +41,7 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
 import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.awaitWithCheckCanceled;
+import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.isDoneNormally;
 
 import static com.redhat.devtools.lsp4ij.internal.ApplicationUtils.runCancellableReadAction;
 import static com.redhat.devtools.lsp4ij.usages.LSPFindUsagesHandlerFactory.isUsageSupportedByLanguageServer;
@@ -168,7 +169,7 @@ public class LSPUsageSearcher extends CustomUsageSearcher {
             // This allows the ForkJoinPool background threads to freely acquire ReadActions
             // to resolve the PSI elements during mapping!
             awaitWithCheckCanceled(usagesFuture);
-            if (usagesFuture.isDone()) {
+            if (isDoneNormally(usagesFuture)) {
                 List<LSPUsagePsiElement> usages = usagesFuture.getNow(null);
                 if (usages != null && !usages.isEmpty()) {
                     // 4. Process the results (requires ReadAction again for VFS/PSI mapping)
@@ -219,6 +220,10 @@ public class LSPUsageSearcher extends CustomUsageSearcher {
     /**
      * Wraps a usage element for the usage view.
      * <p>
+     * The usage is shown with an {@link LSPUsageViewElement}, which the usage preview highlights at the range of the
+     * usage, also in a file without real PSI.
+     * </p>
+     * <p>
      * A usage whose access is known becomes a {@link ReadWriteAccessUsage}, which is what the read and write
      * access filters and icons of the usage view act on. Any other usage is wrapped as it always was.
      * </p>
@@ -227,7 +232,7 @@ public class LSPUsageSearcher extends CustomUsageSearcher {
      * @return the usage to report.
      */
     static @NotNull Usage toUsage(@NotNull LSPUsagePsiElement usage) {
-        UsageInfo usageInfo = new UsageInfo(usage);
+        UsageInfo usageInfo = new UsageInfo(new LSPUsageViewElement(usage));
         ReadWriteAccessDetector.Access access = usage.getAccess();
         return access != null ? new ReadWriteAccessUsageInfo2UsageAdapter(usageInfo, access) : new UsageInfo2UsageAdapter(usageInfo);
     }
@@ -235,14 +240,22 @@ public class LSPUsageSearcher extends CustomUsageSearcher {
     /**
      * Computes the LSP position to use for querying usages of the given element.
      * <p>
-     * The position is calculated as {@code startOffset + 1}, clamped to not exceed {@code endOffset}.
+     * The position is calculated as {@code textOffset + 1}, clamped to not exceed {@code endOffset}.
      * This ensures the position is inside the element's text range (not at the very start boundary),
      * which is important for language servers that may not recognize positions at token boundaries.
      * </p>
      * <p>
+     * The text offset of a named element is the offset of its name, while its text range can start earlier,
+     * for example at the decorators of a Python function, which are not the symbol to query. A text offset
+     * outside the text range, like the default one of a fake or light element, is replaced by {@code startOffset}.
+     * </p>
+     * <p>
+     * A one-character name has no position inside it: the position is then its end, the boundary after the name.
+     * </p>
+     * <p>
      * For example, if the element is the identifier {@code myVar} spanning offsets [10, 15]:
      * <ul>
-     *   <li>startOffset = 10</li>
+     *   <li>textOffset = startOffset = 10</li>
      *   <li>endOffset = 15</li>
      *   <li>returned position = offset 11 (inside the identifier)</li>
      * </ul>
@@ -263,7 +276,10 @@ public class LSPUsageSearcher extends CustomUsageSearcher {
         if (document == null) {
             return null;
         }
-        return LSPIJUtils.toPosition(Math.min(element.getTextRange().getStartOffset() + 1, element.getTextRange().getEndOffset()), document);
+        TextRange textRange = element.getTextRange();
+        int textOffset = element.getTextOffset();
+        int offset = textRange.containsOffset(textOffset) ? textOffset : textRange.getStartOffset();
+        return LSPIJUtils.toPosition(Math.min(offset + 1, textRange.getEndOffset()), document);
     }
 }
 

@@ -9,6 +9,16 @@
     "unix": "sh -c \"node '/usr/share/code/resources/app/extensions/html-language-features/server/dist/node/htmlServerMain.js' --stdio\"",
     "default": "sh -c \"node 'resources/app/extensions/html-language-features/server/dist/node/htmlServerMain.js' --stdio\""
   },
+  "transports": [
+    {
+      "mode": "stdio",
+      "argument": "--stdio"
+    },
+    {
+      "mode": "startAndAccept",
+      "argument": "--socket=${port}"
+    }
+  ],
   "languageMappings": [
     {
       "language": "HTML",

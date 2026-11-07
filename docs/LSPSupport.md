@@ -33,19 +33,18 @@ Current state of [Language Features]( https://microsoft.github.io/language-serve
  * ✅ [textDocument/diagnostic](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_pullDiagnostics) (see [implementation details](#pull-diagnostics))
  * ✅ [workspace/diagnostic/refresh](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#diagnostic_refresh) 
  * ✅ [textDocument/documentLink](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_documentLink) (see [implementation details](#document-link))
- * ❌ [documentLink/resolve](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#documentLink_resolve).
+ * ✅ [documentLink/resolve](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#documentLink_resolve) (see [implementation details](#document-link)).
  * ✅ [textDocument/hover](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_hover) (see [implementation details](#hover))
  * ✅ [textDocument/codeLens](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_codeLens) (see [implementation details](#codeLens))
  * ✅ [codeLens/resolve](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#codeLens_resolve)
  * ✅ [workspace/codeLens/refresh](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#codeLens_refresh)
  * ✅ [textDocument/inlayHint](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_inlayHint) (see [implementation details](#inlay-hint))
- * ❌ [inlayHint/resolve](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#inlayHint_resolve)
+ * ✅ [inlayHint/resolve](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#inlayHint_resolve) (only for an inlay hint without a label, and for the command of a clicked label part)
  * ✅ [workspace/inlayHint/refresh](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_inlayHint_refresh) 
  * ✅ [textDocument/completion](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_completion) (see [implementation details](#completion-proposals))
  * ✅ [completionItem/resolve](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#completionItem_resolve) (see [implementation details](#completion-item-resolve))
  * ✅ [textDocument/inlineCompletion](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.18/specification/#textDocument_inlineCompletion) (see [implementation details](#inline-completion))
  * ✅ [textDocument/signatureHelp](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_signatureHelp) (see [implementation details](#signature-help))
- * ✅ [textDocument/publishDiagnostics](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_publishDiagnostics) (see [implementation details](#publish-diagnostics))
  * ✅ [textDocument/codeAction](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_codeAction) (see [implementation details](#code-action))
  * ✅ [codeAction/resolve](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#codeAction_resolve)
  * ✅ [textDocument/documentColor](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_documentColor) (see [implementation details](#document-color))
@@ -61,29 +60,30 @@ Current state of [Language Features]( https://microsoft.github.io/language-serve
  * ✅ [typeHierarchy/subtypes](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#typeHierarchy_subtypes). 
  * ✅ [typeHierarchy/supertypes](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#typeHierarchy_supertypes).
  * ✅ [textDocument/foldingRange](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_foldingRange)  (see [implementation details](#folding-range))
+ * ✅ [workspace/foldingRange/refresh](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.18/specification/#workspace_foldingRange_refresh) (LSP 3.18).
  * ✅ [textDocument/selectionRange](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_selectionRange)  (see [implementation details](#selection-range))
  * ✅ [textDocument/documentSymbol](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_documentSymbol) (see [implementation details](#document-symbol))
  * ✅ [textDocument/semanticTokens (experimental)](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_semanticTokens) (see [implementation details](#semantic-tokens))
- * ❌ [textDocument/inlineValue](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_inlineValue).
- * ❌ [workspace/inlineValue/refresh](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_inlineValue_refresh).
+ * ✅ [textDocument/inlineValue](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_inlineValue) (see [implementation details](#inline-value)).
+ * ✅ [workspace/inlineValue/refresh](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_inlineValue_refresh).
  * ❌ [textDocument/moniker](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_moniker).
- * ❌ [textDocument/pullDiagnostics](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_pullDiagnostics).
  * ✅ [textDocument/formatting](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_formatting) (see [implementation details](#formatting))
  * ✅ [textDocument/rangeFormatting](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_rangeFormatting) (see [implementation details](#formatting)).
+ * ✅ [textDocument/rangesFormatting](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.18/specification/#textDocument_rangeFormatting) (LSP 3.18, see [implementation details](#formatting)).
  * ✅ [textDocument/onTypeFormatting](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_onTypeFormatting) (see [implementation details](#on-type-formatting)).
  * ✅ [textDocument/prepareRename](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_prepareRename).
  * ✅ [textDocument/rename](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_rename) (see [implementation details](#rename)).
- * ❌ [textDocument/linkedEditingRange](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_linkedEditingRange).
+ * ✅ [textDocument/linkedEditingRange](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_linkedEditingRange) (see [implementation details](#linked-editing-range)).
 
 ## Workspace Features
 
 Current state of [Workspace Features]( https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspaceFeatures) support:
 
- * ✅ [workspace/didChangeWatchedFiles](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_didChangeWatchedFiles).
+ * ✅ [workspace/didChangeWatchedFiles](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_didChangeWatchedFiles) (see [implementation details](#did-change-watched-files)).
  * ✅ [workspace/executeCommand](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_executeCommand).
  * ✅ [workspace/applyEdit](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_applyEdit).
  * ✅ [workspace/symbol](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_symbol) (see [implementation details](#workspace-symbol))
- * ❌ [workspace/symbolResolve](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_symbolResolve).
+ * ✅ [workspace/symbolResolve](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_symbolResolve) (see [implementation details](#workspace-symbol)).
  * ✅ [workspace/configuration](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_configuration) (see [implementation details](./DeveloperGuide.md#workspace-configuration))
  * ✅ [workspace/workspaceFolders](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_workspaceFolders) (see [implementation details](./DeveloperGuide.md#workspace-folders))
  * ✅ [workspace/didChangeWorkspaceFolders](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_didChangeWorkspaceFolders) (see [implementation details](./DeveloperGuide.md#workspace-folders))
@@ -235,6 +235,9 @@ Here is an example with the [Qute language server](https://github.com/redhat-dev
 * an `externalAnnotator` extension point, to display a `documentLink` with an hyperlink renderer.
 * a `gotoDeclarationHandler` extension point, to open the file of the `documentLink`.`
 
+A language server which supports [documentLink/resolve](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#documentLink_resolve) (`resolveProvider`) can leave the target of a
+document link to it: Ctrl+Click on a document link without a target resolves the link, then opens its target.
+
 As those extension points support `any` language, `textDocument/documentLink` works out-of-the-box.
 
 Here is an example with the [Qute language server](https://github.com/redhat-developer/quarkus-ls/tree/master/qute.ls), displaying an `include` template with an hyperlink renderer (Ctrl+Click opens the document link):
@@ -321,6 +324,25 @@ Here is an example with the [Qute language server](https://github.com/redhat-dev
 
 ![textDocument/inlayHint](./images/lsp-support/textDocument_inlayHint.png)
 
+Hovering over an inlay hint shows its tooltip, or, when the hint has none, the tooltips of its label parts. A Markdown tooltip is rendered, and a plain text one is shown as it is.
+
+### Inline Value
+
+[textDocument/inlineValue](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_inlineValue) is implemented with
+[LSPDebugVariablePositionProvider](https://github.com/redhat-developer/lsp4ij/blob/main/src/main/java/com/redhat/devtools/lsp4ij/dap/client/variables/providers/LSPDebugVariablePositionProvider.java),
+which places the values that a [DAP](./dap/DAPSupport.md) debug session shows inline in the editor, while the program is stopped
+(see [user guide](./dap/UserGuide.md#inline-value)).
+
+When the program stops, the language servers of the stopped file which support it (`inlineValueProvider`) are asked for the
+inline values from the start of the file to the end of the stopped line, with the DAP stack frame id and the stopped location
+as `context`. Each variable lookup (`InlineValueVariableLookup`) gives its variable a position: since IntelliJ shows one value
+per variable, the value is shown at the last line, before or on the stopped line, where the language server names the variable.
+The `InlineValueText` and `InlineValueEvaluatableExpression` inline values are ignored.
+
+The language servers are waited for 2 seconds at most; a variable which they don't name is placed with the syntax
+highlighting of the editor, as without a language server. A `workspace/inlineValue/refresh` asks the language servers again
+for the inline values of the current stack frame of each stopped debug session.
+
 ### Document Color
 
 [textDocument/documentColor](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_documentColor) is implemented with the `codeInsight.inlayProvider` extension point.
@@ -342,6 +364,7 @@ the `ColorChooserService`:
 [LSPCompletionContributor](https://github.com/redhat-developer/lsp4ij/blob/main/src/main/java/com/redhat/devtools/lsp4ij/features/completion/LSPCompletionContributor.java) class
 declared with the
 `completion.contributor` extension point. As this extension point supports `any` language, it works out-of-the-box.
+When a language server returns an incomplete list (`isIncomplete: true`), or no items for a trigger character, typing further asks the language servers again instead of filtering the items they gave.
 
 Here is an example with the [Qute language server](https://github.com/redhat-developer/quarkus-ls/tree/master/qute.ls) showing method completion:
 
@@ -372,6 +395,14 @@ Here a sample with [TypeScript Language Server](./user-defined-ls/typescript-lan
 which integrates with IntelliJ's inline completion API to provide AI-assisted code completion via Language Server Protocol.
 
 The provider uses debounced requests (300ms delay) to avoid excessive server calls during rapid typing, with immediate response for manual triggers.
+
+The `context` of a request says how it was triggered:
+
+ * `triggerKind` is `Invoked` when inline completion is called explicitly, and `Automatic` while typing.
+ * While the completion popup shows a selected item, `selectedCompletionInfo` gives the range and the text that the
+   item would insert, and the language servers are asked again when the selection changes. As LSP specifies, only the
+   inline completions which replace the same range and start with that text are shown. A snippet item is not
+   described, since inserting it can change its text.
 
 Here is an example with the [Perl Language Server](./user-defined-ls/perl-lsp.md) showing inline completion:
 
@@ -407,6 +438,16 @@ you can use `order="first"` to gain priority:
         order="first"
         implementationClass="com.redhat.devtools.lsp4ij.features.signatureHelp.LSPParameterInfoHandler"/>
 ```
+
+While the popup is shown, a change of the text or of the caret asks the language servers again, as a retrigger
+(`isRetrigger`, with the last reply as `activeSignatureHelp`), and the popup shows the signatures as the last reply
+describes them:
+
+ * The highlighted parameter of a signature is its own `activeParameter` (LSP4IJ declares `activeParameterSupport`),
+   or else the `activeParameter` of the signature help, or else the first parameter. A value outside the signature's
+   parameters highlights the first one too.
+ * A signature without `parameters` shows its label, with no parameter highlighted.
+ * A reply with other signatures replaces those of the popup, and a reply without signatures closes it.
 
 Here is an example with the [TypeScript Language Server](./user-defined-ls/typescript-language-server.md) showing signature help:
 
@@ -494,7 +535,11 @@ Here is an example with the [Qute language server](https://github.com/redhat-dev
 is consumed after a [textDocument/didOpen](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_didOpen) and [textDocument/didChange](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_didChange)
 with debounce and refresh the LSP diagnostics  `externalAnnotator`.
 
-It doesn't support the related documents.
+ * Each request sends the result ID of the last report as `previousResultId`, so that the language server can answer
+   with an `unchanged` report when the diagnostics it gave are still accurate. An `unchanged` report keeps them.
+ * The `relatedDocuments` of a report of either kind update the diagnostics of those documents, for a language where
+   code in one file can produce diagnostics in a file it depends on. A related document with an `unchanged` report
+   keeps its diagnostics.
 
 ### Workspace Diagnostics
 
@@ -546,11 +591,37 @@ Here is an example with the [TypeScript Language Server](./user-defined-ls/types
 
 ![textDocument/rename](./images/lsp-support/textDocument_rename.gif)
 
+### Linked Editing Range
+
+[textDocument/linkedEditingRange](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_linkedEditingRange) is implemented with
+[LSPLinkedEditingRangeSynchronizer](https://github.com/redhat-developer/lsp4ij/blob/main/src/main/java/com/redhat/devtools/lsp4ij/features/linkedEditingRange/LSPLinkedEditingRangeSynchronizer.java),
+which edits linked ranges together while typing, as IntelliJ edits the start and the end tag of an HTML element.
+
+When the caret stops in an editor, the language servers of the file which support it (`linkedEditingRangeProvider`) are asked for
+the ranges linked at the caret, such as the declaration and the uses of a local variable. A text typed in the range with the
+caret is then copied into the other ranges by the same command, so that one undo reverts them all. The edited range must match
+the `wordPattern` of the ranges, or, when the language server gives none, VS Code's default word definition, which excludes
+whitespace and punctuation. A text which doesn't match, a change outside the range, a second caret and a caret which leaves the
+range stop the linked editing until the caret stops again.
+
+Linked editing is off by default, as in VS Code (`editor.linkedEditing`). A user can turn it on for every language
+server which supports it in `Settings | Editor | General | Smart Keys`, under `Language Servers`, beside XML's
+`Simultaneous <tag></tag> editing`. A client can turn it off for its language server with
+[LSPLinkedEditingRangeFeature](./LSPApi.md#lsp-linkededitingrange-feature).
+
 ### Formatting
 
-[textDocument/formatting](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_documentColor) / [textDocument/rangeFormatting](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_rangeFormatting) are implemented with 
+[textDocument/formatting](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_formatting) / [textDocument/rangeFormatting](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_rangeFormatting) are implemented with 
 [LSPFormattingOnlyService](https://github.com/redhat-developer/lsp4ij/blob/main/src/main/java/com/redhat/devtools/lsp4ij/features/formatting/LSPFormattingOnlyService.java) /
 [LSPFormattingAndRangeBothService](https://github.com/redhat-developer/lsp4ij/blob/main/src/main/java/com/redhat/devtools/lsp4ij/features/formatting/LSPFormattingAndRangeBothService.java) with the `formattingService` extension point.
+
+When IntelliJ formats several ranges of a file at once, as **Reformat Code** does with **Only VCS changed text**, a language server
+which supports `textDocument/rangesFormatting` (LSP 3.18) formats them all with one request. Any other language server formats them
+one after the other with `textDocument/rangeFormatting`, and two ranges whose edits overlap are formatted again as one range.
+
+A file without an open editor, as when **Reformat Code** runs on a directory, is opened on the language servers which
+can format it for the time of the request (`textDocument/didOpen`, then `textDocument/didClose`), and formatted as an
+open one. A reply which comes after the document changed, or after the request was cancelled, is ignored.
 
 ### On-Type Formatting
 
@@ -858,6 +929,26 @@ If you use another language, you will have to declare `typeHierarchyProvider` wi
 
 After setting the cursor position in a file, you can view the Type Hierarchy using the `Navigate / Type Hierarchy` menu (or `Ctrl+H`).
 
+### Did Change Watched Files
+
+[workspace/didChangeWatchedFiles](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_didChangeWatchedFiles)
+reports the changes to the files which match the file system watchers that a language server registers with
+`client/registerCapability`, as the IntelliJ VFS reports them.
+
+IntelliJ watches the files of the project. When a watcher names a directory outside the project, with the base of a
+`RelativePattern` or the fixed start of an absolute glob pattern such as `/opt/sdk/lib/**/*.jar`, LSP4IJ watches that
+directory too, so that the changes which other processes make there are reported:
+
+ * IntelliJ's native file watcher watches the directory, with its subdirectories when the pattern descends into them,
+   and the directory is loaded into the VFS.
+ * The directory is refreshed every 2 seconds, and all of it is listed every 30 seconds, for the changes that the native
+   file watcher misses.
+ * A directory which doesn't exist yet is watched from its nearest existing parent until it is created.
+ * A directory which is a symbolic link is not watched, and the symbolic links under a watched directory are not followed.
+
+A watcher whose pattern names no directory, such as `**/*.java`, or names a directory in the project, needs nothing more.
+The watchers of a language server are dropped when it stops, and a restarted language server registers its own.
+
 ### Workspace Symbol
 
 [workspace/symbol](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_symbol) is implemented with the `gotoSymbolContributor` and `gotoClassContributor` extension points as appropriate for the symbol type(s). 
@@ -865,6 +956,8 @@ After setting the cursor position in a file, you can view the Type Hierarchy usi
 Here is an example with the [MicroProfile language server](https://github.com/eclipse/lsp4mp/tree/master/microprofile.ls) collecting JAX-RS endpoints:
 
 ![workspace/symbol](./images/lsp-support/workspace_symbol.gif)
+
+A language server which supports [workspaceSymbol/resolve](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_symbolResolve) (`resolveProvider`) can return a symbol whose location has a URI but no range, since the client declares that it resolves `location.range`. The range is then resolved when the symbol is opened.
 
 ### Text Document Content
 

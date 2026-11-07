@@ -13,10 +13,10 @@ package com.redhat.devtools.lsp4ij.dap.client;
 import com.intellij.icons.AllIcons;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.fileEditor.FileEditorManager;
-import com.intellij.openapi.vfs.LocalFileSystem;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.ui.ColoredTextContainer;
 import com.intellij.ui.SimpleTextAttributes;
+import com.intellij.util.concurrency.AppExecutorUtil;
 import com.intellij.xdebugger.XDebuggerBundle;
 import com.intellij.xdebugger.XDebuggerUtil;
 import com.intellij.xdebugger.XSourcePosition;
@@ -27,6 +27,7 @@ import com.intellij.xdebugger.frame.XValueChildrenList;
 import com.redhat.devtools.lsp4ij.dap.client.files.DAPFileRegistry;
 import com.redhat.devtools.lsp4ij.dap.client.files.DAPSourceReferencePosition;
 import com.redhat.devtools.lsp4ij.dap.client.files.DeferredLocalFileSourcePosition;
+import com.redhat.devtools.lsp4ij.dap.client.files.LocalSourceFiles;
 import com.redhat.devtools.lsp4ij.dap.client.variables.DAPValueGroup;
 import com.redhat.devtools.lsp4ij.dap.client.variables.providers.DebugVariableContext;
 import com.redhat.devtools.lsp4ij.dap.disassembly.DisassemblyDeferredSourcePosition;
@@ -39,6 +40,7 @@ import org.jetbrains.annotations.Nullable;
 import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static com.redhat.devtools.lsp4ij.dap.DAPIJUtils.getValidFilePath;
@@ -53,7 +55,7 @@ public class DAPStackFrame extends XStackFrame {
     private volatile @Nullable XSourcePosition sourcePosition;
     private @Nullable DisassemblyDeferredSourcePosition disassemblyInstructionSourcePosition;
     private XDebuggerEvaluator evaluator;
-    private CompletableFuture<DebugVariableContext> variablesContext;
+    private volatile @Nullable CompletableFuture<DebugVariableContext> variablesContext;
 
     public DAPStackFrame(@NotNull DAPClient client,
                          @NotNull StackFrame stackFrame) {
@@ -117,8 +119,8 @@ public class DAPStackFrame extends XStackFrame {
             return new DeferredLocalFileSourcePosition(filePath, line);
         }
 
-        VirtualFile file = LocalFileSystem.getInstance().findFileByPath(filePath.toString());
-        if (file == null || !file.isValid()) {
+        VirtualFile file = LocalSourceFiles.findFile(filePath);
+        if (file == null) {
             return null;
         }
         return XDebuggerUtil.getInstance().createPosition(file, line);
@@ -133,11 +135,18 @@ public class DAPStackFrame extends XStackFrame {
                 .thenApply(context -> context.getSourcePositionFor(variable));
     }
 
+    /**
+     * Drops the variables context of this stack frame, with the inline values which the language servers answered,
+     * so that they are asked again the next time the variables of this frame are computed.
+     */
+    public synchronized void clearVariablesContext() {
+        variablesContext = null;
+    }
+
     private CompletableFuture<DebugVariableContext> getVariablesContext() {
-        if (variablesContext != null) {
-            return variablesContext;
-        }
-        return getVariablesContextSync();
+        // read once: clearVariablesContext() can drop it at any time
+        var context = variablesContext;
+        return context != null ? context : getVariablesContextSync();
     }
 
     private synchronized CompletableFuture<DebugVariableContext> getVariablesContextSync() {
@@ -146,13 +155,15 @@ public class DAPStackFrame extends XStackFrame {
         }
 
         var context = new DebugVariableContext(this);
-        CompletableFuture<DebugVariableContext> future = new CompletableFuture<>();
-        ApplicationManager.getApplication().executeOnPooledThread(() ->
-                ApplicationManager.getApplication().runReadAction(() -> {
-                    context.configureContext();
-                    future.complete(context);
-                }));
-        variablesContext = future;
+        Executor executor = AppExecutorUtil.getAppExecutorService();
+        // The providers first load, without a read action, what may take time, such as the inline values that a
+        // language server answers, then configure the context in a read action, which waits for nothing
+        variablesContext = CompletableFuture.supplyAsync(context::loadContext, executor)
+                .thenCompose(loaded -> loaded)
+                .thenApplyAsync(unused -> {
+                    ApplicationManager.getApplication().runReadAction(context::configureContext);
+                    return context;
+                }, executor);
         return variablesContext;
     }
 
@@ -176,6 +187,7 @@ public class DAPStackFrame extends XStackFrame {
                         return;
                     }
                     AtomicInteger remaining = new AtomicInteger(scopeArray.length);
+                    Scope expanded = getAutoExpandedScope(scopeArray);
                     for (Scope scope : scopeArray) {
                         int parentVariablesReference = scope.getVariablesReference();
                         XValueChildrenList children = new XValueChildrenList();
@@ -186,11 +198,27 @@ public class DAPStackFrame extends XStackFrame {
                                 .thenAccept(variablesResponse -> {
                                     children.addBottomGroup(new DAPValueGroup(this, scope.getName(),
                                             Arrays.asList(variablesResponse.getVariables()),
-                                            parentVariablesReference));
+                                            parentVariablesReference,
+                                            scope == expanded));
                                     node.addChildren(children, remaining.decrementAndGet() == 0);
                                 });
                     }
                 });
+    }
+
+    /**
+     * Returns the scope whose group is expanded when the frame's variables are shown: the one which the DAP server
+     * presents as the frame's local variables ('locals'), or else the first one. The debugger computes the values of
+     * an expanded group's variables, and their inline values in the editor.
+     *
+     * @param scopes the scopes of the frame, in the order of the DAP server.
+     * @return the scope whose group is expanded, or null if there is none.
+     */
+    static @Nullable Scope getAutoExpandedScope(@NotNull Scope[] scopes) {
+        return Arrays.stream(scopes)
+                .filter(scope -> ScopePresentationHint.LOCALS.equals(scope.getPresentationHint()))
+                .findFirst()
+                .orElse(scopes.length > 0 ? scopes[0] : null);
     }
 
     public @NotNull DAPClient getClient() {
@@ -199,6 +227,15 @@ public class DAPStackFrame extends XStackFrame {
 
     public int getFrameId() {
         return stackFrame.getId();
+    }
+
+    /**
+     * Returns the stack frame which the DAP server sent.
+     *
+     * @return the stack frame which the DAP server sent.
+     */
+    public @NotNull StackFrame getStackFrame() {
+        return stackFrame;
     }
 
     public @Nullable String getInstructionPointerReference() {

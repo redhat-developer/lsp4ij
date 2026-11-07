@@ -87,6 +87,10 @@ Hide specific symbol types (e.g., constants):
 
 The LSP formatting support can be done with the standard `Reformat Code` and `Reformat File` actions.
 
+A language server doesn't format a file which matches a `Do not format` pattern of
+`Settings | Editor | Code Style | Formatter`, also when `Reformat code` runs before a commit. Server-side on-type
+formatting doesn't check these patterns.
+
 ### Find Usages
 
 The following LSP features are integrated with the standard `Find Usages` menu (provided they're supported by the underlying language server): 
@@ -108,6 +112,22 @@ The following LSP features are integrated with the standard `Find Usages` menu (
 If the language server can support [workspace/willRenameFiles](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_willRenameFiles), when a file is
 renamed inside IntelliJ IDEA, LSP4IJ can consume it and applies the `WorkspaceEdit`
 to apply some refactoring.
+
+## Linked Editing Range
+
+If the language server supports [textDocument/linkedEditingRange](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_linkedEditingRange),
+typing in a range which it links to others, such as the declaration of a local variable, edits the others too, such as
+the variable's uses.
+
+Linked editing is off by default. Turn it on with `Edit linked ranges together, such as a variable's declaration and its uses`
+in `Settings | Editor | General | Smart Keys`, under `Language Servers`:
+
+![Linked editing setting](./images/LSPLinkedEditingSettings.png)
+
+In this [Ecstasy](https://github.com/xtclang/) file, the language server links the declaration of `total` with its two uses: typing `sub` in the
+declaration renames all three to `subtotal`, and one undo reverts them together.
+
+![Linked editing in action](./images/lsp-support/textDocument_linkedEditingRange.gif)
 
 ## Semantic Tokens support
 

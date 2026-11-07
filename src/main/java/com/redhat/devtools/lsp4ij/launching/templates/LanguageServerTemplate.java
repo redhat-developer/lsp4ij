@@ -12,8 +12,12 @@ package com.redhat.devtools.lsp4ij.launching.templates;
 
 import com.redhat.devtools.lsp4ij.LanguageServerBundle;
 import com.redhat.devtools.lsp4ij.internal.PluginUtils;
+import com.redhat.devtools.lsp4ij.server.definition.launching.TransportSupport;
+import com.redhat.devtools.lsp4ij.server.definition.launching.UserDefinedTransport;
 import com.redhat.devtools.lsp4ij.templates.ServerTemplate;
+import org.jetbrains.annotations.NotNull;
 
+import java.util.List;
 import java.util.Set;
 
 /**
@@ -39,6 +43,13 @@ public class LanguageServerTemplate extends ServerTemplate {
     public static final String DISABLE_PROMOTION_FOR = "disablePromotionFor";
     public static final String PROGRAM_ARGS_JSON_PROPERTY = "programArgs";
     public static final String EXPAND_CONFIGURATION_JSON_PROPERTY = "expandConfiguration";
+    public static final String SOCKET_JSON_PROPERTY = "socket";
+    public static final String SOCKET_MODE_JSON_PROPERTY = "mode";
+    public static final String SOCKET_HOST_JSON_PROPERTY = "host";
+    public static final String SOCKET_PORT_JSON_PROPERTY = "port";
+    public static final String TRANSPORTS_JSON_PROPERTY = "transports";
+    public static final String TRANSPORT_MODE_JSON_PROPERTY = "mode";
+    public static final String TRANSPORT_ARGUMENT_JSON_PROPERTY = "argument";
 
     private String description;
 
@@ -51,7 +62,52 @@ public class LanguageServerTemplate extends ServerTemplate {
     private String workspaceFolderConfiguration;
 
     private Set<String> disablePromotionFor;
+    private @NotNull UserDefinedTransport transport = UserDefinedTransport.STDIO;
+    private @NotNull List<TransportSupport> supportedTransports = List.of();
+    private @NotNull List<String> problems = List.of();
     private Boolean promotable;
+
+    /**
+     * Returns how LSP4IJ talks to the language server: over the standard input and output of its process, unless the
+     * template has a "socket".
+     *
+     * @return how LSP4IJ talks to the language server.
+     */
+    public @NotNull UserDefinedTransport getTransport() {
+        return transport;
+    }
+
+    public void setTransport(@NotNull UserDefinedTransport transport) {
+        this.transport = transport;
+    }
+
+    /**
+     * Returns the transports which the language server supports, as the "transports" of the template list them, and
+     * none if the template doesn't say.
+     *
+     * @return the transports which the language server supports, empty if the template doesn't say.
+     */
+    public @NotNull List<TransportSupport> getSupportedTransports() {
+        return supportedTransports;
+    }
+
+    public void setSupportedTransports(@NotNull List<TransportSupport> supportedTransports) {
+        this.supportedTransports = List.copyOf(supportedTransports);
+    }
+
+    /**
+     * Returns what LSP4IJ couldn't use in the template, such as a socket mode it doesn't know, each as a message which
+     * says what it does instead.
+     *
+     * @return the problems of the template, empty if it has none.
+     */
+    public @NotNull List<String> getProblems() {
+        return problems;
+    }
+
+    public void setProblems(@NotNull List<String> problems) {
+        this.problems = List.copyOf(problems);
+    }
 
     public String getDescription() {
         return description;

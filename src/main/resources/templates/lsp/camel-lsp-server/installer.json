@@ -2,11 +2,13 @@
   "id": "camel-lsp-server",
   "name": "Camel Language Server",
   "executeOnStartServer": false,
+  "properties": {
+    "serverDist": "$USER_HOME$/.lsp4ij/lsp/camel-lsp-server"
+  },
   "check": {
-    "exec": {
-      "name": "Trying current command",
-      "command": "${server.command}",
-      "timeout": 2000
+    "fileExists": {
+      "name": "Check if Camel Language Server is installed",
+      "file": "${serverDist}/camel-lsp-server-*.jar"
     }
   },
   "run": {
@@ -18,7 +20,7 @@
       },
       "url": "https://repo1.maven.org/maven2/com/github/camel-tooling/camel-lsp-server/1.31.0/camel-lsp-server-1.31.0.jar",
       "output": {
-        "dir": "$USER_HOME$/.lsp4ij/lsp/camel-lsp-server"
+        "dir": "${serverDist}"
       },
       "onSuccess": {
         "configureServer": {

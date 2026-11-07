@@ -221,7 +221,7 @@ public abstract class InvalidWebFilter implements Filter {
                             "documentChanges": [
                               {
                                 "textDocument": {
-                                  "version": null,
+                                  "version": 0,
                                   "uri": "%s"
                                 },
                                 "edits": [

@@ -12,6 +12,7 @@ package com.redhat.devtools.lsp4ij.features.formatting;
 
 import com.intellij.formatting.service.AsyncDocumentFormattingService;
 import com.intellij.formatting.service.AsyncFormattingRequest;
+import com.intellij.lang.LanguageFormattingRestriction;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.project.Project;
@@ -52,23 +53,23 @@ public abstract class AbstractLSPFormattingService extends AsyncDocumentFormatti
         if (psiFile == null) {
             return null;
         }
-        TextRange formattingRange = getFormattingRange(formattingRequest);
-        return new LSPFormattingTask(psiFile, formattingRange, formattingRequest);
+        List<TextRange> formattingRanges = getFormattingRanges(formattingRequest);
+        return new LSPFormattingTask(psiFile, formattingRanges, formattingRequest);
     }
 
     private static class LSPFormattingTask implements FormattingTask {
 
         private final @NotNull PsiFile psiFile;
 
-        private final @Nullable TextRange formattingRange;
+        private final @NotNull List<TextRange> formattingRanges;
 
         private final @NotNull AsyncFormattingRequest formattingRequest;
 
         private LSPFormattingSupport formattingSupport;
 
-        private LSPFormattingTask(@NotNull PsiFile psiFile, @Nullable TextRange formattingRange, @NotNull AsyncFormattingRequest formattingRequest) {
+        private LSPFormattingTask(@NotNull PsiFile psiFile, @NotNull List<TextRange> formattingRanges, @NotNull AsyncFormattingRequest formattingRequest) {
             this.psiFile = psiFile;
-            this.formattingRange = formattingRange;
+            this.formattingRanges = formattingRanges;
             this.formattingRequest = formattingRequest;
         }
 
@@ -80,7 +81,7 @@ public abstract class AbstractLSPFormattingService extends AsyncDocumentFormatti
             Editor editor = editors.length > 0 ? editors[0] : null;
             Document document = editor != null ? editor.getDocument() : LSPIJUtils.getDocument(psiFile.getVirtualFile());
             if (document != null) {
-                formattingSupport.format(document, psiFile, editor, formattingRange, formattingRequest);
+                formattingSupport.format(document, psiFile, editor, formattingRanges, formattingRequest);
             }
         }
 
@@ -115,9 +116,26 @@ public abstract class AbstractLSPFormattingService extends AsyncDocumentFormatti
             // The file is not associated to a language server
             return false;
         }
+        if (!isFormatterAllowed(file)) {
+            // The file is excluded from formatting (ex: a "Do not format" pattern of the code style settings)
+            return false;
+        }
         Project project = file.getProject();
         return LanguageServiceAccessor.getInstance(project)
                 .hasAny(file, ls -> canSupportFormatting(ls, file));
+    }
+
+    /**
+     * Returns true if no {@link LanguageFormattingRestriction} forbids formatting the given file. IntelliJ asks the
+     * restrictions only for its own formatter (in {@code LanguageFormatting#forContext}), so a formatting service
+     * must ask them itself.
+     *
+     * @param file the Psi file.
+     * @return true if no {@link LanguageFormattingRestriction} forbids formatting the given file.
+     */
+    private static boolean isFormatterAllowed(@NotNull PsiFile file) {
+        return LanguageFormattingRestriction.EP_NAME.getExtensionList().stream()
+                .allMatch(restriction -> restriction.isFormatterAllowed(file));
     }
 
     private boolean canSupportFormatting(@NotNull LanguageServerWrapper ls,
@@ -132,17 +150,13 @@ public abstract class AbstractLSPFormattingService extends AsyncDocumentFormatti
     protected abstract boolean canSupportFormatting(@NotNull LSPFormattingFeature formattingFeature,
                                                     @NotNull PsiFile file);
 
-    private static @Nullable TextRange getFormattingRange(@NotNull AsyncFormattingRequest formattingRequest) {
+    private static @NotNull List<TextRange> getFormattingRanges(@NotNull AsyncFormattingRequest formattingRequest) {
         List<TextRange> ranges = formattingRequest.getFormattingRanges();
-        if (ranges.isEmpty()) {
-            return null;
-        }
-        TextRange textRange = ranges.get(0);
-        if (textRange.getLength() == formattingRequest.getDocumentText().length()) {
+        if (ranges.size() == 1 && ranges.get(0).getLength() == formattingRequest.getDocumentText().length()) {
             // The full document must be formatted
-            return null;
+            return List.of();
         }
-        return textRange;
+        return List.copyOf(ranges);
     }
 
 }

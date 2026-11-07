@@ -308,6 +308,14 @@ public class CancellationSupport implements CancelChecker {
         }
     }
 
+    /**
+     * Wait for the done of the given future and stop the wait if {@link ProcessCanceledException} is thrown.
+     *
+     * @param future the future to wait.
+     * @param <T>    the response type of the future.
+     * @return the result of the future, or null if the future failed.
+     * @throws ProcessCanceledException if the future is cancelled, or the progress is canceled.
+     */
     public static <T> T awaitWithCheckCanceled(@NotNull Future<T> future) {
         ProgressIndicator indicator = ProgressManager.getInstance().getProgressIndicator();
         return (T)awaitWithCheckCanceled(future, indicator);
@@ -354,6 +362,11 @@ public class CancellationSupport implements CancelChecker {
                 }
                 if (cause instanceof CancellationException) {
                     throw new ProcessCanceledException(cause);
+                }
+                if (e instanceof ExecutionException failure) {
+                    // The future failed: return no result, as CompletableFutures.awaitWithCheckCanceled does
+                    CompletableFutures.logFailure(failure);
+                    return null;
                 }
                 ExceptionUtil.rethrow(e);
             }

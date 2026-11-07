@@ -15,9 +15,24 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 /**
- *  Debug Adapter Protocol (DAP) breakpoint properties.
+ *  Debug Adapter Protocol (DAP) breakpoint properties: the hit condition, which IntelliJ breakpoints don't have.
  */
 public class DAPBreakpointProperties extends XBreakpointProperties<DAPBreakpointProperties> {
+
+    private @NotNull String hitCondition = "";
+
+    /**
+     * Returns the hit condition, which the DAP server interprets, and an empty string if there is none.
+     *
+     * @return the hit condition, and an empty string if there is none.
+     */
+    public @NotNull String getHitCondition() {
+        return hitCondition;
+    }
+
+    public void setHitCondition(@NotNull String hitCondition) {
+        this.hitCondition = hitCondition;
+    }
 
     @Override
     public @Nullable DAPBreakpointProperties getState() {
@@ -26,6 +41,6 @@ public class DAPBreakpointProperties extends XBreakpointProperties<DAPBreakpoint
 
     @Override
     public void loadState(@NotNull DAPBreakpointProperties state) {
-
+        hitCondition = state.hitCondition;
     }
 }

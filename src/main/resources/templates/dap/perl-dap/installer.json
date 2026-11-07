@@ -1,11 +1,16 @@
 {
   "id": "perl-dap-installer",
   "name": "perl-dap",
+  "properties": {
+    "serverDist": "$USER_HOME$/.lsp4ij/dap/perl-lsp"
+  },
   "check": {
-    "exec": {
-      "name": "Trying current command",
-      "command": "${server.command}",
-      "timeout": 2000
+    "fileExists": {
+      "name": "Check if Perl DAP is installed",
+      "file": {
+        "windows": "${serverDist}/perl-dap.exe",
+        "default": "${serverDist}/perl-dap"
+      }
     }
   },
   "run": {
@@ -39,7 +44,7 @@
         }
       },
       "output": {
-        "dir": "$USER_HOME$/.lsp4ij/dap/perl-lsp",
+        "dir": "${serverDist}",
         "file": {
           "name": {
             "windows": "perl-dap.exe",

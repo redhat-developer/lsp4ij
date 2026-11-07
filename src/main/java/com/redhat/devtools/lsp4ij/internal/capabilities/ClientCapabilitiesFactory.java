@@ -56,8 +56,9 @@ public class ClientCapabilitiesFactory {
         // schemes, which it can also register dynamically
         workspaceClientCapabilities.setTextDocumentContent(new TextDocumentContentCapabilities(Boolean.TRUE));
 
-        // Support for 'workspace/symbol'
+        // Support for 'workspace/symbol', and 'workspaceSymbol/resolve' for a symbol whose location has no range
         var symbolCapabilities = new SymbolCapabilities();
+        symbolCapabilities.setResolveSupport(new WorkspaceSymbolResolveSupportCapabilities(List.of("location.range")));
         workspaceClientCapabilities.setSymbol(symbolCapabilities);
 
         // See https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#executeCommandClientCapabilities
@@ -100,6 +101,12 @@ public class ClientCapabilitiesFactory {
 
         // Refresh support for InlayHint
         workspaceClientCapabilities.setInlayHint(new InlayHintWorkspaceCapabilities(Boolean.TRUE));
+
+        // Refresh support for InlineValue, for the inline values of a DAP debug session
+        workspaceClientCapabilities.setInlineValue(new InlineValueWorkspaceCapabilities(Boolean.TRUE));
+
+        // Refresh support for FoldingRange (LSP 3.18)
+        workspaceClientCapabilities.setFoldingRange(new FoldingRangeWorkspaceCapabilities(Boolean.TRUE));
 
         // Refresh support for SemanticTokens
         workspaceClientCapabilities.setSemanticTokens(new SemanticTokensWorkspaceCapabilities(Boolean.TRUE));
@@ -149,6 +156,9 @@ public class ClientCapabilitiesFactory {
 
         // Inlay Hint support
         textDocumentClientCapabilities.setInlayHint(new InlayHintCapabilities(Boolean.TRUE));
+
+        // Inline Value support, for the inline values of a DAP debug session
+        textDocumentClientCapabilities.setInlineValue(new InlineValueCapabilities(Boolean.TRUE));
 
         // Color support
         textDocumentClientCapabilities.setColorProvider(new ColorProviderCapabilities(Boolean.TRUE));
@@ -204,6 +214,9 @@ public class ClientCapabilitiesFactory {
         // DocumentHighlight support
         textDocumentClientCapabilities.setDocumentHighlight(new DocumentHighlightCapabilities(Boolean.TRUE));
 
+        // LinkedEditingRange support
+        textDocumentClientCapabilities.setLinkedEditingRange(new LinkedEditingRangeCapabilities(Boolean.TRUE));
+
         // DocumentLink support
         textDocumentClientCapabilities.setDocumentLink(new DocumentLinkCapabilities(Boolean.TRUE));
 
@@ -240,8 +253,10 @@ public class ClientCapabilitiesFactory {
         // textDocument/formatting
         textDocumentClientCapabilities.setFormatting(new FormattingCapabilities(Boolean.TRUE));
 
-        // textDocument/rangeFormatting
-        textDocumentClientCapabilities.setRangeFormatting(new RangeFormattingCapabilities(Boolean.TRUE));
+        // textDocument/rangeFormatting and textDocument/rangesFormatting
+        var rangeFormattingCapabilities = new RangeFormattingCapabilities(Boolean.TRUE);
+        rangeFormattingCapabilities.setRangesSupport(Boolean.TRUE);
+        textDocumentClientCapabilities.setRangeFormatting(rangeFormattingCapabilities);
 
         // textDocument/rename support
         final var renameCapabilities = new RenameCapabilities(Boolean.TRUE);

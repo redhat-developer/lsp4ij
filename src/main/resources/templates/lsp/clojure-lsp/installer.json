@@ -2,11 +2,16 @@
   "id": "clojure-lsp-installer",
   "name": "clojure-lsp",
   "executeOnStartServer": false,
+  "properties": {
+    "serverDist": "$USER_HOME$/.lsp4ij/lsp/clojure-lsp"
+  },
   "check": {
-    "exec": {
-      "name": "Trying current command",
-      "command": "${server.command}",
-      "timeout": 2000
+    "fileExists": {
+      "name": "Check if clojure-lsp is installed",
+      "file": {
+        "windows": "${serverDist}/clojure-lsp.exe",
+        "default": "${serverDist}/clojure-lsp"
+      }
     }
   },
   "run": {
@@ -29,7 +34,7 @@
         }
       },
       "output": {
-        "dir": "$USER_HOME$/.lsp4ij/lsp/clojure-lsp",
+        "dir": "${serverDist}",
         "file": {
           "name": {
             "windows": "clojure-lsp.exe",

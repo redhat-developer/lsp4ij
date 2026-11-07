@@ -39,7 +39,11 @@ You can reinstall the server at any time (e.g. to fetch the latest version) usin
 
 ### Server tab
 
-The `Server tab` requires the `server name` and `command` fields to be set.
+The `Server tab` requires the `server name` and `command` fields to be set. A language server which runs already, and
+to which LSP4IJ attaches over a socket, needs no command, but its port (see [Transport](#transport)).
+
+Below the `Working Directory` field, a line shows the directory with its macros resolved, and says when no such directory
+exists yet: the language server can only start in one that exists, which its installer can still create.
 
 Here is a sample with the [typescript-language-server](https://github.com/typescript-language-server/typescript-language-server):
 
@@ -95,6 +99,43 @@ Here is an example with Scala Language Server's `metals.bat` stored at the root 
 
 When commands contain macros, their resolved value is visible below the `Command` field.
 
+#### Transport
+
+By default, LSP4IJ talks to the language server over the standard input and output (stdio) of its process. A language
+server which talks LSP over a TCP socket instead is configured with `Transport: Socket (experimental)`, in one of three
+ways, which are experimental:
+
+![Transport](./images/user-defined-ls/SocketTransportModes.png)
+
+* `Attach to a running language server`: the language server runs already and listens on `Host` and `Port`, as when it
+  runs in a debugger or inside another application. LSP4IJ doesn't start it, so the environment variables, the
+  `Command` and the working directory are hidden, and stopping the language server only closes the connection. Without a host, LSP4IJ connects to the loopback address; a host is a plain host name or IP address, without a scheme,
+  and the port has its own field. An attach that gets no answer within 10 seconds fails.
+  The port is needed, since LSP4IJ can't choose it.
+* `Start the language server, LSP4IJ connects to it`: LSP4IJ starts the language server with the `Command`, and
+  connects to the port once the language server accepts connections.
+* `Start the language server, it connects to LSP4IJ`: LSP4IJ listens on the port and starts the language server with
+  the `Command`, which connects to it, as VS Code's socket transport does for a language server started with
+  `--socket=<port>`.
+
+When LSP4IJ starts the language server, the `Command` takes the port as `${port}`, and a `Port` of `Auto` lets LSP4IJ
+choose a free port each time: the `Command` must then have `${port}`, or the language server can't know the port. A
+start that gets no connection within 60 seconds fails. For instance, with a language server built on `vscode-languageserver`:
+
+`node path/to/server.js --socket=${port}`
+
+![Socket transport](./images/user-defined-ls/SocketTransport.png)
+
+An [installer](#installer-tab) which sets the `Command` writes the command of its template, which is for the standard
+input and output unless it takes the port as `${port}`. A language server which LSP4IJ starts over a socket is then
+switched back to the standard input and output; set the socket again with a command that takes the port.
+
+LSP4IJ listens on the loopback address only. The output of a language server which LSP4IJ starts is shown in the `Log`
+tab of the [LSP console](./UserGuide.md#lsp-console), since the socket carries the protocol: its standard output as
+information, and its standard error as errors. As with any TCP transport
+of LSP, which has no handshake to authenticate its peer, any local process can connect to a loopback port: on a machine
+shared with other users, prefer the standard input and output.
+
 ### Mappings tab
 
 The `Mappings tab` provides the capability to `associate the language server with the proper files` identified by: 
@@ -132,6 +173,18 @@ The `Configuration tab` allows to configure the language server with the expecte
 Here are configuration sample with the [typescript-language-server](https://github.com/typescript-language-server/typescript-language-server):
 
 ![Configuration with TypeScript](images/user-defined-ls/typescript-language-server/TypeScriptServerDialog_Configuration.png)
+
+A property set to `null` in `Configuration` or `Initialization Options` reaches the language server as `null`, so that
+it can reset that setting to its default.
+
+LSP4IJ must be able to read the JSON fields: `Configuration`, `Initialization Options` and `Experimental` in the
+`Server` tab of the `Configuration` tab, the configuration in its `Client` tab, and the JSON of the `Installer` and
+`Workspace Folders` tabs. It reads them leniently, so comments (`//`, `/* */` and `#`), unquoted names and
+single-quoted strings are accepted, but a missing brace or a trailing comma is not. `Configuration`,
+`Initialization Options` and `Experimental` must stay readable once their macros, such as `$PROJECT_DIR$`, are
+expanded, which a Windows path in a string may not. A language server with a field that can't be read is not saved:
+the `New Language Server` dialog lists the errors and disables `OK`, and the settings page and the `Apply` action of
+the LSP console show the error.
 
 ### Debug tab
 

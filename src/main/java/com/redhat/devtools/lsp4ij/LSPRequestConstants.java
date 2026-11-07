@@ -21,6 +21,7 @@ public class LSPRequestConstants {
     public static final String WORKSPACE_WILL_DELETE_FILES = "workspace/willDeleteFiles";
     public static final String WORKSPACE_WILL_RENAME_FILES = "workspace/willRenameFiles";
     public static final String WORKSPACE_SYMBOL = "workspace/symbol";
+    public static final String WORKSPACE_SYMBOL_RESOLVE = "workspaceSymbol/resolve";
     public static final String WORKSPACE_TEXT_DOCUMENT_CONTENT = "workspace/textDocumentContent";
 
     // textDocument/* LSP requests
@@ -29,6 +30,7 @@ public class LSPRequestConstants {
     public static final String TEXT_DOCUMENT_DEFINITION = "textDocument/definition";
     public static final String TEXT_DOCUMENT_DIAGNOSTIC = "textDocument/diagnostic";
     public static final String TEXT_DOCUMENT_DOCUMENT_LINK = "textDocument/documentLink";
+    public static final String DOCUMENT_LINK_RESOLVE = "documentLink/resolve";
     public static final String TEXT_DOCUMENT_FOLDING_RANGE = "textDocument/foldingRange";
     public static final String TEXT_DOCUMENT_SELECTION_RANGE = "textDocument/selectionRange";
     public static final String TEXT_DOCUMENT_SEMANTIC_TOKENS = "textDocument/semanticTokens";
@@ -40,19 +42,23 @@ public class LSPRequestConstants {
     public static final String TEXT_DOCUMENT_HOVER = "textDocument/hover";
     public static final String TEXT_DOCUMENT_INLAY_HINT = "textDocument/inlayHint";
     public static final String INLAY_HINT_RESOLVE = "inlayHint/resolve";
+    public static final String TEXT_DOCUMENT_INLINE_VALUE = "textDocument/inlineValue";
     public static final String TEXT_DOCUMENT_DOCUMENT_COLOR = "textDocument/documentColor";
     public static final String TEXT_DOCUMENT_COLOR_PRESENTATION = "textDocument/colorPresentation";
     public static final String TEXT_DOCUMENT_COMPLETION = "textDocument/completion";
+    public static final String COMPLETION_ITEM_RESOLVE = "completionItem/resolve";
     public static final String TEXT_DOCUMENT_INLINE_COMPLETION = "textDocument/inlineCompletion";
     public static final String TEXT_DOCUMENT_DOCUMENT_HIGHLIGHT = "textDocument/documentHighlight";
     public static final String TEXT_DOCUMENT_FORMATTING = "textDocument/formatting";
     public static final String TEXT_DOCUMENT_RANGE_FORMATTING = "textDocument/rangeFormatting";
+    public static final String TEXT_DOCUMENT_RANGES_FORMATTING = "textDocument/rangesFormatting";
     public static final String TEXT_DOCUMENT_ON_TYPE_FORMATTING = "textDocument/onTypeFormatting";
     public static final String TEXT_DOCUMENT_IMPLEMENTATION = "textDocument/implementation";
     public static final String TEXT_DOCUMENT_REFERENCES = "textDocument/references";
     public static final String TEXT_DOCUMENT_SIGNATURE_HELP = "textDocument/signatureHelp";
     public static final String TEXT_DOCUMENT_PREPARE_RENAME = "textDocument/prepareRename";
     public static final String TEXT_DOCUMENT_RENAME = "textDocument/rename";
+    public static final String TEXT_DOCUMENT_LINKED_EDITING_RANGE = "textDocument/linkedEditingRange";
     public static final String TEXT_DOCUMENT_DOCUMENT_SYMBOL = "textDocument/documentSymbol";
     public static final String TEXT_DOCUMENT_CALL_HIERARCHY = "textDocument/callHierarchy";
     public static final String TEXT_DOCUMENT_PREPARE_CALL_HIERARCHY = "textDocument/prepareCallHierarchy";

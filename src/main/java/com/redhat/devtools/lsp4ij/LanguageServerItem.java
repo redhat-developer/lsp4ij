@@ -18,6 +18,7 @@ import com.redhat.devtools.lsp4ij.server.Lease;
 import com.redhat.devtools.lsp4ij.server.ServerWasStoppedException;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
 import org.eclipse.lsp4j.Command;
+import org.eclipse.lsp4j.DocumentRangeFormattingOptions;
 import org.eclipse.lsp4j.ExecuteCommandOptions;
 import org.eclipse.lsp4j.RenameOptions;
 import org.eclipse.lsp4j.ServerCapabilities;
@@ -181,6 +182,29 @@ public class LanguageServerItem {
     public static boolean isDocumentRangeFormattingSupported(@Nullable ServerCapabilities serverCapabilities) {
         return serverCapabilities != null &&
                 hasCapability(serverCapabilities.getDocumentRangeFormattingProvider());
+    }
+
+    /**
+     * Returns true if the language server can format several ranges at once with 'textDocument/rangesFormatting' and false otherwise.
+     *
+     * @return true if the language server can format several ranges at once and false otherwise.
+     */
+    public boolean isDocumentRangesFormattingSupported() {
+        return isDocumentRangesFormattingSupported(getServerCapabilities());
+    }
+
+    /**
+     * Returns true if the language server can format several ranges at once with 'textDocument/rangesFormatting' and false otherwise.
+     *
+     * @param serverCapabilities the server capabilities.
+     * @return true if the language server can format several ranges at once and false otherwise.
+     */
+    public static boolean isDocumentRangesFormattingSupported(@Nullable ServerCapabilities serverCapabilities) {
+        Either<Boolean, DocumentRangeFormattingOptions> rangeFormattingProvider = serverCapabilities != null ? serverCapabilities.getDocumentRangeFormattingProvider() : null;
+        if (rangeFormattingProvider != null && rangeFormattingProvider.isRight()) {
+            return hasCapability(rangeFormattingProvider.getRight().getRangesSupport());
+        }
+        return false;
     }
 
     /**

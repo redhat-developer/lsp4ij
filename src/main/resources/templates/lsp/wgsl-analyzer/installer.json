@@ -2,11 +2,20 @@
   "id": "wgsl-analyzer-installer",
   "name": "wgsl-analyzer",
   "executeOnStartServer": false,
+  "properties": {
+    "serverDist": "$USER_HOME$/.lsp4ij/lsp/wgsl-analyzer"
+  },
   "check": {
-    "exec": {
-      "name": "Trying current command",
-      "command": "${server.command}",
-      "timeout": 2000
+    "fileExists": {
+      "name": "Check if wgsl-analyzer is installed",
+      "file": {
+        "windows": "${serverDist}/wgsl-analyzer.exe",
+        "unix": {
+          "x86_64": "${serverDist}/wgsl-analyzer-x86_64-unknown-linux-gnu",
+          "arm64": "${serverDist}/wgsl-analyzer-aarch64-unknown-linux-gnu"
+        },
+        "mac": "${serverDist}/wgsl-analyzer-aarch64-apple-darwin"
+      }
     }
   },
   "run": {
@@ -30,7 +39,7 @@
         }
       },
       "output": {
-        "dir": "$USER_HOME$/.lsp4ij/lsp/wgsl-analyzer",
+        "dir": "${serverDist}",
         "file": {
           "name": {
             "windows": "wgsl-analyzer.exe",

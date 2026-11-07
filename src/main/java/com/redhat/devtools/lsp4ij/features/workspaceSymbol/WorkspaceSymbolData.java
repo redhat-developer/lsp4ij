@@ -13,9 +13,12 @@ package com.redhat.devtools.lsp4ij.features.workspaceSymbol;
 import com.intellij.lang.Language;
 import com.intellij.navigation.ItemPresentation;
 import com.intellij.navigation.NavigationItem;
+import com.intellij.openapi.progress.ProcessCanceledException;
+import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.project.ProjectUtil;
 import com.intellij.openapi.util.NlsSafe;
+import com.intellij.openapi.util.Ref;
 import com.intellij.openapi.util.TextRange;
 import com.intellij.openapi.vfs.VfsUtilCore;
 import com.intellij.openapi.vfs.VirtualFile;
@@ -24,11 +27,16 @@ import com.intellij.psi.PsiFile;
 import com.intellij.psi.PsiManager;
 import com.intellij.psi.impl.light.LightElement;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
+import com.redhat.devtools.lsp4ij.LSPRequestConstants;
+import com.redhat.devtools.lsp4ij.LanguageServerBundle;
+import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import com.redhat.devtools.lsp4ij.client.features.FileUriSupport;
+import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
 import com.redhat.devtools.lsp4ij.ui.IconMapper;
 import org.eclipse.lsp4j.Location;
 import org.eclipse.lsp4j.Position;
 import org.eclipse.lsp4j.SymbolKind;
+import org.eclipse.lsp4j.WorkspaceSymbol;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -44,8 +52,11 @@ public class WorkspaceSymbolData extends LightElement implements NavigationItem,
     private final SymbolKind symbolKind;
     private final String fileUri;
     private final FileUriSupport fileUriSupport;
-    private final Position position;
+    private @Nullable Position position;
     private final Project project;
+    // A symbol whose location has no range, and the language server which resolves it when it is opened
+    private final @Nullable WorkspaceSymbol unresolvedSymbol;
+    private final @Nullable LanguageServerItem languageServer;
 
     private @Nullable VirtualFile file;
     private @Nullable PsiFile psiFile;
@@ -67,6 +78,32 @@ public class WorkspaceSymbolData extends LightElement implements NavigationItem,
                                Position position,
                                FileUriSupport fileUriSupport,
                                Project project) {
+        this(name, symbolKind, fileUri, position, fileUriSupport, project, null, null);
+    }
+
+    /**
+     * Creates the item of a workspace symbol whose location has a URI but no range. Its range is resolved with
+     * 'workspaceSymbol/resolve' when the symbol is opened, if the language server supports it.
+     *
+     * @param symbol         the workspace symbol.
+     * @param languageServer the language server which returned the symbol.
+     * @param project        the project.
+     */
+    public WorkspaceSymbolData(@NotNull WorkspaceSymbol symbol,
+                               @NotNull LanguageServerItem languageServer,
+                               Project project) {
+        this(symbol.getName(), symbol.getKind(), symbol.getLocation().getRight().getUri(), null,
+                languageServer.getClientFeatures(), project, symbol, languageServer);
+    }
+
+    private WorkspaceSymbolData(String name,
+                                SymbolKind symbolKind,
+                                String fileUri,
+                                @Nullable Position position,
+                                FileUriSupport fileUriSupport,
+                                Project project,
+                                @Nullable WorkspaceSymbol unresolvedSymbol,
+                                @Nullable LanguageServerItem languageServer) {
         super(PsiManager.getInstance(project), Language.ANY);
         this.name = name;
         this.symbolKind = symbolKind;
@@ -74,6 +111,8 @@ public class WorkspaceSymbolData extends LightElement implements NavigationItem,
         this.position = position;
         this.fileUriSupport = fileUriSupport;
         this.project = project;
+        this.unresolvedSymbol = unresolvedSymbol;
+        this.languageServer = languageServer;
     }
 
     @Override
@@ -112,7 +151,46 @@ public class WorkspaceSymbolData extends LightElement implements NavigationItem,
 
     @Override
     public void navigate(boolean requestFocus) {
+        if (position == null && unresolvedSymbol != null && languageServer != null
+                && languageServer.getClientFeatures().getWorkspaceSymbolFeature().isResolveSupported()) {
+            Ref<Position> resolved = Ref.create();
+            if (!resolvePosition(unresolvedSymbol, languageServer, resolved)) {
+                // The user cancelled
+                return;
+            }
+            // Without a resolved range, the file opens without a position, as before
+            position = resolved.get();
+        }
         LSPIJUtils.openInEditor(fileUri, position, requestFocus, false, fileUriSupport, project);
+    }
+
+    /**
+     * Resolves the range of a symbol with 'workspaceSymbol/resolve', under a progress which the user can cancel.
+     *
+     * @param symbol         the symbol whose location has no range.
+     * @param languageServer the language server which returned the symbol.
+     * @param resolved       set to the start of the resolved range, or to null if the server gives none.
+     * @return false if the user cancelled, and true otherwise.
+     */
+    private boolean resolvePosition(@NotNull WorkspaceSymbol symbol,
+                                    @NotNull LanguageServerItem languageServer,
+                                    @NotNull Ref<Position> resolved) {
+        return ProgressManager.getInstance().runProcessWithProgressSynchronously(() -> {
+            var cancellationSupport = new CancellationSupport();
+            var future = cancellationSupport.execute(languageServer.getWorkspaceService()
+                    .resolveWorkspaceSymbol(symbol), languageServer, LSPRequestConstants.WORKSPACE_SYMBOL_RESOLVE);
+            try {
+                WorkspaceSymbol resolvedSymbol = CancellationSupport.awaitWithCheckCanceled(future);
+                if (resolvedSymbol != null && resolvedSymbol.getLocation() != null && resolvedSymbol.getLocation().isLeft()) {
+                    resolved.set(resolvedSymbol.getLocation().getLeft().getRange().getStart());
+                }
+            } catch (ProcessCanceledException e) {
+                cancellationSupport.cancel();
+                throw e;
+            } catch (Exception e) {
+                // The symbol is opened without its range
+            }
+        }, LanguageServerBundle.message("workspace.symbol.resolve.progress", getName()), true, project);
     }
 
     @Override
@@ -128,6 +206,10 @@ public class WorkspaceSymbolData extends LightElement implements NavigationItem,
     @Override
     public @Nullable TextRange getTextRange() {
         if (textRange == null) {
+            if (position == null) {
+                // The location of the symbol has no range
+                return null;
+            }
             var file = getFile();
             if (file == null || !file.isValid()) {
                 return null;

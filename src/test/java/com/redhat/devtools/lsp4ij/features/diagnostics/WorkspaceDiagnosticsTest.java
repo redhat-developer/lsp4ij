@@ -9,6 +9,7 @@ package com.redhat.devtools.lsp4ij.features.diagnostics;
 
 import com.intellij.openapi.fileEditor.FileEditorManager;
 import com.intellij.openapi.command.WriteCommandAction;
+import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.fileEditor.FileDocumentManager;
 import com.intellij.openapi.fileEditor.FileEditorManagerListener;
 import com.intellij.openapi.project.Project;
@@ -37,6 +38,8 @@ public class WorkspaceDiagnosticsTest extends UsefulTestCase {
     private LSPCodeInsightTestFixture fixture;
     private ScopedServer definition;
     private LanguageServerWrapper wrapper;
+    /** The document of the file whose retained match is checked, kept until the test ends. */
+    private Document matchedDocument;
     private final BlockingQueue<Request> requests = new LinkedBlockingQueue<>();
 
     @Override protected void setUp() throws Exception {
@@ -303,8 +306,12 @@ public class WorkspaceDiagnosticsTest extends UsefulTestCase {
         });
         var file = fixture.addFileToProject("cached.routed", "value").getVirtualFile();
         // Load the document before caching a match, so the unsaved-edit test
-        // changes only its text, not the set of PSI files in the project.
-        assertNotNull(FileDocumentManager.getInstance().getDocument(file));
+        // changes only its text, not the set of PSI files in the project. Keep it:
+        // FileDocumentManager holds an unmodified document weakly, and the matching
+        // version includes the cached document's stamp, so a collected document
+        // would make the unchanged report match again.
+        matchedDocument = FileDocumentManager.getInstance().getDocument(file);
+        assertNotNull(matchedDocument);
         String uri = LSPIJUtils.toUri(file).toString();
         start(true);
         var full = report(file, "cached", null);
@@ -485,8 +492,9 @@ public class WorkspaceDiagnosticsTest extends UsefulTestCase {
         definition.getServer().setPullDiagnostics(new DocumentDiagnosticReport(
                 new RelatedFullDocumentDiagnosticReport(List.of(diagnostic("document")))));
         start(false);
-        var editors = FileEditorManager.getInstance(fixture.getProject());
-        editors.openFile(file, false);
+        // No editor shows the file: an editor's code vision asks for the file's servers on its own
+        // schedule, and when that connection runs after the close below, it connects the file again,
+        // so that the fresh report is applied to an open file instead of the closed-file cache.
         LanguageServiceAccessor.getInstance(fixture.getProject()).getLanguageServers(psi, null, null)
                 .get(10, TimeUnit.SECONDS);
         var options = JSONUtils.getLsp4jGson().fromJson(
@@ -495,10 +503,10 @@ public class WorkspaceDiagnosticsTest extends UsefulTestCase {
                 new Registration("workspace", "textDocument/diagnostic", options)))).get(5, TimeUnit.SECONDS);
         var pending = next();
         assertTrue(pending.params.getPreviousResultIds().isEmpty());
-        editors.closeFile(file);
+        // The event that closing the file's last editor publishes, which disconnects the file.
         fixture.getProject().getMessageBus().syncPublisher(FileEditorManagerListener.FILE_EDITOR_MANAGER)
-                .fileClosed(editors, file);
-        PlatformTestUtil.waitWithEventsDispatching("the closed editor must disconnect",
+                .fileClosed(FileEditorManager.getInstance(fixture.getProject()), file);
+        PlatformTestUtil.waitWithEventsDispatching("the closed file must disconnect",
                 () -> wrapper.getOpenedDocument(LSPIJUtils.toUri(file)) == null, 10);
         var stale = report(file, "stale", null);
         stale.getLeft().setResultId("stale");

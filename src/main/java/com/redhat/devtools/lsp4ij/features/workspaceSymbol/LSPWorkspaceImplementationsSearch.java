@@ -89,7 +89,16 @@ public class LSPWorkspaceImplementationsSearch extends QueryExecutorBase<PsiElem
             return;
         }
 
-        int offset = element.getTextRange().getStartOffset();
+        var textRange = element.getTextRange();
+        if (textRange == null) {
+            // ex: a workspace symbol whose location has no range yet
+            return;
+        }
+        // The text offset of a named element is the offset of its name, while its text range can start earlier,
+        // ex: at the decorators of a Python function. A text offset outside the range, like the -1 of a light
+        // element, is replaced by the start of the range
+        int textOffset = element.getTextOffset();
+        int offset = textRange.containsOffset(textOffset) ? textOffset : textRange.getStartOffset();
         LSPImplementationParams params = new LSPImplementationParams(
                 new TextDocumentIdentifier(),
                 LSPIJUtils.toPosition(offset, document),

@@ -50,6 +50,8 @@ The template descriptor (`template.json`) is a JSON file used to define:
 
 * the server ID and name
 * the command to start the server
+* the socket of a language server which doesn't talk LSP over its standard input and output
+* the transports which the language server supports
 * the file type mappings
 
 #### Example `template.json`
@@ -89,6 +91,62 @@ The template descriptor (`template.json`) is a JSON file used to define:
         "patterns": ["*.tsx"]
       },
       "languageId": "typescriptreact"
+    }
+  ]
+}
+```
+
+#### Socket
+
+A language server which talks LSP over a TCP socket instead of its standard input and output has a `socket`, which is
+experimental, whose `mode` is one of the [transports](./UserDefinedLanguageServer.md#transport):
+
+* `attach`: LSP4IJ attaches to a language server which runs already and listens on `host` (the loopback address by
+  default) and `port`.
+* `startAndConnect`: LSP4IJ starts the language server, which listens on the port, and connects to it.
+* `startAndAccept`: LSP4IJ listens on the port and starts the language server, which connects to it.
+
+The command of a language server which LSP4IJ starts takes the port as `${port}`, and a `port` of 0, or none, lets
+LSP4IJ choose a free one. A value LSP4IJ can't use, such as an unknown `mode` or a `port` that isn't a number from 0 to
+65535, is shown as a warning in the New Language Server dialog, which says what LSP4IJ does instead:
+
+```json
+{
+  "id": "my-language-server",
+  "name": "My Language Server",
+  "programArgs": {
+    "default": "node path/to/server.js --socket=${port}"
+  },
+  "socket": {
+    "mode": "startAndAccept",
+    "port": 0
+  }
+}
+```
+
+#### Transports
+
+A template can list the transports which its language server supports, in `transports`, which is experimental, each
+with its `mode` (`stdio` or one of the socket modes above) and the `argument` of the command for it. The New Language
+Server dialog then helps with the transport: Socket is disabled for a language server which lists only `stdio`, and
+for one which lists a socket mode, a hint below the socket modes names the mode and the argument. Without
+`transports`, every transport can be chosen. The CSS language server, for instance, is started over its standard input
+and output, and also talks over a socket it connects to:
+
+```json
+{
+  "id": "vscode-css-language-server",
+  "programArgs": {
+    "default": "node .../cssServerMain.js --stdio"
+  },
+  "transports": [
+    {
+      "mode": "stdio",
+      "argument": "--stdio"
+    },
+    {
+      "mode": "startAndAccept",
+      "argument": "--socket=${port}"
     }
   ]
 }

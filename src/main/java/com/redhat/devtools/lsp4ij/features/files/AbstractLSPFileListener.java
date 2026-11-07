@@ -194,7 +194,8 @@ public abstract class AbstractLSPFileListener implements FileEditorManagerListen
         boolean renameFilesSupported = canRenameFilesSupported();
         boolean changeFilesSupported = canChangeFilesSupported();
         boolean saveSupported = languageServerWrapper.isSaveSupported();
-        if (!createFilesSupported && !deleteFilesSupported && !renameFilesSupported && !changeFilesSupported && !saveSupported) {
+        if (!createFilesSupported && !deleteFilesSupported && !renameFilesSupported && !changeFilesSupported && !saveSupported
+                && events.stream().noneMatch(this::isRenameOrMoveOfAnOpenedFile)) {
             return Collections.emptyList();
         }
         List<@NotNull VFileEvent> supportedEvents = null;
@@ -214,7 +215,9 @@ public abstract class AbstractLSPFileListener implements FileEditorManagerListen
                     supportedEvents.add(event);
                 }
             } else if (event instanceof VFilePropertyChangeEvent || event instanceof VFileMoveEvent) {
-                if (renameFilesSupported) {
+                // An open file that is renamed or moved is connected again with its new URI, also without file
+                // operations
+                if (renameFilesSupported || isOpened(event.getFile())) {
                     if (supportedEvents == null) {
                         supportedEvents = new ArrayList<>();
                     }
@@ -230,6 +233,14 @@ public abstract class AbstractLSPFileListener implements FileEditorManagerListen
             }
         }
         return supportedEvents != null ? supportedEvents : Collections.emptyList();
+    }
+
+    /**
+     * Returns true if the given event renames or moves a file that is open in the language server, which then connects
+     * it again with its new URI.
+     */
+    private boolean isRenameOrMoveOfAnOpenedFile(@NotNull VFileEvent event) {
+        return (event instanceof VFilePropertyChangeEvent || event instanceof VFileMoveEvent) && isOpened(event.getFile());
     }
 
     private boolean isOpened(@Nullable VirtualFile file) {

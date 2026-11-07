@@ -154,11 +154,11 @@ public abstract class LSPSemanticTokensFileViewProviderFixtureTestCase extends L
         setClientConfigurable(true);
     }
 
-    private PsiFile initialize(@NotNull String fileName,
-                               @NotNull String fileBody,
-                               @Nullable String mockSemanticTokensProviderJson,
-                               @Nullable String mockSemanticTokensJson,
-                               boolean enabled) {
+    protected PsiFile initialize(@NotNull String fileName,
+                                 @NotNull String fileBody,
+                                 @Nullable String mockSemanticTokensProviderJson,
+                                 @Nullable String mockSemanticTokensJson,
+                                 boolean enabled) {
         MockLanguageServer.INSTANCE.setTimeToProceedQueries(100);
 
         // Must both be non-null or null together

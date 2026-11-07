@@ -14,6 +14,7 @@ import com.google.gson.reflect.TypeToken;
 import com.intellij.codeInsight.daemon.impl.HighlightInfo;
 import com.intellij.codeInsight.intention.IntentionAction;
 import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.application.impl.NonBlockingReadActionImpl;
 import com.intellij.psi.PsiDocumentManager;
 import com.intellij.testFramework.fixtures.CodeInsightTestUtil;
@@ -32,6 +33,7 @@ import org.junit.Assert;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 /**
@@ -118,7 +120,7 @@ public abstract class LSPCodeActionFixtureTestCase extends LSPCodeInsightFixture
 
         List<String> codeActionTitles = new ArrayList<>();
         for (IntentionAction action : actions) {
-            if (action.isAvailable(myFixture.getProject(), myFixture.getEditor(), myFixture.getFile())) {
+            if (isAvailable(action)) {
                 codeActionTitles.add(action.getText());
             }
         }
@@ -126,6 +128,21 @@ public abstract class LSPCodeActionFixtureTestCase extends LSPCodeInsightFixture
             assertContainsElements(codeActionTitles, expectedAction);
         }
         return actions;
+    }
+
+    /**
+     * Returns whether the action is available, asked as the intention pass asks, in a read action off the EDT: the EDT
+     * never waits for the language server's code actions, which a lazy action is not available without.
+     */
+    private boolean isAvailable(@NotNull IntentionAction action) {
+        try {
+            return ApplicationManager.getApplication()
+                    .executeOnPooledThread(() -> ReadAction.compute(() ->
+                            action.isAvailable(myFixture.getProject(), myFixture.getEditor(), myFixture.getFile())))
+                    .get(10, TimeUnit.SECONDS);
+        } catch (Exception e) {
+            throw new AssertionError("Cannot tell whether '" + action.getText() + "' is available", e);
+        }
     }
 
     public void assertApplyCodeAction(@NotNull String expectedEditorContentText,

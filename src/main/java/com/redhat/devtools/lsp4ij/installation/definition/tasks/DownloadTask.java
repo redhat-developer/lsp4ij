@@ -108,6 +108,9 @@ public class DownloadTask extends InstallerTask {
 
             // Create output directory where downloaded file must be extracted
             String dir = getDir();
+            // Resolve ${key} variables before IntelliJ macros so that properties
+            // like ${serverDist} defined in installer.json can be used in output.dir
+            dir = context.resolveValues(dir);
             var project = context.getProject();
             String resolvedDir = CommandUtils.resolveCommandLine(dir, project);
             Path outputDir = Paths.get(resolvedDir);

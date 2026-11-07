@@ -25,5 +25,6 @@ public enum EditorFeatureType {
     STRUCTURE_VIEW,
     LSP_DIAGNOSTICS,
     LSP_DOCUMENT_LINK,
+    CODE_ACTION,
     ALL
 }
