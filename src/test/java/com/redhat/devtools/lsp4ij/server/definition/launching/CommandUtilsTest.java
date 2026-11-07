@@ -192,7 +192,7 @@ public class CommandUtilsTest {
             CommandUtils.resolveExecutable(commandLine);
 
             // No directory to take the environment from: the platform looks it up when the process starts, as before
-            Assert.assertEquals(tool.getFileName().toString(), commandLine.getExePath());
+            Assertions.assertEquals(tool.getFileName().toString(), commandLine.getExePath());
         } finally {
             FileUtil.delete(directory.toFile());
         }
