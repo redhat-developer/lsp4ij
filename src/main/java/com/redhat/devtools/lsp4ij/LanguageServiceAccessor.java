@@ -16,6 +16,7 @@ import com.intellij.notification.NotificationType;
 import com.intellij.notification.Notifications;
 import com.intellij.openapi.Disposable;
 import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.application.ModalityState;
 import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.fileEditor.FileEditorManager;
@@ -462,6 +463,10 @@ public class LanguageServiceAccessor implements Disposable {
             @NotNull PsiFile psiFile, @Nullable Predicate<LSPClientFeatures> beforeStartingServerFilter,
             @Nullable Predicate<LSPClientFeatures> afterStartingServerFilter,
             @Nullable LanguageServerDefinition matchServerDefinition, @Nullable DocumentConnectionScope scope) {
+        // The place of the file before its instances are chosen: an instance can start for a while, and if the file
+        // moves meanwhile, it can be the instance of its earlier place, which then must not get the file
+        var file = psiFile.getVirtualFile();
+        var url = file != null ? file.getUrl() : null;
         // Collect started (or not) language servers which matches the given file.
         CompletableFuture<Collection<LanguageServerWrapper>> matchedServers = getMatchedLanguageServersWrappers(psiFile, matchServerDefinition, beforeStartingServerFilter);
         var matchedServersNow = matchedServers.getNow(Collections.emptyList());
@@ -477,7 +482,6 @@ public class LanguageServiceAccessor implements Disposable {
         boolean writeAccessAllowed = ApplicationManager.getApplication().isWriteAccessAllowed();
         boolean readAccessAllowed = ApplicationManager.getApplication().isReadAccessAllowed();
         Document document = readAccessAllowed || (!writeAccessAllowed) ? LSPIJUtils.getDocument(psiFile) : null;
-        var file = psiFile.getVirtualFile();
         // A close of the file's last editor after this, as when a feature of the editor asks just as it closes,
         // disconnects the file, which the connection made later must not connect again
         int editorCloses = ConnectDocumentToLanguageServerSetupParticipant.getEditorCloses(file);
@@ -514,7 +518,12 @@ public class LanguageServiceAccessor implements Disposable {
                                                         if (info == null) {
                                                             info = new LanguageServerWrapper.LSPFileConnectionInfo(document, null, null, !writeAccessAllowed);
                                                         }
-                                                        return scope == null ? wrapper.connect(file, info, editorCloses) : wrapper.connect(file, info, scope);
+                                                        // The connection compares the file with it as it opens the
+                                                        // document, which can be a while after this
+                                                        var chosenUrl = wrapper.getInstanceRoot() != null ? url : null;
+                                                        return scope == null
+                                                                ? wrapper.connect(file, info, editorCloses, chosenUrl)
+                                                                : wrapper.connect(file, info, scope, chosenUrl);
                                                     }
                                                     return CompletableFuture.completedFuture(null);
                                                 }).thenAccept(server -> {
@@ -673,9 +682,8 @@ public class LanguageServiceAccessor implements Disposable {
         }
         boolean refreshEditorFeature = !ApplicationManager.getApplication().isUnitTestMode();
         for (int i = 0; i < languageServers.size(); i++) {
-            var languageServer = languageServers.get(i);
             try {
-                languageServer.stopAndDispose(refreshEditorFeature);
+                stopAndDisposeReplaced(languageServers.get(i), refreshEditorFeature);
             } catch (ProcessCanceledException cancellation) {
                 // As a canceled dispose does: the language servers it did not reach stay started, for a later change,
                 // removal or close to dispose
@@ -683,22 +691,51 @@ public class LanguageServiceAccessor implements Disposable {
                     startedServers.addAll(languageServers.subList(i + 1, languageServers.size()));
                 }
                 throw cancellation;
-            } catch (Exception e) {
-                // A language server that fails to stop must neither keep running nor keep the others running
-                LOGGER.warn("Error while stopping the language server '{}'.", serverDefinition.getId(), e);
-                disposeLoggingFailure(languageServer, refreshEditorFeature);
             }
         }
         sendDidOpenAndRefreshEditorFeatureForOpenedFiles(serverDefinition, project);
     }
 
     /**
+     * Stops and disposes a replaced language server, which is no longer among the started servers. A stop that fails
+     * or is canceled disposes it all the same, so that it doesn't keep running unknown to LSP4IJ.
+     */
+    private static void stopAndDisposeReplaced(@NotNull LanguageServerWrapper languageServer,
+                                               boolean refreshEditorFeature) {
+        try {
+            languageServer.stopAndDispose(refreshEditorFeature);
+        } catch (ProcessCanceledException cancellation) {
+            // The stop disposes the language server only once it has stopped
+            disposeAfterFailedStop(languageServer, refreshEditorFeature);
+            throw cancellation;
+        } catch (Exception e) {
+            // A language server that fails to stop must neither keep running nor keep the others running
+            LOGGER.warn("Error while stopping the language server '{}'.", languageServer.getServerDefinition().getId(), e);
+            disposeAfterFailedStop(languageServer, refreshEditorFeature);
+        }
+    }
+
+    /**
+     * Disposes a language server whose stop failed or was canceled, and then its children too, such as its file
+     * listener, through the Disposer on the UI thread, as a stop that completes does. The children are disposed also
+     * when the dispose of the language server fails or is canceled.
+     */
+    private static void disposeAfterFailedStop(@NotNull LanguageServerWrapper languageServer,
+                                               boolean refreshEditorFeature) {
+        try {
+            disposeLoggingFailure(languageServer, refreshEditorFeature);
+        } finally {
+            ApplicationManager.getApplication().invokeLater(() -> Disposer.dispose(languageServer), ModalityState.any());
+        }
+    }
+
+    /**
      * The language server instance of a file for a definition with several instances: the instance that has the file
      * connected or provides it, which keeps it, or the root of the instance that serves it, with how often the instances
-     * of the definition were replaced before the choice.
+     * of the definition were replaced before the choice, and the URL of the place of the file that it was made for.
      */
-    private record InstanceChoice(@Nullable LanguageServerWrapper connected, @Nullable WorkspaceFolder root,
-                                  int replacements) {
+    record InstanceChoice(@Nullable LanguageServerWrapper connected, @Nullable WorkspaceFolder root,
+                          int replacements, @NotNull String url) {
 
         boolean isFor(@NotNull LanguageServerWrapper instance) {
             if (connected != null) {
@@ -736,7 +773,18 @@ public class LanguageServiceAccessor implements Disposable {
     @Nullable
     LanguageServerWrapper getOrCreateInstanceOf(@NotNull VirtualFile file,
                                                 @NotNull LanguageServerDefinition serverDefinition) {
-        var choice = chooseInstance(file, serverDefinition);
+        return getOrCreateInstanceOf(file, serverDefinition, chooseInstance(file, serverDefinition));
+    }
+
+    /**
+     * Returns the language server instance of the given choice for a file: the one that has the file connected or
+     * provides it, or the one of its root, created if there is none. Returns null if no instance serves the file, or if
+     * the instances of the definition were replaced since the choice, which connects the open files again.
+     */
+    @Nullable
+    LanguageServerWrapper getOrCreateInstanceOf(@NotNull VirtualFile file,
+                                                @NotNull LanguageServerDefinition serverDefinition,
+                                                @NotNull InstanceChoice choice) {
         if (choice.connected() == null && choice.root() == null) {
             return null;
         }
@@ -771,14 +819,20 @@ public class LanguageServiceAccessor implements Disposable {
         }
     }
 
-    private @NotNull InstanceChoice chooseInstance(@NotNull VirtualFile file,
-                                                   @NotNull LanguageServerDefinition serverDefinition) {
-        // Before the root: a replacement while the strategy is asked can make the root outdated
+    /**
+     * Chooses the language server instance of the given file for a definition with several instances, without
+     * creating it. A strategy can do I/O, so don't call this method in a synchronized block.
+     */
+    @NotNull
+    InstanceChoice chooseInstance(@NotNull VirtualFile file,
+                                  @NotNull LanguageServerDefinition serverDefinition) {
+        // Before the root: a replacement or a move while the strategy is asked can make the root outdated
         int replaced = replacementsOf(serverDefinition);
+        var url = file.getUrl();
         var connected = findInstanceConnectedTo(file, serverDefinition);
         return connected != null
-                ? new InstanceChoice(connected, null, replaced)
-                : new InstanceChoice(null, serverDefinition.getServerInstanceRoot(file, project), replaced);
+                ? new InstanceChoice(connected, null, replaced, url)
+                : new InstanceChoice(null, serverDefinition.getServerInstanceRoot(file, project), replaced, url);
     }
 
     private int replacementsOf(@NotNull LanguageServerDefinition serverDefinition) {
@@ -821,10 +875,11 @@ public class LanguageServiceAccessor implements Disposable {
         return server -> server.getInstanceRoot() == null
                 || choices.computeIfAbsent(server.getServerDefinition(), serverDefinition -> {
                     int replaced = replacementsOf(serverDefinition);
+                    var url = file.getUrl();
                     var connected = findInstanceConnectedTo(file, serverDefinition);
                     return connected != null
-                            ? new InstanceChoice(connected, null, replaced)
-                            : new InstanceChoice(null, getRememberedServerInstanceRoot(psiFile, file, serverDefinition), replaced);
+                            ? new InstanceChoice(connected, null, replaced, url)
+                            : new InstanceChoice(null, getRememberedServerInstanceRoot(psiFile, file, serverDefinition), replaced, url);
                 }).isFor(server);
     }
 
@@ -869,6 +924,11 @@ public class LanguageServiceAccessor implements Disposable {
                                        @NotNull InstanceChoice choice,
                                        @NotNull Set<LanguageServerWrapper> matchedServers,
                                        @Nullable Predicate<LSPClientFeatures> beforeStartingServerFilter) {
+        if (!choice.url().equals(file.getUrl())) {
+            // The file moved since the choice, which can be for its earlier place: its new place decides, as the move
+            // connects an open file again, or as the next request chooses
+            return;
+        }
         LanguageServerWrapper instance;
         if (choice.connected() != null) {
             // The choice was made before the monitor was entered, and a replacement can have removed the instance since.

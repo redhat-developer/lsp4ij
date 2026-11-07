@@ -89,6 +89,12 @@ public interface WorkspaceFolderStrategy {
      * to. So a directory that is a root has to give itself, and not the root of its parent. With instances, the same
      * goes for {@link #getWorkspaceFolderForFile}, which is what this method asks by default.</p>
      *
+     * <p>For a file that no instance has connected, the lookups that run as the file is edited remember the root that
+     * this method returns. They ask again once files of the project are created, deleted, moved or renamed, the roots
+     * of the project change, a language server starts or stops, or a language server definition changes or is
+     * removed. Requests ask this method each time. So for these lookups, a strategy whose root depends on anything
+     * else, such as the content of a file, is not asked again until then.</p>
+     *
      * @param file the file or directory
      * @param project the project
      * @param fileUriSupport file URI support for converting files to URIs
