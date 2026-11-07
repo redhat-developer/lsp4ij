@@ -13,6 +13,7 @@ import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.application.impl.NonBlockingReadActionImpl;
 import com.intellij.openapi.command.WriteCommandAction;
+import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.Disposer;
 import com.intellij.openapi.vfs.VirtualFile;
@@ -57,8 +58,10 @@ import java.io.UncheckedIOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Queue;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.CyclicBarrier;
@@ -269,6 +272,7 @@ public class LanguageServerInstancesTest extends LSPCodeInsightFixtureTestCase {
 
     public void testAnInstanceThatFailsToStopAsItIsReplacedKeepsNoOtherInstanceRunning() throws Exception {
         definition.failingClientRoot = "a";
+        definition.clientFailures.add(new IllegalStateException("The language client fails to be disposed"));
         var a = instanceOf(file("a/one.per-folder"));
         var b = instanceOf(file("b/one.per-folder"));
         var serverOfB = definition.servers.get(1);
@@ -280,6 +284,37 @@ public class LanguageServerInstancesTest extends LSPCodeInsightFixtureTestCase {
         waitUntilDisposed(b);
         assertFalse(serverOfB.isRunning());
         assertEmpty(instances());
+    }
+
+    public void testACanceledDisposeOfAnInstanceThatFailedToStopLeavesTheOtherInstancesStarted() throws Exception {
+        definition.failingClientRoot = "a";
+        // The stop of the instance of a fails, and its dispose that follows is canceled
+        definition.clientFailures.add(new IllegalStateException("The language client fails to be disposed"));
+        definition.clientFeaturesFailures.add(new ProcessCanceledException());
+        var a = instanceOf(file("a/one.per-folder"));
+        var b = instanceOf(file("b/one.per-folder"));
+
+        // The registry logs what a listener throws, the cancellation too
+        fireStrategyChanged();
+
+        assertTrue(a.isDisposed());
+        assertFalse(b.isDisposed());
+        assertTrue("An instance that the canceled replacement did not reach must stay started, for a later change, "
+                + "removal or close to dispose", instances().contains(b));
+    }
+
+    public void testAnInstanceWhoseStopIsCanceledAsItIsReplacedIsDisposed() throws Exception {
+        definition.failingClientRoot = "a";
+        definition.clientFailures.add(new ProcessCanceledException());
+        var a = instanceOf(file("a/one.per-folder"));
+        var b = instanceOf(file("b/one.per-folder"));
+
+        // The registry logs what a listener throws, the cancellation too
+        fireStrategyChanged();
+
+        assertTrue("An instance whose stop is canceled is no longer started, so it must be disposed", a.isDisposed());
+        assertFalse(instances().contains(a));
+        assertTrue(instances().contains(b));
     }
 
     public void testANewInstanceThatAFailingFilterRefusesIsDisposed() throws Exception {
@@ -1295,8 +1330,15 @@ public class LanguageServerInstancesTest extends LSPCodeInsightFixtureTestCase {
         volatile @Nullable Runnable strategyCreation;
         // The name of the root whose instance can't start
         volatile @Nullable String failingRoot;
-        // The name of the root whose instance has a language client that fails as a stop disposes it
+        // The name of the root whose instance has a language client and client features that fail as they are
+        // disposed, the language client as a stop disposes it, and the client features as the dispose of the instance
+        // does, after the stop
         volatile @Nullable String failingClientRoot;
+        // What that language client throws as it is disposed, one at each dispose, until they are used up. A stop
+        // that fails there leaves the connection open, which the dispose then closes
+        final Queue<RuntimeException> clientFailures = new ConcurrentLinkedQueue<>();
+        // What these client features throw as they are disposed, one at each dispose, until they are used up
+        final Queue<RuntimeException> clientFeaturesFailures = new ConcurrentLinkedQueue<>();
         // Holds the initialize replies of the instances that start, until it completes
         volatile @Nullable CompletableFuture<Void> initializeGate;
 
@@ -1340,7 +1382,10 @@ public class LanguageServerInstancesTest extends LSPCodeInsightFixtureTestCase {
                     @Override
                     public void dispose() {
                         super.dispose();
-                        throw new IllegalStateException("The language client fails to be disposed");
+                        var failure = clientFailures.poll();
+                        if (failure != null) {
+                            throw failure;
+                        }
                     }
                 };
             }
@@ -1352,10 +1397,16 @@ public class LanguageServerInstancesTest extends LSPCodeInsightFixtureTestCase {
             var features = new LSPClientFeatures() {
                 @Override
                 public void dispose() {
-                    boolean ofNoLanguageServer = getServerWrapper() == null;
+                    var languageServer = getServerWrapper();
                     super.dispose();
-                    if (ofNoLanguageServer) {
+                    if (languageServer == null) {
                         disposedWithoutLanguageServer.incrementAndGet();
+                    } else if (languageServer.getInstanceRoot() != null
+                            && languageServer.getInstanceRoot().getName().equals(failingClientRoot)) {
+                        var failure = clientFeaturesFailures.poll();
+                        if (failure != null) {
+                            throw failure;
+                        }
                     }
                 }
             };

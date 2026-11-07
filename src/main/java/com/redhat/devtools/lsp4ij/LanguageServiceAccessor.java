@@ -682,9 +682,8 @@ public class LanguageServiceAccessor implements Disposable {
         }
         boolean refreshEditorFeature = !ApplicationManager.getApplication().isUnitTestMode();
         for (int i = 0; i < languageServers.size(); i++) {
-            var languageServer = languageServers.get(i);
             try {
-                languageServer.stopAndDispose(refreshEditorFeature);
+                stopAndDisposeReplaced(languageServers.get(i), refreshEditorFeature);
             } catch (ProcessCanceledException cancellation) {
                 // As a canceled dispose does: the language servers it did not reach stay started, for a later change,
                 // removal or close to dispose
@@ -692,13 +691,28 @@ public class LanguageServiceAccessor implements Disposable {
                     startedServers.addAll(languageServers.subList(i + 1, languageServers.size()));
                 }
                 throw cancellation;
-            } catch (Exception e) {
-                // A language server that fails to stop must neither keep running nor keep the others running
-                LOGGER.warn("Error while stopping the language server '{}'.", serverDefinition.getId(), e);
-                disposeLoggingFailure(languageServer, refreshEditorFeature);
             }
         }
         sendDidOpenAndRefreshEditorFeatureForOpenedFiles(serverDefinition, project);
+    }
+
+    /**
+     * Stops and disposes a replaced language server, which is no longer among the started servers. A stop that fails
+     * or is canceled disposes it all the same, so that it doesn't keep running unknown to LSP4IJ.
+     */
+    private static void stopAndDisposeReplaced(@NotNull LanguageServerWrapper languageServer,
+                                               boolean refreshEditorFeature) {
+        try {
+            languageServer.stopAndDispose(refreshEditorFeature);
+        } catch (ProcessCanceledException cancellation) {
+            // The stop disposes the language server only once it has stopped
+            disposeLoggingFailure(languageServer, refreshEditorFeature);
+            throw cancellation;
+        } catch (Exception e) {
+            // A language server that fails to stop must neither keep running nor keep the others running
+            LOGGER.warn("Error while stopping the language server '{}'.", languageServer.getServerDefinition().getId(), e);
+            disposeLoggingFailure(languageServer, refreshEditorFeature);
+        }
     }
 
     /**
