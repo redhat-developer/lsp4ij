@@ -18,21 +18,36 @@ import com.intellij.openapi.util.text.Formats;
 import com.intellij.ui.AnimatedIcon;
 import com.redhat.devtools.lsp4ij.LanguageServerWrapper;
 import com.redhat.devtools.lsp4ij.ServerStatus;
+import org.eclipse.lsp4j.WorkspaceFolder;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import javax.swing.*;
 import javax.swing.tree.DefaultMutableTreeNode;
 import javax.swing.tree.DefaultTreeModel;
+import java.util.Comparator;
+import java.util.Objects;
 
 /**
- * Language server process node.
+ * Language server process node. It shows the language server of its definition and root: a language server that
+ * replaces it, with the same root, takes the node over, with the traces and logs so far, as a restarted language
+ * server keeps them.
  */
 public class LanguageServerProcessTreeNode extends DefaultMutableTreeNode {
 
     private static final Icon RUNNING_ICON = new AnimatedIcon.Default();
 
-    private final LanguageServerWrapper languageServer;
+    /**
+     * The order of the process nodes of a definition: by the name of their language server instance, the one without
+     * a root first.
+     */
+    static final Comparator<LanguageServerProcessTreeNode> ORDER = Comparator.comparing(
+            (LanguageServerProcessTreeNode node) -> node.getLanguageServer().getInstanceLabel(),
+            Comparator.nullsFirst(Comparator.<String>naturalOrder()));
+
+    private volatile LanguageServerWrapper languageServer;
+
+    private final @Nullable WorkspaceFolder instanceRoot;
 
     private final DefaultTreeModel treeModel;
 
@@ -44,14 +59,45 @@ public class LanguageServerProcessTreeNode extends DefaultMutableTreeNode {
 
     public LanguageServerProcessTreeNode(LanguageServerWrapper languageServer, DefaultTreeModel treeModel) {
         this.languageServer = languageServer;
+        this.instanceRoot = languageServer.getInstanceRoot();
         this.treeModel = treeModel;
         setServerStatus(ServerStatus.none);
+    }
+
+    /**
+     * Returns true if this node shows the language server instance with the given root, or the language server without
+     * a root for null.
+     *
+     * @param instanceRoot the root of a language server instance, or null.
+     * @return true if this node shows the language server instance with the given root.
+     */
+    public boolean hasInstanceRoot(@Nullable WorkspaceFolder instanceRoot) {
+        return this.instanceRoot == null
+                ? instanceRoot == null
+                : instanceRoot != null && Objects.equals(this.instanceRoot.getUri(), instanceRoot.getUri());
+    }
+
+    /**
+     * Shows the given language server, which replaces the one of this node and has the same root.
+     *
+     * @param languageServer the language server.
+     */
+    void setLanguageServer(@NotNull LanguageServerWrapper languageServer) {
+        this.languageServer = languageServer;
+    }
+
+    /**
+     * Shows the current status again, for a change that has no status of its own, such as that of the enabled flag
+     * of the definition.
+     */
+    void refresh() {
+        setServerStatus(serverStatus);
     }
 
     public void setServerStatus(ServerStatus serverStatus) {
         this.serverStatus = serverStatus;
         displayName = getDisplayName(serverStatus);
-        if (languageServer.isEnabled()) {
+        if (isEnabled()) {
             switch (serverStatus) {
                 case starting:
                 case stopping:
@@ -73,10 +119,27 @@ public class LanguageServerProcessTreeNode extends DefaultMutableTreeNode {
     }
 
     private String getDisplayName(@NotNull ServerStatus serverStatus) {
+        String instanceLabel = languageServer.getInstanceLabel();
+        String statusName = getStatusName(serverStatus);
+        return instanceLabel != null ? instanceLabel + ": " + statusName : statusName;
+    }
+
+    /**
+     * Returns true if the language server of this node is enabled. A disposed one, whose node stays until another
+     * language server with its root takes it over, counts as its definition does.
+     */
+    private boolean isEnabled() {
+        var languageServer = this.languageServer;
+        return languageServer.isDisposed()
+                ? languageServer.getServerDefinition().isEnabled(languageServer.getProject())
+                : languageServer.isEnabled();
+    }
+
+    private String getStatusName(@NotNull ServerStatus serverStatus) {
         if (isInstallStatus(serverStatus)) {
             return serverStatus.name();
         }
-        if (!languageServer.isEnabled()) {
+        if (!isEnabled()) {
             return "disabled";
         }
         Throwable serverError = languageServer.getServerError();
@@ -110,7 +173,7 @@ public class LanguageServerProcessTreeNode extends DefaultMutableTreeNode {
     }
 
     public Icon getIcon() {
-        if (!languageServer.isEnabled() && !isInstallStatus(serverStatus)) {
+        if (!isEnabled() && !isInstallStatus(serverStatus)) {
             return AllIcons.Actions.Cancel;
         }
         boolean hasError = languageServer.getServerError() != null;
@@ -143,7 +206,7 @@ public class LanguageServerProcessTreeNode extends DefaultMutableTreeNode {
     }
 
     public @Nullable String getElapsedTime() {
-        if (!languageServer.isEnabled()) {
+        if (!isEnabled()) {
             return null;
         }
         long endTime = System.currentTimeMillis();

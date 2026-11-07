@@ -55,4 +55,12 @@ public interface LanguageServerLifecycleListener extends Disposable {
     void handleError(@NotNull LanguageServerWrapper languageServer,
                      @NotNull Throwable exception);
 
+    /**
+     * Callback called when the given language server is disposed.
+     *
+     * @param languageServer the language server.
+     */
+    default void handleDisposed(@NotNull LanguageServerWrapper languageServer) {
+    }
+
 }

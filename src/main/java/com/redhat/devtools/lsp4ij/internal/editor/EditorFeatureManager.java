@@ -220,6 +220,9 @@ public class EditorFeatureManager implements Disposable {
                     }
                     return new RefreshEditorFeatureContext(pf, runnables, editors);
                 })
+                // A refresh must not run once the project is disposed. expireWith(project) would register on the project
+                // in a read action taken at submission, and a language server submits refreshes with its monitor held
+                .expireWhen(project::isDisposed)
                 .coalesceBy(file != null ? file : psiFile, featureType, clearLSPCache)
                 .finishOnUiThread(ModalityState.any(), context -> {
                     if (context == null) {

@@ -19,6 +19,7 @@ import com.intellij.lang.Language;
 import com.intellij.openapi.fileTypes.FileNameMatcher;
 import com.intellij.openapi.fileTypes.FileType;
 import com.intellij.openapi.fileTypes.FileTypes;
+import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.Pair;
 import com.intellij.openapi.vfs.VirtualFile;
@@ -26,17 +27,22 @@ import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LanguageServerEnablementSupport;
 import com.redhat.devtools.lsp4ij.LanguageServerFactory;
+import com.redhat.devtools.lsp4ij.client.features.FileUriSupport;
 import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
+import com.redhat.devtools.lsp4ij.features.workspaceFolder.WorkspaceFolderStrategy;
 import com.redhat.devtools.lsp4ij.features.semanticTokens.DefaultSemanticTokensColorsProvider;
 import com.redhat.devtools.lsp4ij.features.semanticTokens.SemanticTokensColorsProvider;
 import com.redhat.devtools.lsp4ij.installation.ServerInstaller;
 import com.redhat.devtools.lsp4ij.server.DefaultLauncherBuilder;
 import com.redhat.devtools.lsp4ij.settings.contributors.LanguageServerSettingsContributor;
+import org.eclipse.lsp4j.WorkspaceFolder;
 import org.eclipse.lsp4j.jsonrpc.Launcher;
 import org.eclipse.lsp4j.services.LanguageServer;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.swing.Icon;
 import java.util.List;
@@ -50,6 +56,8 @@ import java.util.concurrent.CopyOnWriteArrayList;
  * Base class for Language server definition.
  */
 public abstract class LanguageServerDefinition implements LanguageServerFactory, LanguageServerEnablementSupport {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(LanguageServerDefinition.class);
 
     private static final int DEFAULT_LAST_DOCUMENTED_DISCONNECTED_TIMEOUT = 5;
 
@@ -68,6 +76,10 @@ public abstract class LanguageServerDefinition implements LanguageServerFactory,
     Map<FileType, String> languageIdFileTypeMappings;
     private final List<Pair<List<FileNameMatcher>, String>> languageIdFileNameMatcherMappings;
     private boolean enabled;
+    // Set and reset with the lock, which is not held while the strategy is created
+    private final Object workspaceFolderStrategyLock = new Object();
+    private volatile @Nullable DefinitionStrategy workspaceFolderStrategy;
+    private int workspaceFolderStrategyResets;
     private SemanticTokensColorsProvider semanticTokensColorsProvider;
 
     private boolean serverInstallerCreated;
@@ -145,6 +157,144 @@ public abstract class LanguageServerDefinition implements LanguageServerFactory,
      */
     public boolean isSingleton() {
         return isSingleton;
+    }
+
+    /**
+     * Returns true if the workspace folder strategy spreads the files of a project over several language server instances.
+     *
+     * @return true if the workspace folder strategy spreads the files of a project over several language server instances.
+     * @see WorkspaceFolderStrategy#hasServerInstances()
+     */
+    @ApiStatus.Internal
+    public boolean hasServerInstances() {
+        return getWorkspaceFolderStrategy().strategy().hasServerInstances();
+    }
+
+    /**
+     * Returns the root of the language server instance that serves the given file, and null if no instance serves it.
+     * A strategy can do I/O here, so don't call this method in a synchronized block.
+     *
+     * @param file    the file.
+     * @param project the project.
+     * @return the root of the language server instance that serves the given file, and null if no instance serves it.
+     */
+    @ApiStatus.Internal
+    public @Nullable WorkspaceFolder getServerInstanceRoot(@NotNull VirtualFile file,
+                                                           @NotNull Project project) {
+        var strategy = getWorkspaceFolderStrategy();
+        try {
+            var root = strategy.strategy().getServerInstanceRoot(file, project, strategy.fileUriSupport());
+            return root != null ? normalizeServerInstanceRoot(root, strategy) : null;
+        } catch (ProcessCanceledException e) {
+            throw e;
+        } catch (Exception e) {
+            // A failing strategy must not stop the other language servers of the file
+            LOGGER.warn("Cannot get the language server instance of '" + file.getUrl() + "' for the language server '" + id + "'", e);
+            return null;
+        }
+    }
+
+    /**
+     * Returns the given root of a language server instance with the URI that LSP4IJ gives its directory, so that a
+     * directory has one instance however the URI of its root is written.
+     *
+     * @param root the root of a language server instance.
+     * @return the given root with the URI that LSP4IJ gives its directory, or the given root if it has no directory.
+     */
+    @ApiStatus.Internal
+    public @NotNull WorkspaceFolder normalizeServerInstanceRoot(@NotNull WorkspaceFolder root) {
+        return normalizeServerInstanceRoot(root, getWorkspaceFolderStrategy());
+    }
+
+    private static @NotNull WorkspaceFolder normalizeServerInstanceRoot(@NotNull WorkspaceFolder root,
+                                                                        @NotNull DefinitionStrategy strategy) {
+        String uri = FileUriSupport.normalize(root.getUri(), strategy.fileUriSupport());
+        return uri.equals(root.getUri()) ? root : new WorkspaceFolder(uri, root.getName());
+    }
+
+    /**
+     * Drops the workspace folder strategy, for a definition whose strategy has changed or which goes.
+     */
+    @ApiStatus.Internal
+    public void resetWorkspaceFolderStrategy() {
+        DefinitionStrategy strategy;
+        synchronized (workspaceFolderStrategyLock) {
+            strategy = workspaceFolderStrategy;
+            workspaceFolderStrategy = null;
+            // A strategy that is being created meanwhile can come from the configuration before, so it is not kept
+            workspaceFolderStrategyResets++;
+        }
+        if (strategy != null) {
+            strategy.dispose();
+        }
+    }
+
+    /**
+     * Returns the workspace folder strategy, which decides about the language server instance before there is one,
+     * so without a language server: it comes from client features that have none, which also give the file URI
+     * support of the strategy.
+     */
+    private @NotNull DefinitionStrategy getWorkspaceFolderStrategy() {
+        while (true) {
+            var strategy = workspaceFolderStrategy;
+            if (strategy != null) {
+                return strategy;
+            }
+            int resets;
+            synchronized (workspaceFolderStrategyLock) {
+                resets = workspaceFolderStrategyResets;
+            }
+            // Without the lock: the client features come from the plugin, and the strategy can be asked for meanwhile
+            var created = createWorkspaceFolderStrategy();
+            synchronized (workspaceFolderStrategyLock) {
+                if (workspaceFolderStrategy == null && resets == workspaceFolderStrategyResets) {
+                    workspaceFolderStrategy = created;
+                    return created;
+                }
+            }
+            // Another thread kept its strategy first, or a reset came meanwhile, after which this one can be outdated
+            created.dispose();
+        }
+    }
+
+    private @NotNull DefinitionStrategy createWorkspaceFolderStrategy() {
+        LSPClientFeatures clientFeatures = null;
+        try {
+            clientFeatures = createClientFeatures();
+            clientFeatures.setServerDefinition(this);
+            return new DefinitionStrategy(clientFeatures.getWorkspaceFolderFeature().getStrategy(), clientFeatures);
+        } catch (ProcessCanceledException e) {
+            if (clientFeatures != null) {
+                clientFeatures.dispose();
+            }
+            throw e;
+        } catch (Exception e) {
+            if (clientFeatures != null) {
+                clientFeatures.dispose();
+            }
+            // A strategy can need the language server: one instance per project works without it
+            LOGGER.warn("Cannot get the workspace folder strategy of the language server '" + id + "'", e);
+            return new DefinitionStrategy(WorkspaceFolderStrategy.getDefault(), null);
+        }
+    }
+
+    /**
+     * The workspace folder strategy of a definition, with the client features that gave it, which also give its file
+     * URI support. A strategy that could not be created is the default one, without client features.
+     */
+    private record DefinitionStrategy(@NotNull WorkspaceFolderStrategy strategy,
+                                      @Nullable LSPClientFeatures clientFeatures) {
+
+        @NotNull FileUriSupport fileUriSupport() {
+            return clientFeatures != null ? clientFeatures : FileUriSupport.DEFAULT;
+        }
+
+        void dispose() {
+            if (clientFeatures != null) {
+                // Only the strategy and the file URI support were used
+                clientFeatures.dispose();
+            }
+        }
     }
 
     public int getLastDocumentDisconnectedTimeout() {

@@ -11,6 +11,7 @@
 package com.redhat.devtools.lsp4ij.client.features;
 
 import com.intellij.openapi.vfs.VirtualFile;
+import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -85,6 +86,23 @@ public interface FileUriSupport {
             return file;
         }
         return DEFAULT.findFileByUri(fileUri);
+    }
+
+    /**
+     * Returns the URI that the given file URI support gives the file of the given URI, so that a file has one URI
+     * however the given one is written, with or without a trailing slash, or with another case or encoding. Returns
+     * the given URI if no file has it.
+     *
+     * @param fileUri        the file URI.
+     * @param fileUriSupport the file URI support.
+     * @return the URI that the given file URI support gives the file of the given URI, or the given URI.
+     */
+    @ApiStatus.Internal
+    @NotNull
+    public static String normalize(@NotNull String fileUri,
+                                   @Nullable FileUriSupport fileUriSupport) {
+        String uri = toString(findFileByUri(fileUri, fileUriSupport), fileUriSupport);
+        return uri != null ? uri : fileUri;
     }
 
     @Nullable

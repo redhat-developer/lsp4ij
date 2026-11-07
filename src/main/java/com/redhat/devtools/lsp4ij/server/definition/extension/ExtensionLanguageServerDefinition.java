@@ -25,6 +25,7 @@ import com.redhat.devtools.lsp4ij.server.StreamConnectionProvider;
 import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
 import com.redhat.devtools.lsp4ij.settings.contributors.LanguageServerSettingsContributor;
+import org.eclipse.lsp4j.WorkspaceFolder;
 import org.eclipse.lsp4j.services.LanguageServer;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -62,10 +63,36 @@ public class ExtensionLanguageServerDefinition extends LanguageServerDefinition 
     }
 
     @Override
+    public @NotNull StreamConnectionProvider createConnectionProvider(@NotNull Project project,
+                                                                      @NotNull WorkspaceFolder instanceRoot) {
+        try {
+            return getFactory().createConnectionProvider(project, instanceRoot);
+        } catch (Exception e) {
+            throw new RuntimeException(
+                    "Exception occurred while creating an instance of the stream connection provider", e); //$NON-NLS-1$
+        }
+    }
+
+    @Override
     public @NotNull LanguageClientImpl createLanguageClient(@NotNull Project project) {
         LanguageClientImpl languageClient = null;
         try {
             languageClient = getFactory().createLanguageClient(project);
+        } catch (Exception e) {
+            LOGGER.warn("Exception occurred while creating an instance of the language client", e); //$NON-NLS-1$
+        }
+        if (languageClient == null) {
+            languageClient = super.createLanguageClient(project);
+        }
+        return languageClient;
+    }
+
+    @Override
+    public @NotNull LanguageClientImpl createLanguageClient(@NotNull Project project,
+                                                            @NotNull WorkspaceFolder instanceRoot) {
+        LanguageClientImpl languageClient = null;
+        try {
+            languageClient = getFactory().createLanguageClient(project, instanceRoot);
         } catch (Exception e) {
             LOGGER.warn("Exception occurred while creating an instance of the language client", e); //$NON-NLS-1$
         }

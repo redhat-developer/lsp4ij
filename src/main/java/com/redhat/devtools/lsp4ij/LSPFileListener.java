@@ -12,15 +12,18 @@ package com.redhat.devtools.lsp4ij;
 
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.ModalityState;
+import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.fileEditor.FileEditorManager;
 import com.intellij.openapi.vfs.VfsUtilCore;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.openapi.vfs.newvfs.events.VFileEvent;
 import com.intellij.openapi.vfs.newvfs.events.VFileMoveEvent;
 import com.intellij.openapi.vfs.newvfs.events.VFilePropertyChangeEvent;
+import com.intellij.util.concurrency.AppExecutorUtil;
 import com.redhat.devtools.lsp4ij.features.files.AbstractLSPFileListener;
 import org.eclipse.lsp4j.*;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -99,40 +102,73 @@ class LSPFileListener extends AbstractLSPFileListener {
     }
 
     private void reconnectMovedDocument(VirtualFile file) {
-        ApplicationManager.getApplication().invokeLater(() -> {
-            if (!isOpenDocument(file)) {
-                return;
-            }
-            URI uri = languageServerWrapper.toUri(file);
-            // This runs on the EDT, which already has the read access the connection info needs.
-            var connection = languageServerWrapper.connect(file,
-                    languageServerWrapper.createFileConnectionInfo(file, LSPIJUtils.getDocument(file), true));
-            // Never wait for transport under the VFS write lock. A later Move, Undo, Redo or
-            // tab close may overtake this attempt; retire only this file's stale connection.
-            connection.whenComplete((server, failure) -> ApplicationManager.getApplication().invokeLater(() -> {
-                if (languageServerWrapper.isDisposed() || languageServerWrapper.getProject().isDisposed()) {
-                    return;
-                }
-                boolean open = isOpenDocument(file);
-                if (!open || !Objects.equals(uri, languageServerWrapper.toUri(file))) {
-                    var opened = languageServerWrapper.getOpenedDocument(uri);
-                    if (opened != null && opened.getFile() == file) {
-                        languageServerWrapper.disconnect(uri, false);
-                    }
-                    if (open) {
+        if (languageServerWrapper.getInstanceRoot() == null) {
+            ApplicationManager.getApplication().invokeLater(() -> reconnectMovedDocument(languageServerWrapper, file), ModalityState.any());
+            return;
+        }
+        // The new place of the document can belong to another language server instance or to none. The workspace
+        // folder strategy can need read access and do I/O, so it is asked in the background, after the move
+        var serverDefinition = languageServerWrapper.getServerDefinition();
+        var project = languageServerWrapper.getProject();
+        // A document that was closed meanwhile creates no instance
+        ReadAction.nonBlocking(() -> new InstanceOfMovedDocument(file.getUrl(), isOpenDocument(languageServerWrapper, file)
+                        ? LanguageServiceAccessor.getInstance(project).getOrCreateInstanceOf(file, serverDefinition)
+                        : null))
+                .expireWith(languageServerWrapper)
+                .submit(AppExecutorUtil.getAppExecutorService())
+                .onSuccess(choice -> ApplicationManager.getApplication().invokeLater(() -> {
+                    if (!choice.url().equals(file.getUrl())) {
+                        // The document moved again before it was connected, so no instance saw that move: its new
+                        // place decides again
                         reconnectMovedDocument(file);
+                    } else if (choice.instance() != null && choice.instance().isEnabled()) {
+                        // An instance that a stop switched off gets no moved document, as it gets no opened one
+                        reconnectMovedDocument(choice.instance(), file);
                     }
-                } else if (failure != null) {
-                    LOGGER.warn("Cannot reconnect moved document {}", uri, failure);
-                }
-            }, ModalityState.any()));
-        }, ModalityState.any());
+                }, ModalityState.any()));
     }
 
-    private boolean isOpenDocument(VirtualFile file) {
-        return !languageServerWrapper.isDisposed() && !languageServerWrapper.getProject().isDisposed() &&
-                file.isValid() && (FileEditorManager.getInstance(languageServerWrapper.getProject()).isFileOpen(file) ||
-                LSPIJUtils.editorsForFile(file, languageServerWrapper.getProject()).length > 0);
+    /**
+     * The language server instance chosen for a moved document, or null if none serves it, and the URL of the
+     * document's place that it was chosen for.
+     */
+    private record InstanceOfMovedDocument(@NotNull String url, @Nullable LanguageServerWrapper instance) {
+    }
+
+    private void reconnectMovedDocument(@NotNull LanguageServerWrapper languageServer, @NotNull VirtualFile file) {
+        if (!isOpenDocument(languageServer, file)) {
+            return;
+        }
+        URI uri = languageServer.toUri(file);
+        // This runs on the EDT, which already has the read access the connection info needs.
+        var connection = languageServer.connect(file,
+                languageServer.createFileConnectionInfo(file, LSPIJUtils.getDocument(file), true));
+        // Never wait for transport under the VFS write lock. A later Move, Undo, Redo or
+        // tab close may overtake this attempt; retire only this file's stale connection.
+        connection.whenComplete((server, failure) -> ApplicationManager.getApplication().invokeLater(() -> {
+            if (languageServer.isDisposed() || languageServer.getProject().isDisposed()) {
+                return;
+            }
+            boolean open = isOpenDocument(languageServer, file);
+            if (!open || !Objects.equals(uri, languageServer.toUri(file))) {
+                var opened = languageServer.getOpenedDocument(uri);
+                if (opened != null && opened.getFile() == file) {
+                    languageServer.disconnect(uri, false);
+                }
+                if (open) {
+                    // The file moved again: its new place decides again which instance gets it
+                    reconnectMovedDocument(file);
+                }
+            } else if (failure != null) {
+                LOGGER.warn("Cannot reconnect moved document {}", uri, failure);
+            }
+        }, ModalityState.any()));
+    }
+
+    private static boolean isOpenDocument(@NotNull LanguageServerWrapper languageServer, @NotNull VirtualFile file) {
+        return !languageServer.isDisposed() && !languageServer.getProject().isDisposed() &&
+                file.isValid() && (FileEditorManager.getInstance(languageServer.getProject()).isFileOpen(file) ||
+                LSPIJUtils.editorsForFile(file, languageServer.getProject()).length > 0);
     }
 
     /**

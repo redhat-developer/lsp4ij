@@ -59,6 +59,72 @@ public interface WorkspaceFolderStrategy {
     boolean sendAllFoldersOnInitialization();
 
     /**
+     * Returns true if the files of a project are spread over several language server instances, and false if one
+     * instance serves all of them.
+     *
+     * <p>{@link #getServerInstanceRoot} then decides which instance serves a file, and a file without a root gets
+     * none. The workspace folders work for an instance as they work for a language server without instances, with
+     * the folders that {@linkplain #belongsToServerInstance belong to it}. If none of them does and the folders are
+     * sent at initialization, the instance gets its root.</p>
+     *
+     * <p>LSP4IJ asks the strategy before there is an instance, so it takes the strategy from client features that
+     * have no language server. A strategy with instances must not need the language server: if getting it fails,
+     * one language server serves the project, and the log says why.</p>
+     *
+     * @return true if the files of a project are spread over several language server instances
+     */
+    default boolean hasServerInstances() {
+        return false;
+    }
+
+    /**
+     * Returns the root of the language server instance that serves the given file, or null if no instance serves
+     * it. Files with the same root share an instance. The root is the rootUri of the instance and gives it its name
+     * in the Language Servers view.
+     *
+     * <p>By default, this is the workspace folder of the file, so each workspace folder gets an instance of its
+     * own.</p>
+     *
+     * <p>This method is also asked about the directories of workspace folders, to tell which instance they belong
+     * to. So a directory that is a root has to give itself, and not the root of its parent. With instances, the same
+     * goes for {@link #getWorkspaceFolderForFile}, which is what this method asks by default.</p>
+     *
+     * @param file the file or directory
+     * @param project the project
+     * @param fileUriSupport file URI support for converting files to URIs
+     * @return the root of the language server instance that serves the file, or null
+     */
+    @Nullable
+    default WorkspaceFolder getServerInstanceRoot(@NotNull VirtualFile file,
+                                                  @NotNull Project project,
+                                                  @NotNull FileUriSupport fileUriSupport) {
+        return getWorkspaceFolderForFile(file, project, fileUriSupport);
+    }
+
+    /**
+     * Returns true if the given workspace folder belongs to the language server instance with the given root, which
+     * means that the directory of the folder has that root. So a folder above the root, such as one that contains
+     * several instances, or the folder of a nested instance, doesn't belong to it, and a folder below the root does,
+     * also when an instance is nested in it.
+     *
+     * @param folder the workspace folder
+     * @param instanceRoot the root of the language server instance
+     * @param project the project
+     * @param fileUriSupport file URI support for converting files to URIs
+     * @return true if the workspace folder belongs to the language server instance
+     */
+    default boolean belongsToServerInstance(@NotNull WorkspaceFolder folder,
+                                            @NotNull WorkspaceFolder instanceRoot,
+                                            @NotNull Project project,
+                                            @NotNull FileUriSupport fileUriSupport) {
+        VirtualFile directory = FileUriSupport.findFileByUri(folder.getUri(), fileUriSupport);
+        WorkspaceFolder root = directory != null ? getServerInstanceRoot(directory, project, fileUriSupport) : null;
+        // One directory can be written as several URIs
+        return root != null && (instanceRoot.getUri().equals(root.getUri())
+                || FileUriSupport.normalize(instanceRoot.getUri(), fileUriSupport).equals(FileUriSupport.normalize(root.getUri(), fileUriSupport)));
+    }
+
+    /**
      * Returns the list of workspace folders for the given project.
      * This represents all potential workspace folders, regardless of lazy loading.
      * Used for UI display.
@@ -92,7 +158,7 @@ public interface WorkspaceFolderStrategy {
      * Returns the workspace folder for the given file, or null if the file
      * is not part of any workspace folder.
      *
-     * @param file the file
+     * @param file the file, and with language server instances also a directory
      * @param project the project
      * @param fileUriSupport file URI support for converting files to URIs
      * @return the workspace folder containing the file, or null

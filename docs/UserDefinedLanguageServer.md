@@ -315,6 +315,47 @@ You can see this behavior with the following configuration:
   }
   ```
 
+#### Several language server instances
+
+By default, one language server instance serves all workspace folders of a project. If parts of a project need a server process of their own, for example because each one has its own environment, `serverInstances` says which instance serves a file. It takes `rootType` or `markers`, as described above:
+
+```json
+{
+    "serverInstances": {
+        "markers": ["pyproject.toml"]
+    }
+}
+```
+
+Files with the same root share an instance:
+
+ * An instance starts when the first of its files is opened. The Language Servers view shows it as a process of its own, with the path of its root in the project. Its node stays when the instance stops or is replaced, with its traces and logs, for the next instance of that root.
+ * It's initialized with its root as `rootUri`.
+ * A file without a root gets no instance, so this language server provides no features for it. LSP4IJ says so once, when such a file is open in an editor.
+ * With markers, the search stops at the project: a file without a marker up to its topmost content root has that content root as its root, so no instance runs above the project. In a project with content roots, a file outside all of them has no root then.
+ * All instances use the same command. If no working directory is configured, an instance runs in its root.
+ * Stop on an instance in the Language Servers view, or too many failed starts of it, switch off that instance only, and the others keep working. Restart switches it on again, and so does a changed configuration.
+ * Each instance needs a connection of its own. Over a socket, use an automatic port, and let LSP4IJ start the language server: the settings don't save `serverInstances` with a language server that runs already, or with a fixed port.
+
+Without `rootType` and `markers` next to `serverInstances`, the root is the only workspace folder of an instance. With them, they describe the workspace folders inside an instance:
+
+```json
+{
+    "serverInstances": {
+        "markers": ["pyproject.toml"]
+    },
+    "rootType": "SOURCE_ROOTS"
+}
+```
+
+Here, each folder with a `pyproject.toml` has an instance, and that instance gets the source roots inside it. With `"lazy": true`, it gets them through `workspace/didChangeWorkspaceFolders` as their files are opened. A workspace folder reaches the instance that its own directory has as root: a folder of another instance doesn't, nor does a folder above the root, such as one that contains several instances. An instance that would start without a folder gets its root, unless `rootType` next to `serverInstances` is `NONE`. In lazy mode, an instance starts without folders and gets those of its files as they are opened, and a file outside all of them adds none.
+
+In this example, `backend` and `frontend` each contain a `pyproject.toml` and source roots, so each has its own instance. `scripts/tool.py` has no marker up to the project's folder, so that folder is its root, with an instance of its own:
+
+![Several language server instances](./images/workspace-folders/ServerInstances.png)
+
+Changing this configuration, the command, the working directory, the environment variables or the mappings replaces the instances. Those with an open file start again, the others when one of their files is opened.
+
 #### Testing your configuration
 
 The **preview panel** on the right shows how workspace folders will be sent based on your configuration.
@@ -330,6 +371,8 @@ The **preview panel** on the right shows how workspace folders will be sent base
 **Drag & drop or click "Open file..."** to simulate opening a file and see which workspace folder it belongs to:
 
 ![Root type - PROJECT_BASE - lazy](./images/workspace-folders/RootType_PROJECT_BASE_lazy_checkInit_openFile.png)
+
+With `serverInstances`, the preview shows each language server instance with its workspace folders below it, so a file you open shows which instance serves it.
 
 If a file is not included in any workspace folder, it will appear under a "(No root)" node:
 
