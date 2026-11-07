@@ -87,14 +87,13 @@ public class RunInIntegratedTerminalService implements RunInTerminalService {
         // 2) Look for existing unassigned terminal in IntelliJ
         for (TerminalWidget terminalWidget : tm.getTerminalWidgets()) {
             if (title != null && title.equals(terminalWidget.getTerminalTitle().getDefaultTitle())) {
+                // A client terminal holds the shell widget, which the tool window's widget wraps
+                JBTerminalWidget jbTerminalWidget = JBTerminalWidget.asJediTermWidget(terminalWidget);
                 boolean used = clientTerminals.values().stream()
-                        .anyMatch(ct -> ct.terminalWidget == terminalWidget);
-                if (!used) {
-                    JBTerminalWidget jbTerminalWidget = JBTerminalWidget.asJediTermWidget(terminalWidget);
-                    if (jbTerminalWidget instanceof ShellTerminalWidget shellTerminalWidget) {
-                        clientTerminals.put(title, new ClientTerminal(title, shellTerminalWidget, client));
-                        return shellTerminalWidget;
-                    }
+                        .anyMatch(ct -> ct.terminalWidget == jbTerminalWidget);
+                if (!used && jbTerminalWidget instanceof ShellTerminalWidget shellTerminalWidget) {
+                    clientTerminals.put(title, new ClientTerminal(title, shellTerminalWidget, client));
+                    return shellTerminalWidget;
                 }
             }
         }
