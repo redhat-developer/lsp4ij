@@ -12,6 +12,7 @@ import com.intellij.notification.Notifications;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.application.impl.NonBlockingReadActionImpl;
+import com.intellij.openapi.command.WriteCommandAction;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.Disposer;
 import com.intellij.openapi.vfs.VirtualFile;
@@ -51,6 +52,8 @@ import org.eclipse.lsp4j.jsonrpc.messages.Message;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -357,6 +360,44 @@ public class LanguageServerInstancesTest extends LSPCodeInsightFixtureTestCase {
         waitFor(servers);
         assertTrue("No instance may have the root chosen with the configuration before", instances().stream()
                 .noneMatch(instance -> instance.getInstanceRoot() != null && "a".equals(instance.getInstanceRoot().getName())));
+    }
+
+    public void testAFileThatMovesAsItsInstanceIsChosenGetsNoInstanceOfItsEarlierPlace() throws Exception {
+        var file = file("a/one.per-folder");
+        var bDirectory = file("b/other.per-folder").getVirtualFile().getParent();
+        definition.strategy.afterAsked = asked -> {
+            if (asked.equals(file.getVirtualFile())) {
+                definition.strategy.afterAsked = null;
+                // Once the strategy has chosen the folder of the file, before the request takes its instance
+                try {
+                    move(asked, bDirectory);
+                } catch (IOException e) {
+                    throw new UncheckedIOException(e);
+                }
+            }
+        };
+
+        assertEmpty(serversOf(file));
+        assertEmpty("No instance may start for the earlier place of the file", instances());
+    }
+
+    public void testAFileThatMovesWhileItsInstanceStartsIsNotConnectedToIt() throws Exception {
+        var file = file("a/one.per-folder");
+        var bDirectory = file("b/other.per-folder").getVirtualFile().getParent();
+        var initialize = new CompletableFuture<Void>();
+        definition.initializeGate = initialize;
+        var servers = accessor.getLanguageServers(file, null, null);
+        var a = instances().get(0);
+        assertEquals("a", a.getInstanceRoot().getName());
+
+        // As an undo can do while the instance starts: the instance has no file yet, so it sees no move
+        move(file.getVirtualFile(), bDirectory);
+        initialize.complete(null);
+
+        var result = waitFor(servers);
+        assertFalse("The instance of the earlier place of the file must not get it",
+                a.isConnectedTo(a.toUri(file.getVirtualFile())));
+        assertEmpty(result);
     }
 
     public void testAReplacedInstanceIsDisposedOnTheUiThread() throws Exception {
@@ -1084,6 +1125,10 @@ public class LanguageServerInstancesTest extends LSPCodeInsightFixtureTestCase {
         return myFixture.addFileToProject(path, "text");
     }
 
+    private void move(@NotNull VirtualFile file, @NotNull VirtualFile target) throws IOException {
+        WriteCommandAction.writeCommandAction(myFixture.getProject()).run(() -> file.move(this, target));
+    }
+
     private @NotNull LanguageServerWrapper instanceOf(@NotNull PsiFile file) throws Exception {
         var servers = serversOf(file);
         assertEquals(1, servers.size());
@@ -1252,6 +1297,8 @@ public class LanguageServerInstancesTest extends LSPCodeInsightFixtureTestCase {
         volatile @Nullable String failingRoot;
         // The name of the root whose instance has a language client that fails as a stop disposes it
         volatile @Nullable String failingClientRoot;
+        // Holds the initialize replies of the instances that start, until it completes
+        volatile @Nullable CompletableFuture<Void> initializeGate;
 
         PerFolderDefinition() {
             super("per-folder-server", false);
@@ -1260,6 +1307,11 @@ public class LanguageServerInstancesTest extends LSPCodeInsightFixtureTestCase {
         @Override
         public @NotNull StreamConnectionProvider createConnectionProvider(@NotNull Project project) {
             var server = new MockLanguageServer(PerFolderDefinition::capabilities);
+            var gate = initializeGate;
+            if (gate != null) {
+                var held = server.holdInitialize();
+                gate.thenRun(() -> held.complete(null));
+            }
             servers.add(server);
             return new MockConnectionProvider(server);
         }

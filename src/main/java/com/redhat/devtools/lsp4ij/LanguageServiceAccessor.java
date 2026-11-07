@@ -462,6 +462,10 @@ public class LanguageServiceAccessor implements Disposable {
             @NotNull PsiFile psiFile, @Nullable Predicate<LSPClientFeatures> beforeStartingServerFilter,
             @Nullable Predicate<LSPClientFeatures> afterStartingServerFilter,
             @Nullable LanguageServerDefinition matchServerDefinition, @Nullable DocumentConnectionScope scope) {
+        // The place of the file before its instances are chosen: an instance can start for a while, and if the file
+        // moves meanwhile, it can be the instance of its earlier place
+        var file = psiFile.getVirtualFile();
+        var url = file != null ? file.getUrl() : null;
         // Collect started (or not) language servers which matches the given file.
         CompletableFuture<Collection<LanguageServerWrapper>> matchedServers = getMatchedLanguageServersWrappers(psiFile, matchServerDefinition, beforeStartingServerFilter);
         var matchedServersNow = matchedServers.getNow(Collections.emptyList());
@@ -477,7 +481,6 @@ public class LanguageServiceAccessor implements Disposable {
         boolean writeAccessAllowed = ApplicationManager.getApplication().isWriteAccessAllowed();
         boolean readAccessAllowed = ApplicationManager.getApplication().isReadAccessAllowed();
         Document document = readAccessAllowed || (!writeAccessAllowed) ? LSPIJUtils.getDocument(psiFile) : null;
-        var file = psiFile.getVirtualFile();
         // A close of the file's last editor after this, as when a feature of the editor asks just as it closes,
         // disconnects the file, which the connection made later must not connect again
         int editorCloses = ConnectDocumentToLanguageServerSetupParticipant.getEditorCloses(file);
@@ -510,6 +513,12 @@ public class LanguageServiceAccessor implements Disposable {
                                                 .thenComposeAsync(server -> {
                                                     if (server != null &&
                                                             (afterStartingServerFilter == null || afterStartingServerFilter.test(clientFeatures))) {
+                                                        if (wrapper.getInstanceRoot() != null && !file.getUrl().equals(url)) {
+                                                            // The file moved since its instance was chosen: its new
+                                                            // place decides, as the move connects an open file again,
+                                                            // or as the next request chooses
+                                                            return CompletableFuture.completedFuture(null);
+                                                        }
                                                         var info = connectionFileInfo != null ? connectionFileInfo.get(wrapper) : null;
                                                         if (info == null) {
                                                             info = new LanguageServerWrapper.LSPFileConnectionInfo(document, null, null, !writeAccessAllowed);
@@ -695,10 +704,10 @@ public class LanguageServiceAccessor implements Disposable {
     /**
      * The language server instance of a file for a definition with several instances: the instance that has the file
      * connected or provides it, which keeps it, or the root of the instance that serves it, with how often the instances
-     * of the definition were replaced before the choice.
+     * of the definition were replaced before the choice, and the URL of the place of the file that it was made for.
      */
     private record InstanceChoice(@Nullable LanguageServerWrapper connected, @Nullable WorkspaceFolder root,
-                                  int replacements) {
+                                  int replacements, @NotNull String url) {
 
         boolean isFor(@NotNull LanguageServerWrapper instance) {
             if (connected != null) {
@@ -773,12 +782,13 @@ public class LanguageServiceAccessor implements Disposable {
 
     private @NotNull InstanceChoice chooseInstance(@NotNull VirtualFile file,
                                                    @NotNull LanguageServerDefinition serverDefinition) {
-        // Before the root: a replacement while the strategy is asked can make the root outdated
+        // Before the root: a replacement or a move while the strategy is asked can make the root outdated
         int replaced = replacementsOf(serverDefinition);
+        var url = file.getUrl();
         var connected = findInstanceConnectedTo(file, serverDefinition);
         return connected != null
-                ? new InstanceChoice(connected, null, replaced)
-                : new InstanceChoice(null, serverDefinition.getServerInstanceRoot(file, project), replaced);
+                ? new InstanceChoice(connected, null, replaced, url)
+                : new InstanceChoice(null, serverDefinition.getServerInstanceRoot(file, project), replaced, url);
     }
 
     private int replacementsOf(@NotNull LanguageServerDefinition serverDefinition) {
@@ -821,10 +831,11 @@ public class LanguageServiceAccessor implements Disposable {
         return server -> server.getInstanceRoot() == null
                 || choices.computeIfAbsent(server.getServerDefinition(), serverDefinition -> {
                     int replaced = replacementsOf(serverDefinition);
+                    var url = file.getUrl();
                     var connected = findInstanceConnectedTo(file, serverDefinition);
                     return connected != null
-                            ? new InstanceChoice(connected, null, replaced)
-                            : new InstanceChoice(null, getRememberedServerInstanceRoot(psiFile, file, serverDefinition), replaced);
+                            ? new InstanceChoice(connected, null, replaced, url)
+                            : new InstanceChoice(null, getRememberedServerInstanceRoot(psiFile, file, serverDefinition), replaced, url);
                 }).isFor(server);
     }
 
@@ -869,6 +880,11 @@ public class LanguageServiceAccessor implements Disposable {
                                        @NotNull InstanceChoice choice,
                                        @NotNull Set<LanguageServerWrapper> matchedServers,
                                        @Nullable Predicate<LSPClientFeatures> beforeStartingServerFilter) {
+        if (!choice.url().equals(file.getUrl())) {
+            // The file moved since the choice, which can be for its earlier place: its new place decides, as the move
+            // connects an open file again, or as the next request chooses
+            return;
+        }
         LanguageServerWrapper instance;
         if (choice.connected() != null) {
             // The choice was made before the monitor was entered, and a replacement can have removed the instance since.
