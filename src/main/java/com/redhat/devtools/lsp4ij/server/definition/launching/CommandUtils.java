@@ -15,6 +15,8 @@ import com.intellij.execution.configurations.PathEnvironmentVariableUtil;
 import com.intellij.execution.util.ProgramParametersUtil;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.project.ProjectManager;
+import com.intellij.openapi.util.SystemInfo;
+import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.util.EnvironmentUtil;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -22,12 +24,16 @@ import org.jetbrains.annotations.Nullable;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 /**
  * Command utilities.
  */
 public class CommandUtils {
+
+    // The executable extensions of Windows when the environment has no PATHEXT
+    private static final String WINDOWS_DEFAULT_PATHEXT = ".COM;.EXE;.BAT;.CMD";
 
     /**
      * Returns the commands to execute with {@link Process} from the given commandline.
@@ -128,6 +134,8 @@ public class CommandUtils {
      * PATH given to the command line only. {@link GeneralCommandLine#getEffectiveEnvironment()} is the environment
      * that the process gets, with those customizations. The environment itself is left to the platform, which
      * customizes it once, when the process starts.
+     * <p>
+     * On Windows, the executable is looked up as Windows does, see {@link #findInWindowsPath(String, String, String)}.
      *
      * @param commandLine the command line.
      */
@@ -137,14 +145,51 @@ public class CommandUtils {
             // A path to the executable, which the platform doesn't look up either
             return;
         }
-        String path = commandLine.getEffectiveEnvironment().get("PATH");
+        Map<String, String> environment = commandLine.getEffectiveEnvironment();
+        String path = environment.get("PATH");
         if (path == null) {
             return;
         }
-        File found = PathEnvironmentVariableUtil.findInPath(executable, path, null);
+        File found = SystemInfo.isWindows
+                ? findInWindowsPath(executable, path, environment.get("PATHEXT"))
+                : PathEnvironmentVariableUtil.findInPath(executable, path, null);
         if (found != null) {
             commandLine.setExePath(found.getPath());
         }
+    }
+
+    /**
+     * Looks up an executable in the given PATH as Windows does. A name without one of the executable extensions of
+     * PATHEXT, such as {@code node} or {@code npx}, is looked up with each of them, directory by directory, so that
+     * {@code node.exe} or {@code npx.cmd} is found, and not the shell script without an extension that Node.js ships
+     * next to {@code npx.cmd}, which Windows can't start. A name with one of them is looked up as it is.
+     * <p>
+     * The platform's own lookup finds the exact name only, so a command such as {@code node} would otherwise be left to
+     * Windows, which looks it up in the IDE's PATH, and not in the PATH of the working directory's environment.
+     *
+     * @param executable the name of the executable, without a path.
+     * @param path       the PATH to look it up in.
+     * @param pathExt    the PATHEXT of the environment, or null for the default executable extensions of Windows.
+     * @return the executable, or null if none is found.
+     */
+    static @Nullable File findInWindowsPath(@NotNull String executable,
+                                            @NotNull String path,
+                                            @Nullable String pathExt) {
+        List<String> extensions = StringUtil.split(pathExt != null ? pathExt : WINDOWS_DEFAULT_PATHEXT, ";", true, true)
+                .stream()
+                .filter(extension -> extension.startsWith("."))
+                .map(extension -> extension.toLowerCase(Locale.ROOT))
+                .toList();
+        if (extensions.stream().anyMatch(extension -> StringUtil.endsWithIgnoreCase(executable, extension))) {
+            return PathEnvironmentVariableUtil.findInPath(executable, path, null);
+        }
+        return PathEnvironmentVariableUtil.getPathDirs(path).stream()
+                .map(File::new)
+                .filter(File::isAbsolute)
+                .flatMap(directory -> extensions.stream().map(extension -> new File(directory, executable + extension)))
+                .filter(File::isFile)
+                .findFirst()
+                .orElse(null);
     }
 
     /**

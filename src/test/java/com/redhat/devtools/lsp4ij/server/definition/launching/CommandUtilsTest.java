@@ -16,6 +16,7 @@ import com.intellij.openapi.util.io.FileUtil;
 import com.intellij.util.EnvironmentUtil;
 import org.jetbrains.annotations.NotNull;
 import org.junit.Assert;
+import org.junit.Assume;
 import org.junit.Test;
 
 import java.io.File;
@@ -212,6 +213,131 @@ public class CommandUtilsTest {
         } finally {
             FileUtil.delete(directory.toFile());
         }
+    }
+
+    @Test
+    public void testTheWindowsLookupTriesTheExtensionsOfPathextForANameWithoutOne() throws Exception {
+        Path directory = Files.createTempDirectory("tool-dir");
+        try {
+            // As Node.js ships npx: a shell script without an extension, which Windows can't start, next to npx.cmd
+            createFile(directory, "lsp4ij-tool");
+            Path cmd = createFile(directory, "lsp4ij-tool.cmd");
+
+            File found = CommandUtils.findInWindowsPath("lsp4ij-tool", directory.toString(), ".COM;.EXE;.BAT;.CMD");
+
+            assertSameFile(cmd, found);
+        } finally {
+            FileUtil.delete(directory.toFile());
+        }
+    }
+
+    @Test
+    public void testTheWindowsLookupGoesThroughThePathBeforeTheOrderOfPathext() throws Exception {
+        Path first = Files.createTempDirectory("tool-dir");
+        Path second = Files.createTempDirectory("tool-dir");
+        try {
+            Path cmd = createFile(first, "lsp4ij-tool.cmd");
+            createFile(second, "lsp4ij-tool.exe");
+
+            File found = CommandUtils.findInWindowsPath("lsp4ij-tool", first + File.pathSeparator + second, ".EXE;.CMD");
+
+            assertSameFile(cmd, found);
+        } finally {
+            FileUtil.delete(first.toFile());
+            FileUtil.delete(second.toFile());
+        }
+    }
+
+    @Test
+    public void testTheWindowsLookupTriesTheExtensionsOfADirectoryInTheOrderOfPathext() throws Exception {
+        Path directory = Files.createTempDirectory("tool-dir");
+        try {
+            createFile(directory, "lsp4ij-tool.cmd");
+            Path exe = createFile(directory, "lsp4ij-tool.exe");
+
+            File found = CommandUtils.findInWindowsPath("lsp4ij-tool", directory.toString(), ".EXE;.CMD");
+
+            assertSameFile(exe, found);
+        } finally {
+            FileUtil.delete(directory.toFile());
+        }
+    }
+
+    @Test
+    public void testTheWindowsLookupTakesANameWithAnExecutableExtensionAsItIs() throws Exception {
+        Path directory = Files.createTempDirectory("tool-dir");
+        try {
+            Path cmd = createFile(directory, "lsp4ij-tool.cmd");
+            createFile(directory, "lsp4ij-tool.cmd.exe");
+
+            File found = CommandUtils.findInWindowsPath("lsp4ij-tool.cmd", directory.toString(), ".EXE;.CMD");
+
+            assertSameFile(cmd, found);
+        } finally {
+            FileUtil.delete(directory.toFile());
+        }
+    }
+
+    @Test
+    public void testTheWindowsLookupWithoutPathextTriesTheDefaultExtensions() throws Exception {
+        Path directory = Files.createTempDirectory("tool-dir");
+        try {
+            Path bat = createFile(directory, "lsp4ij-tool.bat");
+
+            File found = CommandUtils.findInWindowsPath("lsp4ij-tool", directory.toString(), null);
+
+            assertSameFile(bat, found);
+        } finally {
+            FileUtil.delete(directory.toFile());
+        }
+    }
+
+    @Test
+    public void testTheWindowsLookupFindsNoFileWithoutAnExtension() throws Exception {
+        Path directory = Files.createTempDirectory("tool-dir");
+        try {
+            createFile(directory, "lsp4ij-tool");
+
+            Assert.assertNull(CommandUtils.findInWindowsPath("lsp4ij-tool", directory.toString(), ".EXE;.CMD"));
+        } finally {
+            FileUtil.delete(directory.toFile());
+        }
+    }
+
+    @Test
+    public void testOnWindowsACommandWithoutItsExtensionIsLookedUpInTheEnvironmentTheProcessGets() throws Exception {
+        Assume.assumeTrue("Windows only", SystemInfo.isWindows);
+        Path directory = Files.createTempDirectory("tool-dir");
+        try {
+            createFile(directory, "lsp4ij-tool");
+            Path bat = createTool(directory);
+            // As a CommandLineEnvCustomizer does for the working directory of a process since 2025.1
+            GeneralCommandLine commandLine = new GeneralCommandLine("lsp4ij-tool") {
+                @Override
+                protected void setupEnvironment(@NotNull Map<String, String> environment) {
+                    super.setupEnvironment(environment);
+                    String path = environment.get("PATH");
+                    environment.put("PATH", path != null ? directory + File.pathSeparator + path : directory.toString());
+                }
+            };
+
+            CommandUtils.resolveExecutable(commandLine);
+
+            assertSameFile(bat, new File(commandLine.getExePath()));
+        } finally {
+            FileUtil.delete(directory.toFile());
+        }
+    }
+
+    private static Path createFile(Path directory, String name) throws Exception {
+        Path file = Files.writeString(directory.resolve(name), "");
+        Assert.assertTrue(file.toFile().setExecutable(true));
+        return file;
+    }
+
+    private static void assertSameFile(Path expected, File actual) throws Exception {
+        Assert.assertNotNull(actual);
+        Assert.assertEquals(expected.toFile().getCanonicalPath(), actual.getCanonicalPath());
     }
 
     private static Path createTool(Path directory) throws Exception {

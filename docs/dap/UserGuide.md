@@ -61,6 +61,7 @@ The debug adapter's process gets that environment when it starts, and LSP4IJ loo
 > - **The working directory selects the environment**: a configuration created from a file keeps the project's directory. For a file in a directory that selects other tools, such as a subdirectory with its own `mise.toml`, set the working directory to that directory. It is also the `${workspaceFolder}` of the launch configuration.
 > - **The debug adapter runs with them too**: its own command, such as `node`, is the directory's. A project pinned to a version that the debug adapter doesn't support can keep it from starting.
 > - **Precedence**: the directory's environment is applied when the process starts, after the environment variables of the run configuration, so it wins over a variable that both set.
+> - **Windows**: a debug adapter's command without its extension, such as `node` or `npx`, is looked up with the extensions in `PATHEXT`, as Windows does, so that the directory's `node.exe` or `npx.cmd` starts.
 > - **Tools not bundled**: LSP4IJ doesn't bundle mise or direnv. Install the tool and its IntelliJ plugin. The mise plugin customizes the processes of other plugins only with its `useMiseInAllCommandLines` setting, which is off by default.
 > - **IntelliJ 2024.x** has no such extension point: the environment and the lookup are as before.
 
