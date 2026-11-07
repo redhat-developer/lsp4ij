@@ -111,7 +111,11 @@ public class RunInIntegratedTerminalService implements RunInTerminalService {
                                                                   @NotNull DAPClient client) {
         var project = client.getProject();
         TerminalToolWindowManager tm = TerminalToolWindowManager.getInstance(project);
-        ShellTerminalWidget shellTerminalWidget = tm.createLocalShellWidget(workingDirectory, title);
+        // What the createLocalShellWidget(workingDirectory, title) scheduled for removal does: a Classic terminal tab, whose
+        // shell widget can execute the command. Its replacement, the Reworked Terminal API
+        // (TerminalToolWindowTabsManager), needs 2025.3
+        ShellTerminalWidget shellTerminalWidget = ShellTerminalWidget.toShellJediTermWidgetOrThrow(
+                tm.createShellWidget(workingDirectory, title, true, true));
         if (StringUtils.isNotBlank(title)) {
             // Cache the terminal widget to reuse if title is filled
             clientTerminals.put(title, new ClientTerminal(title, shellTerminalWidget, client));
