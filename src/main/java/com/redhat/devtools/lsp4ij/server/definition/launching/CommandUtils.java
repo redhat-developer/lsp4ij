@@ -111,10 +111,7 @@ public class CommandUtils {
         }
         // After the system variables, which they override. The command line's map ignores the case of a name on
         // Windows, as Windows does.
-        generalCommandLine.withEnvironment(userEnvironmentVariables)
-                .withParentEnvironmentType(includeSystemEnvironmentVariables
-                        ? GeneralCommandLine.ParentEnvironmentType.CONSOLE
-                        : GeneralCommandLine.ParentEnvironmentType.NONE);
+        generalCommandLine.withEnvironment(userEnvironmentVariables);
         if (workingDir != null && !workingDir.isBlank()) {
             generalCommandLine.setWorkDirectory(workingDir);
             resolveExecutable(generalCommandLine);

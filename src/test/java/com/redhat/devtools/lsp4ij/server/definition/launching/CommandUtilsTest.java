@@ -142,12 +142,12 @@ public class CommandUtilsTest {
     }
 
     @Test
-    public void testIncludeParentEnvironmentFalseExcludesParentVars() {
+    public void testWithoutTheSystemVariablesTheProcessStillInheritsTheIdeEnvironment() {
+        // As on main: the system variables aren't copied into the command line, but its process inherits them
         Map<String, String> userEnv = Map.of("USER_VAR", "user_val");
         GeneralCommandLine cmd = CommandUtils.createCommandLine("node server.js", "C:/test/dir", userEnv, false);
-        Assert.assertEquals(GeneralCommandLine.ParentEnvironmentType.NONE, cmd.getParentEnvironmentType());
-        Assert.assertEquals(1, cmd.getEnvironment().size());
-        Assert.assertEquals("user_val", cmd.getEnvironment().get("USER_VAR"));
+        Assert.assertEquals(GeneralCommandLine.ParentEnvironmentType.CONSOLE, cmd.getParentEnvironmentType());
+        Assert.assertEquals(userEnv, cmd.getEnvironment());
     }
 
     @Test

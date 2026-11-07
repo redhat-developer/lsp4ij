@@ -128,6 +128,15 @@ public class DebugAdapterDescriptorTest {
     }
 
     @Test
+    public void testTheCommandLineOfACommandAloneInheritsTheIdeEnvironment() throws Exception {
+        // createStartServerCommandLine(command) passes no system variables, and its process inherits them, as on main
+        GeneralCommandLine cmd = new TestDescriptor().createStartServerCommandLine("node server.js");
+
+        Assert.assertEquals(GeneralCommandLine.ParentEnvironmentType.CONSOLE, cmd.getParentEnvironmentType());
+        Assert.assertNotNull(cmd.getEffectiveEnvironment().get("PATH"));
+    }
+
+    @Test
     public void testCreateStartServerCommandLineReplacesPortMacro() throws Exception {
         TestDescriptor descriptor = new TestDescriptor();
         GeneralCommandLine cmd = descriptor.createStartServerCommandLine(
