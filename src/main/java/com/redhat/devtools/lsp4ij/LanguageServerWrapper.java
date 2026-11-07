@@ -1155,6 +1155,12 @@ public class LanguageServerWrapper implements Disposable {
                         || isEditorClosedSince(file, editorCloses)) {
                     return CompletableFuture.completedFuture(null);
                 }
+                if (!fileUri.equals(toUri(file))) {
+                    // The file moved since the connection was asked for. Opened with the URI of its earlier place,
+                    // which the move found no document for, it would stay with this language server. Its new place
+                    // decides, as the move connects an open file again, or as the next request asks
+                    return CompletableFuture.completedFuture(null);
+                }
                 if (claim == null) {
                     promoteConnection(fileUri);
                 }

@@ -454,6 +454,26 @@ public class LanguageServerInstancesTest extends LSPCodeInsightFixtureTestCase {
         assertEmpty(result);
     }
 
+    public void testAFileThatMovesWhileItsConnectionWaitsIsNotConnectedToItsEarlierPlace() throws Exception {
+        var a = instanceOf(file("a/one.per-folder"));
+        var file = file("a/two.per-folder");
+        var bDirectory = file("b/other.per-folder").getVirtualFile().getParent();
+        Queue<Runnable> waiting = new ConcurrentLinkedQueue<>();
+        a.setConnectionExecutor(waiting::add);
+        var earlierUri = a.toUri(file.getVirtualFile());
+        var servers = accessor.getLanguageServers(file, null, null);
+        PlatformTestUtil.waitWithEventsDispatching("The connection must wait", () -> !waiting.isEmpty(), TIMEOUT);
+
+        // The instance has no document of the file yet, so it sees no move
+        move(file.getVirtualFile(), bDirectory);
+        a.setConnectionExecutor(AppExecutorUtil.getAppExecutorService());
+        waiting.forEach(AppExecutorUtil.getAppExecutorService()::execute);
+
+        var result = waitFor(servers);
+        assertFalse("The instance must not get the file with the URI of its earlier place", a.isConnectedTo(earlierUri));
+        assertEmpty(result);
+    }
+
     public void testAReplacedInstanceIsDisposedOnTheUiThread() throws Exception {
         var instance = instanceOf(file("a/one.per-folder"));
         var disposedOnTheUiThread = new AtomicBoolean();
