@@ -1079,6 +1079,9 @@ public class LanguageServerWrapper implements Disposable {
                                                                         @Nullable String chosenUrl) {
         removeStopTimer();
 
+        // Before the URI: the registration compares this URL with the one of the file then, which asks no URI support
+        // under documentsLock, and a move between the two calls then shows too
+        String fileUrl = file.getUrl();
         URI fileUri = toUri(file);
         if (fileUri == null) {
             // Invalid file uri
@@ -1159,7 +1162,8 @@ public class LanguageServerWrapper implements Disposable {
                         || isEditorClosedSince(file, editorCloses)) {
                     return CompletableFuture.completedFuture(null);
                 }
-                if ((chosenUrl != null && !chosenUrl.equals(file.getUrl())) || !fileUri.equals(toUri(file))) {
+                String url = file.getUrl();
+                if ((chosenUrl != null && !chosenUrl.equals(url)) || !fileUrl.equals(url)) {
                     // The file moved since the connection was asked for, or since this instance was chosen for it.
                     // Opened with the URI of its earlier place, which the move found no document for, or on the
                     // instance of its earlier place, it would stay with this language server. Its new place decides,

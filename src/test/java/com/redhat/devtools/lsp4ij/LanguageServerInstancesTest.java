@@ -480,6 +480,24 @@ public class LanguageServerInstancesTest extends LSPCodeInsightFixtureTestCase {
         assertEmpty(result);
     }
 
+    public void testAConnectionAsksTheUriSupportForNoUriWhileItHoldsTheLockOfTheDocuments() throws Exception {
+        var a = instanceOf(file("a/one.per-folder"));
+        var file = file("a/two.per-folder");
+        var documentsLock = documentsLock(a);
+        var askedUnderTheLock = new AtomicBoolean();
+        definition.uriAsked = asked -> {
+            if (asked.equals(file.getVirtualFile()) && Thread.holdsLock(documentsLock)) {
+                askedUnderTheLock.set(true);
+            }
+        };
+
+        waitFor(accessor.getLanguageServers(file, null, null));
+
+        // A URI support can take a read action, which a write action that waits for the lock, as a move does, holds off
+        assertFalse("The URI support must not be asked under the lock of the documents", askedUnderTheLock.get());
+        assertTrue(a.isConnectedTo(a.toUri(file.getVirtualFile())));
+    }
+
     public void testAFileThatMovesAsItsConnectionTakesItsUriIsNotConnectedToTheInstanceOfItsEarlierPlace()
             throws Exception {
         var a = instanceOf(file("a/one.per-folder"));
@@ -1272,6 +1290,12 @@ public class LanguageServerInstancesTest extends LSPCodeInsightFixtureTestCase {
 
     private void move(@NotNull VirtualFile file, @NotNull VirtualFile target) throws IOException {
         WriteCommandAction.writeCommandAction(myFixture.getProject()).run(() -> file.move(this, target));
+    }
+
+    private static Object documentsLock(LanguageServerWrapper wrapper) throws ReflectiveOperationException {
+        var field = LanguageServerWrapper.class.getDeclaredField("documentsLock");
+        field.setAccessible(true);
+        return field.get(wrapper);
     }
 
     private @NotNull LanguageServerWrapper instanceOf(@NotNull PsiFile file) throws Exception {
