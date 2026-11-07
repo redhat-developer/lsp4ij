@@ -2417,8 +2417,15 @@ public class LanguageServerWrapper implements Disposable {
         try {
             updateStatus(ServerStatus.stopping);
             removeStopTimer();
+            // A language client that fails to be disposed doesn't end the stop, which then fails at its end: the
+            // connection would stay open, and a later stop, as the dispose makes, would go through it all again
+            RuntimeException clientFailure = null;
             if (languageClient != null) {
-                languageClient.dispose();
+                try {
+                    languageClient.dispose();
+                } catch (RuntimeException e) {
+                    clientFailure = e;
+                }
             }
             if (current) {
                 currentInitializingContext = null;
@@ -2435,10 +2442,11 @@ public class LanguageServerWrapper implements Disposable {
                 }
             }
 
+            CompletableFuture<Void> stopped;
             if (isDisposed()) {
                 // When project is closing we shutdown everything in synch mode
                 shutdownAll(languageServer, lspStreamProvider, launcherFuture);
-                return CompletableFuture.completedFuture(null);
+                stopped = CompletableFuture.completedFuture(null);
             } else {
                 // We need to shutdown, kill and stop the process in a thread to avoid for instance
                 // stopping the new process created with a new start.
@@ -2453,8 +2461,12 @@ public class LanguageServerWrapper implements Disposable {
                         updateStatus(ServerStatus.stopped);
                     }
                 }, AppExecutorUtil.getAppExecutorService());
-                return runningStop;
+                stopped = runningStop;
             }
+            if (clientFailure != null) {
+                throw clientFailure;
+            }
+            return stopped;
         } finally {
             if (current) {
                 this.launcherFuture = null;

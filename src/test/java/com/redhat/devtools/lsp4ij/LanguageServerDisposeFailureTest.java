@@ -13,6 +13,7 @@ package com.redhat.devtools.lsp4ij;
 import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.project.Project;
 import com.intellij.testFramework.PlatformTestUtil;
+import com.redhat.devtools.lsp4ij.client.LanguageClientImpl;
 import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
 import com.redhat.devtools.lsp4ij.fixtures.LSPCodeInsightFixtureTestCase;
 import com.redhat.devtools.lsp4ij.lifecycle.LanguageServerLifecycleListener;
@@ -37,7 +38,8 @@ import java.util.concurrent.atomic.AtomicInteger;
  * A language server whose connection fails to stop is still cleaned up as it is disposed, and neither keeps the other
  * language servers from being disposed nor stays among the started servers: when its server definition is removed,
  * and when the project closes. A dispose that is canceled ends the disposing, and the language servers it did not reach
- * stay started, for a later removal or close to dispose.
+ * stay started, for a later removal or close to dispose. A language server whose language client fails to be disposed
+ * still stops its connection.
  */
 public class LanguageServerDisposeFailureTest extends LSPCodeInsightFixtureTestCase {
 
@@ -194,6 +196,23 @@ public class LanguageServerDisposeFailureTest extends LSPCodeInsightFixtureTestC
         }
     }
 
+    public void testALanguageServerWhoseLanguageClientFailsToBeDisposedStillStopsItsConnection() throws Exception {
+        var failingClient = new ClientFailingServerDefinition();
+        register(failingClient, "*.failing-client");
+        try {
+            var languageServer = startAnother(failingClient);
+
+            // A stop disposes the language client before it stops the connection
+            assertThrows(IllegalStateException.class, languageServer::stop);
+
+            PlatformTestUtil.waitWithEventsDispatching("The connection must be asked to stop",
+                    () -> failingClient.stops.get() > 0, 10);
+            assertEquals(1, failingClient.stops.get());
+        } finally {
+            LanguageServersRegistry.getInstance().removeServerDefinition(project, failingClient);
+        }
+    }
+
     private void register(@NotNull LanguageServerDefinition serverDefinition, @NotNull String fileNamePattern) {
         var mapping = ServerMappingSettings.createFileNamePatternsMappingSettings(List.of(fileNamePattern), "plaintext");
         LanguageServersRegistry.getInstance().addServerDefinition(project, serverDefinition, List.of(mapping));
@@ -262,6 +281,40 @@ public class LanguageServerDisposeFailureTest extends LSPCodeInsightFixtureTestC
                     super.stop();
                     stops.incrementAndGet();
                     throw new IllegalStateException("The connection fails to stop");
+                }
+            };
+        }
+    }
+
+    /**
+     * Server definition whose language client fails to be disposed, and which counts the stops of its connection.
+     */
+    private static class ClientFailingServerDefinition extends MockLanguageServerDefinition {
+
+        private final AtomicInteger stops = new AtomicInteger();
+
+        ClientFailingServerDefinition() {
+            super("client-failing-server", false);
+        }
+
+        @Override
+        public @NotNull LanguageClientImpl createLanguageClient(@NotNull Project project) {
+            return new LanguageClientImpl(project) {
+                @Override
+                public void dispose() {
+                    super.dispose();
+                    throw new IllegalStateException("The language client fails to be disposed");
+                }
+            };
+        }
+
+        @Override
+        public @NotNull StreamConnectionProvider createConnectionProvider(@NotNull Project project) {
+            return new MockConnectionProvider(getServer()) {
+                @Override
+                public synchronized void stop() {
+                    super.stop();
+                    stops.incrementAndGet();
                 }
             };
         }
