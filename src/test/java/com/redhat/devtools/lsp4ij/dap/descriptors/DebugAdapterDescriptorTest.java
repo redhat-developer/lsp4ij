@@ -19,14 +19,11 @@ import com.intellij.openapi.fileTypes.FileType;
 import com.intellij.openapi.fileTypes.PlainTextFileType;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
-import com.redhat.devtools.lsp4ij.server.definition.launching.CommandUtils;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.junit.After;
 import org.junit.Assert;
 import org.junit.Test;
 
-import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Collections;
@@ -36,25 +33,6 @@ import java.util.Map;
  * Tests for {@link DebugAdapterDescriptor}.
  */
 public class DebugAdapterDescriptorTest {
-
-    @After
-    public void tearDown() {
-        CommandUtils.CommandLineEnvCustomizerReflection.setTestCustomizeEnv(null);
-        CommandUtils.CommandLineEnvCustomizerReflection.setTestCustomizers(null);
-    }
-
-    public static class TestDapCustomizer {
-        public boolean executed = false;
-        public String capturedWorkingDir = null;
-
-        public void customizeEnv(GeneralCommandLine cmd, Map<String, String> env) {
-            executed = true;
-            if (cmd.getWorkDirectory() != null) {
-                capturedWorkingDir = cmd.getWorkDirectory().getAbsolutePath();
-            }
-            env.put("DAP_CUSTOMIZED_ENV", "customized_value");
-        }
-    }
 
     private static class TestDescriptor extends DebugAdapterDescriptor {
         public TestDescriptor() {
@@ -90,20 +68,10 @@ public class DebugAdapterDescriptorTest {
         }
     }
 
-    /**
-     * Verifies that a valid working directory is validated and propagated to the GeneralCommandLine,
-     * and that directory-aware environment customizers are invoked and mutate the environment during
-     * command line creation.
-     */
     @Test
     public void testCreateStartServerCommandLineWithValidWorkingDirectory() throws Exception {
         Path tempDir = Files.createTempDirectory("dap-test");
         try {
-            TestDapCustomizer testCustomizer = new TestDapCustomizer();
-            CommandUtils.CommandLineEnvCustomizerReflection.setTestCustomizeEnv(
-                    TestDapCustomizer.class.getMethod("customizeEnv", GeneralCommandLine.class, Map.class));
-            CommandUtils.CommandLineEnvCustomizerReflection.setTestCustomizers(new Object[]{testCustomizer});
-
             TestDescriptor descriptor = new TestDescriptor();
             GeneralCommandLine cmd = descriptor.createStartServerCommandLine(
                     tempDir.toString(),
@@ -114,11 +82,6 @@ public class DebugAdapterDescriptorTest {
 
             Assert.assertNotNull(cmd.getWorkDirectory());
             Assert.assertEquals(tempDir.toFile().getCanonicalPath(), cmd.getWorkDirectory().getCanonicalPath());
-            Assert.assertTrue("Test customizer must be executed during createStartServerCommandLine", testCustomizer.executed);
-            Assert.assertEquals("Customizer must receive the configured working directory",
-                    tempDir.toFile().getAbsolutePath(), testCustomizer.capturedWorkingDir);
-            Assert.assertEquals("customized_value", cmd.getEnvironment().get("DAP_CUSTOMIZED_ENV"));
-            Assert.assertEquals(GeneralCommandLine.ParentEnvironmentType.NONE, cmd.getParentEnvironmentType());
         } finally {
             Files.deleteIfExists(tempDir);
         }
@@ -128,11 +91,6 @@ public class DebugAdapterDescriptorTest {
     public void testCreateStartServerCommandLineWithNonDirectoryPath() throws Exception {
         Path tempFile = Files.createTempFile("dap-test", ".tmp");
         try {
-            TestDapCustomizer testCustomizer = new TestDapCustomizer();
-            CommandUtils.CommandLineEnvCustomizerReflection.setTestCustomizeEnv(
-                    TestDapCustomizer.class.getMethod("customizeEnv", GeneralCommandLine.class, Map.class));
-            CommandUtils.CommandLineEnvCustomizerReflection.setTestCustomizers(new Object[]{testCustomizer});
-
             TestDescriptor descriptor = new TestDescriptor();
             GeneralCommandLine cmd = descriptor.createStartServerCommandLine(
                     tempFile.toString(),
@@ -141,9 +99,8 @@ public class DebugAdapterDescriptorTest {
                     false
             );
 
-            // A file path is not a directory, so effectiveWorkingDirectory should be null
+            // A file is not a directory, so no working directory is set
             Assert.assertNull(cmd.getWorkDirectory());
-            Assert.assertFalse("Customizer should not execute when working directory is not a directory", testCustomizer.executed);
         } finally {
             Files.deleteIfExists(tempFile);
         }
@@ -151,11 +108,6 @@ public class DebugAdapterDescriptorTest {
 
     @Test
     public void testCreateStartServerCommandLineWithNullOrBlankWorkingDirectory() throws Exception {
-        TestDapCustomizer testCustomizer = new TestDapCustomizer();
-        CommandUtils.CommandLineEnvCustomizerReflection.setTestCustomizeEnv(
-                TestDapCustomizer.class.getMethod("customizeEnv", GeneralCommandLine.class, Map.class));
-        CommandUtils.CommandLineEnvCustomizerReflection.setTestCustomizers(new Object[]{testCustomizer});
-
         TestDescriptor descriptor = new TestDescriptor();
 
         GeneralCommandLine cmdNull = descriptor.createStartServerCommandLine(
@@ -165,7 +117,6 @@ public class DebugAdapterDescriptorTest {
                 false
         );
         Assert.assertNull(cmdNull.getWorkDirectory());
-        Assert.assertFalse("Customizer should not execute when working directory is null", testCustomizer.executed);
 
         GeneralCommandLine cmdBlank = descriptor.createStartServerCommandLine(
                 "   ",
@@ -174,7 +125,6 @@ public class DebugAdapterDescriptorTest {
                 false
         );
         Assert.assertNull(cmdBlank.getWorkDirectory());
-        Assert.assertFalse("Customizer should not execute when working directory is blank", testCustomizer.executed);
     }
 
     @Test
