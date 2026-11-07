@@ -17,6 +17,7 @@ import com.intellij.execution.process.ProcessHandler;
 import com.intellij.openapi.application.Application;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.util.io.BaseOutputReader;
+import com.redhat.devtools.lsp4ij.server.definition.launching.CommandUtils;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -122,6 +123,9 @@ public class OSProcessStreamConnectionProvider implements StreamConnectionProvid
             throw new CannotStartProcessException("Unable to start language server: " + this);
         }
         try {
+            // A command line with a working directory starts the tool which that directory's environment selects, also
+            // when a plugin created it
+            CommandUtils.resolveExecutable(commandLine);
             processHandler = new OSProcessHandler(commandLine) {
                 @Override
                 protected BaseOutputReader.@NotNull Options readerOptions() {
