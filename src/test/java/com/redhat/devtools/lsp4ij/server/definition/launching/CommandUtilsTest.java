@@ -20,11 +20,14 @@ import org.junit.Assume;
 import org.junit.Test;
 
 import java.io.File;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Tests for {@link CommandUtils}.
@@ -324,6 +327,32 @@ public class CommandUtilsTest {
             CommandUtils.resolveExecutable(commandLine);
 
             assertSameFile(bat, new File(commandLine.getExePath()));
+        } finally {
+            FileUtil.delete(directory.toFile());
+        }
+    }
+
+    @Test
+    public void testOnWindowsTheScriptFoundForACommandWithoutItsExtensionStarts() throws Exception {
+        Assume.assumeTrue("Windows only", SystemInfo.isWindows);
+        Path directory = Files.createTempDirectory("tool-dir");
+        try {
+            // Windows can't start the script without an extension, so the .bat next to it must be the one that starts
+            createFile(directory, "lsp4ij-tool");
+            createTool(directory);
+            String path = directory + File.pathSeparator + Objects.requireNonNullElse(System.getenv("PATH"), "");
+            GeneralCommandLine commandLine = CommandUtils.createCommandLine("lsp4ij-tool", directory.toString(),
+                    Map.of("PATH", path), true);
+
+            Process process = commandLine.createProcess();
+            String output;
+            try {
+                output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8).trim();
+            } finally {
+                Assert.assertTrue("The script must end", process.waitFor(30, TimeUnit.SECONDS));
+            }
+
+            Assert.assertEquals("ok", output);
         } finally {
             FileUtil.delete(directory.toFile());
         }
