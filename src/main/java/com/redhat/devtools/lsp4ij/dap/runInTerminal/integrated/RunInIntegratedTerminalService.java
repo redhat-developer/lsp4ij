@@ -87,14 +87,13 @@ public class RunInIntegratedTerminalService implements RunInTerminalService {
         // 2) Look for existing unassigned terminal in IntelliJ
         for (TerminalWidget terminalWidget : tm.getTerminalWidgets()) {
             if (title != null && title.equals(terminalWidget.getTerminalTitle().getDefaultTitle())) {
+                // A client terminal holds the shell widget, which the tool window's widget wraps
+                JBTerminalWidget jbTerminalWidget = JBTerminalWidget.asJediTermWidget(terminalWidget);
                 boolean used = clientTerminals.values().stream()
-                        .anyMatch(ct -> ct.terminalWidget == terminalWidget);
-                if (!used) {
-                    JBTerminalWidget jbTerminalWidget = JBTerminalWidget.asJediTermWidget(terminalWidget);
-                    if (jbTerminalWidget instanceof ShellTerminalWidget shellTerminalWidget) {
-                        clientTerminals.put(title, new ClientTerminal(title, shellTerminalWidget, client));
-                        return shellTerminalWidget;
-                    }
+                        .anyMatch(ct -> ct.terminalWidget == jbTerminalWidget);
+                if (!used && jbTerminalWidget instanceof ShellTerminalWidget shellTerminalWidget) {
+                    clientTerminals.put(title, new ClientTerminal(title, shellTerminalWidget, client));
+                    return shellTerminalWidget;
                 }
             }
         }
@@ -111,7 +110,11 @@ public class RunInIntegratedTerminalService implements RunInTerminalService {
                                                                   @NotNull DAPClient client) {
         var project = client.getProject();
         TerminalToolWindowManager tm = TerminalToolWindowManager.getInstance(project);
-        ShellTerminalWidget shellTerminalWidget = tm.createLocalShellWidget(workingDirectory, title);
+        // What the createLocalShellWidget(workingDirectory, title) scheduled for removal does: a Classic terminal tab, whose
+        // shell widget can execute the command. Its replacement, the Reworked Terminal API
+        // (TerminalToolWindowTabsManager), needs 2025.3
+        ShellTerminalWidget shellTerminalWidget = ShellTerminalWidget.toShellJediTermWidgetOrThrow(
+                tm.createShellWidget(workingDirectory, title, true, true));
         if (StringUtils.isNotBlank(title)) {
             // Cache the terminal widget to reuse if title is filled
             clientTerminals.put(title, new ClientTerminal(title, shellTerminalWidget, client));
