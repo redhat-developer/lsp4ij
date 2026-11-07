@@ -719,13 +719,16 @@ public class LanguageServiceAccessor implements Disposable {
     LanguageServerWrapper getOrCreateInstanceOf(@NotNull VirtualFile file,
                                                 @NotNull LanguageServerDefinition serverDefinition) {
         var choice = chooseInstance(file, serverDefinition);
-        if (choice.connected() != null) {
-            return choice.connected();
-        }
-        if (choice.root() == null) {
+        if (choice.connected() == null && choice.root() == null) {
             return null;
         }
         synchronized (startedServers) {
+            if (choice.connected() != null) {
+                // As for a request: a replacement can have removed the instance since the choice
+                return startedServers.contains(choice.connected())
+                        ? choice.connected()
+                        : findInstanceConnectedTo(file, serverDefinition);
+            }
             // As for a request: a replacement after the choice connects the open files again
             return choice.replacements() == replacementsOf(serverDefinition)
                     ? getOrCreateInstance(serverDefinition, choice.root())
