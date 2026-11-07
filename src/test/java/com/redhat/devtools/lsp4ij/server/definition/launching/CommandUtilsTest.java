@@ -13,6 +13,7 @@ package com.redhat.devtools.lsp4ij.server.definition.launching;
 import com.intellij.execution.configurations.GeneralCommandLine;
 import com.intellij.openapi.util.SystemInfo;
 import com.intellij.openapi.util.io.FileUtil;
+import com.intellij.util.EnvironmentUtil;
 import org.jetbrains.annotations.NotNull;
 import org.junit.Assert;
 import org.junit.Test;
@@ -21,12 +22,8 @@ import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
-import java.util.Set;
 
 /**
  * Tests for {@link CommandUtils}.
@@ -85,75 +82,26 @@ public class CommandUtilsTest {
     }
 
     @Test
-    public void testWindowsEnvironmentMergeIsCaseInsensitive() {
-        // Parent defines variables with various casings
-        Map<String, String> parentEnvironment = new HashMap<>();
-        parentEnvironment.put("Path", "C:\\Windows\\System32");
-        parentEnvironment.put("COMMON_VAR", "parent-value");
-        parentEnvironment.put("MIXED_Case", "parent-mixed");
+    public void testAUserVariableReplacesTheSystemVariableOfTheSameNameInAnotherCaseOnWindowsOnly() {
+        String systemName = EnvironmentUtil.getEnvironmentMap().keySet().stream()
+                .filter(name -> name.equalsIgnoreCase("PATH"))
+                .findFirst()
+                .orElseThrow();
+        String userName = systemName.equals("PATH") ? "Path" : "PATH";
 
-        // Configured (user) variables override parent variables using different casings
-        Map<String, String> configuredEnvironment = new HashMap<>();
-        configuredEnvironment.put("PATH", "C:\\custom\\bin;C:\\Windows\\System32"); // different case, should override Path
-        configuredEnvironment.put("common_var", "user-override");                   // different case, should override COMMON_VAR
-        configuredEnvironment.put("USER_ONLY", "user-val");
+        GeneralCommandLine cmd = CommandUtils.createCommandLine("node server.js", null, Map.of(userName, "user-path"), true);
 
-        Map<String, String> result = CommandUtils.mergeEnvironmentVariables(
-                parentEnvironment,
-                configuredEnvironment,
-                true
-        );
-
-        // 1. Verify size: exactly 4 unique variables (Path/PATH, COMMON_VAR/common_var, MIXED_Case, USER_ONLY)
-        Assert.assertEquals(4, result.size());
-
-        // 2. Case-insensitive lookup: all case variations return the winning value
-        Assert.assertEquals("C:\\custom\\bin;C:\\Windows\\System32", result.get("Path"));
-        Assert.assertEquals("C:\\custom\\bin;C:\\Windows\\System32", result.get("PATH"));
-        Assert.assertEquals("C:\\custom\\bin;C:\\Windows\\System32", result.get("path"));
-        Assert.assertEquals("C:\\custom\\bin;C:\\Windows\\System32", result.get("pAtH"));
-
-        Assert.assertEquals("user-override", result.get("COMMON_VAR"));
-        Assert.assertEquals("user-override", result.get("common_var"));
-        Assert.assertEquals("user-override", result.get("Common_Var"));
-
-        Assert.assertEquals("parent-mixed", result.get("mixed_case"));
-        Assert.assertEquals("parent-mixed", result.get("MIXED_CASE"));
-
-        Assert.assertEquals("user-val", result.get("USER_ONLY"));
-        Assert.assertEquals("user-val", result.get("user_only"));
-
-        // 3. Verify correct precedence: user/configured variables must win over parent variables
-        Assert.assertEquals("C:\\custom\\bin;C:\\Windows\\System32", result.get("Path"));
-        Assert.assertEquals("user-override", result.get("COMMON_VAR"));
-
-        // 4. Verify no duplicate variable names across cases in key set
-        Set<String> lowerCaseKeys = new HashSet<>();
-        for (String key : result.keySet()) {
-            boolean isNew = lowerCaseKeys.add(key.toLowerCase(Locale.ROOT));
-            Assert.assertTrue("Duplicate key detected with different casing: " + key, isNew);
+        long pathNames = cmd.getEnvironment().keySet().stream().filter(name -> name.equalsIgnoreCase("PATH")).count();
+        if (SystemInfo.isWindows) {
+            // Windows ignores the case of a name: there is one variable, which the user's replaces
+            Assert.assertEquals(1, pathNames);
+            Assert.assertEquals("user-path", cmd.getEnvironment().get(systemName));
+        } else {
+            // Elsewhere they are two variables
+            Assert.assertEquals(2, pathNames);
+            Assert.assertEquals("user-path", cmd.getEnvironment().get(userName));
+            Assert.assertEquals(EnvironmentUtil.getEnvironmentMap().get(systemName), cmd.getEnvironment().get(systemName));
         }
-
-        // 5. Verify that when transferred to GeneralCommandLine environment, no duplicates occur
-        GeneralCommandLine cmd = new GeneralCommandLine("echo", "test");
-        cmd.getEnvironment().putAll(result);
-        Assert.assertEquals(4, cmd.getEnvironment().size());
-    }
-
-    @Test
-    public void testNonWindowsEnvironmentMergeIsCaseSensitive() {
-        Map<String, String> parentEnvironment = Map.of("Path", "parent-path");
-        Map<String, String> configuredEnvironment = Map.of("PATH", "configured-path");
-
-        Map<String, String> result = CommandUtils.mergeEnvironmentVariables(
-                parentEnvironment,
-                configuredEnvironment,
-                false
-        );
-
-        Assert.assertEquals(2, result.size());
-        Assert.assertEquals("parent-path", result.get("Path"));
-        Assert.assertEquals("configured-path", result.get("PATH"));
     }
 
     @Test

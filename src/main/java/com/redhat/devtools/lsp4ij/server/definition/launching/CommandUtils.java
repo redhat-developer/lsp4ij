@@ -15,17 +15,14 @@ import com.intellij.execution.configurations.PathEnvironmentVariableUtil;
 import com.intellij.execution.util.ProgramParametersUtil;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.project.ProjectManager;
-import com.intellij.openapi.util.SystemInfo;
 import com.intellij.util.EnvironmentUtil;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.io.File;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.TreeMap;
 
 /**
  * Command utilities.
@@ -108,12 +105,13 @@ public class CommandUtils {
                                                        @Nullable String workingDir,
                                                        @NotNull Map<String, String> userEnvironmentVariables,
                                                        boolean includeSystemEnvironmentVariables) {
-        Map<String, String> environmentVariables = mergeEnvironmentVariables(
-                includeSystemEnvironmentVariables ? EnvironmentUtil.getEnvironmentMap() : null,
-                userEnvironmentVariables,
-                SystemInfo.isWindows);
-        GeneralCommandLine generalCommandLine = new GeneralCommandLine(CommandUtils.createCommands(commandLine))
-                .withEnvironment(environmentVariables)
+        GeneralCommandLine generalCommandLine = new GeneralCommandLine(CommandUtils.createCommands(commandLine));
+        if (includeSystemEnvironmentVariables) {
+            generalCommandLine.withEnvironment(EnvironmentUtil.getEnvironmentMap());
+        }
+        // After the system variables, which they override. The command line's map ignores the case of a name on
+        // Windows, as Windows does.
+        generalCommandLine.withEnvironment(userEnvironmentVariables)
                 .withParentEnvironmentType(includeSystemEnvironmentVariables
                         ? GeneralCommandLine.ParentEnvironmentType.CONSOLE
                         : GeneralCommandLine.ParentEnvironmentType.NONE);
@@ -150,36 +148,6 @@ public class CommandUtils {
         if (found != null) {
             commandLine.setExePath(found.getPath());
         }
-    }
-
-    /**
-     * Merges inherited and configured environment variables.
-     * Variable names are case-insensitive on Windows.
-     *
-     * @param parentEnvironment inherited environment variables.
-     * @param configuredEnvironment explicitly configured environment variables.
-     * @param caseInsensitive whether variable names should be compared case-insensitively.
-     * @return the merged environment.
-     */
-    static Map<String, String> mergeEnvironmentVariables(
-            Map<String, String> parentEnvironment,
-            Map<String, String> configuredEnvironment,
-            boolean caseInsensitive) {
-
-        Map<String, String> effectiveEnvironment;
-        if (caseInsensitive) {
-            effectiveEnvironment = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
-        } else {
-            effectiveEnvironment = new HashMap<>();
-        }
-
-        if (parentEnvironment != null) {
-            effectiveEnvironment.putAll(parentEnvironment);
-        }
-        if (configuredEnvironment != null) {
-            effectiveEnvironment.putAll(configuredEnvironment);
-        }
-        return effectiveEnvironment;
     }
 
     /**
