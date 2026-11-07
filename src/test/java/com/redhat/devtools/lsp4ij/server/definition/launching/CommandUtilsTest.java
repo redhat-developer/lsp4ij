@@ -210,6 +210,25 @@ public class CommandUtilsTest {
     }
 
     @Test
+    public void testAnExecutableGivenWithAPathWithForwardSlashesIsNotLookedUp() throws Exception {
+        Path directory = Files.createTempDirectory("tool-dir");
+        try {
+            // A tool of the same relative path under a directory of the PATH, which Windows mustn't start instead
+            Files.createDirectories(directory.resolve("bin"));
+            createTool(directory.resolve("bin"));
+            GeneralCommandLine commandLine = new GeneralCommandLine("bin/lsp4ij-tool")
+                    .withEnvironment("PATH", directory.toString())
+                    .withWorkDirectory(System.getProperty("java.io.tmpdir"));
+
+            CommandUtils.resolveExecutable(commandLine);
+
+            Assertions.assertEquals("bin/lsp4ij-tool", commandLine.getExePath());
+        } finally {
+            FileUtil.delete(directory.toFile());
+        }
+    }
+
+    @Test
     public void testAnExecutableThatIsNotInThePathIsLeftAsItIs() {
         GeneralCommandLine commandLine = new GeneralCommandLine("lsp4ij-no-such-tool")
                 .withEnvironment("PATH", System.getProperty("java.io.tmpdir"))

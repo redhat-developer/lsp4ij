@@ -148,8 +148,8 @@ public class CommandUtils {
             return;
         }
         String executable = commandLine.getExePath();
-        if (executable.indexOf(File.separatorChar) != -1) {
-            // A path to the executable, which the platform doesn't look up either
+        if (executable.indexOf('/') != -1 || executable.indexOf(File.separatorChar) != -1) {
+            // A path to the executable, which the platform doesn't look up either. Windows takes '/' as a separator too.
             return;
         }
         Map<String, String> environment = commandLine.getEffectiveEnvironment();
