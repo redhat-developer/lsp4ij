@@ -55,6 +55,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
@@ -521,6 +522,44 @@ public class LanguageServerManagerInstancesTest extends LSPCodeInsightFixtureTes
             assertNull(instanceOfRoot("b"));
         } finally {
             EditorFactory.getInstance().releaseEditor(editor);
+        }
+    }
+
+    public void testAFileClosedAsItsMoveChoosesItsInstanceCreatesNoInstance() throws Exception {
+        var file = file("a/moved.instances").getVirtualFile();
+        var bDirectory = myFixture.getTempDirFixture().findOrCreateDir("b");
+        // In an editor without the features of a file editor, which would ask for the instance of the file too
+        var editor = EditorFactory.getInstance().createEditor(FileDocumentManager.getInstance().getDocument(file),
+                myFixture.getProject());
+        var released = new AtomicBoolean();
+        try {
+            var psiFile = myFixture.getPsiManager().findFile(file);
+            assertNotNull(psiFile);
+            assertEquals(1, waitFor(LanguageServiceAccessor.getInstance(myFixture.getProject())
+                    .getLanguageServers(psiFile, null, null)).size());
+            // The editor closes as the instance of b is chosen for the file, in an event of the UI thread before the
+            // one in which the choice connects the file
+            definition.instanceRootAsked = asked -> {
+                if (asked.equals(file) && bDirectory.equals(asked.getParent())) {
+                    definition.instanceRootAsked = null;
+                    ApplicationManager.getApplication().invokeLater(() -> {
+                        if (released.compareAndSet(false, true)) {
+                            EditorFactory.getInstance().releaseEditor(editor);
+                        }
+                    }, ModalityState.nonModal());
+                }
+            };
+
+            move(file, bDirectory);
+
+            PlatformTestUtil.waitWithEventsDispatching("The editor must close", released::get, TIMEOUT);
+            dispatchAll();
+            // A request without a file, as for the workspace symbols, would start it
+            assertNull("The file must not leave an instance for its new place", instanceOfRoot("b"));
+        } finally {
+            if (released.compareAndSet(false, true)) {
+                EditorFactory.getInstance().releaseEditor(editor);
+            }
         }
     }
 

@@ -116,9 +116,9 @@ class LSPFileListener extends AbstractLSPFileListener {
                 .expireWith(languageServerWrapper)
                 .submit(AppExecutorUtil.getAppExecutorService())
                 .onSuccess(choice -> ApplicationManager.getApplication().invokeLater(() -> {
-                    if (choice == null || languageServerWrapper.isDisposed()) {
-                        // Nor does the document of a language server that is gone meanwhile, as when its definition
-                        // was removed
+                    if (choice == null || !isOpenDocument(languageServerWrapper, file)) {
+                        // Nor does a document that was closed since the choice, or the document of a language server
+                        // that is gone meanwhile, as when its definition was removed
                         return;
                     }
                     if (!choice.url().equals(file.getUrl())) {
