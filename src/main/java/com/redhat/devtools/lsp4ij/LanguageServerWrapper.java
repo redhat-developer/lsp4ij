@@ -987,23 +987,26 @@ public class LanguageServerWrapper implements Disposable {
         synchronized (documentsLock) {
             promoteConnection(toUri(file));
         }
-        return connectDocument(file, fileConnectionInfo, null, null);
+        return connectDocument(file, fileConnectionInfo, null, null, null);
     }
 
     /**
      * Connects the file as {@link #connect(VirtualFile, LSPFileConnectionInfo)} does, for a connection asked for when
      * the last editor of the file had closed the given number of times. A close of the file's last editor since then
-     * disconnects the file, which this connection then leaves disconnected: it gives no language server.
+     * disconnects the file, which this connection then leaves disconnected: it gives no language server. So does a
+     * move of the file from the place with the given URL, which this instance was chosen for.
      */
     CompletableFuture<@Nullable LanguageServer> connect(@NotNull VirtualFile file,
                                                         @NotNull LSPFileConnectionInfo fileConnectionInfo,
-                                                        int editorCloses) {
-        return connectDocument(file, fileConnectionInfo, null, editorCloses);
+                                                        int editorCloses,
+                                                        @Nullable String chosenUrl) {
+        return connectDocument(file, fileConnectionInfo, null, editorCloses, chosenUrl);
     }
 
     CompletableFuture<@Nullable LanguageServer> connect(@NotNull VirtualFile file,
                                                         @NotNull LSPFileConnectionInfo info,
-                                                        @NotNull DocumentConnectionScope scope) {
+                                                        @NotNull DocumentConnectionScope scope,
+                                                        @Nullable String chosenUrl) {
         URI uri = toUri(file);
         if (uri == null) {
             return CompletableFuture.completedFuture(null);
@@ -1016,7 +1019,7 @@ public class LanguageServerWrapper implements Disposable {
             claim = new DocumentConnectionClaim(uri, connection, new AtomicBoolean());
         }
         scope.register(() -> releaseConnection(file, claim));
-        return connectDocument(file, info, claim, null);
+        return connectDocument(file, info, claim, null, chosenUrl);
     }
 
     private void promoteConnection(@Nullable URI uri) {
@@ -1072,7 +1075,8 @@ public class LanguageServerWrapper implements Disposable {
     private CompletableFuture<@Nullable LanguageServer> connectDocument(@NotNull VirtualFile file,
                                                                         @NotNull LSPFileConnectionInfo fileConnectionInfo,
                                                                         @Nullable DocumentConnectionClaim claim,
-                                                                        @Nullable Integer editorCloses) {
+                                                                        @Nullable Integer editorCloses,
+                                                                        @Nullable String chosenUrl) {
         removeStopTimer();
 
         URI fileUri = toUri(file);
@@ -1155,10 +1159,11 @@ public class LanguageServerWrapper implements Disposable {
                         || isEditorClosedSince(file, editorCloses)) {
                     return CompletableFuture.completedFuture(null);
                 }
-                if (!fileUri.equals(toUri(file))) {
-                    // The file moved since the connection was asked for. Opened with the URI of its earlier place,
-                    // which the move found no document for, it would stay with this language server. Its new place
-                    // decides, as the move connects an open file again, or as the next request asks
+                if ((chosenUrl != null && !chosenUrl.equals(file.getUrl())) || !fileUri.equals(toUri(file))) {
+                    // The file moved since the connection was asked for, or since this instance was chosen for it.
+                    // Opened with the URI of its earlier place, which the move found no document for, or on the
+                    // instance of its earlier place, it would stay with this language server. Its new place decides,
+                    // as the move connects an open file again, or as the next request asks
                     return CompletableFuture.completedFuture(null);
                 }
                 if (claim == null) {

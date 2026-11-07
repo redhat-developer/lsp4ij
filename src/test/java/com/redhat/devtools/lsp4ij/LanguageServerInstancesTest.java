@@ -10,6 +10,7 @@ package com.redhat.devtools.lsp4ij;
 import com.intellij.notification.Notification;
 import com.intellij.notification.Notifications;
 import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.application.ModalityState;
 import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.application.impl.NonBlockingReadActionImpl;
 import com.intellij.openapi.command.WriteCommandAction;
@@ -55,6 +56,7 @@ import org.jetbrains.annotations.Nullable;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -471,6 +473,41 @@ public class LanguageServerInstancesTest extends LSPCodeInsightFixtureTestCase {
 
         var result = waitFor(servers);
         assertFalse("The instance must not get the file with the URI of its earlier place", a.isConnectedTo(earlierUri));
+        assertEmpty(result);
+    }
+
+    public void testAFileThatMovesAsItsConnectionTakesItsUriIsNotConnectedToTheInstanceOfItsEarlierPlace()
+            throws Exception {
+        var a = instanceOf(file("a/one.per-folder"));
+        var file = file("a/two.per-folder");
+        var bDirectory = file("b/other.per-folder").getVirtualFile().getParent();
+        var armed = new AtomicBoolean();
+        var moved = new AtomicBoolean();
+        definition.uriAsked = asked -> {
+            // The connection takes the URI of the file on its own thread, after the filter that arms this
+            if (asked.equals(file.getVirtualFile()) && !ApplicationManager.getApplication().isDispatchThread()
+                    && armed.compareAndSet(true, false)) {
+                ApplicationManager.getApplication().invokeAndWait(() -> {
+                    try {
+                        move(asked, bDirectory);
+                    } catch (IOException e) {
+                        throw new UncheckedIOException(e);
+                    }
+                }, ModalityState.nonModal());
+                moved.set(true);
+            }
+        };
+
+        // The filter runs just before the connection starts
+        var servers = accessor.getLanguageServers(file, null, features -> {
+            armed.set(true);
+            return true;
+        });
+
+        var result = waitFor(servers);
+        assertTrue("The file must move as its connection takes its URI", moved.get());
+        assertFalse("The instance of the earlier place of the file must not get it",
+                a.isConnectedTo(a.toUri(file.getVirtualFile())));
         assertEmpty(result);
     }
 
@@ -1380,6 +1417,8 @@ public class LanguageServerInstancesTest extends LSPCodeInsightFixtureTestCase {
         final Queue<RuntimeException> clientFeaturesFailures = new ConcurrentLinkedQueue<>();
         // Holds the initialize replies of the instances that start, until it completes
         volatile @Nullable CompletableFuture<Void> initializeGate;
+        // Is given each file whose URI the client features are asked for
+        volatile @Nullable Consumer<VirtualFile> uriAsked;
 
         PerFolderDefinition() {
             super("per-folder-server", false);
@@ -1447,6 +1486,15 @@ public class LanguageServerInstancesTest extends LSPCodeInsightFixtureTestCase {
                             throw failure;
                         }
                     }
+                }
+
+                @Override
+                public @Nullable URI getFileUri(@NotNull VirtualFile file) {
+                    var asked = uriAsked;
+                    if (asked != null) {
+                        asked.accept(file);
+                    }
+                    return super.getFileUri(file);
                 }
             };
             return features.setWorkspaceFolderFeature(new LSPWorkspaceFolderFeature() {

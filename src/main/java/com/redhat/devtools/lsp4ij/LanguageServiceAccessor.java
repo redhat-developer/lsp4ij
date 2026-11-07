@@ -464,7 +464,7 @@ public class LanguageServiceAccessor implements Disposable {
             @Nullable Predicate<LSPClientFeatures> afterStartingServerFilter,
             @Nullable LanguageServerDefinition matchServerDefinition, @Nullable DocumentConnectionScope scope) {
         // The place of the file before its instances are chosen: an instance can start for a while, and if the file
-        // moves meanwhile, it can be the instance of its earlier place
+        // moves meanwhile, it can be the instance of its earlier place, which then must not get the file
         var file = psiFile.getVirtualFile();
         var url = file != null ? file.getUrl() : null;
         // Collect started (or not) language servers which matches the given file.
@@ -514,17 +514,16 @@ public class LanguageServiceAccessor implements Disposable {
                                                 .thenComposeAsync(server -> {
                                                     if (server != null &&
                                                             (afterStartingServerFilter == null || afterStartingServerFilter.test(clientFeatures))) {
-                                                        if (wrapper.getInstanceRoot() != null && !file.getUrl().equals(url)) {
-                                                            // The file moved since its instance was chosen: its new
-                                                            // place decides, as the move connects an open file again,
-                                                            // or as the next request chooses
-                                                            return CompletableFuture.completedFuture(null);
-                                                        }
                                                         var info = connectionFileInfo != null ? connectionFileInfo.get(wrapper) : null;
                                                         if (info == null) {
                                                             info = new LanguageServerWrapper.LSPFileConnectionInfo(document, null, null, !writeAccessAllowed);
                                                         }
-                                                        return scope == null ? wrapper.connect(file, info, editorCloses) : wrapper.connect(file, info, scope);
+                                                        // The connection compares the file with it as it opens the
+                                                        // document, which can be a while after this
+                                                        var chosenUrl = wrapper.getInstanceRoot() != null ? url : null;
+                                                        return scope == null
+                                                                ? wrapper.connect(file, info, editorCloses, chosenUrl)
+                                                                : wrapper.connect(file, info, scope, chosenUrl);
                                                     }
                                                     return CompletableFuture.completedFuture(null);
                                                 }).thenAccept(server -> {
