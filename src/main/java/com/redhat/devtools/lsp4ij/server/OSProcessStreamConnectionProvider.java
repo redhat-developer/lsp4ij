@@ -124,7 +124,7 @@ public class OSProcessStreamConnectionProvider implements StreamConnectionProvid
         }
         try {
             // A command line with a working directory starts the tool which that directory's environment selects, also
-            // when a plugin created it
+            // when a plugin created it. One that LSP4IJ created looks it up as it starts.
             CommandUtils.resolveExecutable(commandLine);
             processHandler = new OSProcessHandler(commandLine) {
                 @Override

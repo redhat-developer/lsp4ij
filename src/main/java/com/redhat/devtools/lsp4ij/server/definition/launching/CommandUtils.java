@@ -98,8 +98,8 @@ public class CommandUtils {
 
     /**
      * Creates a {@link GeneralCommandLine} from the given command line, working directory and environment settings.
-     * With a working directory, the executable is looked up in the environment that the process gets there, as
-     * {@link #resolveExecutable(GeneralCommandLine)} does.
+     * With a working directory, the executable is looked up as the process starts, in the environment that the
+     * process gets there, see {@link WorkingDirectoryCommandLine}.
      *
      * @param commandLine the command line string to execute.
      * @param workingDir the working directory, or null if unspecified.
@@ -112,7 +112,7 @@ public class CommandUtils {
                                                        @Nullable String workingDir,
                                                        @NotNull Map<String, String> userEnvironmentVariables,
                                                        boolean includeSystemEnvironmentVariables) {
-        GeneralCommandLine generalCommandLine = new GeneralCommandLine(CommandUtils.createCommands(commandLine));
+        GeneralCommandLine generalCommandLine = new WorkingDirectoryCommandLine(CommandUtils.createCommands(commandLine));
         if (includeSystemEnvironmentVariables) {
             generalCommandLine.withEnvironment(EnvironmentUtil.getEnvironmentMap());
         }
@@ -121,7 +121,6 @@ public class CommandUtils {
         generalCommandLine.withEnvironment(userEnvironmentVariables);
         if (workingDir != null && !workingDir.isBlank()) {
             generalCommandLine.setWorkDirectory(workingDir);
-            resolveExecutable(generalCommandLine);
         }
         return generalCommandLine;
     }
@@ -131,11 +130,13 @@ public class CommandUtils {
      * process gets there, so that the tool which the directory provides, as with mise or direnv, is the one that
      * starts. A command line without a working directory, or whose executable is a path, is left as it is.
      * <p>
-     * Since 2025.1, the platform lets plugins customize the environment of a process for its working directory
-     * ({@code CommandLineEnvCustomizer}) when the process starts, but it looks up the executable before that, in the
-     * PATH given to the command line only. {@link GeneralCommandLine#getEffectiveEnvironment()} is the environment
-     * that the process gets, with those customizations. The environment itself is left to the platform, which
-     * customizes it once, when the process starts.
+     * This is for a command line that a plugin creates. Since 2025.1, the platform lets plugins customize the
+     * environment of a process for its working directory ({@code CommandLineEnvCustomizer}) when the process starts,
+     * but it looks up the executable before that, in the PATH given to the command line only.
+     * {@link GeneralCommandLine#getEffectiveEnvironment()} is the environment that the process gets, with those
+     * customizations, so the customizers run for the lookup, and again when the process starts. A
+     * {@link WorkingDirectoryCommandLine}, which LSP4IJ creates, looks up its executable as its process starts instead,
+     * and is left as it is.
      * <p>
      * On Windows, the executable is looked up as Windows does, see {@link #findInWindowsPath(String, String, String)}.
      *
@@ -143,8 +144,8 @@ public class CommandUtils {
      */
     @ApiStatus.Internal
     public static void resolveExecutable(@NotNull GeneralCommandLine commandLine) {
-        if (commandLine.getWorkDirectory() == null) {
-            // No directory to take the environment from
+        if (commandLine.getWorkDirectory() == null || commandLine instanceof WorkingDirectoryCommandLine) {
+            // No directory to take the environment from, or a command line which looks it up as it starts
             return;
         }
         String executable = getExecutable(commandLine);
@@ -152,18 +153,12 @@ public class CommandUtils {
             // No executable, as for a command without parts: the platform reports it when the process starts
             return;
         }
-        if (executable.indexOf('/') != -1 || executable.indexOf(File.separatorChar) != -1) {
-            // A path to the executable, which the platform doesn't look up either. Windows takes '/' as a separator too.
+        if (isPath(executable)) {
+            // A path to the executable, which the platform doesn't look up either. Checked before the environment,
+            // whose customizers it would run for nothing.
             return;
         }
-        Map<String, String> environment = commandLine.getEffectiveEnvironment();
-        String path = environment.get("PATH");
-        if (path == null) {
-            return;
-        }
-        File found = SystemInfo.isWindows
-                ? findInWindowsPath(executable, path, environment.get("PATHEXT"))
-                : PathEnvironmentVariableUtil.findInPath(executable, path, null);
+        File found = findExecutable(executable, commandLine.getEffectiveEnvironment());
         if (found != null) {
             commandLine.setExePath(found.getPath());
         }
@@ -174,13 +169,57 @@ public class CommandUtils {
      * annotates {@link GeneralCommandLine#getExePath()} with {@code @NotNull}, and its instrumented build throws an
      * {@link IllegalStateException} there when no executable is set.
      */
-    private static @Nullable String getExecutable(@NotNull GeneralCommandLine commandLine) {
+    static @Nullable String getExecutable(@NotNull GeneralCommandLine commandLine) {
         try {
             String executable = commandLine.getExePath();
             return StringUtil.isEmptyOrSpaces(executable) ? null : executable;
         } catch (IllegalStateException noExecutable) {
             return null;
         }
+    }
+
+    /**
+     * Returns true if the executable is a path, which the platform doesn't look up either. Windows takes '/' as a
+     * separator too.
+     */
+    private static boolean isPath(@NotNull String executable) {
+        return executable.indexOf('/') != -1 || executable.indexOf(File.separatorChar) != -1;
+    }
+
+    /**
+     * Looks up an executable in the PATH of the environment of a process.
+     *
+     * @param executable  the executable of the command line.
+     * @param environment the environment of the process.
+     * @return the executable, or null if it is a path, or none is found.
+     */
+    static @Nullable File findExecutable(@NotNull String executable, @NotNull Map<String, String> environment) {
+        if (isPath(executable)) {
+            return null;
+        }
+        String path = getVariable(environment, "PATH");
+        if (path == null) {
+            return null;
+        }
+        return SystemInfo.isWindows
+                ? findInWindowsPath(executable, path, getVariable(environment, "PATHEXT"))
+                : PathEnvironmentVariableUtil.findInPath(executable, path, null);
+    }
+
+    /**
+     * Returns the variable of the environment. Windows ignores the case of its name, and the environment of a
+     * {@link ProcessBuilder} keeps the case that the name has, such as {@code Path}.
+     */
+    private static @Nullable String getVariable(@NotNull Map<String, String> environment, @NotNull String name) {
+        String value = environment.get(name);
+        if (value != null || !SystemInfo.isWindows) {
+            return value;
+        }
+        return environment.entrySet().stream()
+                .filter(variable -> variable.getKey().equalsIgnoreCase(name))
+                .map(Map.Entry::getValue)
+                .findFirst()
+                .orElse(null);
     }
 
     /**
