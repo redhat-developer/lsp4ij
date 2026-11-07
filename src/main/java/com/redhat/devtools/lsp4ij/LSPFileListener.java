@@ -360,10 +360,9 @@ class LSPFileListener extends AbstractLSPFileListener {
 
         URI oldFileUri = getUri(virtualParentFile, oldFileName);
         URI newFileUri = languageServerWrapper.toUri(newFile);
-        boolean docIsConnected = languageServerWrapper.isConnectedTo(oldFileUri);
-        if (docIsConnected) {
-            // 1. Send a textDocument/didClose for the old file name
-            languageServerWrapper.disconnect(oldFileUri, false);
+        // 1. Send a textDocument/didClose for the old file name. The check and the disconnection are one step, so that a
+        // connection that registers the document with the old file name meanwhile can't escape the move
+        if (languageServerWrapper.disconnectIfConnected(oldFileUri)) {
             // 2. Reconnect after the VFS write action has completed, instead of waiting here for
             // the server while holding the write lock. The notification queue keeps didClose
             // ahead of the new didOpen.

@@ -12,7 +12,6 @@ import com.intellij.notification.Notifications;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.ModalityState;
 import com.intellij.openapi.application.ReadAction;
-import com.intellij.openapi.application.WriteAction;
 import com.intellij.openapi.application.impl.NonBlockingReadActionImpl;
 import com.intellij.openapi.command.WriteCommandAction;
 import com.intellij.openapi.progress.ProcessCanceledException;
@@ -46,6 +45,10 @@ import com.redhat.devtools.lsp4ij.settings.LanguageServerSettings;
 import com.redhat.devtools.lsp4ij.settings.LanguageServerSettingsListener;
 import com.redhat.devtools.lsp4ij.settings.ProjectLanguageServerSettings;
 import com.redhat.devtools.lsp4ij.templates.ServerMappingSettings;
+import org.eclipse.lsp4j.FileOperationFilter;
+import org.eclipse.lsp4j.FileOperationOptions;
+import org.eclipse.lsp4j.FileOperationPattern;
+import org.eclipse.lsp4j.FileOperationsServerCapabilities;
 import org.eclipse.lsp4j.ServerCapabilities;
 import org.eclipse.lsp4j.WorkspaceFolder;
 import org.eclipse.lsp4j.WorkspaceFoldersOptions;
@@ -512,30 +515,34 @@ public class LanguageServerInstancesTest extends LSPCodeInsightFixtureTestCase {
         assertEmpty(result);
     }
 
-    public void testTheConnectionOfADocumentWaitsForAWriteActionThatCanMoveTheFile() throws Exception {
+    public void testAFileThatMovesAsItsDocumentIsRegisteredDoesNotStayAtItsEarlierPlace() throws Exception {
+        // The move takes the documents along, which it sees for a language server with workspace/didRenameFiles
+        definition.renameFilesSupported = true;
         var a = instanceOf(file("a/one.per-folder"));
         var file = file("a/two.per-folder");
-        Queue<Runnable> waiting = new ConcurrentLinkedQueue<>();
-        a.setConnectionExecutor(waiting::add);
-        var uri = a.toUri(file.getVirtualFile());
-        var servers = accessor.getLanguageServers(file, null, null);
-        PlatformTestUtil.waitWithEventsDispatching("The connection must wait", () -> !waiting.isEmpty(), TIMEOUT);
-        a.setConnectionExecutor(AppExecutorUtil.getAppExecutorService());
-
-        // As the write action of a move, in which the move takes along the documents that are open
-        boolean connectedDuringTheWriteAction = WriteAction.compute(() -> {
-            waiting.forEach(AppExecutorUtil.getAppExecutorService()::execute);
-            var deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(1);
-            while (!a.isConnectedTo(uri) && System.nanoTime() < deadline) {
-                Thread.sleep(10);
+        var virtualFile = file.getVirtualFile();
+        var bDirectory = file("b/other.per-folder").getVirtualFile().getParent();
+        var earlierUri = a.toUri(virtualFile);
+        var earlierUrl = virtualFile.getUrl();
+        var holding = new AtomicBoolean();
+        definition.uriWritten = uri -> {
+            // The connection writes the URI of the document once it has checked the place of the file, before it
+            // registers the document: it waits there until the file moved
+            if (uri.equals(earlierUri) && !ApplicationManager.getApplication().isDispatchThread()
+                    && holding.compareAndSet(false, true)) {
+                var deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(TIMEOUT);
+                while (virtualFile.getUrl().equals(earlierUrl) && System.nanoTime() < deadline) {
+                    Thread.onSpinWait();
+                }
             }
-            return a.isConnectedTo(uri);
-        });
+        };
+        var servers = accessor.getLanguageServers(file, null, null);
+        PlatformTestUtil.waitWithEventsDispatching("The connection must check the place of the file", holding::get, TIMEOUT);
+
+        move(virtualFile, bDirectory);
 
         waitFor(servers);
-        assertFalse("The document must not be registered while a write action, as of a move, runs",
-                connectedDuringTheWriteAction);
-        assertTrue("The document must be registered once the write action is done", a.isConnectedTo(uri));
+        assertFalse("The instance of the earlier place of the file must not keep it", a.isConnectedTo(earlierUri));
     }
 
     public void testAReplacedInstanceIsDisposedOnTheUiThread() throws Exception {
@@ -1446,6 +1453,10 @@ public class LanguageServerInstancesTest extends LSPCodeInsightFixtureTestCase {
         volatile @Nullable CompletableFuture<Void> initializeGate;
         // Is given each file whose URI the client features are asked for
         volatile @Nullable Consumer<VirtualFile> uriAsked;
+        // Is given each URI that the client features write as text
+        volatile @Nullable Consumer<URI> uriWritten;
+        // Whether the language servers that start support workspace/didRenameFiles
+        volatile boolean renameFilesSupported;
 
         PerFolderDefinition() {
             super("per-folder-server", false);
@@ -1453,7 +1464,7 @@ public class LanguageServerInstancesTest extends LSPCodeInsightFixtureTestCase {
 
         @Override
         public @NotNull StreamConnectionProvider createConnectionProvider(@NotNull Project project) {
-            var server = new MockLanguageServer(PerFolderDefinition::capabilities);
+            var server = new MockLanguageServer(this::capabilities);
             var gate = initializeGate;
             if (gate != null) {
                 var held = server.holdInitialize();
@@ -1468,7 +1479,7 @@ public class LanguageServerInstancesTest extends LSPCodeInsightFixtureTestCase {
                                                                           @NotNull WorkspaceFolder instanceRoot) {
             connectionFolders.add(instanceRoot);
             if (instanceRoot.getName().equals(failingRoot)) {
-                return new MockConnectionProvider(new MockLanguageServer(PerFolderDefinition::capabilities)) {
+                return new MockConnectionProvider(new MockLanguageServer(this::capabilities)) {
                     @Override
                     public void start() throws CannotStartProcessException {
                         throw new CannotStartProcessException("Cannot run program \"missing\"");
@@ -1523,6 +1534,15 @@ public class LanguageServerInstancesTest extends LSPCodeInsightFixtureTestCase {
                     }
                     return super.getFileUri(file);
                 }
+
+                @Override
+                public @Nullable String toString(@NotNull URI fileUri, boolean directory) {
+                    var written = uriWritten;
+                    if (written != null) {
+                        written.accept(fileUri);
+                    }
+                    return super.toString(fileUri, directory);
+                }
             };
             return features.setWorkspaceFolderFeature(new LSPWorkspaceFolderFeature() {
                 @Override
@@ -1540,12 +1560,18 @@ public class LanguageServerInstancesTest extends LSPCodeInsightFixtureTestCase {
             });
         }
 
-        private static ServerCapabilities capabilities() {
+        private ServerCapabilities capabilities() {
             var folders = new WorkspaceFoldersOptions();
             folders.setSupported(true);
             folders.setChangeNotifications(true);
             var workspace = new WorkspaceServerCapabilities();
             workspace.setWorkspaceFolders(folders);
+            if (renameFilesSupported) {
+                var operations = new FileOperationsServerCapabilities();
+                operations.setDidRename(new FileOperationOptions(List.of(
+                        new FileOperationFilter(new FileOperationPattern("**/*.per-folder")))));
+                workspace.setFileOperations(operations);
+            }
             var capabilities = MockLanguageServer.defaultServerCapabilities();
             capabilities.setWorkspace(workspace);
             return capabilities;
