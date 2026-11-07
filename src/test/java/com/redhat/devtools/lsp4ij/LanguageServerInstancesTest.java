@@ -14,6 +14,7 @@ import com.intellij.openapi.application.ModalityState;
 import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.application.impl.NonBlockingReadActionImpl;
 import com.intellij.openapi.command.WriteCommandAction;
+import com.intellij.openapi.fileEditor.FileDocumentManager;
 import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.Disposer;
@@ -498,6 +499,33 @@ public class LanguageServerInstancesTest extends LSPCodeInsightFixtureTestCase {
         assertTrue(a.isConnectedTo(a.toUri(file.getVirtualFile())));
     }
 
+    public void testTheConnectionOfAMovedDocumentAsksTheUriSupportOnlyOutsideTheLockOfTheDocuments() throws Exception {
+        var a = instanceOf(file("a/one.per-folder"));
+        var file = file("a/two.per-folder").getVirtualFile();
+        var uri = a.toUri(file);
+        var documentsLock = documentsLock(a);
+        var askedUnderTheLock = new AtomicBoolean();
+        definition.uriAsked = asked -> {
+            if (asked.equals(file) && Thread.holdsLock(documentsLock)) {
+                askedUnderTheLock.set(true);
+            }
+        };
+        definition.uriWritten = written -> {
+            if (written.equals(uri) && Thread.holdsLock(documentsLock)) {
+                askedUnderTheLock.set(true);
+            }
+        };
+        var document = FileDocumentManager.getInstance().getDocument(file);
+        assertNotNull(document);
+
+        // As a move connects an open document again at its new place
+        waitFor(a.connect(file, a.createFileConnectionInfo(file, document, true)));
+
+        // A URI support can take a read action, which a write action that waits for the lock, as a move does, holds off
+        assertFalse("The URI support must not be asked under the lock of the documents", askedUnderTheLock.get());
+        assertTrue(a.isConnectedTo(uri));
+    }
+
     public void testAFileThatMovesAsItsConnectionTakesItsUriIsNotConnectedToTheInstanceOfItsEarlierPlace()
             throws Exception {
         var a = instanceOf(file("a/one.per-folder"));
@@ -543,17 +571,16 @@ public class LanguageServerInstancesTest extends LSPCodeInsightFixtureTestCase {
         var earlierUri = a.toUri(virtualFile);
         var earlierUrl = virtualFile.getUrl();
         var holding = new AtomicBoolean();
-        definition.uriWritten = uri -> {
-            // The connection writes the URI of the document once it has checked the place of the file, before it
-            // registers the document: it waits there until the file moved
-            if (uri.equals(earlierUri) && !ApplicationManager.getApplication().isDispatchThread()
-                    && holding.compareAndSet(false, true)) {
+        // The connection has checked the place of the file, and waits until the file moved before it registers the
+        // document
+        a.setBeforeRegistration(() -> {
+            if (holding.compareAndSet(false, true)) {
                 var deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(TIMEOUT);
                 while (virtualFile.getUrl().equals(earlierUrl) && System.nanoTime() < deadline) {
                     Thread.onSpinWait();
                 }
             }
-        };
+        });
         var servers = accessor.getLanguageServers(file, null, null);
         PlatformTestUtil.waitWithEventsDispatching("The connection must check the place of the file", holding::get, TIMEOUT);
 

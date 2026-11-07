@@ -186,6 +186,8 @@ public class LanguageServerWrapper implements Disposable {
     // Where the connection of a document runs once its start attempt is initialized: the executor that
     // thenComposeAsync uses by default, which a test can replace to run the connection when it chooses
     private @NotNull Executor connectionExecutor = CompletableFuture.completedFuture(null).defaultExecutor();
+    // Runs as a connection has checked the place of its file, before it registers the document, for a test
+    private volatile @Nullable Runnable beforeRegistration;
     private @NotNull TextDocumentSyncOptions syncOptions;
 
     /* Backwards compatible constructor */
@@ -785,6 +787,17 @@ public class LanguageServerWrapper implements Disposable {
     }
 
     /**
+     * Sets what runs as a connection has checked the place of its file, under documentsLock, before it registers the
+     * document, so that a test can move the file then.
+     *
+     * @param beforeRegistration what runs, or null for nothing.
+     */
+    @TestOnly
+    void setBeforeRegistration(@Nullable Runnable beforeRegistration) {
+        this.beforeRegistration = beforeRegistration;
+    }
+
+    /**
      * Throws a {@link CancellationException} unless the given start attempt is still the current one. A stop, or a
      * stop and a newer start, replaces an attempt, but cancels only the last stage of its start chain, so the stages
      * before it still run when the attempt's initialize reply comes. The caller holds this wrapper's monitor, which
@@ -984,8 +997,10 @@ public class LanguageServerWrapper implements Disposable {
      */
     CompletableFuture<@Nullable LanguageServer> connect(@NotNull VirtualFile file,
                                                         @NotNull LanguageServerWrapper.LSPFileConnectionInfo fileConnectionInfo) {
+        // Before the lock: the URI support can take a read action, and the write action of a move waits for the lock
+        URI fileUri = toUri(file);
         synchronized (documentsLock) {
-            promoteConnection(toUri(file));
+            promoteConnection(fileUri);
         }
         return connectDocument(file, fileConnectionInfo, null, null, null);
     }
@@ -1154,6 +1169,9 @@ public class LanguageServerWrapper implements Disposable {
                     initializedServer = getInitializedServer();
                 }
             }
+            // Before the lock, as the URI of the file: the URI support can take a read action, and the write action of
+            // a move waits for the lock
+            String fileUriString = toUriString(fileUri);
             DocumentContentSynchronizer synchronizer;
             synchronized (documentsLock) {
                 // A stop which replaced the attempt after this check disconnects the document once this lock is
@@ -1169,6 +1187,10 @@ public class LanguageServerWrapper implements Disposable {
                     // instance of its earlier place, it would stay with this language server. Its new place decides,
                     // as the move connects an open file again, or as the next request asks
                     return CompletableFuture.completedFuture(null);
+                }
+                var hook = beforeRegistration;
+                if (hook != null) {
+                    hook.run();
                 }
                 if (claim == null) {
                     promoteConnection(fileUri);
@@ -1190,8 +1212,7 @@ public class LanguageServerWrapper implements Disposable {
                         sendNotification(initializedServer, workspaceFolderNotificationManager.folderAddedNotification(folderToNotify));
                     }
 
-                    synchronizer = createDocumentContentSynchronizer(
-                            toUriString(fileUri), file, document, fileConnectionInfo);
+                    synchronizer = createDocumentContentSynchronizer(fileUriString, file, document, fileConnectionInfo);
                     // Synchronizer usually is disposed when document editor is closed.
                     // But in case of closing the project, it does not close all editors,
                     // so to ensure synchronizer is disposed we also register it here
