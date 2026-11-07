@@ -15,28 +15,44 @@ import com.intellij.openapi.actionSystem.AnAction;
 import com.intellij.openapi.actionSystem.AnActionEvent;
 import com.intellij.openapi.project.Project;
 import com.redhat.devtools.lsp4ij.LanguageServerBundle;
+import com.redhat.devtools.lsp4ij.LanguageServerWrapper;
 import com.redhat.devtools.lsp4ij.console.LSPConsoleToolWindowPanel;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
+import org.eclipse.lsp4j.WorkspaceFolder;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 /**
- * Select "log" tab (for a given language server definition) action.
+ * Select "log" tab (for a given language server or language server definition) action.
  */
 public class ShowErrorLogAction extends AnAction {
 
-    private final @NotNull LanguageServerDefinition languageServerDefinition;
-    private final @NotNull Project project;
+    private final @NotNull Runnable selectLogTab;
 
     public ShowErrorLogAction(@NotNull LanguageServerDefinition languageServerDefinition,
                               @NotNull Project project) {
+        this(() -> LSPConsoleToolWindowPanel.selectLogTab(languageServerDefinition, project));
+    }
+
+    public ShowErrorLogAction(@NotNull LanguageServerWrapper languageServer) {
+        // By definition and root: another language server with that root can replace this one, and takes its node over
+        this(selectLogTabOf(languageServer.getServerDefinition(), languageServer.getInstanceRoot(), languageServer.getProject()));
+    }
+
+    private static @NotNull Runnable selectLogTabOf(@NotNull LanguageServerDefinition serverDefinition,
+                                                    @Nullable WorkspaceFolder instanceRoot,
+                                                    @NotNull Project project) {
+        return () -> LSPConsoleToolWindowPanel.selectLogTab(serverDefinition, instanceRoot, project);
+    }
+
+    private ShowErrorLogAction(@NotNull Runnable selectLogTab) {
         super(LanguageServerBundle.message("action.language.server.error.show.logs.text"));
-        this.languageServerDefinition = languageServerDefinition;
-        this.project = project;
+        this.selectLogTab = selectLogTab;
     }
 
     @Override
     public void actionPerformed(@NotNull AnActionEvent e) {
-        LSPConsoleToolWindowPanel.selectLogTab(languageServerDefinition, project);
+        selectLogTab.run();
     }
 
     @Override

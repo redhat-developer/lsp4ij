@@ -1138,6 +1138,16 @@ Determines how workspace folders are discovered:
 }
 ```
 
+#### Server Instances
+
+Spreads the files of a project over several language server instances, see [Several Language Server Instances](#several-language-server-instances):
+
+```json
+{
+  "serverInstances": { "markers": ["pyproject.toml"] }
+}
+```
+
 #### Marker-based Discovery
 
 When `markers` is specified, LSP4IJ walks up the directory tree from each opened file looking for the specified marker files:
@@ -1284,6 +1294,85 @@ public class MyWorkspaceFolderFeature extends LSPWorkspaceFolderFeature {
     }
 }
 ```
+
+## Several Language Server Instances
+
+By default, one language server instance serves all workspace folders of a project. If parts of a project need a server process of their own, for example because each one has its own environment, a strategy can spread the files over several instances:
+
+```java
+package my.language.server;
+
+import com.redhat.devtools.lsp4ij.features.workspaceFolder.ProjectWorkspaceFolderStrategy;
+
+public class MyWorkspaceFolderStrategy extends ProjectWorkspaceFolderStrategy {
+
+    @Override
+    public boolean hasServerInstances() {
+        return true;
+    }
+}
+```
+
+Set this strategy with a workspace folder feature as described above. Then:
+
+ * LSP4IJ asks the strategy before an instance exists, so the strategy must not need the language server. If getting it fails, one language server serves the project, and the log says why.
+ * `getServerInstanceRoot` decides which instance serves a file, and files with the same root share an instance, however the URI of the root is written. By default, the root is the workspace folder of the file, so each workspace folder gets an instance of its own. Override it to separate the instances from the workspace folders, for example to give all content roots of a module one instance. It's also asked about the directories of workspace folders, so a directory that is a root has to give itself.
+ * A file without a root gets no instance, so this language server provides no features for it. LSP4IJ says so once, when such a file is open in an editor.
+ * An instance starts when the first of its files is opened. It's initialized with its root as `rootUri`.
+ * The workspace folders work for an instance as they work for a language server without instances, with the folders that belong to it: a workspace folder belongs to the instance that its own directory has as root (`belongsToServerInstance`). If none does and the strategy sends its folders at initialization, the instance gets its root.
+ * With lazy loading, an instance gets its folders through `workspace/didChangeWorkspaceFolders` as their files are opened. A folder that belongs to another instance, or that contains several, doesn't reach it: its root takes that folder's place.
+ * File events and file operations aren't limited to the workspace folders of an instance: each instance gets what it registered, as with a language server client per folder in VS Code.
+ * A file that is moved or renamed goes to the instance of its new place, or to none if its new place has no root.
+ * Requests without a file, such as workspace symbols, go to all instances, and start those that stopped.
+ * A stop that disables, as Stop in the Language Servers view does, or too many failed starts switch off one instance, and the others keep working. `restart()` switches it on again, and a changed configuration replaces it with one that is on.
+ * The Language Servers view shows each instance as a process of its own, with the path of its root in the project. The node of an instance stays when the instance stops or is replaced, with its traces and logs, and the next instance of that root takes it over.
+
+By default, all instances run the same way. If each one needs its own command, for example the interpreter of its module, override the methods of the factory that get the root of the instance:
+
+```java
+package my.language.server;
+
+import com.intellij.openapi.project.Project;
+import com.redhat.devtools.lsp4ij.LanguageServerFactory;
+import com.redhat.devtools.lsp4ij.server.StreamConnectionProvider;
+import org.eclipse.lsp4j.WorkspaceFolder;
+import org.jetbrains.annotations.NotNull;
+
+public class MyLanguageServerFactory implements LanguageServerFactory {
+
+    @Override
+    public @NotNull StreamConnectionProvider createConnectionProvider(@NotNull Project project) {
+        return new MyLanguageServer(project);
+    }
+
+    @Override
+    public @NotNull StreamConnectionProvider createConnectionProvider(@NotNull Project project,
+                                                                      @NotNull WorkspaceFolder instanceRoot) {
+        return new MyLanguageServer(project, instanceRoot);
+    }
+}
+```
+
+`createLanguageClient(project, instanceRoot)` does the same for the language client. By default, these methods call the ones without a root, which a language server without instances keeps using. Like those, they run on a background thread without a read action. `LSPIJUtils.findResourceFor(instanceRoot.getUri())` gives the directory of the root.
+
+The [Language Server Manager](#language-server-manager) reaches one instance with a file or a root:
+
+```java
+var manager = LanguageServerManager.getInstance(project);
+// The instance that serves the file, created and started if needed
+manager.getLanguageServer("myLanguageServerId", file)
+        .thenAccept(languageServerItem -> {
+            // ...
+        });
+// The instance with the given root
+manager.start("myLanguageServerId", instanceRoot, new LanguageServerManager.StartOptions().setForceStart(true));
+manager.stop("myLanguageServerId", instanceRoot, LanguageServerManager.StopOptions.DEFAULT);
+var status = manager.getServerStatus("myLanguageServerId", instanceRoot);
+// All instances, in the order in which they were created, started if they stopped
+manager.getLanguageServers("myLanguageServerId");
+```
+
+The methods that only take the id mean the instance created first, so use the ones with the file or the root where you know them. `stop` with the root of an instance and `willDisable` switches off that instance only, and `start` switches it on again only with `willEnable`, as for a definition that is switched off. `stop("myLanguageServerId", options)` with `willDisable` switches off the whole definition, and switching the definition on again switches on all its instances but those that a stop with their root switched off. With `forceStart`, `start("myLanguageServerId", options)` creates no instance, because without a file nothing tells which one: start each instance with its root instead. `install` runs the installer once for all instances.
 
 ## User-Defined Language Server Configuration
 

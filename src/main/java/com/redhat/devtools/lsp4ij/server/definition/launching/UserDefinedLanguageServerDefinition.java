@@ -16,6 +16,7 @@ package com.redhat.devtools.lsp4ij.server.definition.launching;
 import com.google.gson.annotations.SerializedName;
 import com.intellij.openapi.project.Project;
 import com.redhat.devtools.lsp4ij.JSONUtils;
+import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.client.LanguageClientImpl;
 import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
 import com.redhat.devtools.lsp4ij.installation.CommandLineUpdater;
@@ -30,6 +31,7 @@ import com.redhat.devtools.lsp4ij.settings.contributors.LanguageServerSettingsCo
 import com.redhat.devtools.lsp4ij.settings.contributors.ServerConfigurationContributor;
 import com.redhat.devtools.lsp4ij.settings.contributors.ServerExperimentalContributor;
 import com.redhat.devtools.lsp4ij.settings.contributors.ServerInitializationOptionsContributor;
+import org.eclipse.lsp4j.WorkspaceFolder;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
@@ -137,7 +139,20 @@ public class UserDefinedLanguageServerDefinition extends LanguageServerDefinitio
 
     @Override
     public @NotNull StreamConnectionProvider createConnectionProvider(@NotNull Project project) {
-        String resolvedWorkingDir = workingDir != null ? resolveCommandLine(workingDir, project) : null;
+        return createConnectionProvider(project, (String) null);
+    }
+
+    @Override
+    public @NotNull StreamConnectionProvider createConnectionProvider(@NotNull Project project,
+                                                                      @NotNull WorkspaceFolder instanceRoot) {
+        // Without a configured working directory, an instance runs in its root, unless that is inside an archive
+        var root = LSPIJUtils.findResourceFor(instanceRoot.getUri());
+        return createConnectionProvider(project, root != null && root.isInLocalFileSystem() ? root.getPath() : null);
+    }
+
+    private @NotNull StreamConnectionProvider createConnectionProvider(@NotNull Project project,
+                                                                       @Nullable String defaultWorkingDir) {
+        String resolvedWorkingDir = workingDir != null && !workingDir.isBlank() ? resolveCommandLine(workingDir, project) : defaultWorkingDir;
         var transport = this.transport;
         return switch (transport.mode()) {
             case STDIO -> new UserDefinedStreamConnectionProvider(resolveCommandLine(commandLine, project),

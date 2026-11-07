@@ -11,6 +11,9 @@
 package com.redhat.devtools.lsp4ij;
 
 import com.intellij.lang.Language;
+import com.intellij.notification.Notification;
+import com.intellij.notification.NotificationType;
+import com.intellij.notification.Notifications;
 import com.intellij.openapi.Disposable;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.ReadAction;
@@ -20,20 +23,26 @@ import com.intellij.openapi.fileTypes.FileType;
 import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.project.ProjectManager;
+import com.intellij.openapi.roots.ProjectRootManager;
 import com.intellij.openapi.util.Disposer;
 import com.intellij.openapi.util.ModificationTracker;
 import com.intellij.openapi.util.SimpleModificationTracker;
 import com.intellij.openapi.vfs.VirtualFile;
+import com.intellij.openapi.vfs.VirtualFileManager;
 import com.intellij.psi.PsiFile;
 import com.intellij.psi.PsiManager;
+import com.intellij.psi.util.CachedValueProvider;
+import com.intellij.psi.util.CachedValuesManager;
 import com.intellij.util.concurrency.AppExecutorUtil;
 import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
+import com.redhat.devtools.lsp4ij.console.explorer.actions.EditServerAction;
 import com.redhat.devtools.lsp4ij.internal.PsiFileCancelChecker;
 import com.redhat.devtools.lsp4ij.internal.editor.EditorFeatureManager;
 import com.redhat.devtools.lsp4ij.internal.editor.EditorFeatureType;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinitionListener;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerFileAssociation;
+import org.eclipse.lsp4j.WorkspaceFolder;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -46,6 +55,8 @@ import static com.redhat.devtools.lsp4ij.internal.ApplicationUtils.runCancellabl
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
@@ -64,7 +75,14 @@ public class LanguageServiceAccessor implements Disposable {
 
     private final Project project;
     private final SimpleModificationTracker modificationTracker = new SimpleModificationTracker();
-    private final Set<LanguageServerWrapper> startedServers = new HashSet<>();
+    // Instances of a definition can start at any time, while other threads go through the started servers. The set
+    // keeps the order in which the language servers were created, so that the first one of a definition is its oldest
+    private final Set<LanguageServerWrapper> startedServers = new CopyOnWriteArraySet<>();
+    // The definitions with instances that said once that an open file gets none, until their configuration changes
+    private final Set<LanguageServerDefinition> definitionsWithoutInstanceHint = ConcurrentHashMap.newKeySet();
+    // How often the instances of each definition were replaced: the root of an instance chosen before a replacement
+    // can come from the configuration before it
+    private final Map<LanguageServerDefinition, Integer> replacements = new ConcurrentHashMap<>();
     private final LanguageServerDefinitionListener serverDefinitionListener = new LanguageServerDefinitionListener() {
 
         @Override
@@ -80,6 +98,8 @@ public class LanguageServiceAccessor implements Disposable {
         public void handleRemoved(@NotNull LanguageServerDefinitionListener.LanguageServerRemovedEvent event) {
             // Bump the accessor-level modification tracker
             modificationTracker.incModificationCount();
+            event.serverDefinitions.forEach(definitionsWithoutInstanceHint::remove);
+            event.serverDefinitions.forEach(replacements::remove);
 
             // Dispose all servers which are removed
             // and remove code vision, inlay hints, folding from editors
@@ -108,8 +128,11 @@ public class LanguageServiceAccessor implements Disposable {
                     .filter(server -> event.serverDefinition.equals(server.getServerDefinition()))
                     .toList();
 
-            // Bump the modification trackers
+            // Bump the modification trackers, and the one of the instance roots that the lookups of a file remember
             languageServerWrappers.forEach(LanguageServerWrapper::incrementModificationCount);
+            incrementModificationCount();
+            // A changed configuration can leave an open file without an instance again
+            definitionsWithoutInstanceHint.remove(event.serverDefinition);
 
             // Restart all servers where command, working dir or mappings has changed
             // if changes doesn't come from installer.
@@ -120,7 +143,13 @@ public class LanguageServiceAccessor implements Disposable {
                     event.includeSystemEnvironmentVariablesChanged ||
                     event.mappingsChanged ||
                     event.workspaceFolderStrategyConfigurationChanged)) {
-                languageServerWrappers.forEach(LanguageServerWrapper::restart);
+                // Without language servers, there is nothing to restart, but the changed strategy can give open files one
+                if (usesServerInstances(event.serverDefinition, languageServerWrappers)
+                        || (event.workspaceFolderStrategyConfigurationChanged && languageServerWrappers.isEmpty())) {
+                    replaceServers(event.serverDefinition, languageServerWrappers);
+                } else {
+                    languageServerWrappers.forEach(LanguageServerWrapper::restart);
+                }
             }
         }
     };
@@ -143,7 +172,7 @@ public class LanguageServiceAccessor implements Disposable {
      * @return null if the exception is a normal cancellation, otherwise rethrows.
      */
     @Nullable
-    private static <T> T handleFutureException(@NotNull Throwable ex) {
+    static <T> T handleFutureException(@NotNull Throwable ex) {
         Throwable cause = ex instanceof CompletionException ? ex.getCause() : ex;
         if (cause instanceof CancellationException || cause instanceof ProcessCanceledException) {
             // A cancellation means the language server was stopped or restarted while
@@ -246,22 +275,40 @@ public class LanguageServiceAccessor implements Disposable {
      */
     void sendDidOpenAndRefreshEditorFeatureForOpenedFiles(@NotNull LanguageServerDefinition serverDefinition,
                                                           @NotNull Project project) {
+        sendDidOpenAndRefreshEditorFeatureForOpenedFiles(serverDefinition, project, null);
+    }
+
+    /**
+     * As {@link #sendDidOpenAndRefreshEditorFeatureForOpenedFiles(LanguageServerDefinition, Project)} does, for the open
+     * files that the given language server instance serves: the other instances of its definition don't start.
+     *
+     * @param instance the language server instance.
+     */
+    void sendDidOpenAndRefreshEditorFeatureForOpenedFiles(@NotNull LanguageServerWrapper instance) {
+        sendDidOpenAndRefreshEditorFeatureForOpenedFiles(instance.getServerDefinition(), instance.getProject(),
+                clientFeatures -> clientFeatures.getServerWrapper() == instance);
+    }
+
+    private void sendDidOpenAndRefreshEditorFeatureForOpenedFiles(@NotNull LanguageServerDefinition serverDefinition,
+                                                                  @NotNull Project project,
+                                                                  @Nullable Predicate<LSPClientFeatures> beforeStartingServerFilter) {
         VirtualFile[] files = FileEditorManager.getInstance(project).getOpenFiles();
         for (VirtualFile file : files) {
             // TODO : revisit that
             PsiFile psiFile = LSPIJUtils.getPsiFile(file, project);
             if (psiFile != null) {
-                sendDidOpenAndRefreshEditorFeatureFor(psiFile, serverDefinition);
+                sendDidOpenAndRefreshEditorFeatureFor(psiFile, serverDefinition, beforeStartingServerFilter);
             }
         }
     }
 
     private void sendDidOpenAndRefreshEditorFeatureFor(@NotNull PsiFile file,
-                                                       @NotNull LanguageServerDefinition serverDefinition) {
+                                                       @NotNull LanguageServerDefinition serverDefinition,
+                                                       @Nullable Predicate<LSPClientFeatures> beforeStartingServerFilter) {
         ReadAction.nonBlocking(() -> {
                     // Try to send a textDocument/didOpen notification if the file is associated to the language server definition
                     LanguageServiceAccessor.getInstance(project)
-                            .getLanguageServers(file, null, null, serverDefinition)
+                            .getLanguageServers(file, beforeStartingServerFilter, null, serverDefinition)
                             .thenAccept(servers -> {
                                 // textDocument/didOpen notification has been sent
                                 if (servers.isEmpty()) {
@@ -295,8 +342,9 @@ public class LanguageServiceAccessor implements Disposable {
             return false;
         }
         var matched = mappings.getMatched();
+        var instanceFilter = filter.and(instancesOf(file));
         for (var startedServer : startedServers) {
-            if (isMatchingStartedServer(file, startedServer, matched, filter)) {
+            if (isMatchingStartedServer(file, startedServer, matched, instanceFilter)) {
                 return true;
             }
         }
@@ -322,8 +370,9 @@ public class LanguageServiceAccessor implements Disposable {
         }
 
         Set<LanguageServerDefinition> matchedServerDefinitions = mappings.getMatched();
+        var instanceFilter = instancesOf(file);
         for (var startedServer : startedServers) {
-            if (isMatchingStartedServer(file, startedServer, matchedServerDefinitions, ACCEPT_ALL_SERVERS)) {
+            if (isMatchingStartedServer(file, startedServer, matchedServerDefinitions, instanceFilter)) {
                 processor.accept(startedServer);
             }
         }
@@ -549,8 +598,26 @@ public class LanguageServiceAccessor implements Disposable {
                                                       @NotNull Set<LanguageServerDefinition> serverDefinitions,
                                                       @NotNull Set<LanguageServerWrapper> matchedServers,
                                                       @Nullable Predicate<LSPClientFeatures> beforeStartingServerFilter) {
+        var file = psiFile != null ? psiFile.getVirtualFile() : null;
+        // A workspace folder strategy can do I/O, so ask it before entering the monitor
+        var instanceChoices = file != null ? chooseInstances(file, serverDefinitions) : Map.<LanguageServerDefinition, InstanceChoice>of();
+        if (file != null) {
+            for (var serverDefinition : serverDefinitions) {
+                if (serverDefinition.hasServerInstances() && !instanceChoices.containsKey(serverDefinition)) {
+                    hintAboutAnOpenFileWithoutInstance(file, serverDefinition);
+                }
+            }
+        }
         synchronized (startedServers) {
             for (var serverDefinition : serverDefinitions) {
+                if (serverDefinition.hasServerInstances()) {
+                    if (file == null) {
+                        collectStartedInstances(serverDefinition, matchedServers, beforeStartingServerFilter);
+                    } else if (instanceChoices.containsKey(serverDefinition)) {
+                        collectInstanceOfFile(file, serverDefinition, instanceChoices.get(serverDefinition), matchedServers, beforeStartingServerFilter);
+                    }
+                    continue;
+                }
                 boolean useExistingServer = false;
                 // Loop for started language servers
                 for (var startedServer : startedServers) {
@@ -581,6 +648,289 @@ public class LanguageServiceAccessor implements Disposable {
                 }
             }
         }
+    }
+
+    private static boolean usesServerInstances(@NotNull LanguageServerDefinition serverDefinition,
+                                               @NotNull List<LanguageServerWrapper> languageServers) {
+        return serverDefinition.hasServerInstances()
+                || languageServers.stream().anyMatch(languageServer -> languageServer.getInstanceRoot() != null);
+    }
+
+    /**
+     * Replaces the language servers of a changed definition with several instances, as a restart would also start the
+     * instances that stopped when idle. And if the workspace folder strategy has changed, the instances that run may no
+     * longer be the ones that it asks for, and open documents would stay with them.
+     */
+    private void replaceServers(@NotNull LanguageServerDefinition serverDefinition,
+                                @NotNull List<LanguageServerWrapper> languageServers) {
+        if (!languageServers.isEmpty()) {
+            // As a restart does: a stop or too many failed starts must not outlast a changed configuration
+            serverDefinition.setEnabled(true, project);
+        }
+        synchronized (startedServers) {
+            languageServers.forEach(startedServers::remove);
+            replacements.merge(serverDefinition, 1, Integer::sum);
+        }
+        boolean refreshEditorFeature = !ApplicationManager.getApplication().isUnitTestMode();
+        for (int i = 0; i < languageServers.size(); i++) {
+            var languageServer = languageServers.get(i);
+            try {
+                languageServer.stopAndDispose(refreshEditorFeature);
+            } catch (ProcessCanceledException cancellation) {
+                // As a canceled dispose does: the language servers it did not reach stay started, for a later change,
+                // removal or close to dispose
+                synchronized (startedServers) {
+                    startedServers.addAll(languageServers.subList(i + 1, languageServers.size()));
+                }
+                throw cancellation;
+            } catch (Exception e) {
+                // A language server that fails to stop must neither keep running nor keep the others running
+                LOGGER.warn("Error while stopping the language server '{}'.", serverDefinition.getId(), e);
+                disposeLoggingFailure(languageServer, refreshEditorFeature);
+            }
+        }
+        sendDidOpenAndRefreshEditorFeatureForOpenedFiles(serverDefinition, project);
+    }
+
+    /**
+     * The language server instance of a file for a definition with several instances: the instance that has the file
+     * connected or provides it, which keeps it, or the root of the instance that serves it, with how often the instances
+     * of the definition were replaced before the choice.
+     */
+    private record InstanceChoice(@Nullable LanguageServerWrapper connected, @Nullable WorkspaceFolder root,
+                                  int replacements) {
+
+        boolean isFor(@NotNull LanguageServerWrapper instance) {
+            if (connected != null) {
+                return connected == instance;
+            }
+            var instanceRoot = instance.getInstanceRoot();
+            return root != null && instanceRoot != null && root.getUri().equals(instanceRoot.getUri());
+        }
+    }
+
+    /**
+     * Chooses the language server instances of the given file for the definitions with several instances. A definition
+     * has no entry if no instance serves the file.
+     */
+    private @NotNull Map<LanguageServerDefinition, InstanceChoice> chooseInstances(@NotNull VirtualFile file,
+                                                                                   @NotNull Set<LanguageServerDefinition> serverDefinitions) {
+        Map<LanguageServerDefinition, InstanceChoice> choices = new HashMap<>();
+        for (var serverDefinition : serverDefinitions) {
+            if (!serverDefinition.hasServerInstances()) {
+                continue;
+            }
+            var choice = chooseInstance(file, serverDefinition);
+            if (choice.connected() != null || choice.root() != null) {
+                choices.put(serverDefinition, choice);
+            }
+        }
+        return choices;
+    }
+
+    /**
+     * Returns the language server instance that serves the given file for a definition with several instances: the
+     * one that has the file connected or provides it, or the one of its root, created if there is none. Returns null if
+     * no instance serves the file. A strategy can do I/O, so don't call this method in a synchronized block.
+     */
+    @Nullable
+    LanguageServerWrapper getOrCreateInstanceOf(@NotNull VirtualFile file,
+                                                @NotNull LanguageServerDefinition serverDefinition) {
+        var choice = chooseInstance(file, serverDefinition);
+        if (choice.connected() == null && choice.root() == null) {
+            return null;
+        }
+        synchronized (startedServers) {
+            if (choice.connected() != null) {
+                // As for a request: a replacement can have removed the instance since the choice
+                return startedServers.contains(choice.connected())
+                        ? choice.connected()
+                        : findInstanceConnectedTo(file, serverDefinition);
+            }
+            // As for a request: a replacement after the choice connects the open files again
+            return choice.replacements() == replacementsOf(serverDefinition)
+                    ? getOrCreateInstance(serverDefinition, choice.root())
+                    : null;
+        }
+    }
+
+    /**
+     * Returns the language server instance with the given root of a definition with several instances, and creates it
+     * if there is none.
+     */
+    @NotNull
+    LanguageServerWrapper getOrCreateInstance(@NotNull LanguageServerDefinition serverDefinition,
+                                              @NotNull WorkspaceFolder instanceRoot) {
+        synchronized (startedServers) {
+            var instance = findInstance(serverDefinition, instanceRoot);
+            if (instance == null) {
+                instance = LanguageServerWrapper.forInstanceRoot(project, serverDefinition, instanceRoot);
+                startedServers.add(instance);
+            }
+            return instance;
+        }
+    }
+
+    private @NotNull InstanceChoice chooseInstance(@NotNull VirtualFile file,
+                                                   @NotNull LanguageServerDefinition serverDefinition) {
+        // Before the root: a replacement while the strategy is asked can make the root outdated
+        int replaced = replacementsOf(serverDefinition);
+        var connected = findInstanceConnectedTo(file, serverDefinition);
+        return connected != null
+                ? new InstanceChoice(connected, null, replaced)
+                : new InstanceChoice(null, serverDefinition.getServerInstanceRoot(file, project), replaced);
+    }
+
+    private int replacementsOf(@NotNull LanguageServerDefinition serverDefinition) {
+        return replacements.getOrDefault(serverDefinition, 0);
+    }
+
+    /**
+     * Says once per definition, until its configuration changes, that a file open in an editor has no root, so that no
+     * instance of the definition serves it: the language server then provides no features for that file.
+     */
+    private void hintAboutAnOpenFileWithoutInstance(@NotNull VirtualFile file,
+                                                    @NotNull LanguageServerDefinition serverDefinition) {
+        if (definitionsWithoutInstanceHint.contains(serverDefinition)
+                || !FileEditorManager.getInstance(project).isFileOpen(file)
+                || !definitionsWithoutInstanceHint.add(serverDefinition)) {
+            return;
+        }
+        var notification = new Notification(LSPNotificationConstants.LSP4IJ_GENERAL_NOTIFICATIONS_ID,
+                serverDefinition.getDisplayName(),
+                LanguageServerBundle.message("language.server.instances.noInstance", file.getName()),
+                NotificationType.INFORMATION);
+        notification.addAction(new EditServerAction(serverDefinition));
+        Notifications.Bus.notify(notification, project);
+    }
+
+    /**
+     * Returns a filter for one pass over the started language servers that keeps those that serve the given file. It
+     * asks a workspace folder strategy at most once per definition, as the strategy can do I/O, and not at all if an
+     * instance has the file.
+     *
+     * @param file the file, without a file, all language servers are kept.
+     * @return the filter.
+     */
+    private @NotNull Predicate<LanguageServerWrapper> instancesOf(@NotNull PsiFile psiFile) {
+        var file = psiFile.getVirtualFile();
+        if (file == null) {
+            return ACCEPT_ALL_SERVERS;
+        }
+        Map<LanguageServerDefinition, InstanceChoice> choices = new HashMap<>();
+        return server -> server.getInstanceRoot() == null
+                || choices.computeIfAbsent(server.getServerDefinition(), serverDefinition -> {
+                    int replaced = replacementsOf(serverDefinition);
+                    var connected = findInstanceConnectedTo(file, serverDefinition);
+                    return connected != null
+                            ? new InstanceChoice(connected, null, replaced)
+                            : new InstanceChoice(null, getRememberedServerInstanceRoot(psiFile, file, serverDefinition), replaced);
+                }).isFor(server);
+    }
+
+    /**
+     * Returns the root of the language server instance of a file that no instance has connected, for the lookups that
+     * run as the file is edited, on the UI thread. It is remembered until the files or the roots of the project, or a
+     * configuration, change, so that the strategy doesn't look for markers on disk at each key typed.
+     */
+    private @Nullable WorkspaceFolder getRememberedServerInstanceRoot(@NotNull PsiFile psiFile,
+                                                                     @NotNull VirtualFile file,
+                                                                     @NotNull LanguageServerDefinition serverDefinition) {
+        Map<LanguageServerDefinition, Optional<WorkspaceFolder>> roots = CachedValuesManager.getCachedValue(psiFile,
+                () -> CachedValueProvider.Result.create(
+                        new ConcurrentHashMap<LanguageServerDefinition, Optional<WorkspaceFolder>>(),
+                        VirtualFileManager.VFS_STRUCTURE_MODIFICATIONS, ProjectRootManager.getInstance(project),
+                        modificationTracker));
+        var root = roots.get(serverDefinition);
+        if (root == null) {
+            // Not in computeIfAbsent: the strategy can do I/O
+            root = Optional.ofNullable(serverDefinition.getServerInstanceRoot(file, project));
+            roots.putIfAbsent(serverDefinition, root);
+        }
+        return root.orElse(null);
+    }
+
+    private @Nullable LanguageServerWrapper findInstanceConnectedTo(@NotNull VirtualFile file,
+                                                                    @NotNull LanguageServerDefinition serverDefinition) {
+        for (var startedServer : startedServers) {
+            if (startedServer.getServerDefinition().equals(serverDefinition)
+                    && (startedServer.isSynchronizing(file) || startedServer.providesDocument(file))) {
+                return startedServer;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Adds the language server instance that serves a file, and creates it if needed.
+     */
+    private void collectInstanceOfFile(@NotNull VirtualFile file,
+                                       @NotNull LanguageServerDefinition serverDefinition,
+                                       @NotNull InstanceChoice choice,
+                                       @NotNull Set<LanguageServerWrapper> matchedServers,
+                                       @Nullable Predicate<LSPClientFeatures> beforeStartingServerFilter) {
+        LanguageServerWrapper instance;
+        if (choice.connected() != null) {
+            // The choice was made before the monitor was entered, and a replacement can have removed the instance since.
+            // The file then goes to the instance that has it now, or to none, until the replacement connects it again
+            instance = startedServers.contains(choice.connected()) ? choice.connected() : findInstanceConnectedTo(file, serverDefinition);
+            if (instance == null) {
+                return;
+            }
+        } else if (choice.replacements() != replacementsOf(serverDefinition)) {
+            // The root was chosen before a replacement, so it can come from the configuration before it: the
+            // replacement connects the open files again
+            return;
+        } else {
+            instance = findInstance(serverDefinition, choice.root());
+        }
+        boolean created = instance == null;
+        if (created) {
+            instance = LanguageServerWrapper.forInstanceRoot(project, serverDefinition, choice.root());
+        }
+        boolean accepted = false;
+        try {
+            accepted = beforeStartingServerFilter == null || beforeStartingServerFilter.test(instance.getClientFeatures());
+        } finally {
+            // As for a language server without instances: also when the filter throws, as a cancellation does
+            if (created && !accepted) {
+                Disposer.dispose(instance);
+            }
+        }
+        if (accepted) {
+            if (created) {
+                startedServers.add(instance);
+            }
+            matchedServers.add(instance);
+        }
+    }
+
+    /**
+     * Adds all started language server instances of a definition with several instances. Without a file, nothing tells
+     * which instance to start.
+     */
+    private void collectStartedInstances(@NotNull LanguageServerDefinition serverDefinition,
+                                         @NotNull Set<LanguageServerWrapper> matchedServers,
+                                         @Nullable Predicate<LSPClientFeatures> beforeStartingServerFilter) {
+        for (var startedServer : startedServers) {
+            if (startedServer.getServerDefinition().equals(serverDefinition)
+                    && (beforeStartingServerFilter == null || beforeStartingServerFilter.test(startedServer.getClientFeatures()))) {
+                matchedServers.add(startedServer);
+            }
+        }
+    }
+
+    @Nullable
+    LanguageServerWrapper findInstance(@NotNull LanguageServerDefinition serverDefinition,
+                                       @NotNull WorkspaceFolder instanceRoot) {
+        for (var startedServer : startedServers) {
+            var root = startedServer.getInstanceRoot();
+            if (startedServer.getServerDefinition().equals(serverDefinition)
+                    && root != null && instanceRoot.getUri().equals(root.getUri())) {
+                return startedServer;
+            }
+        }
+        return null;
     }
 
     public LanguageServerWrapper forceCreateServer(@NotNull LanguageServerDefinition serverDefinition) {
@@ -734,8 +1084,8 @@ public class LanguageServiceAccessor implements Disposable {
 
     private void disposeAllServers() {
         synchronized (startedServers) {
-            for (var servers = startedServers.iterator(); servers.hasNext(); ) {
-                var ls = servers.next();
+            // The iterator of the set is a snapshot, which can't remove a server
+            for (var ls : startedServers) {
                 try {
                     if (project.equals(ls.getProject())) {
                         disposeLoggingFailure(ls, false);
@@ -743,7 +1093,7 @@ public class LanguageServiceAccessor implements Disposable {
                 } finally {
                     // Forget each server once it had its dispose: a cancellation ends the loop, and the servers it
                     // never reached stay started, for a later close to dispose
-                    servers.remove();
+                    startedServers.remove(ls);
                 }
             }
         }
@@ -803,9 +1153,11 @@ public class LanguageServiceAccessor implements Disposable {
         MatchedLanguageServerDefinitions mappings = getMatchedLanguageServerDefinitions(file, true);
         if (mappings != MatchedLanguageServerDefinitions.NO_MATCH) {
             Set<LanguageServerDefinition> languageServerDefinitions = mappings.getMatched();
+            var instanceFilter = instancesOf(file);
             Set<LanguageServerWrapper> languageServerWrappers = new HashSet<>(getStartedServers())
                     .stream()
-                    .filter(languageServerWrapper -> languageServerDefinitions.contains(languageServerWrapper.getServerDefinition()))
+                    .filter(languageServerWrapper -> languageServerDefinitions.contains(languageServerWrapper.getServerDefinition())
+                            && instanceFilter.test(languageServerWrapper))
                     .collect(Collectors.toSet());
             for (LanguageServerWrapper languageServerWrapper : languageServerWrappers) {
                 if (languageServerDefinitions.contains(languageServerWrapper.getServerDefinition())) {

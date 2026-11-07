@@ -91,6 +91,10 @@ public class LanguageClientImpl implements LanguageClient, Disposable {
         this.wrapper = wrapper;
     }
 
+    @NotNull LanguageServerWrapper getServerWrapper() {
+        return wrapper;
+    }
+
     public @NotNull LanguageServerDefinition getServerDefinition() {
         return wrapper.getServerDefinition();
     }
@@ -274,7 +278,7 @@ public class LanguageClientImpl implements LanguageClient, Disposable {
 
     @Override
     public void logMessage(MessageParams message) {
-        CompletableFuture.runAsync(() -> ServerMessageHandler.logMessage(getServerDefinition(), message, getProject()));
+        CompletableFuture.runAsync(() -> ServerMessageHandler.logMessage(wrapper, message));
     }
 
     @Override

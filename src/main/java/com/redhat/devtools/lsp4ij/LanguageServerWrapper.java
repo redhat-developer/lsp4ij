@@ -21,9 +21,12 @@ import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.fileEditor.FileEditorManager;
 import com.intellij.openapi.fileEditor.FileEditorManagerListener;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.project.ProjectUtil;
 import com.intellij.openapi.util.Disposer;
+import com.intellij.openapi.util.io.FileUtil;
 import com.intellij.openapi.util.ModificationTracker;
 import com.intellij.openapi.util.SimpleModificationTracker;
+import com.intellij.openapi.vfs.VfsUtilCore;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.openapi.vfs.VirtualFileManager;
 import com.intellij.openapi.vfs.impl.BulkVirtualFileListenerAdapter;
@@ -37,6 +40,7 @@ import com.redhat.devtools.lsp4ij.client.features.FileUriSupport;
 import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
 import com.redhat.devtools.lsp4ij.console.explorer.TracingMessageConsumer;
 import com.redhat.devtools.lsp4ij.features.diagnostics.LSPDiagnosticUtils;
+import com.redhat.devtools.lsp4ij.features.documentContent.DocumentContentFile;
 import com.redhat.devtools.lsp4ij.features.files.AbstractLSPFileListener;
 import com.redhat.devtools.lsp4ij.features.files.operations.FileOperationsManager;
 import com.redhat.devtools.lsp4ij.installation.ServerInstallationContext;
@@ -68,6 +72,7 @@ import org.jetbrains.annotations.TestOnly;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.File;
 import java.net.URI;
 import java.util.*;
 import java.util.concurrent.*;
@@ -130,6 +135,13 @@ public class LanguageServerWrapper implements Disposable {
     }
     @Nullable
     protected final URI initialPath;
+    private final @Nullable WorkspaceFolder instanceRoot;
+    private volatile @Nullable String instanceLabel;
+    // An instance of a definition with several is switched off on its own
+    private volatile boolean instanceDisabled;
+
+    // The last stop that runs in the background, for a stop that comes while it is running
+    private CompletableFuture<Void> runningStop = CompletableFuture.completedFuture(null);
     protected final InitializeParams initParams = new InitializeParams();
     @NotNull
     private final LanguageServerDefinition serverDefinition;
@@ -156,7 +168,7 @@ public class LanguageServerWrapper implements Disposable {
     private ServerCapabilities serverCapabilities;
     private volatile @Nullable Alarm stopAlarm = null;
     private ServerStatus serverStatus;
-    private boolean disposed;
+    private volatile boolean disposed;
     private LanguageServerException serverError;
     private Long currentProcessId;
     private List<String> currentProcessCommandLines;
@@ -166,7 +178,7 @@ public class LanguageServerWrapper implements Disposable {
 
     private LSPClientFeatures clientFeatures;
     // error notification displayed when server start fails.
-    private @Nullable Notification errorNotification;
+    private volatile @Nullable Notification errorNotification;
     private @Nullable TracingMessageConsumer tracing;
     private volatile @Nullable ConcurrentLinkedQueue<LSPTrace> traces;
     private @Nullable Alarm traceFlushAlarm;
@@ -181,14 +193,38 @@ public class LanguageServerWrapper implements Disposable {
         this(project, serverDefinition, null);
     }
 
-    /**
-     * Unified private constructor to set sensible defaults in all cases
-     */
     public LanguageServerWrapper(@NotNull Project project,
                                  @NotNull LanguageServerDefinition serverDefinition,
                                  @Nullable URI initialPath) {
+        this(project, serverDefinition, initialPath, null);
+    }
+
+    /**
+     * Creates the language server instance with the given root.
+     *
+     * @param project          the project.
+     * @param serverDefinition the language server definition.
+     * @param instanceRoot     the root of this instance.
+     * @return the language server instance with the given root.
+     * @see com.redhat.devtools.lsp4ij.features.workspaceFolder.WorkspaceFolderStrategy#hasServerInstances()
+     */
+    @ApiStatus.Internal
+    public static @NotNull LanguageServerWrapper forInstanceRoot(@NotNull Project project,
+                                                                 @NotNull LanguageServerDefinition serverDefinition,
+                                                                 @NotNull WorkspaceFolder instanceRoot) {
+        return new LanguageServerWrapper(project, serverDefinition, null, instanceRoot);
+    }
+
+    /**
+     * Unified private constructor to set sensible defaults in all cases
+     */
+    private LanguageServerWrapper(@NotNull Project project,
+                                  @NotNull LanguageServerDefinition serverDefinition,
+                                  @Nullable URI initialPath,
+                                  @Nullable WorkspaceFolder instanceRoot) {
         this.initialProject = project;
         this.initialPath = initialPath;
+        this.instanceRoot = instanceRoot;
         this.serverDefinition = serverDefinition;
         this.openedDocuments = new ConcurrentHashMap<>();
         this.closedDocuments = new ConcurrentHashMap<>();
@@ -196,6 +232,9 @@ public class LanguageServerWrapper implements Disposable {
         VirtualFileManager.getInstance().addAsyncFileListener(fileListener, this);
 
         String projectName = sanitize(!serverDefinition.isSingleton() ? ("@" + project.getName()) : "");  //$NON-NLS-1$//$NON-NLS-2$
+        if (instanceRoot != null) {
+            projectName += sanitize("@" + instanceRoot.getName());
+        }
 
         // Worker threads must not inherit the plugin classloader, or they pin it and block dynamic unload.
         var workerCtxClassLoader = ApplicationManager.class.getClassLoader();
@@ -302,11 +341,30 @@ public class LanguageServerWrapper implements Disposable {
     }
 
     /**
+     * Stops the language server and removes the code vision, inlay hints and folding of its open editors, as
+     * {@link #stopAndDisable()} does, without switching it off: for a stop of its definition, which switches the
+     * definition off instead.
+     */
+    synchronized void stopAndRefreshEditorFeature() {
+        stopAndRefreshEditorFeature(true, false);
+    }
+
+    /**
+     * Starts the language server if it is switched on, in one step with {@link #stopAndDisable()}, which can switch it
+     * off meanwhile.
+     */
+    synchronized void startIfEnabled() {
+        if (isEnabled()) {
+            start();
+        }
+    }
+
+    /**
      * Stop the language server, disable it and
      * remove IJ code vision, inlay hints, folding
      * for all opened editors which edit the files associated to the language server.
      */
-    private synchronized void stopAndRefreshEditorFeature(boolean refreshEditorFeature, boolean disable) {
+    private synchronized CompletableFuture<Void> stopAndRefreshEditorFeature(boolean refreshEditorFeature, boolean disable) {
         // Collect opened files before stopping the language server
         List<VirtualFile> openedFiles = refreshEditorFeature ?
                 new ArrayList<>(openedDocuments.values())
@@ -320,7 +378,7 @@ public class LanguageServerWrapper implements Disposable {
         }
 
         // Stop the language server
-        stop();
+        var stopped = stop();
 
         if (!openedFiles.isEmpty()) {
             // remove IJ code vision, inlay hints, folding
@@ -331,6 +389,23 @@ public class LanguageServerWrapper implements Disposable {
                         .refreshEditorFeature(file, EditorFeatureType.ALL, true, new VirtualFileCancelChecker(file));
             }
         }
+        return stopped;
+    }
+
+    /**
+     * Stops the language server and then disposes it, for a language server that goes while the project stays. Unlike
+     * {@link #dispose(boolean)}, the language server still gets shutdown and exit: a disposed language server no longer
+     * sends messages.
+     *
+     * @param refreshEditorFeature true to refresh the code vision, inlay hints and folding of the opened editors.
+     */
+    @ApiStatus.Internal
+    public void stopAndDispose(boolean refreshEditorFeature) {
+        // On the UI thread: while it processes a VFS event, the platform goes through a live view of the async file
+        // listeners, so removing the listener of this language server from another thread can make the event fail
+        stopAndRefreshEditorFeature(refreshEditorFeature, false)
+                .whenComplete((unused, error) -> ApplicationManager.getApplication()
+                        .invokeLater(() -> Disposer.dispose(this), ModalityState.any()));
     }
 
     /**
@@ -338,6 +413,18 @@ public class LanguageServerWrapper implements Disposable {
      * which edit the files associated to the language server.
      */
     public synchronized void restart() {
+        restart(false);
+    }
+
+    /**
+     * Restarts this language server instance as {@link #restart()} does, but connects again only the open files that it
+     * serves, so that the other instances of its definition stay as they are, also when they are stopped.
+     */
+    synchronized void restartOnItsOwn() {
+        restart(true);
+    }
+
+    private synchronized void restart(boolean onItsOwn) {
         numberOfRestartAttempts = 0;
         serverError = null;
         setEnabled(true);
@@ -356,16 +443,31 @@ public class LanguageServerWrapper implements Disposable {
                     if (p.isDefault() || p.isDisposed()) {
                         return;
                     }
-                    LanguageServiceAccessor.getInstance(p).
-                            sendDidOpenAndRefreshEditorFeatureForOpenedFiles(serverDefinition, p);
+                    if (onItsOwn) {
+                        LanguageServiceAccessor.getInstance(p).sendDidOpenAndRefreshEditorFeatureForOpenedFiles(this);
+                    } else {
+                        LanguageServiceAccessor.getInstance(p).
+                                sendDidOpenAndRefreshEditorFeatureForOpenedFiles(serverDefinition, p);
+                    }
                 });
     }
 
     public boolean isEnabled() {
-        return !isDisposed() && serverDefinition.isEnabled(initialProject);
+        return !isDisposed() && !instanceDisabled && serverDefinition.isEnabled(initialProject);
     }
 
+    /**
+     * Switches this language server on or off. An instance of a definition with several is switched off on its own, as
+     * by a stop or too many failed starts, so that the other instances keep working. Switching it on also switches the
+     * definition on, which would keep it off otherwise.
+     */
     private void setEnabled(boolean enabled) {
+        if (instanceRoot != null) {
+            instanceDisabled = !enabled;
+            if (!enabled) {
+                return;
+            }
+        }
         this.serverDefinition.setEnabled(enabled, initialProject);
     }
 
@@ -461,7 +563,9 @@ public class LanguageServerWrapper implements Disposable {
                             tracing = null;
                         }
 
-                        var provider = serverDefinition.createConnectionProvider(initialProject);
+                        var provider = instanceRoot != null ?
+                                serverDefinition.createConnectionProvider(initialProject, instanceRoot) :
+                                serverDefinition.createConnectionProvider(initialProject);
                         initializingContext.provider = provider;
                         initParams.setInitializationOptions(provider.getInitializationOptions(rootURI));
 
@@ -469,12 +573,12 @@ public class LanguageServerWrapper implements Disposable {
                         provider.addLogErrorHandler(new LanguageServerLogErrorHandler() {
                             @Override
                             public void logError(String error) {
-                                ServerMessageHandler.logMessage(getServerDefinition(), new MessageParams(MessageType.Error, error), getProject());
+                                ServerMessageHandler.logMessage(LanguageServerWrapper.this, new MessageParams(MessageType.Error, error));
                             }
 
                             @Override
                             public void logInfo(String message) {
-                                ServerMessageHandler.logMessage(getServerDefinition(), new MessageParams(MessageType.Info, message), getProject());
+                                ServerMessageHandler.logMessage(LanguageServerWrapper.this, new MessageParams(MessageType.Info, message));
                             }
                         });
                         provider.addUnexpectedServerStopHandler(() -> {
@@ -522,7 +626,9 @@ public class LanguageServerWrapper implements Disposable {
             };
             this.initializeFuture = startFuture
                     .thenApply(initializingContext -> {
-                        var languageClient = serverDefinition.createLanguageClient(initialProject);
+                        var languageClient = instanceRoot != null ?
+                                serverDefinition.createLanguageClient(initialProject, instanceRoot) :
+                                serverDefinition.createLanguageClient(initialProject);
                         initializingContext.languageClient = languageClient;
                         languageClient.setServerWrapper(this);
                         initParams.setProcessId(getParentProcessId());
@@ -710,7 +816,13 @@ public class LanguageServerWrapper implements Disposable {
                 errorNotification.expire();
             }
             // Show start server error notification.
-            errorNotification = showNotificationError(this.getServerDefinition(), "Cannot start server", serverError, this.getProject());
+            var notification = showNotificationError(this, "Cannot start server", serverError);
+            errorNotification = notification;
+            if (isDisposed()) {
+                // A dispose while it was shown didn't see it, and its actions would keep this language server
+                errorNotification = null;
+                notification.expire();
+            }
         }
     }
 
@@ -741,6 +853,9 @@ public class LanguageServerWrapper implements Disposable {
 
     @Nullable
     private VirtualFile getRootURI() {
+        if (instanceRoot != null) {
+            return FileUriSupport.findFileByUri(instanceRoot.getUri(), getClientFeatures());
+        }
         var roots = LSPIJUtils.getRoots(getProject());
         if (roots.size() == 1) {
             return roots.iterator().next();
@@ -1669,6 +1784,79 @@ public class LanguageServerWrapper implements Disposable {
         getClientFeatures().retireUnprovidedDocumentContent();
     }
 
+    /**
+     * Returns the root of this language server instance, and null if one instance serves the whole project.
+     *
+     * @return the root of this language server instance, and null if one instance serves the whole project.
+     */
+    public @Nullable WorkspaceFolder getInstanceRoot() {
+        return instanceRoot;
+    }
+
+    /**
+     * Returns the name of this language server instance for the user: the path of its root relative to the project's
+     * directory, the name of its root if that is the project's directory, or its full path outside the project.
+     *
+     * @return the name of this language server instance, and null if one instance serves the whole project.
+     */
+    @ApiStatus.Internal
+    public @Nullable String getInstanceLabel() {
+        var root = instanceRoot;
+        if (root == null) {
+            return null;
+        }
+        var label = instanceLabel;
+        if (label == null) {
+            var directory = LSPIJUtils.findResourceFor(root.getUri());
+            if (directory == null) {
+                label = root.getName();
+            } else {
+                var projectDirectory = ProjectUtil.guessProjectDir(initialProject);
+                var relativePath = projectDirectory != null && !projectDirectory.equals(directory)
+                        // With the separator of the full path that a root outside the project gets
+                        ? VfsUtilCore.getRelativePath(directory, projectDirectory, File.separatorChar)
+                        : null;
+                if (relativePath != null) {
+                    label = relativePath;
+                } else if (directory.equals(projectDirectory)) {
+                    label = directory.getName();
+                } else {
+                    label = FileUtil.getLocationRelativeToUserHome(directory.getPresentableUrl());
+                }
+            }
+            instanceLabel = label;
+        }
+        return label;
+    }
+
+    /**
+     * Returns true if the language server got the given file with didOpen and follows its changes. Unlike
+     * {@link #isConnectedTo(URI)}, this doesn't count an entry that only keeps what the language server reported about
+     * a file that is open in the editor.
+     *
+     * @param file the file.
+     * @return true if the language server got the given file with didOpen.
+     */
+    @ApiStatus.Internal
+    public boolean isSynchronizing(@NotNull VirtualFile file) {
+        var fileUri = toUri(file);
+        var openedDocument = fileUri != null ? openedDocuments.get(fileUri) : null;
+        return openedDocument != null && openedDocument.getSynchronizer() != null;
+    }
+
+    /**
+     * Returns true if the language server provides the given document through workspace/textDocumentContent. Such a
+     * document isn't part of a folder, so no workspace folder strategy can tell which instance it belongs to.
+     *
+     * @param file the file.
+     * @return true if the language server provides the given document.
+     */
+    @ApiStatus.Internal
+    public boolean providesDocument(@NotNull VirtualFile file) {
+        return file instanceof DocumentContentFile document
+                && getClientFeatures().findFileByUri(document.getUri().toString()) == file;
+    }
+
     public boolean canOperate(@NotNull VirtualFile file) {
         if (this.isConnectedTo(toUri(file))) {
             return true;
@@ -2215,7 +2403,7 @@ public class LanguageServerWrapper implements Disposable {
 
     private synchronized CompletableFuture<Void> stop(boolean alreadyStopping) {
         if (alreadyStopping && currentInitializingContext == null) {
-            return CompletableFuture.completedFuture(null);
+            return runningStop;
         }
         return stop(currentInitializingContext);
     }
@@ -2258,13 +2446,14 @@ public class LanguageServerWrapper implements Disposable {
                 // ForkJoinPool.helpAsyncBlocker() executing the blocking shutdown (up to 5 seconds)
                 // in the current thread when stop() is called from a ReadAction.
                 // See: https://github.com/redhat-developer/lsp4ij/issues/1672
-                return CompletableFuture.runAsync(() -> {
+                runningStop = CompletableFuture.runAsync(() -> {
                     shutdownAll(languageServer, lspStreamProvider, launcherFuture);
                     boolean delayedCurrent = currentInitializingContext == null || currentInitializingContext.equals(initializingContext);
                     if (delayedCurrent) {
                         updateStatus(ServerStatus.stopped);
                     }
                 }, AppExecutorUtil.getAppExecutorService());
+                return runningStop;
             }
         } finally {
             if (current) {
@@ -2395,19 +2584,30 @@ public class LanguageServerWrapper implements Disposable {
             return;
         }
         this.disposed = true;
-        fileListener.disposeFileSystemWatchers();
         try {
-            // A language server that never started has nothing to stop, and no status to report
-            if (currentInitializingContext != null || getServerStatus() != ServerStatus.none) {
-                stopAndRefreshEditorFeature(refreshEditorFeature, false);
+            fileListener.disposeFileSystemWatchers();
+            try {
+                // A language server that never started has nothing to stop, and no status to report
+                if (currentInitializingContext != null || getServerStatus() != ServerStatus.none) {
+                    stopAndRefreshEditorFeature(refreshEditorFeature, false);
+                }
+            } finally {
+                // Also when the stop fails, as when the connection fails to stop: the executors would keep their threads
+                stopDispatcher();
+                if (clientFeatures != null) {
+                    clientFeatures.dispose();
+                    clientFeatures = null;
+                }
             }
         } finally {
-            // Also when the stop fails, as when the connection fails to stop: the executors would keep their threads
-            stopDispatcher();
-            if (clientFeatures != null) {
-                clientFeatures.dispose();
-                clientFeatures = null;
+            // Also when the stop or the cleanup fails: a language server that is disposed is never disposed again
+            var notification = errorNotification;
+            if (notification != null) {
+                // Its actions would keep this language server, which no longer starts
+                errorNotification = null;
+                notification.expire();
             }
+            getLanguageServerLifecycleManager().onDisposed(this);
         }
     }
 

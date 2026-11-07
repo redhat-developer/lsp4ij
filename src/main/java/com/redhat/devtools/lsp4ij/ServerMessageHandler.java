@@ -65,6 +65,18 @@ public class ServerMessageHandler {
         LSPConsoleToolWindowPanel.showLog(serverDefinition, params, project);
     }
 
+    /**
+     * Implements the LSP <a href="https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#window_logMessage">window/logMessage</a> specification
+     * for one language server of a definition.
+     *
+     * @param languageServer the language server.
+     * @param params         the message request parameters.
+     */
+    public static void logMessage(@NotNull LanguageServerWrapper languageServer,
+                                  @NotNull MessageParams params) {
+        LSPConsoleToolWindowPanel.showLog(languageServer, params);
+    }
+
     private static Icon messageTypeToIcon(MessageType type) {
         return switch (type) {
             case Error -> AllIcons.General.Error;
