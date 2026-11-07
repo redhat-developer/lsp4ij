@@ -171,14 +171,8 @@ public class CommandUtilsTest {
             Path tool = createTool(directory);
             // Adds the directory to the PATH when the environment is set up, as a CommandLineEnvCustomizer does for
             // the working directory of a process since 2025.1
-            GeneralCommandLine commandLine = new GeneralCommandLine(tool.getFileName().toString()) {
-                @Override
-                protected void setupEnvironment(@NotNull Map<String, String> environment) {
-                    super.setupEnvironment(environment);
-                    String path = environment.get("PATH");
-                    environment.put("PATH", path != null ? directory + File.pathSeparator + path : directory.toString());
-                }
-            };
+            GeneralCommandLine commandLine = withDirectoryInPath(new GeneralCommandLine(tool.getFileName().toString()), directory)
+                    .withWorkDirectory(directory.toFile());
 
             CommandUtils.resolveExecutable(commandLine);
 
@@ -189,9 +183,26 @@ public class CommandUtilsTest {
     }
 
     @Test
+    public void testACommandLineWithoutAWorkingDirectoryIsLeftAsItIs() throws Exception {
+        Path directory = Files.createTempDirectory("tool-dir");
+        try {
+            Path tool = createTool(directory);
+            GeneralCommandLine commandLine = withDirectoryInPath(new GeneralCommandLine(tool.getFileName().toString()), directory);
+
+            CommandUtils.resolveExecutable(commandLine);
+
+            // No directory to take the environment from: the platform looks it up when the process starts, as before
+            Assert.assertEquals(tool.getFileName().toString(), commandLine.getExePath());
+        } finally {
+            FileUtil.delete(directory.toFile());
+        }
+    }
+
+    @Test
     public void testAnExecutableGivenWithItsPathIsNotLookedUp() {
         String executable = new File("bin", "tool").getPath();
-        GeneralCommandLine commandLine = new GeneralCommandLine(executable);
+        GeneralCommandLine commandLine = new GeneralCommandLine(executable)
+                .withWorkDirectory(System.getProperty("java.io.tmpdir"));
 
         CommandUtils.resolveExecutable(commandLine);
 
@@ -201,7 +212,8 @@ public class CommandUtilsTest {
     @Test
     public void testAnExecutableThatIsNotInThePathIsLeftAsItIs() {
         GeneralCommandLine commandLine = new GeneralCommandLine("lsp4ij-no-such-tool")
-                .withEnvironment("PATH", System.getProperty("java.io.tmpdir"));
+                .withEnvironment("PATH", System.getProperty("java.io.tmpdir"))
+                .withWorkDirectory(System.getProperty("java.io.tmpdir"));
 
         CommandUtils.resolveExecutable(commandLine);
 
@@ -394,7 +406,22 @@ public class CommandUtilsTest {
         Assertions.assertEquals(expected.toFile().getCanonicalPath(), actual.getCanonicalPath());
     }
 
-    private static Path createTool(Path directory) throws Exception {
+    /**
+     * Returns a command line whose environment, once set up, has the directory in front of its PATH, as a
+     * CommandLineEnvCustomizer does for the working directory of a process since 2025.1.
+     */
+    public static GeneralCommandLine withDirectoryInPath(GeneralCommandLine commandLine, Path directory) {
+        return new GeneralCommandLine(commandLine) {
+            @Override
+            protected void setupEnvironment(@NotNull Map<String, String> environment) {
+                super.setupEnvironment(environment);
+                String path = environment.get("PATH");
+                environment.put("PATH", path != null ? directory + File.pathSeparator + path : directory.toString());
+            }
+        };
+    }
+
+    public static Path createTool(Path directory) throws Exception {
         Path tool = directory.resolve(SystemInfo.isWindows ? "lsp4ij-tool.bat" : "lsp4ij-tool");
         Files.writeString(tool, SystemInfo.isWindows ? "@echo off\r\necho ok" : "#!/bin/sh\necho ok");
         Assertions.assertTrue(tool.toFile().setExecutable(true));

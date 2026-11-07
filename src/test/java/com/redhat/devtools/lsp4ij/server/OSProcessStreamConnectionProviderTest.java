@@ -9,8 +9,12 @@ package com.redhat.devtools.lsp4ij.server;
 
 import com.intellij.execution.configurations.GeneralCommandLine;
 import com.intellij.openapi.application.PathManager;
+import com.intellij.openapi.util.io.FileUtil;
 import com.intellij.testFramework.LightPlatformTestCase;
+import com.redhat.devtools.lsp4ij.server.definition.launching.CommandUtilsTest;
 
+import java.io.File;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.concurrent.TimeUnit;
 
@@ -72,6 +76,30 @@ public class OSProcessStreamConnectionProviderTest extends LightPlatformTestCase
                     awaitExit(first);
                 }
             }
+        }
+    }
+
+    /**
+     * A command line that a plugin creates with a working directory starts the tool which that directory's environment
+     * selects, as a user-defined language server's does.
+     */
+    public void testStartLooksUpTheCommandInTheEnvironmentOfItsWorkingDirectory() throws Exception {
+        Path directory = Files.createTempDirectory("tool-dir");
+        OSProcessStreamConnectionProvider provider = null;
+        try {
+            Path tool = CommandUtilsTest.createTool(directory);
+            provider = new OSProcessStreamConnectionProvider(CommandUtilsTest.withDirectoryInPath(
+                    new GeneralCommandLine(tool.getFileName().toString()), directory)
+                    .withWorkDirectory(directory.toFile()));
+
+            provider.start();
+
+            assertEquals(tool.toFile().getCanonicalPath(), new File(provider.getCommandLine().getExePath()).getCanonicalPath());
+        } finally {
+            if (provider != null) {
+                reap(provider);
+            }
+            FileUtil.delete(directory.toFile());
         }
     }
 
