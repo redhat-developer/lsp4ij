@@ -15,9 +15,11 @@ import com.intellij.openapi.util.SystemInfo;
 import com.intellij.openapi.util.io.FileUtil;
 import com.intellij.util.EnvironmentUtil;
 import org.jetbrains.annotations.NotNull;
-import org.junit.Assert;
-import org.junit.Assume;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.DisabledOnOs;
+import org.junit.jupiter.api.condition.EnabledOnOs;
+import org.junit.jupiter.api.condition.OS;
 
 import java.io.File;
 import java.nio.charset.StandardCharsets;
@@ -86,63 +88,71 @@ public class CommandUtilsTest {
     }
 
     @Test
-    public void testAUserVariableReplacesTheSystemVariableOfTheSameNameInAnotherCaseOnWindowsOnly() {
-        String systemName = EnvironmentUtil.getEnvironmentMap().keySet().stream()
-                .filter(name -> name.equalsIgnoreCase("PATH"))
-                .findFirst()
-                .orElseThrow();
-        String userName = systemName.equals("PATH") ? "Path" : "PATH";
+    @EnabledOnOs(OS.WINDOWS)
+    public void testOnWindowsAUserVariableReplacesTheSystemVariableOfTheSameNameInAnotherCase() {
+        String systemName = systemPathName();
+        String userName = otherCase(systemName);
 
         GeneralCommandLine cmd = CommandUtils.createCommandLine("node server.js", null, Map.of(userName, "user-path"), true);
 
-        long pathNames = cmd.getEnvironment().keySet().stream().filter(name -> name.equalsIgnoreCase("PATH")).count();
-        if (SystemInfo.isWindows) {
-            // Windows ignores the case of a name: there is one variable, which the user's replaces
-            Assert.assertEquals(1, pathNames);
-            Assert.assertEquals("user-path", cmd.getEnvironment().get(systemName));
-        } else {
-            // Elsewhere they are two variables
-            Assert.assertEquals(2, pathNames);
-            Assert.assertEquals("user-path", cmd.getEnvironment().get(userName));
-            Assert.assertEquals(EnvironmentUtil.getEnvironmentMap().get(systemName), cmd.getEnvironment().get(systemName));
-        }
+        // Windows ignores the case of a name: there is one variable, which the user's replaces
+        Assertions.assertEquals(1, pathNames(cmd));
+        Assertions.assertEquals("user-path", cmd.getEnvironment().get(systemName));
+    }
+
+    @Test
+    @DisabledOnOs(OS.WINDOWS)
+    public void testOutsideWindowsAUserVariableInAnotherCaseIsASecondVariable() {
+        String systemName = systemPathName();
+        String userName = otherCase(systemName);
+
+        GeneralCommandLine cmd = CommandUtils.createCommandLine("node server.js", null, Map.of(userName, "user-path"), true);
+
+        Assertions.assertEquals(2, pathNames(cmd));
+        Assertions.assertEquals("user-path", cmd.getEnvironment().get(userName));
+        Assertions.assertEquals(EnvironmentUtil.getEnvironmentMap().get(systemName), cmd.getEnvironment().get(systemName));
     }
 
     @Test
     public void testCreateCommandLineWithWorkingDirectory() {
         GeneralCommandLine cmd = CommandUtils.createCommandLine("node server.js", "C:/test/dir", Collections.emptyMap(), false);
-        Assert.assertNotNull(cmd.getWorkDirectory());
-        Assert.assertEquals(new File("C:/test/dir").getAbsolutePath(), cmd.getWorkDirectory().getAbsolutePath());
+        Assertions.assertNotNull(cmd.getWorkDirectory());
+        Assertions.assertEquals(new File("C:/test/dir").getAbsolutePath(), cmd.getWorkDirectory().getAbsolutePath());
     }
 
     @Test
     public void testCreateCommandLineWithNullOrBlankWorkingDirectory() {
         GeneralCommandLine cmdNull = CommandUtils.createCommandLine("node server.js", null, Collections.emptyMap(), false);
-        Assert.assertNull(cmdNull.getWorkDirectory());
+        Assertions.assertNull(cmdNull.getWorkDirectory());
 
         GeneralCommandLine cmdBlank = CommandUtils.createCommandLine("node server.js", "   ", Collections.emptyMap(), false);
-        Assert.assertNull(cmdBlank.getWorkDirectory());
+        Assertions.assertNull(cmdBlank.getWorkDirectory());
     }
 
     @Test
     public void testIncludeParentEnvironmentTruePreservesParentVars() {
         Map<String, String> userEnv = Map.of("USER_VAR", "user_val");
         GeneralCommandLine cmd = CommandUtils.createCommandLine("node server.js", "C:/test/dir", userEnv, true);
-        Assert.assertEquals(GeneralCommandLine.ParentEnvironmentType.CONSOLE, cmd.getParentEnvironmentType());
-        Assert.assertEquals("user_val", cmd.getEnvironment().get("USER_VAR"));
-        Assert.assertFalse(cmd.getEnvironment().isEmpty());
+        Assertions.assertEquals(GeneralCommandLine.ParentEnvironmentType.CONSOLE, cmd.getParentEnvironmentType());
+        Assertions.assertEquals("user_val", cmd.getEnvironment().get("USER_VAR"));
+        Assertions.assertFalse(cmd.getEnvironment().isEmpty());
     }
 
     @Test
     public void testUserEnvironmentVariablesOverrideSystemEnvironmentVariables() {
-        String pathKey = SystemInfo.isWindows ? "path" : "PATH";
-        Map<String, String> userEnv = Map.of(pathKey, "custom-path-override");
+        Map<String, String> userEnv = Map.of("PATH", "custom-path-override");
         GeneralCommandLine cmd = CommandUtils.createCommandLine("node server.js", null, userEnv, true);
-        Assert.assertEquals("custom-path-override", cmd.getEnvironment().get(pathKey));
-        if (SystemInfo.isWindows) {
-            Assert.assertEquals("custom-path-override", cmd.getEnvironment().get("PATH"));
-            Assert.assertEquals("custom-path-override", cmd.getEnvironment().get("Path"));
-        }
+        Assertions.assertEquals("custom-path-override", cmd.getEnvironment().get("PATH"));
+    }
+
+    @Test
+    @EnabledOnOs(OS.WINDOWS)
+    public void testOnWindowsAUserVariableOverridesTheSystemVariableWhateverTheCaseOfItsName() {
+        Map<String, String> userEnv = Map.of("path", "custom-path-override");
+        GeneralCommandLine cmd = CommandUtils.createCommandLine("node server.js", null, userEnv, true);
+        Assertions.assertEquals("custom-path-override", cmd.getEnvironment().get("path"));
+        Assertions.assertEquals("custom-path-override", cmd.getEnvironment().get("PATH"));
+        Assertions.assertEquals("custom-path-override", cmd.getEnvironment().get("Path"));
     }
 
     @Test
@@ -150,8 +160,8 @@ public class CommandUtilsTest {
         // As on main: the system variables aren't copied into the command line, but its process inherits them
         Map<String, String> userEnv = Map.of("USER_VAR", "user_val");
         GeneralCommandLine cmd = CommandUtils.createCommandLine("node server.js", "C:/test/dir", userEnv, false);
-        Assert.assertEquals(GeneralCommandLine.ParentEnvironmentType.CONSOLE, cmd.getParentEnvironmentType());
-        Assert.assertEquals(userEnv, cmd.getEnvironment());
+        Assertions.assertEquals(GeneralCommandLine.ParentEnvironmentType.CONSOLE, cmd.getParentEnvironmentType());
+        Assertions.assertEquals(userEnv, cmd.getEnvironment());
     }
 
     @Test
@@ -172,7 +182,7 @@ public class CommandUtilsTest {
 
             CommandUtils.resolveExecutable(commandLine);
 
-            Assert.assertEquals(tool.toFile().getCanonicalPath(), new File(commandLine.getExePath()).getCanonicalPath());
+            Assertions.assertEquals(tool.toFile().getCanonicalPath(), new File(commandLine.getExePath()).getCanonicalPath());
         } finally {
             FileUtil.delete(directory.toFile());
         }
@@ -185,7 +195,7 @@ public class CommandUtilsTest {
 
         CommandUtils.resolveExecutable(commandLine);
 
-        Assert.assertEquals(executable, commandLine.getExePath());
+        Assertions.assertEquals(executable, commandLine.getExePath());
     }
 
     @Test
@@ -195,7 +205,7 @@ public class CommandUtilsTest {
 
         CommandUtils.resolveExecutable(commandLine);
 
-        Assert.assertEquals("lsp4ij-no-such-tool", commandLine.getExePath());
+        Assertions.assertEquals("lsp4ij-no-such-tool", commandLine.getExePath());
     }
 
     @Test
@@ -211,8 +221,8 @@ public class CommandUtilsTest {
                     tool.getFileName().toString(), directory.toString(), environment, true);
 
             // Without a working directory, the platform looks it up when the process starts, as before
-            Assert.assertEquals(tool.getFileName().toString(), withoutWorkingDirectory.getExePath());
-            Assert.assertEquals(tool.toFile().getCanonicalPath(), new File(withWorkingDirectory.getExePath()).getCanonicalPath());
+            Assertions.assertEquals(tool.getFileName().toString(), withoutWorkingDirectory.getExePath());
+            Assertions.assertEquals(tool.toFile().getCanonicalPath(), new File(withWorkingDirectory.getExePath()).getCanonicalPath());
         } finally {
             FileUtil.delete(directory.toFile());
         }
@@ -301,15 +311,15 @@ public class CommandUtilsTest {
         try {
             createFile(directory, "lsp4ij-tool");
 
-            Assert.assertNull(CommandUtils.findInWindowsPath("lsp4ij-tool", directory.toString(), ".EXE;.CMD"));
+            Assertions.assertNull(CommandUtils.findInWindowsPath("lsp4ij-tool", directory.toString(), ".EXE;.CMD"));
         } finally {
             FileUtil.delete(directory.toFile());
         }
     }
 
     @Test
+    @EnabledOnOs(OS.WINDOWS)
     public void testOnWindowsACommandWithoutItsExtensionIsLookedUpInTheEnvironmentTheProcessGets() throws Exception {
-        Assume.assumeTrue("Windows only", SystemInfo.isWindows);
         Path directory = Files.createTempDirectory("tool-dir");
         try {
             createFile(directory, "lsp4ij-tool");
@@ -333,8 +343,8 @@ public class CommandUtilsTest {
     }
 
     @Test
+    @EnabledOnOs(OS.WINDOWS)
     public void testOnWindowsTheScriptFoundForACommandWithoutItsExtensionStarts() throws Exception {
-        Assume.assumeTrue("Windows only", SystemInfo.isWindows);
         Path directory = Files.createTempDirectory("tool-dir");
         try {
             // Windows can't start the script without an extension, so the .bat next to it must be the one that starts
@@ -349,35 +359,50 @@ public class CommandUtilsTest {
             try {
                 output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8).trim();
             } finally {
-                Assert.assertTrue("The script must end", process.waitFor(30, TimeUnit.SECONDS));
+                Assertions.assertTrue(process.waitFor(30, TimeUnit.SECONDS), "The script must end");
             }
 
-            Assert.assertEquals("ok", output);
+            Assertions.assertEquals("ok", output);
         } finally {
             FileUtil.delete(directory.toFile());
         }
     }
 
+    private static String systemPathName() {
+        return EnvironmentUtil.getEnvironmentMap().keySet().stream()
+                .filter(name -> name.equalsIgnoreCase("PATH"))
+                .findFirst()
+                .orElseThrow();
+    }
+
+    private static String otherCase(String pathName) {
+        return pathName.equals("PATH") ? "Path" : "PATH";
+    }
+
+    private static long pathNames(GeneralCommandLine cmd) {
+        return cmd.getEnvironment().keySet().stream().filter(name -> name.equalsIgnoreCase("PATH")).count();
+    }
+
     private static Path createFile(Path directory, String name) throws Exception {
         Path file = Files.writeString(directory.resolve(name), "");
-        Assert.assertTrue(file.toFile().setExecutable(true));
+        Assertions.assertTrue(file.toFile().setExecutable(true));
         return file;
     }
 
     private static void assertSameFile(Path expected, File actual) throws Exception {
-        Assert.assertNotNull(actual);
-        Assert.assertEquals(expected.toFile().getCanonicalPath(), actual.getCanonicalPath());
+        Assertions.assertNotNull(actual);
+        Assertions.assertEquals(expected.toFile().getCanonicalPath(), actual.getCanonicalPath());
     }
 
     private static Path createTool(Path directory) throws Exception {
         Path tool = directory.resolve(SystemInfo.isWindows ? "lsp4ij-tool.bat" : "lsp4ij-tool");
         Files.writeString(tool, SystemInfo.isWindows ? "@echo off\r\necho ok" : "#!/bin/sh\necho ok");
-        Assert.assertTrue(tool.toFile().setExecutable(true));
+        Assertions.assertTrue(tool.toFile().setExecutable(true));
         return tool;
     }
 
     private static void assertCommand(String command, String... expected) {
         List<String> actual = CommandUtils.createCommands(command);
-        Assert.assertArrayEquals(expected, actual.toArray());
+        Assertions.assertArrayEquals(expected, actual.toArray());
     }
 }
