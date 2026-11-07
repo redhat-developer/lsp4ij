@@ -30,6 +30,8 @@ import com.redhat.devtools.lsp4ij.features.workspaceFolder.ConfigurableWorkspace
 import com.redhat.devtools.lsp4ij.features.workspaceFolder.MarkersWorkspaceFolderStrategy;
 import com.redhat.devtools.lsp4ij.features.workspaceFolder.WorkspaceFolderStrategy;
 import com.redhat.devtools.lsp4ij.fixtures.LSPCodeInsightFixtureTestCase;
+import com.redhat.devtools.lsp4ij.lifecycle.LanguageServerLifecycleListener;
+import com.redhat.devtools.lsp4ij.lifecycle.LanguageServerLifecycleManager;
 import com.redhat.devtools.lsp4ij.mock.MockConnectionProvider;
 import com.redhat.devtools.lsp4ij.mock.MockLanguageServer;
 import com.redhat.devtools.lsp4ij.mock.MockLanguageServerDefinition;
@@ -44,6 +46,8 @@ import org.eclipse.lsp4j.ServerCapabilities;
 import org.eclipse.lsp4j.WorkspaceFolder;
 import org.eclipse.lsp4j.WorkspaceFoldersOptions;
 import org.eclipse.lsp4j.WorkspaceServerCapabilities;
+import org.eclipse.lsp4j.jsonrpc.MessageConsumer;
+import org.eclipse.lsp4j.jsonrpc.messages.Message;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -273,6 +277,52 @@ public class LanguageServerInstancesTest extends LSPCodeInsightFixtureTestCase {
         waitUntilDisposed(b);
         assertFalse(serverOfB.isRunning());
         assertEmpty(instances());
+    }
+
+    public void testANewInstanceThatAFailingFilterRefusesIsDisposed() throws Exception {
+        List<LanguageServerWrapper> disposed = new CopyOnWriteArrayList<>();
+        var listener = new LanguageServerLifecycleListener() {
+            @Override
+            public void handleStatusChanged(@NotNull LanguageServerWrapper languageServer) {
+            }
+
+            @Override
+            public void handleLSPMessage(@NotNull Message message,
+                                         @NotNull MessageConsumer messageConsumer,
+                                         @NotNull LanguageServerWrapper languageServer) {
+            }
+
+            @Override
+            public void handleError(@NotNull LanguageServerWrapper languageServer, @Nullable Throwable exception) {
+            }
+
+            @Override
+            public void handleDisposed(@NotNull LanguageServerWrapper languageServer) {
+                if (languageServer.getServerDefinition() == definition) {
+                    disposed.add(languageServer);
+                }
+            }
+
+            @Override
+            public void dispose() {
+            }
+        };
+        var lifecycleManager = LanguageServerLifecycleManager.getInstance(myFixture.getProject());
+        lifecycleManager.addLanguageServerLifecycleListener(listener);
+        try {
+            var file = file("a/one.per-folder");
+
+            // As a filter that is canceled does
+            assertThrows(IllegalStateException.class, () -> accessor.getLanguageServers(file, clientFeatures -> {
+                throw new IllegalStateException("The filter fails");
+            }, null));
+
+            assertEmpty(instances());
+            assertEquals(1, disposed.size());
+            assertEquals("a", disposed.get(0).getInstanceRoot().getName());
+        } finally {
+            lifecycleManager.removeLanguageServerLifecycleListener(listener);
+        }
     }
 
     public void testARootChosenBeforeAReplacementGetsNoInstance() throws Exception {

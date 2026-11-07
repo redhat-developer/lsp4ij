@@ -888,13 +888,20 @@ public class LanguageServiceAccessor implements Disposable {
         if (created) {
             instance = LanguageServerWrapper.forInstanceRoot(project, serverDefinition, choice.root());
         }
-        if (beforeStartingServerFilter == null || beforeStartingServerFilter.test(instance.getClientFeatures())) {
+        boolean accepted = false;
+        try {
+            accepted = beforeStartingServerFilter == null || beforeStartingServerFilter.test(instance.getClientFeatures());
+        } finally {
+            // As for a language server without instances: also when the filter throws, as a cancellation does
+            if (created && !accepted) {
+                Disposer.dispose(instance);
+            }
+        }
+        if (accepted) {
             if (created) {
                 startedServers.add(instance);
             }
             matchedServers.add(instance);
-        } else if (created) {
-            Disposer.dispose(instance);
         }
     }
 
