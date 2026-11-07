@@ -17,7 +17,10 @@ import com.intellij.openapi.application.ModalityState;
 import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.components.Service;
 import com.intellij.openapi.editor.Document;
+import com.intellij.openapi.editor.impl.DocumentMarkupModel;
+import com.intellij.openapi.editor.markup.RangeHighlighter;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.util.Key;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiFile;
 import com.intellij.util.concurrency.AppExecutorUtil;
@@ -25,8 +28,11 @@ import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -42,6 +48,10 @@ import java.util.Set;
 public final class LSPDiagnosticsApplier implements Disposable {
 
     public static volatile int GROUP_ID = -1;
+
+    // The highlighters that the diagnostics applied last time, kept by the markup model of the document and the project,
+    // which owns them anyway
+    private static final Key<List<RangeHighlighter>> APPLIED_HIGHLIGHTERS = Key.create("lsp4ij.diagnostics.appliedHighlighters");
 
     private final Project project;
 
@@ -254,6 +264,40 @@ public final class LSPDiagnosticsApplier implements Disposable {
                 null,
                 data.groupId
         );
+        removeHighlightersOfOtherContexts(data);
+    }
+
+    /**
+     * Removes the highlighters that the diagnostics applied last time for the document and that the highlights just
+     * applied don't reuse. Since IntelliJ 2025.1, a highlighter belongs to the code insight context of its file, which is
+     * the file's module, and {@link UpdateHighlightersUtil#setHighlightersToEditor} only replaces those of the file's
+     * current context. So after a file moved to another module, the diagnostics shown before the move would stay.
+     * Without such contexts, setHighlightersToEditor has already disposed or reused them all.
+     */
+    private void removeHighlightersOfOtherContexts(@NotNull HighlightsToApply data) {
+        Set<HighlightInfo> applied = Collections.newSetFromMap(new IdentityHashMap<>());
+        applied.addAll(data.highlights);
+        var markup = DocumentMarkupModel.forDocument(data.document, project, true);
+        var previous = markup.getUserData(APPLIED_HIGHLIGHTERS);
+        if (previous != null) {
+            for (var highlighter : previous) {
+                // A reused highlighter refers to the HighlightInfo that was just applied
+                var info = highlighter.isValid() ? HighlightInfo.fromRangeHighlighter(highlighter) : null;
+                if (info != null && !applied.contains(info)) {
+                    highlighter.dispose();
+                }
+            }
+        }
+        // setHighlightersToEditor gives each highlight the highlighter that it created or reused for it, so the other
+        // highlighters of the document need no visit
+        List<RangeHighlighter> current = new ArrayList<>();
+        for (var info : data.highlights) {
+            var highlighter = info.getHighlighter();
+            if (highlighter != null) {
+                current.add(highlighter);
+            }
+        }
+        markup.putUserData(APPLIED_HIGHLIGHTERS, current.isEmpty() ? null : current);
     }
 
     @Override
