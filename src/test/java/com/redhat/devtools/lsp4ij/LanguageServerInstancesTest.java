@@ -308,13 +308,32 @@ public class LanguageServerInstancesTest extends LSPCodeInsightFixtureTestCase {
         definition.clientFailures.add(new ProcessCanceledException());
         var a = instanceOf(file("a/one.per-folder"));
         var b = instanceOf(file("b/one.per-folder"));
+        var childDisposed = new AtomicBoolean();
+        Disposer.register(a, () -> childDisposed.set(true));
 
         // The registry logs what a listener throws, the cancellation too
         fireStrategyChanged();
+        PlatformTestUtil.dispatchAllEventsInIdeEventQueue();
 
         assertTrue("An instance whose stop is canceled is no longer started, so it must be disposed", a.isDisposed());
+        assertTrue("Its children, such as its file listener, must be disposed too", childDisposed.get());
         assertFalse(instances().contains(a));
         assertTrue(instances().contains(b));
+    }
+
+    public void testAnInstanceThatFailsToStopAsItIsReplacedIsDisposedThroughTheDisposer() throws Exception {
+        definition.failingClientRoot = "a";
+        definition.clientFailures.add(new IllegalStateException("The language client fails to be disposed"));
+        var a = instanceOf(file("a/one.per-folder"));
+        instanceOf(file("b/one.per-folder"));
+        var childDisposed = new AtomicBoolean();
+        Disposer.register(a, () -> childDisposed.set(true));
+
+        fireStrategyChanged();
+        PlatformTestUtil.dispatchAllEventsInIdeEventQueue();
+
+        assertTrue(a.isDisposed());
+        assertTrue("The children of the instance, such as its file listener, must be disposed", childDisposed.get());
     }
 
     public void testANewInstanceThatAFailingFilterRefusesIsDisposed() throws Exception {

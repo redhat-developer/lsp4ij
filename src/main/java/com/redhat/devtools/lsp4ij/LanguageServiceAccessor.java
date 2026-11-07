@@ -16,6 +16,7 @@ import com.intellij.notification.NotificationType;
 import com.intellij.notification.Notifications;
 import com.intellij.openapi.Disposable;
 import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.application.ModalityState;
 import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.fileEditor.FileEditorManager;
@@ -706,12 +707,26 @@ public class LanguageServiceAccessor implements Disposable {
             languageServer.stopAndDispose(refreshEditorFeature);
         } catch (ProcessCanceledException cancellation) {
             // The stop disposes the language server only once it has stopped
-            disposeLoggingFailure(languageServer, refreshEditorFeature);
+            disposeAfterFailedStop(languageServer, refreshEditorFeature);
             throw cancellation;
         } catch (Exception e) {
             // A language server that fails to stop must neither keep running nor keep the others running
             LOGGER.warn("Error while stopping the language server '{}'.", languageServer.getServerDefinition().getId(), e);
+            disposeAfterFailedStop(languageServer, refreshEditorFeature);
+        }
+    }
+
+    /**
+     * Disposes a language server whose stop failed or was canceled, and then its children too, such as its file
+     * listener, through the Disposer on the UI thread, as a stop that completes does. The children are disposed also
+     * when the dispose of the language server fails or is canceled.
+     */
+    private static void disposeAfterFailedStop(@NotNull LanguageServerWrapper languageServer,
+                                               boolean refreshEditorFeature) {
+        try {
             disposeLoggingFailure(languageServer, refreshEditorFeature);
+        } finally {
+            ApplicationManager.getApplication().invokeLater(() -> Disposer.dispose(languageServer), ModalityState.any());
         }
     }
 
