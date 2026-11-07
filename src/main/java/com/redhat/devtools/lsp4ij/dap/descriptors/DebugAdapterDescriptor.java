@@ -125,11 +125,28 @@ public abstract class DebugAdapterDescriptor implements DebuggableFile {
         return processHandler;
     }
 
+    /**
+     * Creates the command line used to launch the DAP server process without a working directory.
+     *
+     * @param command the command string to execute.
+     * @return the initialized command line.
+     * @throws ExecutionException if the command string is blank.
+     */
     protected @NotNull GeneralCommandLine createStartServerCommandLine(@Nullable String command) throws ExecutionException {
         return createStartServerCommandLine(null, command, Collections.emptyMap(), false);
-
     }
 
+    /**
+     * Creates the command line used to launch the DAP server process, validating the working
+     * directory, in whose environment the executable is looked up.
+     *
+     * @param workingDirectory the effective working directory, or null if none is configured.
+     * @param command the command string to execute.
+     * @param userEnvironmentVariables user-configured environment variables.
+     * @param includeSystemEnvironmentVariables whether system environment variables should be included.
+     * @return the initialized command line.
+     * @throws ExecutionException if the command string is blank.
+     */
     protected @NotNull GeneralCommandLine createStartServerCommandLine(@Nullable String workingDirectory,
                                                                        @Nullable String command,
                                                                        @NotNull Map<String, String> userEnvironmentVariables,
@@ -137,19 +154,27 @@ public abstract class DebugAdapterDescriptor implements DebuggableFile {
         if (StringUtils.isBlank(command)) {
             throw new ExecutionException("DAP server command must be specified.");
         }
+
         Integer port = null;
         int portIndex = command.indexOf($_PORT);
         if (portIndex != -1) {
             port = getAvailablePort();
             command = command.replace($_PORT, String.valueOf(port));
         }
-        GeneralCommandLine commandLine = createCommandLine(command, userEnvironmentVariables, includeSystemEnvironmentVariables);
+
+        // Validate the working directory before creating the command line.
+        String effectiveWorkingDirectory = null;
         if (StringUtils.isNotBlank(workingDirectory)) {
             File workingDir = new File(workingDirectory);
             if (workingDir.isDirectory()) {
-                commandLine = commandLine.withWorkingDirectory(workingDir.toPath());
+                effectiveWorkingDirectory = workingDirectory;
             }
         }
+
+        // With the working directory, the executable is looked up in the environment that the process gets there
+        GeneralCommandLine commandLine = createCommandLine(command, effectiveWorkingDirectory,
+                userEnvironmentVariables, includeSystemEnvironmentVariables);
+
         if (port != null) {
             commandLine.putUserData(DebugAdapterDescriptor.SERVER_PORT, port);
         }
