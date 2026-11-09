@@ -18,6 +18,7 @@ import com.intellij.openapi.project.ProjectManager;
 import com.intellij.openapi.util.SystemInfo;
 import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.util.EnvironmentUtil;
+import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -126,8 +127,9 @@ public class CommandUtils {
     }
 
     /**
-     * Looks up the executable of the command line in the PATH of the environment that its process gets, so that the
-     * tool which a directory provides, as with mise or direnv, is the one that starts.
+     * Looks up the executable of a command line with a working directory in the PATH of the environment that its
+     * process gets there, so that the tool which the directory provides, as with mise or direnv, is the one that
+     * starts. A command line without a working directory, or whose executable is a path, is left as it is.
      * <p>
      * Since 2025.1, the platform lets plugins customize the environment of a process for its working directory
      * ({@code CommandLineEnvCustomizer}) when the process starts, but it looks up the executable before that, in the
@@ -139,10 +141,19 @@ public class CommandUtils {
      *
      * @param commandLine the command line.
      */
-    static void resolveExecutable(@NotNull GeneralCommandLine commandLine) {
-        String executable = commandLine.getExePath();
-        if (executable.indexOf(File.separatorChar) != -1) {
-            // A path to the executable, which the platform doesn't look up either
+    @ApiStatus.Internal
+    public static void resolveExecutable(@NotNull GeneralCommandLine commandLine) {
+        if (commandLine.getWorkDirectory() == null) {
+            // No directory to take the environment from
+            return;
+        }
+        String executable = getExecutable(commandLine);
+        if (executable == null) {
+            // No executable, as for a command without parts: the platform reports it when the process starts
+            return;
+        }
+        if (executable.indexOf('/') != -1 || executable.indexOf(File.separatorChar) != -1) {
+            // A path to the executable, which the platform doesn't look up either. Windows takes '/' as a separator too.
             return;
         }
         Map<String, String> environment = commandLine.getEffectiveEnvironment();
@@ -155,6 +166,20 @@ public class CommandUtils {
                 : PathEnvironmentVariableUtil.findInPath(executable, path, null);
         if (found != null) {
             commandLine.setExePath(found.getPath());
+        }
+    }
+
+    /**
+     * Returns the executable of the command line, or null if it has none, as a command without parts. The platform
+     * annotates {@link GeneralCommandLine#getExePath()} with {@code @NotNull}, and its instrumented build throws an
+     * {@link IllegalStateException} there when no executable is set.
+     */
+    private static @Nullable String getExecutable(@NotNull GeneralCommandLine commandLine) {
+        try {
+            String executable = commandLine.getExePath();
+            return StringUtil.isEmptyOrSpaces(executable) ? null : executable;
+        } catch (IllegalStateException noExecutable) {
+            return null;
         }
     }
 

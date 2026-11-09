@@ -97,6 +97,8 @@ public class ExecTask extends InstallerTask {
                 }
                 cmdLine = cmdLine
                         .withWorkDirectory(workingDir.toFile());
+                // The tools which the working directory's environment selects, as the language server gets them
+                CommandUtils.resolveExecutable(cmdLine);
             }
             cmdLine.setCharset(java.nio.charset.StandardCharsets.UTF_8);
 
