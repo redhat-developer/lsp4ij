@@ -15,6 +15,7 @@ import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.fileEditor.FileDocumentManager;
 import com.intellij.openapi.fileEditor.FileEditorManagerListener;
 import com.intellij.openapi.progress.ProcessCanceledException;
+import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.progress.util.ProgressIndicatorUtils;
 import com.intellij.openapi.vfs.AsyncFileListener;
 import com.intellij.openapi.vfs.VirtualFile;
@@ -494,7 +495,9 @@ public abstract class AbstractLSPFileListener implements FileEditorManagerListen
         } catch (ProcessCanceledException e) {
             if (future.isCancelled()) {
                 // The request itself was cancelled, which the platform reports as a ProcessCanceledException since
-                // Java 25: no edit from this language server, as when its request fails
+                // Java 25: no edit from this language server, as when its request fails. A progress cancelled too still
+                // stops collectWillEdits.
+                ProgressManager.checkCanceled();
                 return null;
             }
             // The enclosing progress indicator was cancelled (e.g. the VFS

@@ -61,11 +61,29 @@ public class AwaitWithCheckCanceledTest extends BasePlatformTestCase {
      * platform reports as a ProcessCanceledException: the wait still throws the future's cancellation.
      */
     public void testACancelledFutureThrowsItsCancellationAsJava25ReportsIt() {
-        var future = cancelledAsOnJava25();
+        var cancellation = new CancellationException("the future's cancellation");
+        var future = cancelledAsOnJava25(cancellation);
 
         var thrown = thrownBy(() -> CompletableFutures.awaitWithCheckCanceled(future));
 
-        assertEquals(CancellationException.class, thrown.getClass());
+        assertSame(cancellation, thrown);
+    }
+
+    /**
+     * A progress that is cancelled too still throws its own cancellation, which callers tell from the future's.
+     */
+    public void testACanceledProgressThrowsAProcessCanceledExceptionWhenTheFutureIsCancelledToo() {
+        var indicator = new EmptyProgressIndicator();
+        var future = cancelledAsOnJava25();
+
+        var thrown = thrownBy(() -> ProgressManager.getInstance().executeProcessUnderProgress(
+                () -> {
+                    indicator.cancel();
+                    CompletableFutures.awaitWithCheckCanceled(future);
+                },
+                indicator));
+
+        assertInstanceOf(thrown, ProcessCanceledException.class);
     }
 
     public void testAFutureCancelledInAPreviousStageThrowsAProcessCanceledException() {
@@ -114,10 +132,14 @@ public class AwaitWithCheckCanceledTest extends BasePlatformTestCase {
      * cancelled CompletableFuture does since Java 25, so that a test takes that path on any Java.
      */
     public static <T> CompletableFuture<T> cancelledAsOnJava25() {
+        return cancelledAsOnJava25(new CancellationException());
+    }
+
+    private static <T> CompletableFuture<T> cancelledAsOnJava25(CancellationException cancellation) {
         var future = new CompletableFuture<T>() {
             @Override
             public T get(long timeout, TimeUnit unit) {
-                throw (CancellationException) new CancellationException().initCause(new CancellationException());
+                throw (CancellationException) new CancellationException().initCause(cancellation);
             }
         };
         future.cancel(true);

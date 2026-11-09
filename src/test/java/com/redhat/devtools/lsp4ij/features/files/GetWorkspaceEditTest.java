@@ -188,4 +188,23 @@ public class GetWorkspaceEditTest extends BasePlatformTestCase {
                     future.isCancelled());
         }
     }
+
+    public void testRethrowsProcessCancelledExceptionWhenIndicatorAndRequestAreCancelled() {
+        // A cancelled request, as Java 25 reports it, doesn't hide the cancellation of the progress
+        CompletableFuture<WorkspaceEdit> future = AwaitWithCheckCanceledTest.cancelledAsOnJava25();
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+        EmptyProgressIndicator indicator = new EmptyProgressIndicator();
+
+        try {
+            ProgressManager.getInstance().runProcess(
+                    () -> {
+                        indicator.cancel();
+                        return AbstractLSPFileListener.getWorkspaceEdit(future, deadline);
+                    },
+                    indicator);
+            fail("Should have thrown ProcessCanceledException");
+        } catch (ProcessCanceledException expected) {
+            // the progress was cancelled
+        }
+    }
 }

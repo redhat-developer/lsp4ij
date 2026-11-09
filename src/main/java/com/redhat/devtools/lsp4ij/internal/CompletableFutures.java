@@ -150,7 +150,9 @@ public class CompletableFutures {
         } catch (ProcessCanceledException e) {
             if (future.isCancelled()) {
                 // The future itself was cancelled: since Java 25, its get() throws a CancellationException caused by the
-                // future's, which the platform reports as a ProcessCanceledException, the cancellation of the operation
+                // future's, which the platform reports as a ProcessCanceledException, the cancellation of the operation.
+                // A progress cancelled too still throws its own.
+                ProgressManager.checkCanceled();
                 throw cancellationOf(e);
             }
             throw e;
