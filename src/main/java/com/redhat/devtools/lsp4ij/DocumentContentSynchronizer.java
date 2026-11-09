@@ -353,49 +353,62 @@ public class DocumentContentSynchronizer implements DocumentListener, Disposable
         // The block makes no cancellation check once it starts, so a cancellable read consumes the
         // batch once: it is only retried before starting, while a write action is pending.
         var initializedServer = languageServerWrapper.getInitializedServer();
-        return readDocumentState(() -> {
-            CompletableFuture<Void> barrier;
-            final int version;
-            final CompletableFuture<LanguageServer> didChange;
-            synchronized (changeEvents) {
-                if (changeEvents.isEmpty()) {
-                    return lastDidChangeFuture;
-                }
-                if (closed || syncOptions.getOpenClose() && !opened) {
-                    // Before didOpen the changes wait for it, which either contains them or is
-                    // followed by them; after didClose the server no longer has the document.
-                    return lastDidChangeFuture;
-                }
-                List<TextDocumentContentChangeEvent> events = new ArrayList<>(changeEvents);
-                changeEvents.clear();
-                barrier = new CompletableFuture<>();
-                lastDidChangeFuture = barrier;
-                // Record the state represented by this batch before another flush can advance it.
-                version = languageServerWrapper.nextDocumentVersion();
-                this.version = version;
-                synchronizedModificationStamp = document.getModificationStamp();
+        return readDocumentState(() -> queueDidChangeEvents(initializedServer, true));
+    }
 
-                // send 'textDocument/didChange' notification, queued under the monitor so that a
-                // concurrent close cannot queue its didClose before it
-                DidChangeTextDocumentParams changeParamsToSend = new DidChangeTextDocumentParams(new VersionedTextDocumentIdentifier(), events);
-                changeParamsToSend.getTextDocument().setUri(fileUri);
-                changeParamsToSend.getTextDocument().setVersion(version);
-                didChange = languageServerWrapper.sendNotification(
-                        didOpenNotification != null ? didOpenNotification : initializedServer, ls -> {
-                    ls.getTextDocumentService().didChange(changeParamsToSend);
-                    return ls;
-                });
+    /**
+     * Queues the pending changes as one textDocument/didChange.
+     *
+     * @param initializedServer the server, for a document whose didOpen isn't queued.
+     * @param recordStamp       whether to record the modification stamp of the document that the batch brings the
+     *                          server to, which needs the read access that the caller then holds.
+     * @return the future of the didChange, or of the last one if no change is pending.
+     */
+    private CompletableFuture<Void> queueDidChangeEvents(@NotNull CompletableFuture<LanguageServer> initializedServer,
+                                                         boolean recordStamp) {
+        CompletableFuture<Void> barrier;
+        final int version;
+        final CompletableFuture<LanguageServer> didChange;
+        synchronized (changeEvents) {
+            if (changeEvents.isEmpty()) {
+                return lastDidChangeFuture;
             }
-            processPullDiagnosticIfNeeded(didChange, version);
-            didChange.whenComplete((ls, ex) -> {
-                if (ex != null) {
-                    barrier.completeExceptionally(ex);
-                } else {
-                    barrier.complete(null);
-                }
+            if (closed || syncOptions.getOpenClose() && !opened) {
+                // Before didOpen the changes wait for it, which either contains them or is
+                // followed by them; after didClose the server no longer has the document.
+                return lastDidChangeFuture;
+            }
+            List<TextDocumentContentChangeEvent> events = new ArrayList<>(changeEvents);
+            changeEvents.clear();
+            barrier = new CompletableFuture<>();
+            lastDidChangeFuture = barrier;
+            // Record the state represented by this batch before another flush can advance it.
+            version = languageServerWrapper.nextDocumentVersion();
+            this.version = version;
+            if (recordStamp) {
+                synchronizedModificationStamp = document.getModificationStamp();
+            }
+
+            // send 'textDocument/didChange' notification, queued under the monitor so that a
+            // concurrent close cannot queue its didClose before it
+            DidChangeTextDocumentParams changeParamsToSend = new DidChangeTextDocumentParams(new VersionedTextDocumentIdentifier(), events);
+            changeParamsToSend.getTextDocument().setUri(fileUri);
+            changeParamsToSend.getTextDocument().setVersion(version);
+            didChange = languageServerWrapper.sendNotification(
+                    didOpenNotification != null ? didOpenNotification : initializedServer, ls -> {
+                ls.getTextDocumentService().didChange(changeParamsToSend);
+                return ls;
             });
-            return barrier;
+        }
+        processPullDiagnosticIfNeeded(didChange, version);
+        didChange.whenComplete((ls, ex) -> {
+            if (ex != null) {
+                barrier.completeExceptionally(ex);
+            } else {
+                barrier.complete(null);
+            }
         });
+        return barrier;
     }
 
     @Override
@@ -543,10 +556,13 @@ public class DocumentContentSynchronizer implements DocumentListener, Disposable
             // but workspace/willRenameFiles may modify the file before that.
             // Without this call, the didChange notification could be sent
             // after didClose, breaking the expected LSP event order.
-            if (!changeEvents.isEmpty()) {
-                sendDidChangeEvents();
-            }
             initializedServer = languageServerWrapper.getInitializedServer();
+            if (!changeEvents.isEmpty()) {
+                // Without reading the document: its stamp only checks edits against this synchronizer, which closes,
+                // and a read could wait for a write action while the caller holds documentsLock, as a stop's
+                // disconnection does, which a write action that disconnects a document then waits for
+                queueDidChangeEvents(initializedServer, false);
+            }
         }
 
         synchronized (changeEvents) {

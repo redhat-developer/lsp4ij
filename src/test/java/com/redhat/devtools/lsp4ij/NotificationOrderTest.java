@@ -12,6 +12,7 @@ import com.intellij.openapi.editor.EditorFactory;
 import com.intellij.openapi.util.Disposer;
 import com.intellij.testFramework.LightPlatformTestCase;
 import com.intellij.testFramework.LightVirtualFile;
+import com.intellij.util.concurrency.AppExecutorUtil;
 import com.redhat.devtools.lsp4ij.mock.MockLanguageServer;
 import com.redhat.devtools.lsp4ij.mock.MockLanguageServerDefinition;
 import com.redhat.devtools.lsp4ij.mock.MockTextDocumentService;
@@ -30,6 +31,7 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.IntStream;
 
 /**
@@ -80,6 +82,30 @@ public class NotificationOrderTest extends LightPlatformTestCase {
 
         assertEquals(List.of("open:1:first", "close", "open:2:first", "change:3:reopened"),
                 wrapper.sentSoFar());
+    }
+
+    /**
+     * A close doesn't read the document to send its pending changes, so it doesn't wait for a write action: a stop
+     * disconnects its documents under documentsLock on a thread without read access, and a write action that
+     * disconnects a document, as a move does, waits for that lock (#1902).
+     */
+    public void testAClosingDocumentDoesNotWaitForAWriteActionForItsPendingChanges() throws Exception {
+        var wrapper = new InitializingWrapper();
+        wrapper.initialized.complete(null);
+        var synchronizer = synchronizer(wrapper);
+        // Before its didOpen, a change stays pending
+        change(synchronizer, "second");
+
+        AtomicReference<CompletableFuture<Void>> closed = new AtomicReference<>();
+        ApplicationManager.getApplication().runWriteAction(() -> {
+            closed.set(CompletableFuture.runAsync(synchronizer::documentClosed, AppExecutorUtil.getAppExecutorService()));
+            try {
+                closed.get().get(5, TimeUnit.SECONDS);
+            } catch (Exception e) {
+                fail("The close waited for the write action: " + e);
+            }
+        });
+        closed.get().get(10, TimeUnit.SECONDS);
     }
 
     private DocumentContentSynchronizer synchronizer(InitializingWrapper wrapper) {
