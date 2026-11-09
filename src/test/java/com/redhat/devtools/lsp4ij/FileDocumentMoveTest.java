@@ -456,6 +456,33 @@ public class FileDocumentMoveTest extends LSPCodeInsightFixtureTestCase {
         }
     }
 
+    public void testALanguageServerStopsOnceItsMatcherFailsForItsLastDocumentAtTheNewPlaceOfItsFile() throws Exception {
+        // A language server of its own, whose document matcher fails for the files whose name starts with "broken"
+        var definition = new MockLanguageServerDefinition("fails-for-broken", false);
+        LanguageServersRegistry.getInstance().addServerDefinition(myFixture.getProject(), definition, List.of());
+        LanguageServersRegistry.getInstance().registerAssociation(definition,
+                new ServerFileNamePatternMapping(List.of("*.fails"), definition.getId(), null, (file, project) -> {
+                    if (file.getName().startsWith("broken")) {
+                        throw new IllegalStateException("The matcher fails for " + file.getName());
+                    }
+                    return true;
+                }));
+        var file = myFixture.getTempDirFixture().createFile("source/ok.fails", "disk");
+        var editor = EditorFactory.getInstance().createEditor(LSPIJUtils.getDocument(file), myFixture.getProject());
+        try {
+            var wrapper = connect(file).wrapper();
+            assertSame(definition, wrapper.getServerDefinition());
+
+            write(() -> file.rename(this, "broken.fails"));
+
+            PlatformTestUtil.waitWithEventsDispatching("The language server must stop, as it has no document left",
+                    () -> !wrapper.isActive(), 10);
+        } finally {
+            EditorFactory.getInstance().releaseEditor(editor);
+            LanguageServersRegistry.getInstance().removeServerDefinition(myFixture.getProject(), definition);
+        }
+    }
+
     public void testALanguageServerStopsOnceTheEditorOfItsLastDocumentClosesAsTheMoveConnectsItAgain() throws Exception {
         var file = myFixture.getTempDirFixture().createFile("source/test.foo", "disk");
         var editor = EditorFactory.getInstance().createEditor(LSPIJUtils.getDocument(file), myFixture.getProject());

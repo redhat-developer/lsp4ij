@@ -155,11 +155,7 @@ class LSPFileListener extends AbstractLSPFileListener {
                             return;
                         }
                         if (failure != null) {
-                            var cause = failure instanceof CompletionException ? failure.getCause() : failure;
-                            if (!(cause instanceof CancellationException || cause instanceof ProcessCanceledException)) {
-                                LOGGER.warn("Cannot match moved document {} to '{}'", place.url(),
-                                        serverDefinition.getDisplayName(), failure);
-                            }
+                            reportMatchFailure(place.url(), failure);
                             stopIfIdle(languageServerWrapper);
                             return;
                         }
@@ -181,7 +177,24 @@ class LSPFileListener extends AbstractLSPFileListener {
                             reconnectMovedDocument(languageServer, file);
                         }
                     }, ModalityState.any()));
+                })
+                .onError(failure -> {
+                    // A document matcher or the workspace folder strategy that fails before it answers
+                    reportMatchFailure(file.getUrl(), failure);
+                    stopIfIdle(languageServerWrapper);
                 });
+    }
+
+    /**
+     * Reports a failure to match a moved document, as of a document matcher or a workspace folder strategy that fails:
+     * the document isn't connected again, and nothing else reports it. A cancellation isn't reported.
+     */
+    private void reportMatchFailure(@NotNull String url, @NotNull Throwable failure) {
+        var cause = failure instanceof CompletionException ? failure.getCause() : failure;
+        if (!(cause instanceof CancellationException || cause instanceof ProcessCanceledException)) {
+            LOGGER.warn("Cannot match moved document {} to '{}'", url,
+                    languageServerWrapper.getServerDefinition().getDisplayName(), failure);
+        }
     }
 
     /**
