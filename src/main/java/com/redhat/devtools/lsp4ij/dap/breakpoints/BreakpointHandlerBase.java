@@ -150,6 +150,7 @@ public abstract class BreakpointHandlerBase<B extends XBreakpoint<?>> extends XB
             // Not registered (ex: not supported when it was registered)
             return;
         }
+        verifiedBy.remove(breakpoint);
         onBreakpointsChanged(breakpoint);
         // DAP replaces breakpoints per source, not per session. Include the removed
         // source even when other files still have breakpoints, so its last breakpoint
@@ -218,7 +219,8 @@ public abstract class BreakpointHandlerBase<B extends XBreakpoint<?>> extends XB
             // Retrieve the IntelliJ breakpoint by the id.
             ijBreakpoint = findBreakpointById(breakpoint.getId());
         }
-        if (ijBreakpoint == null) {
+        if (ijBreakpoint == null || !breakpoints.contains(ijBreakpoint)) {
+            // A late answer for an unregistered breakpoint must not keep its verdicts
             return;
         }
         Object session = debugProtocolServer != null ? debugProtocolServer : UNKNOWN_SESSION;

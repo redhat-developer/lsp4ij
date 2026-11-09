@@ -73,15 +73,7 @@ public class DAPBreakpointHandlerBaseTest extends HeavyPlatformTestCase {
      */
     public void testBreakpointBoundByOneSessionStaysVerified() throws Exception {
         var states = new ArrayList<String>();
-        var session = (XDebugSession)Proxy.newProxyInstance(XDebugSession.class.getClassLoader(),new Class<?>[]{XDebugSession.class}, (p, m, a) -> {
-            switch (m.getName()) {
-                case "setBreakpointVerified" -> states.add("verified");
-                case "setBreakpointInvalid" -> states.add("invalid: " + a[1]);
-                default -> { }
-            }
-            return null;
-        });
-        var handler = handler(session);
+        var handler = handler(recordingSession(states));
         var dir = Files.createTempDirectory("dap-breakpoints-");
         var a = breakpoint(dir.resolve("a.lua"), 0);
         try {
@@ -97,6 +89,60 @@ public class DAPBreakpointHandlerBaseTest extends HeavyPlatformTestCase {
             handler.dispose();
             com.intellij.openapi.util.io.FileUtil.delete(dir.toFile());
         }
+    }
+
+    /** Once the only session which bound a breakpoint has terminated, a session which cannot bind it decides. */
+    public void testAForgottenSessionNoLongerKeepsTheBreakpointVerified() throws Exception {
+        var states = new ArrayList<String>();
+        var handler = handler(recordingSession(states));
+        var dir = Files.createTempDirectory("dap-breakpoints-");
+        var a = breakpoint(dir.resolve("a.lua"), 0);
+        try {
+            handler.registerBreakpoint(a);
+            var bound = server(true);
+            handler.initialize(bound, new Capabilities()).join();
+            assertEquals(List.of("verified"), states);
+            handler.forgetSessionVerdicts(bound);
+            handler.initialize(server(false), new Capabilities()).join();
+            assertEquals("invalid: Unbound breakpoint", states.get(states.size() - 1));
+        } finally {
+            handler.dispose();
+            com.intellij.openapi.util.io.FileUtil.delete(dir.toFile());
+        }
+    }
+
+    /** An answer which arrives after its breakpoint was unregistered changes nothing. */
+    public void testALateAnswerForAnUnregisteredBreakpointIsIgnored() throws Exception {
+        var states = new ArrayList<String>();
+        var handler = handler(recordingSession(states));
+        var dir = Files.createTempDirectory("dap-breakpoints-");
+        var a = breakpoint(dir.resolve("a.lua"), 0);
+        try {
+            handler.registerBreakpoint(a);
+            var server = server(false);
+            handler.initialize(server, new Capabilities()).join();
+            handler.unregisterBreakpoint(a, false);
+            var before = List.copyOf(states);
+            var late = new Breakpoint();
+            late.setVerified(true);
+            handler.updateBreakpoint(server, late, a);
+            assertEquals(before, states);
+        } finally {
+            handler.dispose();
+            com.intellij.openapi.util.io.FileUtil.delete(dir.toFile());
+        }
+    }
+
+    /** Returns a debug session which records, in the given list, each state the breakpoints are shown in. */
+    private static XDebugSession recordingSession(List<String> states) {
+        return (XDebugSession)Proxy.newProxyInstance(XDebugSession.class.getClassLoader(),new Class<?>[]{XDebugSession.class}, (p, m, a) -> {
+            switch (m.getName()) {
+                case "setBreakpointVerified" -> states.add("verified");
+                case "setBreakpointInvalid" -> states.add("invalid: " + a[1]);
+                default -> { }
+            }
+            return null;
+        });
     }
 
     private DAPBreakpointHandlerBase<XLineBreakpoint<DAPBreakpointProperties>> handler(XDebugSession session) throws Exception {
