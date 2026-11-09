@@ -564,7 +564,9 @@ public class LanguageServiceAccessor implements Disposable {
             @NotNull PsiFile file,
             @Nullable LanguageServerDefinition matchServerDefinition,
             @Nullable Predicate<LSPClientFeatures> beforeStartingServerFilter) {
-        MatchedLanguageServerDefinitions mappings = getMatchedLanguageServerDefinitions(file, false);
+        // With a definition, only its mappings are matched, as by isFileMappedToServer: a definition that matches the
+        // file asynchronously answers too, and no other definition does
+        MatchedLanguageServerDefinitions mappings = getMatchedLanguageServerDefinitions(file, false, matchServerDefinition);
         if (mappings == MatchedLanguageServerDefinitions.NO_MATCH) {
             // There are no mapping for the given file
             return CompletableFuture.completedFuture(Collections.emptyList());
@@ -573,15 +575,7 @@ public class LanguageServiceAccessor implements Disposable {
         Set<LanguageServerWrapper> matchedServers = new LinkedHashSet<>();
 
         // Collect sync server definitions
-        var serverDefinitions = mappings.getMatched();
-        if (matchServerDefinition != null) {
-            if (!serverDefinitions.contains(matchServerDefinition)) {
-                return CompletableFuture.completedFuture(Collections.emptyList());
-            }
-            collectLanguageServersFromDefinition(file, Set.of(matchServerDefinition), matchedServers, beforeStartingServerFilter);
-        } else {
-            collectLanguageServersFromDefinition(file, serverDefinitions, matchedServers, beforeStartingServerFilter);
-        }
+        collectLanguageServersFromDefinition(file, mappings.getMatched(), matchedServers, beforeStartingServerFilter);
 
         CompletableFuture<Set<LanguageServerDefinition>> async = mappings.getAsyncMatched();
         if (async != null) {
