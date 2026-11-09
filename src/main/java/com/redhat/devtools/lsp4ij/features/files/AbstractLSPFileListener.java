@@ -492,6 +492,11 @@ public abstract class AbstractLSPFileListener implements FileEditorManagerListen
             }
             return result;
         } catch (ProcessCanceledException e) {
+            if (future.isCancelled()) {
+                // The request itself was cancelled, which the platform reports as a ProcessCanceledException since
+                // Java 25: no edit from this language server, as when its request fails
+                return null;
+            }
             // The enclosing progress indicator was cancelled (e.g. the VFS
             // operation is being aborted). Cancel the LSP future and rethrow
             // so collectWillEdits stops immediately instead of trying the

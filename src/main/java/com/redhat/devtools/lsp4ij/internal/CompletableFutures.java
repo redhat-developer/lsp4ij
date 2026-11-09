@@ -147,6 +147,13 @@ public class CompletableFutures {
         }
         try {
             ProgressIndicatorUtils.awaitWithCheckCanceled(future);
+        } catch (ProcessCanceledException e) {
+            if (future.isCancelled()) {
+                // The future itself was cancelled: since Java 25, its get() throws a CancellationException caused by the
+                // future's, which the platform reports as a ProcessCanceledException, the cancellation of the operation
+                throw cancellationOf(e);
+            }
+            throw e;
         } catch (CancellationException e) {
             // Since 2024.2 ProcessCanceledException extends CancellationException
             throw e;
@@ -157,6 +164,16 @@ public class CompletableFutures {
             }
             logFailure(failure);
         }
+    }
+
+    /**
+     * Returns the cancellation of a cancelled future, which the platform reported as the given ProcessCanceledException:
+     * the future's CancellationException, which is its cause, or a new one.
+     */
+    private static @NotNull CancellationException cancellationOf(@NotNull ProcessCanceledException e) {
+        return e.getCause() instanceof CancellationException cancellation && !(cancellation instanceof ProcessCanceledException)
+                ? cancellation
+                : new CancellationException();
     }
 
     /**

@@ -14,6 +14,7 @@ import com.intellij.openapi.progress.EmptyProgressIndicator;
 import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.testFramework.fixtures.BasePlatformTestCase;
+import com.redhat.devtools.lsp4ij.internal.AwaitWithCheckCanceledTest;
 import com.redhat.devtools.lsp4ij.mock.MockWorkspaceService;
 import org.eclipse.lsp4j.*;
 
@@ -100,6 +101,16 @@ public class GetWorkspaceEditTest extends BasePlatformTestCase {
     public void testReturnsNullOnCancellation() {
         CompletableFuture<WorkspaceEdit> future = new CompletableFuture<>();
         future.cancel(true);
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+
+        WorkspaceEdit result = AbstractLSPFileListener.getWorkspaceEdit(future, deadline);
+
+        assertNull("Should return null on cancellation", result);
+    }
+
+    public void testReturnsNullOnCancellationAsJava25ReportsIt() {
+        // Since Java 25, the platform reports the cancellation of the request as a ProcessCanceledException
+        CompletableFuture<WorkspaceEdit> future = AwaitWithCheckCanceledTest.cancelledAsOnJava25();
         long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
 
         WorkspaceEdit result = AbstractLSPFileListener.getWorkspaceEdit(future, deadline);

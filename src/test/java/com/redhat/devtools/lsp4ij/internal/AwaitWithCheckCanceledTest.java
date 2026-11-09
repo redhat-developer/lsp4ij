@@ -56,6 +56,18 @@ public class AwaitWithCheckCanceledTest extends BasePlatformTestCase {
         assertEquals(CancellationException.class, thrown.getClass());
     }
 
+    /**
+     * Since Java 25, the get() of a cancelled future throws a CancellationException caused by the future's, which the
+     * platform reports as a ProcessCanceledException: the wait still throws the future's cancellation.
+     */
+    public void testACancelledFutureThrowsItsCancellationAsJava25ReportsIt() {
+        var future = cancelledAsOnJava25();
+
+        var thrown = thrownBy(() -> CompletableFutures.awaitWithCheckCanceled(future));
+
+        assertEquals(CancellationException.class, thrown.getClass());
+    }
+
     public void testAFutureCancelledInAPreviousStageThrowsAProcessCanceledException() {
         var previous = new CompletableFuture<>();
         var future = previous.thenApply(result -> result);
@@ -95,6 +107,21 @@ public class AwaitWithCheckCanceledTest extends BasePlatformTestCase {
         var thrown = thrownBy(() -> CancellationSupport.awaitWithCheckCanceled(future));
 
         assertInstanceOf(thrown, ProcessCanceledException.class);
+    }
+
+    /**
+     * Returns a cancelled future whose get() throws a CancellationException caused by the future's, as the get() of a
+     * cancelled CompletableFuture does since Java 25, so that a test takes that path on any Java.
+     */
+    public static <T> CompletableFuture<T> cancelledAsOnJava25() {
+        var future = new CompletableFuture<T>() {
+            @Override
+            public T get(long timeout, TimeUnit unit) {
+                throw (CancellationException) new CancellationException().initCause(new CancellationException());
+            }
+        };
+        future.cancel(true);
+        return future;
     }
 
     private static Throwable thrownBy(ThrowableRunnable<?> wait) {
