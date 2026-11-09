@@ -186,6 +186,8 @@ public class LanguageServerWrapper implements Disposable {
     // Where the connection of a document runs once its start attempt is initialized: the executor that
     // thenComposeAsync uses by default, which a test can replace to run the connection when it chooses
     private @NotNull Executor connectionExecutor = CompletableFuture.completedFuture(null).defaultExecutor();
+    // Runs as a connection has checked the place of its file, before it registers the document, for a test
+    private volatile @Nullable Runnable beforeRegistration;
     private @NotNull TextDocumentSyncOptions syncOptions;
 
     /* Backwards compatible constructor */
@@ -785,6 +787,17 @@ public class LanguageServerWrapper implements Disposable {
     }
 
     /**
+     * Sets what runs as a connection has checked the place of its file, under documentsLock, before it registers the
+     * document, so that a test can move the file then.
+     *
+     * @param beforeRegistration what runs, or null for nothing.
+     */
+    @TestOnly
+    void setBeforeRegistration(@Nullable Runnable beforeRegistration) {
+        this.beforeRegistration = beforeRegistration;
+    }
+
+    /**
      * Throws a {@link CancellationException} unless the given start attempt is still the current one. A stop, or a
      * stop and a newer start, replaces an attempt, but cancels only the last stage of its start chain, so the stages
      * before it still run when the attempt's initialize reply comes. The caller holds this wrapper's monitor, which
@@ -984,26 +997,31 @@ public class LanguageServerWrapper implements Disposable {
      */
     CompletableFuture<@Nullable LanguageServer> connect(@NotNull VirtualFile file,
                                                         @NotNull LanguageServerWrapper.LSPFileConnectionInfo fileConnectionInfo) {
+        // Before the lock: the URI support can take a read action, and the write action of a move waits for the lock
+        URI fileUri = toUri(file);
         synchronized (documentsLock) {
-            promoteConnection(toUri(file));
+            promoteConnection(fileUri);
         }
-        return connectDocument(file, fileConnectionInfo, null, null);
+        return connectDocument(file, fileConnectionInfo, null, null, null);
     }
 
     /**
      * Connects the file as {@link #connect(VirtualFile, LSPFileConnectionInfo)} does, for a connection asked for when
      * the last editor of the file had closed the given number of times. A close of the file's last editor since then
-     * disconnects the file, which this connection then leaves disconnected: it gives no language server.
+     * disconnects the file, which this connection then leaves disconnected: it gives no language server. So does a
+     * move of the file from the place with the given URL, which this instance was chosen for.
      */
     CompletableFuture<@Nullable LanguageServer> connect(@NotNull VirtualFile file,
                                                         @NotNull LSPFileConnectionInfo fileConnectionInfo,
-                                                        int editorCloses) {
-        return connectDocument(file, fileConnectionInfo, null, editorCloses);
+                                                        int editorCloses,
+                                                        @Nullable String chosenUrl) {
+        return connectDocument(file, fileConnectionInfo, null, editorCloses, chosenUrl);
     }
 
     CompletableFuture<@Nullable LanguageServer> connect(@NotNull VirtualFile file,
                                                         @NotNull LSPFileConnectionInfo info,
-                                                        @NotNull DocumentConnectionScope scope) {
+                                                        @NotNull DocumentConnectionScope scope,
+                                                        @Nullable String chosenUrl) {
         URI uri = toUri(file);
         if (uri == null) {
             return CompletableFuture.completedFuture(null);
@@ -1016,7 +1034,7 @@ public class LanguageServerWrapper implements Disposable {
             claim = new DocumentConnectionClaim(uri, connection, new AtomicBoolean());
         }
         scope.register(() -> releaseConnection(file, claim));
-        return connectDocument(file, info, claim, null);
+        return connectDocument(file, info, claim, null, chosenUrl);
     }
 
     private void promoteConnection(@Nullable URI uri) {
@@ -1072,9 +1090,13 @@ public class LanguageServerWrapper implements Disposable {
     private CompletableFuture<@Nullable LanguageServer> connectDocument(@NotNull VirtualFile file,
                                                                         @NotNull LSPFileConnectionInfo fileConnectionInfo,
                                                                         @Nullable DocumentConnectionClaim claim,
-                                                                        @Nullable Integer editorCloses) {
+                                                                        @Nullable Integer editorCloses,
+                                                                        @Nullable String chosenUrl) {
         removeStopTimer();
 
+        // Before the URI: the registration compares this URL with the one of the file then, which asks no URI support
+        // under documentsLock, and a move between the two calls then shows too
+        String fileUrl = file.getUrl();
         URI fileUri = toUri(file);
         if (fileUri == null) {
             // Invalid file uri
@@ -1147,6 +1169,9 @@ public class LanguageServerWrapper implements Disposable {
                     initializedServer = getInitializedServer();
                 }
             }
+            // Before the lock, as the URI of the file: the URI support can take a read action, and the write action of
+            // a move waits for the lock
+            String fileUriString = toUriString(fileUri);
             DocumentContentSynchronizer synchronizer;
             synchronized (documentsLock) {
                 // A stop which replaced the attempt after this check disconnects the document once this lock is
@@ -1154,6 +1179,18 @@ public class LanguageServerWrapper implements Disposable {
                 if (!isCurrent(claim) || currentInitializingContext != attempt
                         || isEditorClosedSince(file, editorCloses)) {
                     return CompletableFuture.completedFuture(null);
+                }
+                String url = file.getUrl();
+                if ((chosenUrl != null && !chosenUrl.equals(url)) || !fileUrl.equals(url)) {
+                    // The file moved since the connection was asked for, or since this instance was chosen for it.
+                    // Opened with the URI of its earlier place, which the move found no document for, or on the
+                    // instance of its earlier place, it would stay with this language server. Its new place decides,
+                    // as the move connects an open file again, or as the next request asks
+                    return CompletableFuture.completedFuture(null);
+                }
+                var hook = beforeRegistration;
+                if (hook != null) {
+                    hook.run();
                 }
                 if (claim == null) {
                     promoteConnection(fileUri);
@@ -1175,8 +1212,7 @@ public class LanguageServerWrapper implements Disposable {
                         sendNotification(initializedServer, workspaceFolderNotificationManager.folderAddedNotification(folderToNotify));
                     }
 
-                    synchronizer = createDocumentContentSynchronizer(
-                            toUriString(fileUri), file, document, fileConnectionInfo);
+                    synchronizer = createDocumentContentSynchronizer(fileUriString, file, document, fileConnectionInfo);
                     // Synchronizer usually is disposed when document editor is closed.
                     // But in case of closing the project, it does not close all editors,
                     // so to ensure synchronizer is disposed we also register it here
@@ -1349,6 +1385,25 @@ public class LanguageServerWrapper implements Disposable {
         }
         if (stopIfNoOpenedFiles) {
             maybeShutdown();
+        }
+    }
+
+    /**
+     * Disconnects the document with the given URI if this language server has it connected, and returns whether it
+     * had. The check and the disconnection hold documentsLock, as a connection does as it checks the place of its file
+     * and registers the document: a connection then either registers the document before, which this finds, or checks
+     * the place of its file after, and sees where the file is now.
+     *
+     * @param fileUri the URI of the document.
+     * @return true if the document was connected and false otherwise.
+     */
+    boolean disconnectIfConnected(@NotNull URI fileUri) {
+        synchronized (documentsLock) {
+            if (!openedDocuments.containsKey(fileUri)) {
+                return false;
+            }
+            disconnect(fileUri, false);
+            return true;
         }
     }
 
@@ -2417,8 +2472,15 @@ public class LanguageServerWrapper implements Disposable {
         try {
             updateStatus(ServerStatus.stopping);
             removeStopTimer();
+            // A language client that fails to be disposed doesn't end the stop, which then fails at its end: the
+            // connection would stay open, and a later stop, as the dispose makes, would go through it all again
+            RuntimeException clientFailure = null;
             if (languageClient != null) {
-                languageClient.dispose();
+                try {
+                    languageClient.dispose();
+                } catch (RuntimeException e) {
+                    clientFailure = e;
+                }
             }
             if (current) {
                 currentInitializingContext = null;
@@ -2435,10 +2497,11 @@ public class LanguageServerWrapper implements Disposable {
                 }
             }
 
+            CompletableFuture<Void> stopped;
             if (isDisposed()) {
                 // When project is closing we shutdown everything in synch mode
                 shutdownAll(languageServer, lspStreamProvider, launcherFuture);
-                return CompletableFuture.completedFuture(null);
+                stopped = CompletableFuture.completedFuture(null);
             } else {
                 // We need to shutdown, kill and stop the process in a thread to avoid for instance
                 // stopping the new process created with a new start.
@@ -2453,8 +2516,12 @@ public class LanguageServerWrapper implements Disposable {
                         updateStatus(ServerStatus.stopped);
                     }
                 }, AppExecutorUtil.getAppExecutorService());
-                return runningStop;
+                stopped = runningStop;
             }
+            if (clientFailure != null) {
+                throw clientFailure;
+            }
+            return stopped;
         } finally {
             if (current) {
                 this.launcherFuture = null;

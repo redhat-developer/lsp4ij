@@ -10,8 +10,12 @@ package com.redhat.devtools.lsp4ij;
 import com.intellij.notification.Notification;
 import com.intellij.notification.Notifications;
 import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.application.ModalityState;
 import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.application.impl.NonBlockingReadActionImpl;
+import com.intellij.openapi.command.WriteCommandAction;
+import com.intellij.openapi.fileEditor.FileDocumentManager;
+import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.Disposer;
 import com.intellij.openapi.vfs.VirtualFile;
@@ -42,6 +46,10 @@ import com.redhat.devtools.lsp4ij.settings.LanguageServerSettings;
 import com.redhat.devtools.lsp4ij.settings.LanguageServerSettingsListener;
 import com.redhat.devtools.lsp4ij.settings.ProjectLanguageServerSettings;
 import com.redhat.devtools.lsp4ij.templates.ServerMappingSettings;
+import org.eclipse.lsp4j.FileOperationFilter;
+import org.eclipse.lsp4j.FileOperationOptions;
+import org.eclipse.lsp4j.FileOperationPattern;
+import org.eclipse.lsp4j.FileOperationsServerCapabilities;
 import org.eclipse.lsp4j.ServerCapabilities;
 import org.eclipse.lsp4j.WorkspaceFolder;
 import org.eclipse.lsp4j.WorkspaceFoldersOptions;
@@ -51,11 +59,16 @@ import org.eclipse.lsp4j.jsonrpc.messages.Message;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Queue;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.CyclicBarrier;
@@ -266,6 +279,7 @@ public class LanguageServerInstancesTest extends LSPCodeInsightFixtureTestCase {
 
     public void testAnInstanceThatFailsToStopAsItIsReplacedKeepsNoOtherInstanceRunning() throws Exception {
         definition.failingClientRoot = "a";
+        definition.clientFailures.add(new IllegalStateException("The language client fails to be disposed"));
         var a = instanceOf(file("a/one.per-folder"));
         var b = instanceOf(file("b/one.per-folder"));
         var serverOfB = definition.servers.get(1);
@@ -277,6 +291,56 @@ public class LanguageServerInstancesTest extends LSPCodeInsightFixtureTestCase {
         waitUntilDisposed(b);
         assertFalse(serverOfB.isRunning());
         assertEmpty(instances());
+    }
+
+    public void testACanceledDisposeOfAnInstanceThatFailedToStopLeavesTheOtherInstancesStarted() throws Exception {
+        definition.failingClientRoot = "a";
+        // The stop of the instance of a fails, and its dispose that follows is canceled
+        definition.clientFailures.add(new IllegalStateException("The language client fails to be disposed"));
+        definition.clientFeaturesFailures.add(new ProcessCanceledException());
+        var a = instanceOf(file("a/one.per-folder"));
+        var b = instanceOf(file("b/one.per-folder"));
+
+        // The registry logs what a listener throws, the cancellation too
+        fireStrategyChanged();
+
+        assertTrue(a.isDisposed());
+        assertFalse(b.isDisposed());
+        assertTrue("An instance that the canceled replacement did not reach must stay started, for a later change, "
+                + "removal or close to dispose", instances().contains(b));
+    }
+
+    public void testAnInstanceWhoseStopIsCanceledAsItIsReplacedIsDisposed() throws Exception {
+        definition.failingClientRoot = "a";
+        definition.clientFailures.add(new ProcessCanceledException());
+        var a = instanceOf(file("a/one.per-folder"));
+        var b = instanceOf(file("b/one.per-folder"));
+        var childDisposed = new AtomicBoolean();
+        Disposer.register(a, () -> childDisposed.set(true));
+
+        // The registry logs what a listener throws, the cancellation too
+        fireStrategyChanged();
+        PlatformTestUtil.dispatchAllEventsInIdeEventQueue();
+
+        assertTrue("An instance whose stop is canceled is no longer started, so it must be disposed", a.isDisposed());
+        assertTrue("Its children, such as its file listener, must be disposed too", childDisposed.get());
+        assertFalse(instances().contains(a));
+        assertTrue(instances().contains(b));
+    }
+
+    public void testAnInstanceThatFailsToStopAsItIsReplacedIsDisposedThroughTheDisposer() throws Exception {
+        definition.failingClientRoot = "a";
+        definition.clientFailures.add(new IllegalStateException("The language client fails to be disposed"));
+        var a = instanceOf(file("a/one.per-folder"));
+        instanceOf(file("b/one.per-folder"));
+        var childDisposed = new AtomicBoolean();
+        Disposer.register(a, () -> childDisposed.set(true));
+
+        fireStrategyChanged();
+        PlatformTestUtil.dispatchAllEventsInIdeEventQueue();
+
+        assertTrue(a.isDisposed());
+        assertTrue("The children of the instance, such as its file listener, must be disposed", childDisposed.get());
     }
 
     public void testANewInstanceThatAFailingFilterRefusesIsDisposed() throws Exception {
@@ -357,6 +421,173 @@ public class LanguageServerInstancesTest extends LSPCodeInsightFixtureTestCase {
         waitFor(servers);
         assertTrue("No instance may have the root chosen with the configuration before", instances().stream()
                 .noneMatch(instance -> instance.getInstanceRoot() != null && "a".equals(instance.getInstanceRoot().getName())));
+    }
+
+    public void testAFileThatMovesAsItsInstanceIsChosenGetsNoInstanceOfItsEarlierPlace() throws Exception {
+        var file = file("a/one.per-folder");
+        var bDirectory = file("b/other.per-folder").getVirtualFile().getParent();
+        definition.strategy.afterAsked = asked -> {
+            if (asked.equals(file.getVirtualFile())) {
+                definition.strategy.afterAsked = null;
+                // Once the strategy has chosen the folder of the file, before the request takes its instance
+                try {
+                    move(asked, bDirectory);
+                } catch (IOException e) {
+                    throw new UncheckedIOException(e);
+                }
+            }
+        };
+
+        assertEmpty(serversOf(file));
+        assertEmpty("No instance may start for the earlier place of the file", instances());
+    }
+
+    public void testAFileThatMovesWhileItsInstanceStartsIsNotConnectedToIt() throws Exception {
+        var file = file("a/one.per-folder");
+        var bDirectory = file("b/other.per-folder").getVirtualFile().getParent();
+        var initialize = new CompletableFuture<Void>();
+        definition.initializeGate = initialize;
+        var servers = accessor.getLanguageServers(file, null, null);
+        var a = instances().get(0);
+        assertEquals("a", a.getInstanceRoot().getName());
+
+        // As an undo can do while the instance starts: the instance has no file yet, so it sees no move
+        move(file.getVirtualFile(), bDirectory);
+        initialize.complete(null);
+
+        var result = waitFor(servers);
+        assertFalse("The instance of the earlier place of the file must not get it",
+                a.isConnectedTo(a.toUri(file.getVirtualFile())));
+        assertEmpty(result);
+    }
+
+    public void testAFileThatMovesWhileItsConnectionWaitsIsNotConnectedToItsEarlierPlace() throws Exception {
+        var a = instanceOf(file("a/one.per-folder"));
+        var file = file("a/two.per-folder");
+        var bDirectory = file("b/other.per-folder").getVirtualFile().getParent();
+        Queue<Runnable> waiting = new ConcurrentLinkedQueue<>();
+        a.setConnectionExecutor(waiting::add);
+        var earlierUri = a.toUri(file.getVirtualFile());
+        var servers = accessor.getLanguageServers(file, null, null);
+        PlatformTestUtil.waitWithEventsDispatching("The connection must wait", () -> !waiting.isEmpty(), TIMEOUT);
+
+        // The instance has no document of the file yet, so it sees no move
+        move(file.getVirtualFile(), bDirectory);
+        a.setConnectionExecutor(AppExecutorUtil.getAppExecutorService());
+        waiting.forEach(AppExecutorUtil.getAppExecutorService()::execute);
+
+        var result = waitFor(servers);
+        assertFalse("The instance must not get the file with the URI of its earlier place", a.isConnectedTo(earlierUri));
+        assertEmpty(result);
+    }
+
+    public void testAConnectionAsksTheUriSupportForNoUriWhileItHoldsTheLockOfTheDocuments() throws Exception {
+        var a = instanceOf(file("a/one.per-folder"));
+        var file = file("a/two.per-folder");
+        var documentsLock = documentsLock(a);
+        var askedUnderTheLock = new AtomicBoolean();
+        definition.uriAsked = asked -> {
+            if (asked.equals(file.getVirtualFile()) && Thread.holdsLock(documentsLock)) {
+                askedUnderTheLock.set(true);
+            }
+        };
+
+        waitFor(accessor.getLanguageServers(file, null, null));
+
+        // A URI support can take a read action, which a write action that waits for the lock, as a move does, holds off
+        assertFalse("The URI support must not be asked under the lock of the documents", askedUnderTheLock.get());
+        assertTrue(a.isConnectedTo(a.toUri(file.getVirtualFile())));
+    }
+
+    public void testTheConnectionOfAMovedDocumentAsksTheUriSupportOnlyOutsideTheLockOfTheDocuments() throws Exception {
+        var a = instanceOf(file("a/one.per-folder"));
+        var file = file("a/two.per-folder").getVirtualFile();
+        var uri = a.toUri(file);
+        var documentsLock = documentsLock(a);
+        var askedUnderTheLock = new AtomicBoolean();
+        definition.uriAsked = asked -> {
+            if (asked.equals(file) && Thread.holdsLock(documentsLock)) {
+                askedUnderTheLock.set(true);
+            }
+        };
+        definition.uriWritten = written -> {
+            if (written.equals(uri) && Thread.holdsLock(documentsLock)) {
+                askedUnderTheLock.set(true);
+            }
+        };
+        var document = FileDocumentManager.getInstance().getDocument(file);
+        assertNotNull(document);
+
+        // As a move connects an open document again at its new place
+        waitFor(a.connect(file, a.createFileConnectionInfo(file, document, true)));
+
+        // A URI support can take a read action, which a write action that waits for the lock, as a move does, holds off
+        assertFalse("The URI support must not be asked under the lock of the documents", askedUnderTheLock.get());
+        assertTrue(a.isConnectedTo(uri));
+    }
+
+    public void testAFileThatMovesAsItsConnectionTakesItsUriIsNotConnectedToTheInstanceOfItsEarlierPlace()
+            throws Exception {
+        var a = instanceOf(file("a/one.per-folder"));
+        var file = file("a/two.per-folder");
+        var bDirectory = file("b/other.per-folder").getVirtualFile().getParent();
+        var armed = new AtomicBoolean();
+        var moved = new AtomicBoolean();
+        definition.uriAsked = asked -> {
+            // The connection takes the URI of the file on its own thread, after the filter that arms this
+            if (asked.equals(file.getVirtualFile()) && !ApplicationManager.getApplication().isDispatchThread()
+                    && armed.compareAndSet(true, false)) {
+                ApplicationManager.getApplication().invokeAndWait(() -> {
+                    try {
+                        move(asked, bDirectory);
+                    } catch (IOException e) {
+                        throw new UncheckedIOException(e);
+                    }
+                }, ModalityState.nonModal());
+                moved.set(true);
+            }
+        };
+
+        // The filter runs just before the connection starts
+        var servers = accessor.getLanguageServers(file, null, features -> {
+            armed.set(true);
+            return true;
+        });
+
+        var result = waitFor(servers);
+        assertTrue("The file must move as its connection takes its URI", moved.get());
+        assertFalse("The instance of the earlier place of the file must not get it",
+                a.isConnectedTo(a.toUri(file.getVirtualFile())));
+        assertEmpty(result);
+    }
+
+    public void testAFileThatMovesAsItsDocumentIsRegisteredDoesNotStayAtItsEarlierPlace() throws Exception {
+        // The move takes the documents along, which it sees for a language server with workspace/didRenameFiles
+        definition.renameFilesSupported = true;
+        var a = instanceOf(file("a/one.per-folder"));
+        var file = file("a/two.per-folder");
+        var virtualFile = file.getVirtualFile();
+        var bDirectory = file("b/other.per-folder").getVirtualFile().getParent();
+        var earlierUri = a.toUri(virtualFile);
+        var earlierUrl = virtualFile.getUrl();
+        var holding = new AtomicBoolean();
+        // The connection has checked the place of the file, and waits until the file moved before it registers the
+        // document
+        a.setBeforeRegistration(() -> {
+            if (holding.compareAndSet(false, true)) {
+                var deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(TIMEOUT);
+                while (virtualFile.getUrl().equals(earlierUrl) && System.nanoTime() < deadline) {
+                    Thread.onSpinWait();
+                }
+            }
+        });
+        var servers = accessor.getLanguageServers(file, null, null);
+        PlatformTestUtil.waitWithEventsDispatching("The connection must check the place of the file", holding::get, TIMEOUT);
+
+        move(virtualFile, bDirectory);
+
+        waitFor(servers);
+        assertFalse("The instance of the earlier place of the file must not keep it", a.isConnectedTo(earlierUri));
     }
 
     public void testAReplacedInstanceIsDisposedOnTheUiThread() throws Exception {
@@ -1084,6 +1315,16 @@ public class LanguageServerInstancesTest extends LSPCodeInsightFixtureTestCase {
         return myFixture.addFileToProject(path, "text");
     }
 
+    private void move(@NotNull VirtualFile file, @NotNull VirtualFile target) throws IOException {
+        WriteCommandAction.writeCommandAction(myFixture.getProject()).run(() -> file.move(this, target));
+    }
+
+    private static Object documentsLock(LanguageServerWrapper wrapper) throws ReflectiveOperationException {
+        var field = LanguageServerWrapper.class.getDeclaredField("documentsLock");
+        field.setAccessible(true);
+        return field.get(wrapper);
+    }
+
     private @NotNull LanguageServerWrapper instanceOf(@NotNull PsiFile file) throws Exception {
         var servers = serversOf(file);
         assertEquals(1, servers.size());
@@ -1250,8 +1491,23 @@ public class LanguageServerInstancesTest extends LSPCodeInsightFixtureTestCase {
         volatile @Nullable Runnable strategyCreation;
         // The name of the root whose instance can't start
         volatile @Nullable String failingRoot;
-        // The name of the root whose instance has a language client that fails as a stop disposes it
+        // The name of the root whose instance has a language client and client features that fail as they are
+        // disposed, the language client as a stop disposes it, and the client features as the dispose of the instance
+        // does, after the stop
         volatile @Nullable String failingClientRoot;
+        // What that language client throws as it is disposed, one at each dispose, until they are used up. A stop
+        // that fails there leaves the connection open, which the dispose then closes
+        final Queue<RuntimeException> clientFailures = new ConcurrentLinkedQueue<>();
+        // What these client features throw as they are disposed, one at each dispose, until they are used up
+        final Queue<RuntimeException> clientFeaturesFailures = new ConcurrentLinkedQueue<>();
+        // Holds the initialize replies of the instances that start, until it completes
+        volatile @Nullable CompletableFuture<Void> initializeGate;
+        // Is given each file whose URI the client features are asked for
+        volatile @Nullable Consumer<VirtualFile> uriAsked;
+        // Is given each URI that the client features write as text
+        volatile @Nullable Consumer<URI> uriWritten;
+        // Whether the language servers that start support workspace/didRenameFiles
+        volatile boolean renameFilesSupported;
 
         PerFolderDefinition() {
             super("per-folder-server", false);
@@ -1259,7 +1515,12 @@ public class LanguageServerInstancesTest extends LSPCodeInsightFixtureTestCase {
 
         @Override
         public @NotNull StreamConnectionProvider createConnectionProvider(@NotNull Project project) {
-            var server = new MockLanguageServer(PerFolderDefinition::capabilities);
+            var server = new MockLanguageServer(this::capabilities);
+            var gate = initializeGate;
+            if (gate != null) {
+                var held = server.holdInitialize();
+                gate.thenRun(() -> held.complete(null));
+            }
             servers.add(server);
             return new MockConnectionProvider(server);
         }
@@ -1269,7 +1530,7 @@ public class LanguageServerInstancesTest extends LSPCodeInsightFixtureTestCase {
                                                                           @NotNull WorkspaceFolder instanceRoot) {
             connectionFolders.add(instanceRoot);
             if (instanceRoot.getName().equals(failingRoot)) {
-                return new MockConnectionProvider(new MockLanguageServer(PerFolderDefinition::capabilities)) {
+                return new MockConnectionProvider(new MockLanguageServer(this::capabilities)) {
                     @Override
                     public void start() throws CannotStartProcessException {
                         throw new CannotStartProcessException("Cannot run program \"missing\"");
@@ -1288,7 +1549,10 @@ public class LanguageServerInstancesTest extends LSPCodeInsightFixtureTestCase {
                     @Override
                     public void dispose() {
                         super.dispose();
-                        throw new IllegalStateException("The language client fails to be disposed");
+                        var failure = clientFailures.poll();
+                        if (failure != null) {
+                            throw failure;
+                        }
                     }
                 };
             }
@@ -1300,11 +1564,35 @@ public class LanguageServerInstancesTest extends LSPCodeInsightFixtureTestCase {
             var features = new LSPClientFeatures() {
                 @Override
                 public void dispose() {
-                    boolean ofNoLanguageServer = getServerWrapper() == null;
+                    var languageServer = getServerWrapper();
                     super.dispose();
-                    if (ofNoLanguageServer) {
+                    if (languageServer == null) {
                         disposedWithoutLanguageServer.incrementAndGet();
+                    } else if (languageServer.getInstanceRoot() != null
+                            && languageServer.getInstanceRoot().getName().equals(failingClientRoot)) {
+                        var failure = clientFeaturesFailures.poll();
+                        if (failure != null) {
+                            throw failure;
+                        }
                     }
+                }
+
+                @Override
+                public @Nullable URI getFileUri(@NotNull VirtualFile file) {
+                    var asked = uriAsked;
+                    if (asked != null) {
+                        asked.accept(file);
+                    }
+                    return super.getFileUri(file);
+                }
+
+                @Override
+                public @Nullable String toString(@NotNull URI fileUri, boolean directory) {
+                    var written = uriWritten;
+                    if (written != null) {
+                        written.accept(fileUri);
+                    }
+                    return super.toString(fileUri, directory);
                 }
             };
             return features.setWorkspaceFolderFeature(new LSPWorkspaceFolderFeature() {
@@ -1323,12 +1611,18 @@ public class LanguageServerInstancesTest extends LSPCodeInsightFixtureTestCase {
             });
         }
 
-        private static ServerCapabilities capabilities() {
+        private ServerCapabilities capabilities() {
             var folders = new WorkspaceFoldersOptions();
             folders.setSupported(true);
             folders.setChangeNotifications(true);
             var workspace = new WorkspaceServerCapabilities();
             workspace.setWorkspaceFolders(folders);
+            if (renameFilesSupported) {
+                var operations = new FileOperationsServerCapabilities();
+                operations.setDidRename(new FileOperationOptions(List.of(
+                        new FileOperationFilter(new FileOperationPattern("**/*.per-folder")))));
+                workspace.setFileOperations(operations);
+            }
             var capabilities = MockLanguageServer.defaultServerCapabilities();
             capabilities.setWorkspace(workspace);
             return capabilities;

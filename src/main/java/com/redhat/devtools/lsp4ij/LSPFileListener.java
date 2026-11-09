@@ -23,7 +23,6 @@ import com.intellij.util.concurrency.AppExecutorUtil;
 import com.redhat.devtools.lsp4ij.features.files.AbstractLSPFileListener;
 import org.eclipse.lsp4j.*;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -109,30 +108,33 @@ class LSPFileListener extends AbstractLSPFileListener {
         // The new place of the document can belong to another language server instance or to none. The workspace
         // folder strategy can need read access and do I/O, so it is asked in the background, after the move
         var serverDefinition = languageServerWrapper.getServerDefinition();
-        var project = languageServerWrapper.getProject();
-        // A document that was closed meanwhile creates no instance
-        ReadAction.nonBlocking(() -> new InstanceOfMovedDocument(file.getUrl(), isOpenDocument(languageServerWrapper, file)
-                        ? LanguageServiceAccessor.getInstance(project).getOrCreateInstanceOf(file, serverDefinition)
-                        : null))
+        var accessor = LanguageServiceAccessor.getInstance(languageServerWrapper.getProject());
+        // A document that was closed meanwhile gets no instance
+        ReadAction.nonBlocking(() -> isOpenDocument(languageServerWrapper, file)
+                        ? accessor.chooseInstance(file, serverDefinition)
+                        : null)
                 .expireWith(languageServerWrapper)
                 .submit(AppExecutorUtil.getAppExecutorService())
                 .onSuccess(choice -> ApplicationManager.getApplication().invokeLater(() -> {
+                    if (choice == null || !isOpenDocument(languageServerWrapper, file)) {
+                        // Nor does a document that was closed since the choice, or the document of a language server
+                        // that is gone meanwhile, as when its definition was removed
+                        return;
+                    }
                     if (!choice.url().equals(file.getUrl())) {
                         // The document moved again before it was connected, so no instance saw that move: its new
                         // place decides again
                         reconnectMovedDocument(file);
-                    } else if (choice.instance() != null && choice.instance().isEnabled()) {
+                        return;
+                    }
+                    // Only now that the document is still there: an instance created for a place that it left before
+                    // it was connected would stay without a document
+                    var instance = accessor.getOrCreateInstanceOf(file, serverDefinition, choice);
+                    if (instance != null && instance.isEnabled()) {
                         // An instance that a stop switched off gets no moved document, as it gets no opened one
-                        reconnectMovedDocument(choice.instance(), file);
+                        reconnectMovedDocument(instance, file);
                     }
                 }, ModalityState.any()));
-    }
-
-    /**
-     * The language server instance chosen for a moved document, or null if none serves it, and the URL of the
-     * document's place that it was chosen for.
-     */
-    private record InstanceOfMovedDocument(@NotNull String url, @Nullable LanguageServerWrapper instance) {
     }
 
     private void reconnectMovedDocument(@NotNull LanguageServerWrapper languageServer, @NotNull VirtualFile file) {
@@ -358,10 +360,9 @@ class LSPFileListener extends AbstractLSPFileListener {
 
         URI oldFileUri = getUri(virtualParentFile, oldFileName);
         URI newFileUri = languageServerWrapper.toUri(newFile);
-        boolean docIsConnected = languageServerWrapper.isConnectedTo(oldFileUri);
-        if (docIsConnected) {
-            // 1. Send a textDocument/didClose for the old file name
-            languageServerWrapper.disconnect(oldFileUri, false);
+        // 1. Send a textDocument/didClose for the old file name. The check and the disconnection are one step, so that a
+        // connection that registers the document with the old file name meanwhile can't escape the move
+        if (languageServerWrapper.disconnectIfConnected(oldFileUri)) {
             // 2. Reconnect after the VFS write action has completed, instead of waiting here for
             // the server while holding the write lock. The notification queue keeps didClose
             // ahead of the new didOpen.
