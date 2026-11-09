@@ -8,10 +8,14 @@
 package com.redhat.devtools.lsp4ij.features.codeAction;
 
 import com.intellij.codeInsight.intention.IntentionAction;
+import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.project.DumbService;
 import com.intellij.testFramework.DumbModeTestUtils;
 import com.redhat.devtools.lsp4ij.fixtures.LSPCodeActionFixtureTestCase;
 import com.redhat.devtools.lsp4ij.mock.MockLanguageServer;
+
+import java.util.concurrent.TimeUnit;
 
 /**
  * LSP intentions are DumbAware, as IntelliJ 2025.3 and later offer an intention which isn't only in files they index,
@@ -30,18 +34,27 @@ public class CodeActionsWhileIndexingTest extends LSPCodeActionFixtureTestCase {
         assertTrue(DumbService.isDumbAware(greetingIntention()));
     }
 
-    public void testAnIntentionIsNotAvailableAndSendsNoRequestWhileIndexing() {
+    public void testAnIntentionIsNotAvailableAndSendsNoRequestWhileIndexing() throws Exception {
         var intention = greetingIntention();
-        var project = myFixture.getProject();
         int requests = codeActionRequests();
 
-        DumbModeTestUtils.runInDumbModeSynchronously(project, () -> {
+        DumbModeTestUtils.runInDumbModeSynchronously(myFixture.getProject(), () -> {
             // a range which needs a new request
             myFixture.getEditor().getCaretModel().moveToOffset(2);
 
-            assertFalse(intention.isAvailable(project, myFixture.getEditor(), myFixture.getFile()));
+            assertFalse(isAvailable(intention));
             assertEquals(requests, codeActionRequests());
         });
+    }
+
+    /**
+     * Asks in a read action on a pooled thread, as IntelliJ's intention pass does. There an intention waits for its code
+     * actions, unlike on the EDT, so that a request it sends has been received when it answers.
+     */
+    private boolean isAvailable(IntentionAction intention) throws Exception {
+        return ApplicationManager.getApplication().executeOnPooledThread(() -> ReadAction.compute(() ->
+                        intention.isAvailable(myFixture.getProject(), myFixture.getEditor(), myFixture.getFile())))
+                .get(10, TimeUnit.SECONDS);
     }
 
     private IntentionAction greetingIntention() {

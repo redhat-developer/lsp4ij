@@ -219,6 +219,7 @@ public class LSPLazyCodeActionsTest extends LSPCodeInsightFixtureTestCase {
             assertEquals("", onPooledThread(quickFix::getText));
             assertEquals(LanguageServerBundle.message("lsp.intention.code.action.kind.empty"),
                     onPooledThread(quickFix::getFamilyName));
+            assertFalse(onPooledThread(() -> quickFix.isAvailable(myFixture.getProject(), myFixture.getEditor(), file)));
             assertEquals(0, textDocumentService.codeActionRequests);
         });
 
