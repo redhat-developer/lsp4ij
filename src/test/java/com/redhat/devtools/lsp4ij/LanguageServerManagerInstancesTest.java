@@ -448,6 +448,17 @@ public class LanguageServerManagerInstancesTest extends LSPCodeInsightFixtureTes
         assertFalse(a.isConnectedTo(a.toUri(file)));
     }
 
+    public void testTheInstanceThatAMovedFileLeavesStopsOnceItHasNoDocumentLeft() throws Exception {
+        var file = file("a/moved.instances").getVirtualFile();
+        var a = openAndConnect(file);
+
+        move(file, myFixture.getTempDirFixture().findOrCreateDir("b"));
+
+        assertEquals("b", waitForTheInstanceConnectedTo(file).getInstanceRoot().getName());
+        // As when the last editor of its last document closes
+        waitForStatus(a, ServerStatus.stopped);
+    }
+
     public void testAMovedFileWithoutARootIsConnectedToNoInstance() throws Exception {
         var file = file("a/moved.instances").getVirtualFile();
         var a = openAndConnect(file);

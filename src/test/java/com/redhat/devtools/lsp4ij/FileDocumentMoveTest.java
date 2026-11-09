@@ -408,6 +408,78 @@ public class FileDocumentMoveTest extends LSPCodeInsightFixtureTestCase {
         }
     }
 
+    public void testALanguageServerStopsOnceItsLastDocumentIsRenamedToANameThatItDoesNotMatch() throws Exception {
+        var file = myFixture.getTempDirFixture().createFile("source/test.foo", "disk");
+        var editor = EditorFactory.getInstance().createEditor(LSPIJUtils.getDocument(file), myFixture.getProject());
+        try {
+            var wrapper = connect(file).wrapper();
+            assertTrue(wrapper.isActive());
+
+            write(() -> file.rename(this, "test.txt"));
+
+            // As when the last editor of its last document closes
+            PlatformTestUtil.waitWithEventsDispatching("The language server must stop, as it has no document left",
+                    () -> !wrapper.isActive(), 10);
+        } finally {
+            EditorFactory.getInstance().releaseEditor(editor);
+        }
+    }
+
+    public void testALanguageServerStopsOnceItsClientFeaturesLeaveOutItsLastDocumentAtTheNewPlaceOfItsFile()
+            throws Exception {
+        var definition = new MockLanguageServerDefinition("leaves-out-off", false) {
+            @Override
+            public @NotNull LSPClientFeatures createClientFeatures() {
+                return new LSPClientFeatures() {
+                    @Override
+                    public boolean isEnabled(@NotNull VirtualFile file) {
+                        return super.isEnabled(file) && !file.getName().startsWith("off");
+                    }
+                };
+            }
+        };
+        LanguageServersRegistry.getInstance().addServerDefinition(myFixture.getProject(), definition,
+                List.of(ServerMappingSettings.createFileNamePatternsMappingSettings(List.of("*.bar"), null)));
+        var file = myFixture.getTempDirFixture().createFile("source/on.bar", "disk");
+        var editor = EditorFactory.getInstance().createEditor(LSPIJUtils.getDocument(file), myFixture.getProject());
+        try {
+            var wrapper = connect(file).wrapper();
+            assertTrue(wrapper.isActive());
+
+            write(() -> file.rename(this, "off.bar"));
+
+            PlatformTestUtil.waitWithEventsDispatching("The language server must stop, as it has no document left",
+                    () -> !wrapper.isActive(), 10);
+        } finally {
+            EditorFactory.getInstance().releaseEditor(editor);
+            LanguageServersRegistry.getInstance().removeServerDefinition(myFixture.getProject(), definition);
+        }
+    }
+
+    public void testALanguageServerStopsOnceTheEditorOfItsLastDocumentClosesAsTheMoveConnectsItAgain() throws Exception {
+        var file = myFixture.getTempDirFixture().createFile("source/test.foo", "disk");
+        var editor = EditorFactory.getInstance().createEditor(LSPIJUtils.getDocument(file), myFixture.getProject());
+        var released = false;
+        var wrapper = connect(file).wrapper();
+        Queue<Runnable> waiting = new ConcurrentLinkedQueue<>();
+        wrapper.setConnectionExecutor(waiting::add);
+        try {
+            write(() -> file.rename(this, "renamed.foo"));
+            PlatformTestUtil.waitWithEventsDispatching("The move must connect the file again", () -> !waiting.isEmpty(), 10);
+            EditorFactory.getInstance().releaseEditor(editor);
+            released = true;
+            waiting.poll().run();
+
+            PlatformTestUtil.waitWithEventsDispatching("The language server must stop, as it has no document left",
+                    () -> !wrapper.isActive(), 10);
+        } finally {
+            wrapper.setConnectionExecutor(AppExecutorUtil.getAppExecutorService());
+            if (!released) {
+                EditorFactory.getInstance().releaseEditor(editor);
+            }
+        }
+    }
+
     /**
      * A document matcher that answers later: with the future given for the name of the file, and with a match
      * otherwise. It keeps the names of the files that it was asked about.

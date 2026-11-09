@@ -1474,7 +1474,12 @@ public class LanguageServerWrapper implements Disposable {
         return moved;
     }
 
-    private void maybeShutdown() {
+    /**
+     * Stops this language server if it has no document left and nothing keeps it alive, once the time that its
+     * definition gives after the last document has passed, or at once. The caller must not hold documentsLock: the stop
+     * takes this wrapper's monitor before it.
+     */
+    void maybeShutdown() {
         if (!keepAlive()) {
             if (this.serverDefinition.getLastDocumentDisconnectedTimeout() != 0 && !ApplicationManager.getApplication().isUnitTestMode()) {
                 removeStopTimer();

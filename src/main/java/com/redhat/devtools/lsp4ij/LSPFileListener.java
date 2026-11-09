@@ -137,6 +137,7 @@ class LSPFileListener extends AbstractLSPFileListener {
                 .submit(AppExecutorUtil.getAppExecutorService())
                 .onSuccess(place -> {
                     if (place == null) {
+                        stopIfIdle(languageServerWrapper);
                         return;
                     }
                     // A document matcher can answer later
@@ -144,6 +145,7 @@ class LSPFileListener extends AbstractLSPFileListener {
                         if (!isOpenDocument(languageServerWrapper, file)) {
                             // Nor is a document that was closed since connected, or the document of a language server
                             // that is gone meanwhile, as when its definition was removed
+                            stopIfIdle(languageServerWrapper);
                             return;
                         }
                         if (!place.url().equals(file.getUrl())) {
@@ -158,10 +160,12 @@ class LSPFileListener extends AbstractLSPFileListener {
                                 LOGGER.warn("Cannot match moved document {} to '{}'", place.url(),
                                         serverDefinition.getDisplayName(), failure);
                             }
+                            stopIfIdle(languageServerWrapper);
                             return;
                         }
                         if (!matched) {
                             // The definition no longer matches the file at its new place
+                            stopIfIdle(languageServerWrapper);
                             return;
                         }
                         // Only now that the document is still there: an instance created for a place that it left
@@ -169,11 +173,26 @@ class LSPFileListener extends AbstractLSPFileListener {
                         var languageServer = place.choice() != null
                                 ? accessor.getOrCreateInstanceOf(file, serverDefinition, place.choice())
                                 : languageServerWrapper;
+                        if (languageServer != languageServerWrapper) {
+                            // The document goes to the instance of its new place, or to none
+                            stopIfIdle(languageServerWrapper);
+                        }
                         if (languageServer != null) {
                             reconnectMovedDocument(languageServer, file);
                         }
                     }, ModalityState.any()));
                 });
+    }
+
+    /**
+     * Lets a language server that a moved document doesn't come back to stop once it has no document left, as the
+     * close of the last editor of a document does: the move disconnected the document without that, to connect it
+     * again.
+     */
+    private static void stopIfIdle(@NotNull LanguageServerWrapper languageServer) {
+        if (!languageServer.isDisposed() && languageServer.isActive()) {
+            languageServer.maybeShutdown();
+        }
     }
 
     /**
@@ -190,6 +209,9 @@ class LSPFileListener extends AbstractLSPFileListener {
             // A language server that a stop switched off meanwhile gets no moved document, as it gets no opened one:
             // the connection would start it again. Nor does one whose client features leave out the file at its new
             // place, as a request leaves it out
+            if (languageServer == languageServerWrapper) {
+                stopIfIdle(languageServer);
+            }
             return;
         }
         URI uri = languageServer.toUri(file);
@@ -218,6 +240,8 @@ class LSPFileListener extends AbstractLSPFileListener {
                 if (open) {
                     // The file moved again: its new place decides again which instance gets it
                     reconnectMovedDocument(file);
+                } else {
+                    stopIfIdle(languageServer);
                 }
             } else if (failure != null) {
                 LOGGER.warn("Cannot reconnect moved document {}", uri, failure);
