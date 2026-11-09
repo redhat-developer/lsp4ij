@@ -145,7 +145,7 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
         this.debugMode = debugMode;
         this.serverTrace = serverTrace;
         this.parentClient = parentClient;
-        this.childrenClient = new ArrayList<>();
+        this.childrenClient = new CopyOnWriteArrayList<>();
     }
 
     @NotNull
@@ -813,10 +813,12 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
             root = root.parentClient;
         }
         if (parentClient != null) {
-            parentClient.childrenClient.remove(this);
+            // In one list or the other at any time, so that a parent being disposed meanwhile disposes it
             parentClient.terminatedChildren.add(this);
+            parentClient.childrenClient.remove(this);
         }
-        if (Boolean.TRUE.equals(args.getRestart()) || root.hasLiveSession()) {
+        // TODO : manage args.getRestart()
+        if (root.hasLiveSession()) {
             return;
         }
         root.debugProcess.stop();
@@ -829,7 +831,13 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
         if (!terminatedReceived) {
             return true;
         }
-        for (DAPClient child : List.copyOf(childrenClient)) {
+        for (DAPClient child : childrenClient) {
+            if (child.hasLiveSession()) {
+                return true;
+            }
+        }
+        // A terminated child may still have live children of its own
+        for (DAPClient child : terminatedChildren) {
             if (child.hasLiveSession()) {
                 return true;
             }
