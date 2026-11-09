@@ -112,7 +112,7 @@ public class LSPInlayHintsSupport extends AbstractLSPDocumentFeatureSupport<Inla
                                 }
                             });
                     // Wait for the inlayHint/resolve requests, and keep the inlay hints which have a valid label
-                    return CompletableFuture.allOf(data.toArray(new CompletableFuture[0]))
+                    return CompletableFuture.allOf(data.toArray(new CompletableFuture<?>[0]))
                             .thenApply(unused -> data.stream()
                                     .map(CompletableFuture::join)
                                     .filter(Objects::nonNull)

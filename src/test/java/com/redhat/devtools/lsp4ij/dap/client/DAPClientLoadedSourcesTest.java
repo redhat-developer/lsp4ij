@@ -57,7 +57,7 @@ public class DAPClientLoadedSourcesTest extends BasePlatformTestCase {
     }
 
     private IDebugProtocolServer server(boolean fails) {
-        return (IDebugProtocolServer) Proxy.newProxyInstance(IDebugProtocolServer.class.getClassLoader(), new Class[]{IDebugProtocolServer.class}, (proxy, method, args) -> {
+        return (IDebugProtocolServer) Proxy.newProxyInstance(IDebugProtocolServer.class.getClassLoader(), new Class<?>[]{IDebugProtocolServer.class}, (proxy, method, args) -> {
             switch (method.getName()) {
                 case "loadedSources" -> {
                     asked.add("loadedSources");

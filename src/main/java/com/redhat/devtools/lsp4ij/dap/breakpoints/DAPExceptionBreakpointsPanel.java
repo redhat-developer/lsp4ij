@@ -51,7 +51,7 @@ public class DAPExceptionBreakpointsPanel extends BorderLayoutPanel implements D
         this.breakpointHandler = breakpointHandler;
 
         // Create Table view
-        this.myModel = new ListTableModel<>(new ColumnInfo[]{ENABLED_COLUMN, NAME_COLUMN, new ConditionColumnInfo()});
+        this.myModel = new ListTableModel<>(new ColumnInfo<?, ?>[]{ENABLED_COLUMN, NAME_COLUMN, new ConditionColumnInfo()});
         this.myModel.setSortable(true);
         this.myTable = new TableView<>(this.myModel);
         this.addToCenter(ScrollPaneFactory.createScrollPane(this.myTable));

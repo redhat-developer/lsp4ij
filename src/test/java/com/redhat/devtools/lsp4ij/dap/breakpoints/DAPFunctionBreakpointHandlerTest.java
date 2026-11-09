@@ -303,7 +303,7 @@ public class DAPFunctionBreakpointHandlerTest extends HeavyPlatformTestCase {
                 return true;
             }
         };
-        var session = (XDebugSession) Proxy.newProxyInstance(XDebugSession.class.getClassLoader(), new Class[]{XDebugSession.class}, (p, m, a) -> {
+        var session = (XDebugSession) Proxy.newProxyInstance(XDebugSession.class.getClassLoader(), new Class<?>[]{XDebugSession.class}, (p, m, a) -> {
             if (m.getName().equals("addSessionListener")) {
                 sessionListeners.add((XDebugSessionListener) a[0]);
             }
@@ -339,7 +339,7 @@ public class DAPFunctionBreakpointHandlerTest extends HeavyPlatformTestCase {
      * Returns a DAP server which answers each request when the test completes its answer, in the given list.
      */
     private IDebugProtocolServer pendingServer(List<CompletableFuture<SetFunctionBreakpointsResponse>> answers) {
-        return (IDebugProtocolServer) Proxy.newProxyInstance(IDebugProtocolServer.class.getClassLoader(), new Class[]{IDebugProtocolServer.class}, (p, m, a) -> {
+        return (IDebugProtocolServer) Proxy.newProxyInstance(IDebugProtocolServer.class.getClassLoader(), new Class<?>[]{IDebugProtocolServer.class}, (p, m, a) -> {
             switch (m.getName()) {
                 case "setFunctionBreakpoints" -> {
                     requests.add((SetFunctionBreakpointsArguments) a[0]);
@@ -359,7 +359,7 @@ public class DAPFunctionBreakpointHandlerTest extends HeavyPlatformTestCase {
     }
 
     private IDebugProtocolServer server(Function<SetFunctionBreakpointsArguments, Breakpoint[]> answers) {
-        return (IDebugProtocolServer) Proxy.newProxyInstance(IDebugProtocolServer.class.getClassLoader(), new Class[]{IDebugProtocolServer.class}, (p, m, a) -> {
+        return (IDebugProtocolServer) Proxy.newProxyInstance(IDebugProtocolServer.class.getClassLoader(), new Class<?>[]{IDebugProtocolServer.class}, (p, m, a) -> {
             switch (m.getName()) {
                 case "setFunctionBreakpoints" -> {
                     var arguments = (SetFunctionBreakpointsArguments) a[0];

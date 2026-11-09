@@ -76,7 +76,7 @@ public class CompletableFutures {
     public static <T> @NotNull CompletableFuture<List<T>> mergeInOneFuture(@NotNull List<CompletableFuture<List<T>>> futures,
                                                                            @NotNull CancellationSupport cancellationSupport) {
         CompletableFuture<Void> allFutures = cancellationSupport
-                .execute(CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])));
+                .execute(CompletableFuture.allOf(futures.toArray(new CompletableFuture<?>[0])));
         return allFutures.thenApply(Void -> {
             List<T> mergedDataList = new ArrayList<>(futures.size());
             for (CompletableFuture<List<T>> dataListFuture : futures) {

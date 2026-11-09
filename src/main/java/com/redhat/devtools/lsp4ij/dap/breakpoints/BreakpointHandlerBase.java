@@ -47,7 +47,7 @@ public abstract class BreakpointHandlerBase<B extends XBreakpoint<?>> extends XB
 
     private static final Logger LOGGER = LoggerFactory.getLogger(BreakpointHandlerBase.class);
 
-    protected static final CompletableFuture<?>[] EMPTY_COMPLETABLE_FUTURES = new CompletableFuture[0];
+    protected static final CompletableFuture<?>[] EMPTY_COMPLETABLE_FUTURES = new CompletableFuture<?>[0];
     protected static final @NotNull Key<Integer> DAP_BREAKPOINT_ID = Key.create("dap.breakpoint.id");
 
     protected final @NotNull XDebugSession debugSession;

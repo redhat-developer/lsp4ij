@@ -308,7 +308,7 @@ public class DAPShadowedBreakpointTest extends HeavyPlatformTestCase {
      */
     private static IDebugProtocolServer server(List<SetBreakpointsArguments> requests, @Nullable String pendingMessage) {
         var requestCount = new java.util.concurrent.atomic.AtomicInteger();
-        return (IDebugProtocolServer) Proxy.newProxyInstance(IDebugProtocolServer.class.getClassLoader(), new Class[]{IDebugProtocolServer.class}, (p, m, a) -> {
+        return (IDebugProtocolServer) Proxy.newProxyInstance(IDebugProtocolServer.class.getClassLoader(), new Class<?>[]{IDebugProtocolServer.class}, (p, m, a) -> {
             if (m.getName().equals("setBreakpoints")) {
                 var arguments = (SetBreakpointsArguments) a[0];
                 requests.add(arguments);

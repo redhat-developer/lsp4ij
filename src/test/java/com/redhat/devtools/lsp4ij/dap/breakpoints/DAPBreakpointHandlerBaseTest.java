@@ -46,10 +46,10 @@ public class DAPBreakpointHandlerBaseTest extends HeavyPlatformTestCase {
                 return true;
             }
         };
-        var session = (XDebugSession)Proxy.newProxyInstance(XDebugSession.class.getClassLoader(),new Class[]{XDebugSession.class}, (p, m, a) -> null);
+        var session = (XDebugSession)Proxy.newProxyInstance(XDebugSession.class.getClassLoader(),new Class<?>[]{XDebugSession.class}, (p, m, a) -> null);
         var handler = new DAPBreakpointHandlerBase<XLineBreakpoint<DAPBreakpointProperties>>(DAPBreakpointType.class, session, descriptor, getProject()) {};
         var requests = new ArrayList<SetBreakpointsArguments>();
-        var server = (IDebugProtocolServer)Proxy.newProxyInstance(IDebugProtocolServer.class.getClassLoader(),new Class[]{IDebugProtocolServer.class}, (p, m, a) -> {
+        var server = (IDebugProtocolServer)Proxy.newProxyInstance(IDebugProtocolServer.class.getClassLoader(),new Class<?>[]{IDebugProtocolServer.class}, (p, m, a) -> {
             if (m.getName().equals("setBreakpoints")) {
                 requests.add((SetBreakpointsArguments) a[0]);
                 var response = new SetBreakpointsResponse();

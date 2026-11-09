@@ -120,7 +120,7 @@ public class DAPClientInvalidatedTest {
     }
 
     private XDebugSession session(boolean suspended) {
-        return (XDebugSession) Proxy.newProxyInstance(XDebugSession.class.getClassLoader(), new Class[]{XDebugSession.class},
+        return (XDebugSession) Proxy.newProxyInstance(XDebugSession.class.getClassLoader(), new Class<?>[]{XDebugSession.class},
                 (proxy, method, args) -> switch (method.getName()) {
                     case "isSuspended" -> suspended;
                     case "rebuildViews" -> {

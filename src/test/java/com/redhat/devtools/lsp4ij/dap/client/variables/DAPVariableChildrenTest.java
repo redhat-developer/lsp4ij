@@ -150,7 +150,7 @@ public class DAPVariableChildrenTest extends LightPlatformTestCase {
      */
     private IDebugProtocolServer server() {
         return (IDebugProtocolServer) Proxy.newProxyInstance(IDebugProtocolServer.class.getClassLoader(),
-                new Class[]{IDebugProtocolServer.class},
+                new Class<?>[]{IDebugProtocolServer.class},
                 (proxy, method, args) -> {
                     if (!method.getName().equals("variables")) {
                         throw new UnsupportedOperationException(method.getName());
@@ -182,7 +182,7 @@ public class DAPVariableChildrenTest extends LightPlatformTestCase {
      */
     private XCompositeNode node() {
         return (XCompositeNode) Proxy.newProxyInstance(XCompositeNode.class.getClassLoader(),
-                new Class[]{XCompositeNode.class},
+                new Class<?>[]{XCompositeNode.class},
                 (proxy, method, args) -> switch (method.getName()) {
                     case "addChildren" -> {
                         calls.add("add " + ((XValueChildrenList) args[0]).size() + ((boolean) args[1] ? " last" : ""));

@@ -211,7 +211,7 @@ public class DAPMovedFileBreakpointTest extends HeavyPlatformTestCase {
     }
 
     private IDebugProtocolServer server() {
-        return (IDebugProtocolServer) Proxy.newProxyInstance(IDebugProtocolServer.class.getClassLoader(), new Class[]{IDebugProtocolServer.class}, (p, m, a) -> {
+        return (IDebugProtocolServer) Proxy.newProxyInstance(IDebugProtocolServer.class.getClassLoader(), new Class<?>[]{IDebugProtocolServer.class}, (p, m, a) -> {
             if (m.getName().equals("setBreakpoints")) {
                 var arguments = (SetBreakpointsArguments) a[0];
                 requests.add(arguments);

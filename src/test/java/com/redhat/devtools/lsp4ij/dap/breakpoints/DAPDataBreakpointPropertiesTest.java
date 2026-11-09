@@ -38,7 +38,7 @@ public class DAPDataBreakpointPropertiesTest extends HeavyPlatformTestCase {
         var properties = new DAPDataBreakpointProperties("7:count", "Counter.count", DataBreakpointAccessType.WRITE, true, "xtc");
         properties.setHitCondition(">= 3");
         properties.setServer((IDebugProtocolServer) Proxy.newProxyInstance(IDebugProtocolServer.class.getClassLoader(),
-                new Class[]{IDebugProtocolServer.class}, (p, m, a) -> {
+                new Class<?>[]{IDebugProtocolServer.class}, (p, m, a) -> {
                     throw new AssertionError(m.getName());
                 }));
 

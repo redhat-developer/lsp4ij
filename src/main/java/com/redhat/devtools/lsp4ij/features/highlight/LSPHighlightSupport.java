@@ -109,7 +109,7 @@ public class LSPHighlightSupport extends AbstractLSPDocumentFeatureSupport<Docum
     private static @NotNull CompletableFuture<List<DocumentHighlight>> mergeInOneFuture(List<CompletableFuture<List<? extends DocumentHighlight>>> futures,
                                                                                         @NotNull CancellationSupport cancellationSupport) {
         CompletableFuture<Void> allFutures = cancellationSupport
-                .execute(CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])));
+                .execute(CompletableFuture.allOf(futures.toArray(new CompletableFuture<?>[0])));
         return allFutures.thenApply(Void -> {
             List<DocumentHighlight> mergedDataList = new ArrayList<>(futures.size());
             for (CompletableFuture<List<? extends DocumentHighlight>> dataListFuture : futures) {

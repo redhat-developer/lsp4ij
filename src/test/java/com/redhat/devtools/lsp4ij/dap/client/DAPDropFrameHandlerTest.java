@@ -120,7 +120,7 @@ public class DAPDropFrameHandlerTest {
 
     private IDebugProtocolServer server(CompletableFuture<Void> answer) {
         return (IDebugProtocolServer) Proxy.newProxyInstance(IDebugProtocolServer.class.getClassLoader(),
-                new Class[]{IDebugProtocolServer.class}, (proxy, method, args) -> switch (method.getName()) {
+                new Class<?>[]{IDebugProtocolServer.class}, (proxy, method, args) -> switch (method.getName()) {
                     case "restartFrame" -> {
                         calls.add("restartFrame " + ((RestartFrameArguments) args[0]).getFrameId());
                         yield answer;
@@ -132,7 +132,7 @@ public class DAPDropFrameHandlerTest {
     }
 
     private XDebugSession session() {
-        return (XDebugSession) Proxy.newProxyInstance(XDebugSession.class.getClassLoader(), new Class[]{XDebugSession.class},
+        return (XDebugSession) Proxy.newProxyInstance(XDebugSession.class.getClassLoader(), new Class<?>[]{XDebugSession.class},
                 (proxy, method, args) -> switch (method.getName()) {
                     case "sessionResumed" -> {
                         calls.add("resumed");

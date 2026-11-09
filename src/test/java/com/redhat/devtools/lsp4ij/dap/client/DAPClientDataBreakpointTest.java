@@ -137,7 +137,7 @@ public class DAPClientDataBreakpointTest extends HeavyPlatformTestCase {
                 return true;
             }
         };
-        var session = (XDebugSession) Proxy.newProxyInstance(XDebugSession.class.getClassLoader(), new Class[]{XDebugSession.class}, (p, m, a) -> null);
+        var session = (XDebugSession) Proxy.newProxyInstance(XDebugSession.class.getClassLoader(), new Class<?>[]{XDebugSession.class}, (p, m, a) -> null);
         return new DAPDataBreakpointHandler(session, descriptor, getProject());
     }
 
@@ -145,7 +145,7 @@ public class DAPClientDataBreakpointTest extends HeavyPlatformTestCase {
      * Returns a debug adapter which verifies each data breakpoint, with the ids 31, 32, ...
      */
     private static IDebugProtocolServer server() {
-        return (IDebugProtocolServer) Proxy.newProxyInstance(IDebugProtocolServer.class.getClassLoader(), new Class[]{IDebugProtocolServer.class}, (p, m, a) -> {
+        return (IDebugProtocolServer) Proxy.newProxyInstance(IDebugProtocolServer.class.getClassLoader(), new Class<?>[]{IDebugProtocolServer.class}, (p, m, a) -> {
             switch (m.getName()) {
                 case "setDataBreakpoints" -> {
                     var arguments = (SetDataBreakpointsArguments) a[0];
