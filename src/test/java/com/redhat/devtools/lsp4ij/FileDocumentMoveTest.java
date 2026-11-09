@@ -7,12 +7,14 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij;
 
+import com.intellij.openapi.application.impl.NonBlockingReadActionImpl;
 import com.intellij.openapi.command.WriteCommandAction;
 import com.intellij.openapi.command.undo.UndoManager;
 import com.intellij.openapi.editor.EditorFactory;
 import com.intellij.openapi.fileEditor.FileEditorManager;
 import com.intellij.openapi.progress.EmptyProgressIndicator;
 import com.intellij.openapi.progress.ProgressManager;
+import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.openapi.vfs.newvfs.ManagingFS;
 import com.intellij.psi.PsiManager;
@@ -20,9 +22,14 @@ import com.intellij.testFramework.EdtTestUtil;
 import com.intellij.testFramework.PlatformTestUtil;
 import com.intellij.util.ThrowableRunnable;
 import com.intellij.util.concurrency.AppExecutorUtil;
+import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
 import com.redhat.devtools.lsp4ij.fixtures.LSPCodeInsightFixtureTestCase;
 import com.redhat.devtools.lsp4ij.mock.MockLanguageServer;
+import com.redhat.devtools.lsp4ij.mock.MockLanguageServerDefinition;
 import com.redhat.devtools.lsp4ij.mock.MockTextDocumentService.OpenCloseNotification;
+import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
+import com.redhat.devtools.lsp4ij.server.definition.ServerFileNamePatternMapping;
+import com.redhat.devtools.lsp4ij.templates.ServerMappingSettings;
 import org.eclipse.lsp4j.DidCloseTextDocumentParams;
 import org.eclipse.lsp4j.DidOpenTextDocumentParams;
 import org.eclipse.lsp4j.FileOperationFilter;
@@ -31,14 +38,18 @@ import org.eclipse.lsp4j.FileOperationPattern;
 import org.eclipse.lsp4j.FileOperationsServerCapabilities;
 import org.eclipse.lsp4j.RenameFilesParams;
 import org.eclipse.lsp4j.WorkspaceServerCapabilities;
+import org.jetbrains.annotations.NotNull;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.net.URI;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Queue;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -116,6 +127,8 @@ public class FileDocumentMoveTest extends LSPCodeInsightFixtureTestCase {
             context.file().rename(this, "renamed.foo");
             FileEditorManager.getInstance(myFixture.getProject()).closeFile(context.file());
         });
+        // The move matches the file again after its write action, in a read action
+        NonBlockingReadActionImpl.waitForAsyncTaskCompletion();
         PlatformTestUtil.dispatchAllInvocationEventsInIdeEventQueue();
         assertTrue(context.wrapper().getOpenedDocuments().isEmpty());
     }
@@ -203,6 +216,8 @@ public class FileDocumentMoveTest extends LSPCodeInsightFixtureTestCase {
             wrapper.stopAndDisable();
 
             PlatformTestUtil.dispatchAllInvocationEventsInIdeEventQueue();
+            // Which then matches the file again in a read action
+            NonBlockingReadActionImpl.waitForAsyncTaskCompletion();
             PlatformTestUtil.dispatchAllInvocationEventsInIdeEventQueue();
             assertFalse("A language server that was switched off must not start again for a moved file", wrapper.isActive());
         } finally {
@@ -238,6 +253,154 @@ public class FileDocumentMoveTest extends LSPCodeInsightFixtureTestCase {
 
         holder.get(10, TimeUnit.SECONDS);
         assertFalse("The move must not wait for the documents of a language server that isn't running", waitedFor.get());
+    }
+
+    public void testARenameDoesNotConnectTheFileAgainToALanguageServerThatNoLongerMatchesIt() throws Exception {
+        var context = openDocument();
+        var earlierUri = context.wrapper().toUri(context.file());
+        // A connection then opens the document on the thread that asks for it, so that it shows once that thread is done
+        context.wrapper().setConnectionExecutor(Runnable::run);
+        try {
+            write(() -> context.file().rename(this, "test.txt"));
+
+            // The move connects the file again after its write action
+            NonBlockingReadActionImpl.waitForAsyncTaskCompletion();
+            PlatformTestUtil.dispatchAllInvocationEventsInIdeEventQueue();
+            assertFalse(context.wrapper().isConnectedTo(earlierUri));
+            assertFalse("A language server that no longer matches the renamed file must not get it again",
+                    context.wrapper().isSynchronizing(context.file()));
+            var psiFile = PsiManager.getInstance(myFixture.getProject()).findFile(context.file());
+            assertNotNull(psiFile);
+            assertEmpty("No language server matches the renamed file", LanguageServiceAccessor.getInstance(myFixture.getProject())
+                    .getLanguageServers(psiFile, null, null).get(5, TimeUnit.SECONDS));
+        } finally {
+            context.wrapper().setConnectionExecutor(AppExecutorUtil.getAppExecutorService());
+        }
+    }
+
+    public void testAMovedDocumentIsConnectedAgainOnceAnAsynchronousMatcherAcceptsItsNewPlace() throws Exception {
+        var wrapper = connect(myFixture.getTempDirFixture().createFile("source/other.foo", "other")).wrapper();
+        var matcher = matchAsynchronously(wrapper.getServerDefinition());
+        var file = myFixture.getTempDirFixture().createFile("source/test.async", "disk");
+        var editor = EditorFactory.getInstance().createEditor(LSPIJUtils.getDocument(file), myFixture.getProject());
+        try {
+            assertSame(wrapper, connect(file).wrapper());
+            var answer = new CompletableFuture<Boolean>();
+            matcher.answers.put("kept.async", answer);
+
+            write(() -> file.rename(this, "kept.async"));
+
+            PlatformTestUtil.waitWithEventsDispatching("The move must ask the matcher about the new place of the file",
+                    () -> matcher.asked.contains("kept.async"), 10);
+            NonBlockingReadActionImpl.waitForAsyncTaskCompletion();
+            PlatformTestUtil.dispatchAllInvocationEventsInIdeEventQueue();
+            assertFalse("The document must wait for the matcher", wrapper.isSynchronizing(file));
+            answer.complete(true);
+            PlatformTestUtil.waitWithEventsDispatching("The document must be connected once the matcher accepts its new place",
+                    () -> wrapper.isSynchronizing(file), 10);
+        } finally {
+            EditorFactory.getInstance().releaseEditor(editor);
+        }
+    }
+
+    public void testADocumentThatMovesAgainAsItsNewPlaceIsMatchedIsMatchedAgainAtItsLastPlace() throws Exception {
+        var wrapper = connect(myFixture.getTempDirFixture().createFile("source/other.foo", "other")).wrapper();
+        var matcher = matchAsynchronously(wrapper.getServerDefinition());
+        var file = myFixture.getTempDirFixture().createFile("source/test.async", "disk");
+        var editor = EditorFactory.getInstance().createEditor(LSPIJUtils.getDocument(file), myFixture.getProject());
+        try {
+            assertSame(wrapper, connect(file).wrapper());
+            var answer = new CompletableFuture<Boolean>();
+            matcher.answers.put("kept.async", answer);
+            matcher.answers.put("rejected.async", CompletableFuture.completedFuture(false));
+
+            write(() -> file.rename(this, "kept.async"));
+            PlatformTestUtil.waitWithEventsDispatching("The move must ask the matcher about the new place of the file",
+                    () -> matcher.asked.contains("kept.async"), 10);
+            // The document is not connected while the matcher answers, so this move finds no document of the file
+            write(() -> file.rename(this, "rejected.async"));
+            answer.complete(true);
+
+            PlatformTestUtil.waitWithEventsDispatching("The last place of the document must be matched again",
+                    () -> matcher.asked.contains("rejected.async"), 10);
+            NonBlockingReadActionImpl.waitForAsyncTaskCompletion();
+            PlatformTestUtil.dispatchAllInvocationEventsInIdeEventQueue();
+            assertFalse("A match for a place that the document left must not connect it", wrapper.isSynchronizing(file));
+        } finally {
+            EditorFactory.getInstance().releaseEditor(editor);
+        }
+    }
+
+    public void testARenameDoesNotConnectTheFileAgainToALanguageServerWhoseClientFeaturesLeaveItOut() throws Exception {
+        // A language server of its own, whose client features leave out the files whose name starts with "off"
+        Set<String> asked = ConcurrentHashMap.newKeySet();
+        var definition = new MockLanguageServerDefinition("leaves-out-off", false) {
+            @Override
+            public @NotNull LSPClientFeatures createClientFeatures() {
+                return new LSPClientFeatures() {
+                    @Override
+                    public boolean isEnabled(@NotNull VirtualFile file) {
+                        asked.add(file.getName());
+                        return super.isEnabled(file) && !file.getName().startsWith("off");
+                    }
+                };
+            }
+        };
+        LanguageServersRegistry.getInstance().addServerDefinition(myFixture.getProject(), definition,
+                List.of(ServerMappingSettings.createFileNamePatternsMappingSettings(List.of("*.bar"), null)));
+        var file = myFixture.getTempDirFixture().createFile("source/on.bar", "disk");
+        var editor = EditorFactory.getInstance().createEditor(LSPIJUtils.getDocument(file), myFixture.getProject());
+        try {
+            var wrapper = connect(file).wrapper();
+            assertSame(definition, wrapper.getServerDefinition());
+            // A connection then opens the document on the thread that asks for it, so that it shows once that thread is done
+            wrapper.setConnectionExecutor(Runnable::run);
+
+            write(() -> file.rename(this, "off.bar"));
+
+            PlatformTestUtil.waitWithEventsDispatching("The move must ask the client features about the renamed file",
+                    () -> asked.contains("off.bar"), 10);
+            assertFalse("A language server whose client features leave out the renamed file must not get it again",
+                    wrapper.isSynchronizing(file));
+        } finally {
+            EditorFactory.getInstance().releaseEditor(editor);
+            LanguageServersRegistry.getInstance().removeServerDefinition(myFixture.getProject(), definition);
+        }
+    }
+
+    /**
+     * A document matcher that answers later: with the future given for the name of the file, and with a match
+     * otherwise. It keeps the names of the files that it was asked about.
+     */
+    private static final class MatcherThatAnswersLater implements DocumentMatcher {
+        private final Map<String, CompletableFuture<Boolean>> answers = new ConcurrentHashMap<>();
+        private final Set<String> asked = ConcurrentHashMap.newKeySet();
+
+        @Override
+        public boolean match(@NotNull VirtualFile file, @NotNull Project project) {
+            throw new AssertionError("An asynchronous matcher must be asked with matchAsync");
+        }
+
+        @Override
+        public boolean shouldBeMatchedAsynchronously(@NotNull Project project) {
+            return true;
+        }
+
+        @Override
+        public @NotNull CompletableFuture<Boolean> matchAsync(@NotNull VirtualFile file, @NotNull Project project) {
+            asked.add(file.getName());
+            return answers.getOrDefault(file.getName(), CompletableFuture.completedFuture(true));
+        }
+    }
+
+    /**
+     * Maps the *.async files to the given definition with a matcher that answers later.
+     */
+    private static MatcherThatAnswersLater matchAsynchronously(@NotNull LanguageServerDefinition definition) {
+        var matcher = new MatcherThatAnswersLater();
+        LanguageServersRegistry.getInstance().registerAssociation(definition,
+                new ServerFileNamePatternMapping(List.of("*.async"), definition.getId(), null, matcher));
+        return matcher;
     }
 
     private static Object documentsLock(LanguageServerWrapper wrapper) throws ReflectiveOperationException {
