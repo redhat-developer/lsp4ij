@@ -42,6 +42,10 @@ import java.util.concurrent.TimeUnit;
 
 /**
  * The lazy IJ Quick fix / Intention.
+ * <p>
+ * It is {@link DumbAware}, so that IntelliJ 2025.3 and later offer it in files outside the project's content, which
+ * they don't index. IntelliJ asks it while indexing too, when LSP features don't run: it is not available then, and it
+ * loads no code action.
  */
 public class LSPLazyCodeActionIntentionAction implements IntentionAction, DumbAware {
 
@@ -79,8 +83,7 @@ public class LSPLazyCodeActionIntentionAction implements IntentionAction, DumbAw
 
     @Override
     public boolean isAvailable(@NotNull Project project, Editor editor, PsiFile file) {
-        // This action is DumbAware, so that IntelliJ 2025.3 and later offer it in files outside the project's content,
-        // which they don't index: it is asked while indexing too, when LSP features don't run
+        // Asked while indexing too, as this action is DumbAware
         if (ProjectIndexingManager.canExecuteLSPFeature(file) != ExecuteLSPFeatureStatus.NOW) {
             return false;
         }
@@ -194,6 +197,10 @@ public class LSPLazyCodeActionIntentionAction implements IntentionAction, DumbAw
         }
         if (action != null) {
             // The LSP code action has been already loaded.
+            return;
+        }
+        if (ProjectIndexingManager.isIndexingAll()) {
+            // Asked for its text while indexing too, as this action is DumbAware
             return;
         }
         // Try to get the LSP code action from the given index

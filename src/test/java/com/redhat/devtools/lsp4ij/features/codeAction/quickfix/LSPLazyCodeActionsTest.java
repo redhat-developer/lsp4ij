@@ -14,7 +14,9 @@ import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.WriteAction;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiFile;
+import com.intellij.testFramework.DumbModeTestUtils;
 import com.intellij.testFramework.PlatformTestUtil;
+import com.redhat.devtools.lsp4ij.LanguageServerBundle;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import com.redhat.devtools.lsp4ij.LanguageServerWrapper;
 import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
@@ -27,6 +29,7 @@ import org.eclipse.lsp4j.*;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
 
 import java.util.List;
+import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
@@ -199,6 +202,30 @@ public class LSPLazyCodeActionsTest extends LSPCodeInsightFixtureTestCase {
         assertEquals(1, textDocumentService.codeActionRequests);
     }
 
+    public void testAQuickFixLoadsNoCodeActionWhileIndexing() throws Exception {
+        PsiFile file = myFixture.configureByText("test.ts", "const foo = 1;");
+        LanguageServerItem languageServer = getLanguageServer(file);
+        Diagnostic diagnostic = createDiagnostic();
+        CodeAction codeAction = new CodeAction("Remove unused declaration for: 'foo'");
+        codeAction.setKind(CodeActionKind.QuickFix);
+        codeAction.setDiagnostics(List.of(diagnostic));
+        MockLanguageServer.INSTANCE.setCodeActions(List.of(Either.forRight(codeAction)));
+        var textDocumentService = MockLanguageServer.INSTANCE.getTextDocumentService();
+        var quickFix = new LSPQuickFixIntentionAction(
+                new LSPLazyCodeActions(List.of(diagnostic), file.getVirtualFile(), languageServer), 0);
+
+        // The quick fix is DumbAware, so IntelliJ may ask it for its text while indexing
+        DumbModeTestUtils.runInDumbModeSynchronously(myFixture.getProject(), () -> {
+            assertEquals("", onPooledThread(quickFix::getText));
+            assertEquals(LanguageServerBundle.message("lsp.intention.code.action.kind.empty"),
+                    onPooledThread(quickFix::getFamilyName));
+            assertEquals(0, textDocumentService.codeActionRequests);
+        });
+
+        assertEquals("Remove unused declaration for: 'foo'", onPooledThread(quickFix::getText));
+        assertEquals(1, textDocumentService.codeActionRequests);
+    }
+
     public void testCodeActionsOfADisposedLanguageServerAreNone() throws Exception {
         PsiFile file = myFixture.configureByText("test.ts", "const foo = 1;");
         // A language server of the file's definition that is disposed, as one whose definition was removed, gives no
@@ -220,6 +247,13 @@ public class LSPLazyCodeActionsTest extends LSPCodeInsightFixtureTestCase {
         return ApplicationManager.getApplication()
                 .executeOnPooledThread(() -> codeActions.getCodeActionAt(0))
                 .get(10, TimeUnit.SECONDS);
+    }
+
+    /**
+     * Asks on a pooled thread, which waits for the code actions, unlike the EDT.
+     */
+    private static <T> T onPooledThread(Callable<T> ask) throws Exception {
+        return ApplicationManager.getApplication().executeOnPooledThread(ask).get(10, TimeUnit.SECONDS);
     }
 
     private LanguageServerItem getLanguageServer(PsiFile file) throws Exception {
