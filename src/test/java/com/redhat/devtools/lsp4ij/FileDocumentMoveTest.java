@@ -184,6 +184,33 @@ public class FileDocumentMoveTest extends LSPCodeInsightFixtureTestCase {
         }
     }
 
+    public void testAMovedFileDoesNotStartALanguageServerThatWasSwitchedOffMeanwhile() throws Exception {
+        var wrapper = connect(myFixture.getTempDirFixture().createFile("source/other.foo", "other")).wrapper();
+        var file = myFixture.getTempDirFixture().createFile("source/test.foo", "disk");
+        var destination = myFixture.getTempDirFixture().findOrCreateDir("destination");
+        var editor = EditorFactory.getInstance().createEditor(LSPIJUtils.getDocument(file), myFixture.getProject());
+        Queue<Runnable> waiting = new ConcurrentLinkedQueue<>();
+        wrapper.setConnectionExecutor(waiting::add);
+        try {
+            var servers = connectLater(file);
+            PlatformTestUtil.waitWithEventsDispatching("The connection must wait", () -> !waiting.isEmpty(), 10);
+            write(() -> file.move(this, destination));
+            wrapper.setConnectionExecutor(AppExecutorUtil.getAppExecutorService());
+            waiting.forEach(AppExecutorUtil.getAppExecutorService()::execute);
+            // The connection drops the document of the moved file and hands the open file to the UI thread, which
+            // this test holds until the language server is switched off
+            servers.get(10, TimeUnit.SECONDS);
+            wrapper.stopAndDisable();
+
+            PlatformTestUtil.dispatchAllInvocationEventsInIdeEventQueue();
+            PlatformTestUtil.dispatchAllInvocationEventsInIdeEventQueue();
+            assertFalse("A language server that was switched off must not start again for a moved file", wrapper.isActive());
+        } finally {
+            wrapper.setConnectionExecutor(AppExecutorUtil.getAppExecutorService());
+            EditorFactory.getInstance().releaseEditor(editor);
+        }
+    }
+
     public void testAMoveDoesNotWaitForTheDocumentsOfALanguageServerThatIsNotRunning() throws Exception {
         var wrapper = connect(myFixture.getTempDirFixture().createFile("source/other.foo", "other")).wrapper();
         var file = myFixture.getTempDirFixture().createFile("source/test.foo", "disk");

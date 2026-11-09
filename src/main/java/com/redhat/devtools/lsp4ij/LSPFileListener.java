@@ -154,7 +154,9 @@ class LSPFileListener extends AbstractLSPFileListener {
     }
 
     private void reconnectMovedDocument(@NotNull LanguageServerWrapper languageServer, @NotNull VirtualFile file) {
-        if (!isOpenDocument(languageServer, file)) {
+        if (!isOpenDocument(languageServer, file) || !languageServer.isEnabled()) {
+            // A language server that a stop switched off meanwhile gets no moved document, as it gets no opened one:
+            // the connection would start it again
             return;
         }
         URI uri = languageServer.toUri(file);
