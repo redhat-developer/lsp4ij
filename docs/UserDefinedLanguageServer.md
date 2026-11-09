@@ -73,11 +73,11 @@ When a working directory is set, LSP4IJ also looks up the language server's comm
 that the tool which the directory selects, such as its version of `node`, is the one that starts.
 
 > [!NOTE]
-> - **Set the working directory**: the environment is the one of that directory. Without one, the command is looked up in the IDE's `PATH`.
+> - **Set the working directory**: the environment is the one of that directory. Without one, the directory's environment doesn't apply: the command is looked up in the `PATH` of the environment variables configured here, or else in the IDE's `PATH`.
 > - **Precedence**: the directory's environment is applied when the process starts, after the environment variables configured here, so it wins over a variable that both set.
-> - **Windows**: a command without its extension, such as `node` or `npx`, is looked up with the extensions in `PATHEXT`, as Windows does, so that the directory's `node.exe` or `npx.cmd` starts.
+> - **Windows**: with a working directory, a command without its extension, such as `node` or `npx`, is looked up with the extensions in `PATHEXT`, as Windows does, so that the directory's `node.exe` or `npx.cmd` starts.
 > - **Tools not bundled**: LSP4IJ doesn't bundle mise or direnv. Install the tool and its IntelliJ plugin. The mise plugin customizes the processes of other plugins only with its `useMiseInAllCommandLines` setting, which is off by default.
-> - **IntelliJ 2024.x** has no such extension point: the environment and the lookup are as before.
+> - **IntelliJ 2024.x** has no such extension point, so the environment is as before. The command is looked up as described above, also with the extensions in `PATHEXT` on Windows.
 
 #### Macro syntax
 
