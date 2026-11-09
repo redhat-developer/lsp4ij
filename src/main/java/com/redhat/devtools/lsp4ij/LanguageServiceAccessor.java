@@ -973,9 +973,8 @@ public class LanguageServiceAccessor implements Disposable {
                         return;
                     }
                     var url = file.getUrl();
-                    // The ordinary request, kept to this definition: unlike a request for one definition, it also
-                    // takes a definition that matches the file asynchronously
-                    getLanguageServers(psiFile, features -> features.getServerDefinition() == serverDefinition, null)
+                    // A request for this definition only, so that no other definition chooses an instance for the file
+                    getLanguageServers(psiFile, null, null, serverDefinition)
                             .whenComplete((servers, failure) -> {
                                 if (failure != null) {
                                     // As an asynchronous match that fails: the file would stay without the language
