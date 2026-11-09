@@ -12,10 +12,10 @@ package com.redhat.devtools.lsp4ij.server.definition.launching;
 
 import com.intellij.execution.ExecutionException;
 import com.intellij.execution.configurations.GeneralCommandLine;
-import com.intellij.execution.process.ProcessNotCreatedException;
 import com.intellij.openapi.util.SystemInfo;
 import com.intellij.openapi.util.io.FileUtil;
 import com.intellij.util.EnvironmentUtil;
+import com.intellij.util.io.IdeUtilIoBundle;
 import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -430,13 +430,14 @@ public class CommandUtilsTest {
     }
 
     /**
-     * Asserts that the command line still has no executable: starting it fails as the platform reports a missing one,
-     * not as an executable that the lookup set could fail to start ({@link ProcessNotCreatedException}). Asking for
-     * the executable itself throws, as {@link GeneralCommandLine#getExePath()} is {@code @NotNull}.
+     * Asserts that the command line still has no executable: starting it fails with the platform's "executable not
+     * specified", and not as a missing working directory, or as an executable that the lookup set and that fails to
+     * start. Asking for the executable itself throws, as {@link GeneralCommandLine#getExePath()} is {@code @NotNull}.
      */
     private static void assertNoExecutable(GeneralCommandLine commandLine) {
         ExecutionException failure = Assertions.assertThrows(ExecutionException.class, commandLine::createProcess);
-        Assertions.assertFalse(failure instanceof ProcessNotCreatedException, failure.toString());
+        Assertions.assertEquals(IdeUtilIoBundle.message("run.configuration.error.executable.not.specified"),
+                failure.getMessage());
     }
 
     private static void assertSameFile(Path expected, File actual) throws Exception {
