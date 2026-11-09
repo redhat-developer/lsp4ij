@@ -62,8 +62,14 @@ public class WillRenameFilesMoveHandler extends MoveFileHandler {
         return null;
     }
 
+    // Raw types on purpose, so that LSP4IJ compiles against every platform it supports. The platform declares
+    // List<UsageInfo> up to 2025.2 and List<? extends UsageInfo> since 2025.3: overriding with either generic type
+    // doesn't compile against the other platform ("name clash: ... have the same erasure, yet neither overrides the
+    // other"). Both erase to List and Map, though, and a method declared with the erased types overrides both. Use the
+    // generic types again once the oldest supported platform is 2025.3.
     @Override
-    public void retargetUsages(List<UsageInfo> usageInfos, Map<PsiElement, PsiElement> oldToNewMap) {
+    @SuppressWarnings("rawtypes")
+    public void retargetUsages(List usageInfos, Map oldToNewMap) {
     }
 
     @Override

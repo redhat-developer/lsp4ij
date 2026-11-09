@@ -9,6 +9,8 @@ package com.redhat.devtools.lsp4ij;
 
 import com.intellij.openapi.application.ApplicationListener;
 import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.progress.EmptyProgressIndicator;
+import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiDirectory;
 import com.intellij.psi.PsiElement;
@@ -101,8 +103,7 @@ public class FileOperationRefactoringTest extends LSPCodeInsightFixtureTestCase 
         answerWillRenameSlowlyWithAnEditTo(other);
         var askedInWriteAction = whetherTheServerIsAskedInAWriteAction();
 
-        new MoveFilesOrDirectoriesProcessor(myFixture.getProject(), new PsiElement[]{psiFile(first), psiFile(second)},
-                psiDirectory(destination), false, false, null, null).run();
+        move(psiDirectory(destination), psiFile(first), psiFile(second));
 
         assertFalse("workspace/willRenameFiles must be sent before the write action of the refactoring",
                 askedInWriteAction.get(10, TimeUnit.SECONDS));
@@ -126,8 +127,7 @@ public class FileOperationRefactoringTest extends LSPCodeInsightFixtureTestCase 
         new RenameProcessor(myFixture.getProject(), psiFile(moved), "renamed.foo", false, false)
                 .prepareRenaming(psiFile(moved), "renamed.foo", renames);
 
-        new MoveFilesOrDirectoriesProcessor(myFixture.getProject(), new PsiElement[]{psiFile(moved)},
-                psiDirectory(destination), false, false, null, null).run();
+        move(psiDirectory(destination), psiFile(moved));
 
         var requests = MockLanguageServer.INSTANCE.getWorkspaceService().getWillRenameRequests();
         assertEquals("the move must send workspace/willRenameFiles once", 1, requests.size());
@@ -135,6 +135,17 @@ public class FileOperationRefactoringTest extends LSPCodeInsightFixtureTestCase 
         assertEquals("the request must contain the move only", 1, files.size());
         assertTrue(files.get(0).getNewUri(), files.get(0).getNewUri().endsWith("/destination/moved.foo"));
         assertEquals(destination, moved.getParent());
+    }
+
+    /**
+     * Runs a move refactoring under a progress indicator, as the IDE does: since 2025.3, the platform's move of files
+     * ({@code MoveFilesOrDirectoriesUtil.moveElements}) takes the indicator of the thread, which a test that runs the
+     * processor directly doesn't have otherwise.
+     */
+    private void move(PsiDirectory destination, PsiElement... elements) {
+        var processor = new MoveFilesOrDirectoriesProcessor(myFixture.getProject(), elements, destination, false, false,
+                null, null);
+        ProgressManager.getInstance().runProcess(processor::run, new EmptyProgressIndicator());
     }
 
     /**

@@ -22,10 +22,18 @@ import java.util.List;
  */
 public class WillRenameFilesRefactoringHelper implements RefactoringHelper<Void> {
 
+    // A raw List on purpose, so that LSP4IJ compiles against every platform it supports. The platform declares
+    // List<PsiElement> up to 2025.2 and List<? extends PsiElement> since 2025.3: overriding with either generic type
+    // doesn't compile against the other platform ("name clash: ... have the same erasure, yet neither overrides the
+    // other"). Both erase to List, though, and a method declared with the erased type overrides both. The elements are
+    // only read, so reading them as a List<PsiElement> is safe with either. Use the generic type again once the oldest
+    // supported platform is 2025.3.
     @Override
-    public Void prepareOperation(UsageInfo @NotNull [] usages, @NotNull List<@NotNull PsiElement> elements) {
-        if (!elements.isEmpty()) {
-            WillRenameFilesPreparation.getInstance(elements.get(0).getProject()).sendAndAwait(elements);
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    public Void prepareOperation(UsageInfo @NotNull [] usages, @NotNull List elements) {
+        List<PsiElement> psiElements = elements;
+        if (!psiElements.isEmpty()) {
+            WillRenameFilesPreparation.getInstance(psiElements.get(0).getProject()).sendAndAwait(psiElements);
         }
         return null;
     }
