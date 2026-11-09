@@ -492,6 +492,49 @@ public class LanguageServerInstancesTest extends LSPCodeInsightFixtureTestCase {
         }
     }
 
+    public void testAnOperationKeepsTheDocumentThatItConnectedInAScopeAfterTheEditorOfAFileAskedForAgainClosed()
+            throws Exception {
+        var file = file("a/one.per-folder");
+        var virtualFile = file.getVirtualFile();
+        var b = instanceOf(file("b/other.per-folder"));
+        var bDirectory = virtualFile.getParent().getParent().findChild("b");
+        assertNotNull(bDirectory);
+        Queue<Runnable> waiting = new ConcurrentLinkedQueue<>();
+        b.setConnectionExecutor(waiting::add);
+        var editor = EditorFactory.getInstance().createEditor(LSPIJUtils.getDocument(virtualFile), myFixture.getProject());
+        var released = false;
+        var scope = new DocumentConnectionScope();
+        try {
+            moveAsTheFolderOfTheFileIsChosen(virtualFile, bDirectory);
+            assertEmpty(serversOf(file));
+            PlatformTestUtil.waitWithEventsDispatching("The file must be asked for again", () -> !waiting.isEmpty(), TIMEOUT);
+            var askedAgain = waiting.poll();
+            EditorFactory.getInstance().releaseEditor(editor);
+            released = true;
+
+            // An operation connects the file in a scope before the connection of the second request ends
+            var operation = accessor.getLanguageServersForScope(file, null, null, scope);
+            PlatformTestUtil.waitWithEventsDispatching("The operation must connect the file", () -> !waiting.isEmpty(), TIMEOUT);
+            waiting.poll().run();
+            assertEquals(List.of(b), waitFor(operation).stream().map(LanguageServerItem::getServerWrapper).toList());
+            // The connection of the second request then finds the document open, and ends at once
+            askedAgain.run();
+            PlatformTestUtil.dispatchAllInvocationEventsInIdeEventQueue();
+
+            var uri = b.toUri(virtualFile);
+            assertTrue("The operation must keep its document while its scope holds it", b.isConnectedTo(uri));
+            scope.close();
+            PlatformTestUtil.waitWithEventsDispatching("The end of the scope must disconnect the document",
+                    () -> !b.isConnectedTo(uri), TIMEOUT);
+        } finally {
+            scope.close();
+            b.setConnectionExecutor(AppExecutorUtil.getAppExecutorService());
+            if (!released) {
+                EditorFactory.getInstance().releaseEditor(editor);
+            }
+        }
+    }
+
     public void testAnOpenFileOfAnAsynchronousMatcherThatMovesAsItsInstanceIsChosenIsConnectedAtItsNewPlace()
             throws Exception {
         LanguageServersRegistry.getInstance().registerAssociation(definition,

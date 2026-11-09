@@ -368,6 +368,46 @@ public class FileDocumentMoveTest extends LSPCodeInsightFixtureTestCase {
         }
     }
 
+    public void testAnOperationKeepsTheDocumentThatItConnectedInAScopeAfterTheEditorOfTheMovedFileClosed()
+            throws Exception {
+        var file = myFixture.getTempDirFixture().createFile("source/test.foo", "disk");
+        var editor = EditorFactory.getInstance().createEditor(LSPIJUtils.getDocument(file), myFixture.getProject());
+        var released = false;
+        var scope = new DocumentConnectionScope();
+        var wrapper = connect(file).wrapper();
+        Queue<Runnable> waiting = new ConcurrentLinkedQueue<>();
+        wrapper.setConnectionExecutor(waiting::add);
+        try {
+            write(() -> file.rename(this, "renamed.foo"));
+            PlatformTestUtil.waitWithEventsDispatching("The move must connect the file again", () -> !waiting.isEmpty(), 10);
+            var reconnection = waiting.poll();
+            EditorFactory.getInstance().releaseEditor(editor);
+            released = true;
+
+            // An operation connects the file in a scope before the connection of the move ends
+            var operation = LanguageServiceAccessor.getInstance(myFixture.getProject()).getLanguageServersForScope(
+                    PsiManager.getInstance(myFixture.getProject()).findFile(file), null, null, scope);
+            PlatformTestUtil.waitWithEventsDispatching("The operation must connect the file", () -> !waiting.isEmpty(), 10);
+            waiting.poll().run();
+            assertEquals(1, operation.get(10, TimeUnit.SECONDS).size());
+            // The connection of the move then finds the document open, and ends at once
+            reconnection.run();
+            PlatformTestUtil.dispatchAllInvocationEventsInIdeEventQueue();
+
+            var uri = wrapper.toUri(file);
+            assertTrue("The operation must keep its document while its scope holds it", wrapper.isConnectedTo(uri));
+            scope.close();
+            PlatformTestUtil.waitWithEventsDispatching("The end of the scope must disconnect the document",
+                    () -> !wrapper.isConnectedTo(uri), 10);
+        } finally {
+            scope.close();
+            wrapper.setConnectionExecutor(AppExecutorUtil.getAppExecutorService());
+            if (!released) {
+                EditorFactory.getInstance().releaseEditor(editor);
+            }
+        }
+    }
+
     /**
      * A document matcher that answers later: with the future given for the name of the file, and with a match
      * otherwise. It keeps the names of the files that it was asked about.

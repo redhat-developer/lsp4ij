@@ -203,10 +203,17 @@ class LSPFileListener extends AbstractLSPFileListener {
                 return;
             }
             boolean open = isOpenDocument(languageServer, file);
-            if (!open || !Objects.equals(uri, languageServer.toUri(file))) {
+            boolean moved = !Objects.equals(uri, languageServer.toUri(file));
+            if (!open || moved) {
                 var opened = languageServer.getOpenedDocument(uri);
                 if (opened != null && opened.getFile() == file) {
-                    languageServer.disconnect(uri, false);
+                    if (moved) {
+                        languageServer.disconnect(uri, false);
+                    } else {
+                        // The last editor of the file closed meanwhile. An operation that connected the file in a
+                        // scope since keeps it until its scope ends
+                        languageServer.disconnectUnlessScoped(uri, false);
+                    }
                 }
                 if (open) {
                     // The file moved again: its new place decides again which instance gets it

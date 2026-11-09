@@ -1393,6 +1393,33 @@ public class LanguageServerWrapper implements Disposable {
     }
 
     /**
+     * Disconnects the file as {@link #disconnect(VirtualFile, boolean)} does, for a connection that the file no longer
+     * needs since its last editor closed, unless an operation holds the document in a scope: the end of that scope then
+     * disconnects the document, as it does for a file that no editor shows.
+     */
+    void disconnectUnlessScoped(@NotNull VirtualFile file, boolean stopIfNoOpenedFiles) {
+        disconnectUnlessScoped(toUri(file), stopIfNoOpenedFiles);
+    }
+
+    void disconnectUnlessScoped(@Nullable URI fileUri, boolean stopIfNoOpenedFiles) {
+        if (fileUri == null) {
+            return;
+        }
+        synchronized (documentsLock) {
+            var connection = scopedDocuments.get(fileUri);
+            if (connection != null) {
+                // The connection that this disconnection is for no longer keeps the document
+                connection.persistent = false;
+                return;
+            }
+            disconnect(fileUri, false);
+        }
+        if (stopIfNoOpenedFiles) {
+            maybeShutdown();
+        }
+    }
+
+    /**
      * Disconnects the document with the given URI if this language server has it connected, and returns whether it
      * had. The check and the disconnection hold documentsLock, as a connection does as it checks the place of its file
      * and registers the document: a connection then either registers the document before, which this finds, or checks
