@@ -311,6 +311,12 @@ public class PathPatternMatcher {
         return false;
     }
 
+    @Override
+    public int hashCode() {
+        // Matchers that are equal have equal patterns
+        return pattern.hashCode();
+    }
+
     record Parts(@NotNull List<String> parts, @NotNull List<Integer> cols) {
     }
 }
