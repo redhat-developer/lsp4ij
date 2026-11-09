@@ -79,6 +79,8 @@ public class LSPLazyCodeActionIntentionAction implements IntentionAction, DumbAw
 
     @Override
     public boolean isAvailable(@NotNull Project project, Editor editor, PsiFile file) {
+        // This action is DumbAware, so that IntelliJ 2025.3 and later offer it in files outside the project's content,
+        // which they don't index: it is asked while indexing too, when LSP features don't run
         if (ProjectIndexingManager.canExecuteLSPFeature(file) != ExecuteLSPFeatureStatus.NOW) {
             return false;
         }
