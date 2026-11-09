@@ -925,8 +925,9 @@ public class LanguageServiceAccessor implements Disposable {
                                        @NotNull Set<LanguageServerWrapper> matchedServers,
                                        @Nullable Predicate<LSPClientFeatures> beforeStartingServerFilter) {
         if (!choice.url().equals(file.getUrl())) {
-            // The file moved since the choice, which can be for its earlier place: its new place decides, as the move
-            // connects an open file again, or as the next request chooses
+            // The file moved since the choice, which can be for its earlier place: its new place decides. The move found
+            // no document of the file to take along, so an open file asks again, as the next request would
+            askAgainForTheInstanceOf(file, serverDefinition);
             return;
         }
         LanguageServerWrapper instance;
@@ -963,6 +964,23 @@ public class LanguageServiceAccessor implements Disposable {
             }
             matchedServers.add(instance);
         }
+    }
+
+    /**
+     * Asks again for the instance of the given definition for a file that moved since its request chose the instance,
+     * if the file is open: the move found no document of the file to take along. This happens off the monitor, as a
+     * request does, and only if the definition still applies to the file at its new place.
+     */
+    private void askAgainForTheInstanceOf(@NotNull VirtualFile file, @NotNull LanguageServerDefinition serverDefinition) {
+        ReadAction.nonBlocking(() -> file.isValid() && (FileEditorManager.getInstance(project).isFileOpen(file)
+                        || LSPIJUtils.editorsForFile(file, project).length > 0) ? LSPIJUtils.getPsiFile(file, project) : null)
+                .expireWhen(project::isDisposed)
+                .submit(AppExecutorUtil.getAppExecutorService())
+                .onSuccess(psiFile -> {
+                    if (psiFile != null) {
+                        getLanguageServers(psiFile, null, null, serverDefinition);
+                    }
+                });
     }
 
     /**

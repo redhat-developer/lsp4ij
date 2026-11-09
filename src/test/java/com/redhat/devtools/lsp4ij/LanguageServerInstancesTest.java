@@ -14,6 +14,7 @@ import com.intellij.openapi.application.ModalityState;
 import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.application.impl.NonBlockingReadActionImpl;
 import com.intellij.openapi.command.WriteCommandAction;
+import com.intellij.openapi.editor.EditorFactory;
 import com.intellij.openapi.fileEditor.FileDocumentManager;
 import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.project.Project;
@@ -440,6 +441,35 @@ public class LanguageServerInstancesTest extends LSPCodeInsightFixtureTestCase {
 
         assertEmpty(serversOf(file));
         assertEmpty("No instance may start for the earlier place of the file", instances());
+    }
+
+    public void testAnOpenFileThatMovesAsItsInstanceIsChosenIsConnectedAtItsNewPlace() throws Exception {
+        var file = file("a/one.per-folder");
+        var virtualFile = file.getVirtualFile();
+        var bDirectory = file("b/other.per-folder").getVirtualFile().getParent();
+        var editor = EditorFactory.getInstance().createEditor(LSPIJUtils.getDocument(virtualFile), myFixture.getProject());
+        try {
+            definition.strategy.afterAsked = asked -> {
+                if (asked.equals(virtualFile)) {
+                    definition.strategy.afterAsked = null;
+                    // Once the strategy has chosen the folder of the file, before the request takes its instance
+                    try {
+                        move(asked, bDirectory);
+                    } catch (IOException e) {
+                        throw new UncheckedIOException(e);
+                    }
+                }
+            };
+
+            assertEmpty(serversOf(file));
+
+            // The file had no document yet, so the move took none along
+            PlatformTestUtil.waitWithEventsDispatching("The open file must be connected at its new place",
+                    () -> instances().stream().anyMatch(instance -> instance.getInstanceRoot() != null
+                            && "b".equals(instance.getInstanceRoot().getName()) && instance.isSynchronizing(virtualFile)), 10);
+        } finally {
+            EditorFactory.getInstance().releaseEditor(editor);
+        }
     }
 
     public void testAFileThatMovesWhileItsInstanceStartsIsNotConnectedToIt() throws Exception {
