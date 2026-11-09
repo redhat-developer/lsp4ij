@@ -253,6 +253,8 @@ kover {
 tasks {
     wrapper {
         gradleVersion = properties("gradleVersion").get()
+        // The default of 10 seconds is at times too short for a CI runner to download the distribution
+        networkTimeout = 60_000
     }
 
     // TODO: Once LSP4IJ no longer supports 2023.*, the hotswap JVM args can be added unconditionally
