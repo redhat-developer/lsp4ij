@@ -978,20 +978,33 @@ public class LanguageServiceAccessor implements Disposable {
                     if (psiFile == null) {
                         return;
                     }
+                    var url = file.getUrl();
                     // The ordinary request, kept to this definition: unlike a request for one definition, it also
                     // takes a definition that matches the file asynchronously
                     getLanguageServers(psiFile, features -> features.getServerDefinition() == serverDefinition, null)
-                            .thenAccept(servers -> ApplicationManager.getApplication().invokeLater(() -> {
-                                // The request counts the closes of the editors from its start, after the file was found
-                                // open, so a file whose last editor closed in between is disconnected here
-                                if (isOpen(file)) {
+                            .whenComplete((servers, failure) -> {
+                                if (failure != null) {
+                                    // As an asynchronous match that fails: the file would stay without the language
+                                    // server, and nothing else reports it
+                                    var cause = failure instanceof CompletionException ? failure.getCause() : failure;
+                                    if (!(cause instanceof CancellationException || cause instanceof ProcessCanceledException)) {
+                                        LOGGER.warn("Cannot connect moved file {} to '{}'", url,
+                                                serverDefinition.getDisplayName(), failure);
+                                    }
                                     return;
                                 }
-                                for (var server : servers) {
-                                    var languageServer = server.getServerWrapper();
-                                    languageServer.disconnect(file, !languageServer.isDisposed());
-                                }
-                            }, ModalityState.any()));
+                                ApplicationManager.getApplication().invokeLater(() -> {
+                                    // The request counts the closes of the editors from its start, after the file was
+                                    // found open, so a file whose last editor closed in between is disconnected here
+                                    if (isOpen(file)) {
+                                        return;
+                                    }
+                                    for (var server : servers) {
+                                        var languageServer = server.getServerWrapper();
+                                        languageServer.disconnect(file, !languageServer.isDisposed());
+                                    }
+                                }, ModalityState.any());
+                            });
                 })
                 .expireWhen(project::isDisposed)
                 .submit(AppExecutorUtil.getAppExecutorService());
