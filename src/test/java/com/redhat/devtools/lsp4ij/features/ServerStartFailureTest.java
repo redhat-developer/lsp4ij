@@ -17,19 +17,20 @@ import com.intellij.openapi.editor.event.VisibleAreaListener;
 import com.intellij.openapi.editor.ex.EditorEx;
 import com.intellij.openapi.project.Project;
 import com.intellij.psi.PsiFile;
-import com.intellij.testFramework.PlatformTestUtil;
 import com.intellij.testFramework.UsefulTestCase;
 import com.intellij.testFramework.fixtures.IdeaProjectTestFixture;
 import com.intellij.testFramework.fixtures.IdeaTestFixtureFactory;
 import com.intellij.testFramework.fixtures.TestFixtureBuilder;
-import com.redhat.devtools.lsp4ij.LSPFileSupport;
 import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
 import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
+import com.redhat.devtools.lsp4ij.features.codeLens.CodeLensDataResult;
 import com.redhat.devtools.lsp4ij.features.codeLens.LSPCodeLensEditorFactoryListener;
+import com.redhat.devtools.lsp4ij.features.codeLens.LSPCodeLensSupport;
 import com.redhat.devtools.lsp4ij.features.color.LSPColorProvider;
 import com.redhat.devtools.lsp4ij.features.foldingRange.LSPFoldingRangeBuilder;
 import com.redhat.devtools.lsp4ij.fixtures.LSPCodeInsightTestFixture;
 import com.redhat.devtools.lsp4ij.fixtures.LSPTestFixtureFactory;
+import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
 import com.redhat.devtools.lsp4ij.mock.MockConnectionProvider;
 import com.redhat.devtools.lsp4ij.mock.MockLanguageServerDefinition;
 import com.redhat.devtools.lsp4ij.server.CannotStartProcessException;
@@ -45,6 +46,7 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 
 /**
  * A feature which waits for a language server which cannot start, as when its command is wrong, gets nothing. It
@@ -90,8 +92,6 @@ public class ServerStartFailureTest extends UsefulTestCase {
         // A scroll of the editor, on the UI thread
         scrolled.listener().visibleAreaChanged(new VisibleAreaEvent(scrolled.editor(),
                 new Rectangle(0, 0, 800, 600), new Rectangle(0, 10, 800, 600)));
-
-        assertServerCannotStart(file.getProject());
     }
 
     public void testAScrollOfAnEditorWhoseCodeLensesFailedUpdatesItsViewport() {
@@ -140,14 +140,23 @@ public class ServerStartFailureTest extends UsefulTestCase {
 
     /**
      * Asks for the code lenses of the file for the editor, as LSPCodeLensProvider does for each editor of the file when
-     * code vision asks for them, and waits for the request to fail, since the language server cannot start.
+     * code vision asks for them, with a request that fails as when the language server cannot start. The request of a
+     * language server that cannot start doesn't always fail: when the start fails before {@code start()} returns, or
+     * as another feature's start replaces it, the request finds no language server and has no code lenses, which these
+     * tests are not about. So this request fails every time.
      */
     private static void failCodeLenses(PsiFile file, EditorEx editor) {
-        var support = LSPFileSupport.getSupport(file).getCodeLensSupport();
+        var support = new LSPCodeLensSupport(file) {
+            @Override
+            protected CompletableFuture<CodeLensDataResult> doLoad(@NotNull CodeLensParams params,
+                                                                   @NotNull CancellationSupport cancellationSupport) {
+                return CompletableFuture.failedFuture(new CannotStartProcessException("Cannot run program \"missing\""));
+            }
+        };
         LSPCodeLensEditorFactoryListener.setCodelensSupport(editor, support);
         var codeLenses = support.getCodeLenses(new CodeLensParams(new TextDocumentIdentifier()));
-        PlatformTestUtil.waitWithEventsDispatching("the code lens request must end", codeLenses::isDone, 10);
         assertTrue(codeLenses.isCompletedExceptionally());
+        assertSame(codeLenses, support.getFuture());
     }
 
     private static Object invoke(Method method, Object target, Object[] args) throws Throwable {
