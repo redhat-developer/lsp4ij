@@ -1,0 +1,78 @@
+/*******************************************************************************
+ * Copyright (c) 2026 Red Hat, Inc.
+ * Distributed under license by Red Hat, Inc. All rights reserved.
+ * This program is made available under the terms of the
+ * Eclipse Public License v2.0 which accompanies this distribution,
+ * and is available at https://www.eclipse.org/legal/epl-v20.html
+ ******************************************************************************/
+package com.redhat.devtools.lsp4ij;
+
+import com.intellij.openapi.project.Project;
+import com.intellij.openapi.vfs.VirtualFile;
+import com.intellij.psi.PsiFile;
+import com.intellij.testFramework.PlatformTestUtil;
+import com.redhat.devtools.lsp4ij.fixtures.LSPCodeInsightFixtureTestCase;
+import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
+import com.redhat.devtools.lsp4ij.server.definition.ServerFileNamePatternMapping;
+import org.jetbrains.annotations.NotNull;
+
+import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
+
+/**
+ * A language server definition that matches a file only through a mapping that is matched asynchronously.
+ */
+public class AsynchronousMatcherTest extends LSPCodeInsightFixtureTestCase {
+
+    private LanguageServerDefinition definition;
+
+    public AsynchronousMatcherTest() {
+        super("*.foo");
+    }
+
+    @Override
+    protected void setUp() throws Exception {
+        super.setUp();
+        definition = LanguageServersRegistry.getInstance().getServerDefinition("mock-server-id");
+        LanguageServersRegistry.getInstance().registerAssociation(definition,
+                new ServerFileNamePatternMapping(List.of("*.async"), definition.getId(), null, new DocumentMatcher() {
+                    @Override
+                    public boolean match(@NotNull VirtualFile file, @NotNull Project project) {
+                        throw new AssertionError("The mapping is matched asynchronously");
+                    }
+
+                    @Override
+                    public boolean shouldBeMatchedAsynchronously(@NotNull Project project) {
+                        return true;
+                    }
+
+                    @Override
+                    public @NotNull CompletableFuture<Boolean> matchAsync(@NotNull VirtualFile file, @NotNull Project project) {
+                        return CompletableFuture.completedFuture(true);
+                    }
+                }));
+    }
+
+    public void testARequestForTheDefinitionGetsItsLanguageServer() throws Exception {
+        PsiFile file = myFixture.configureByText("test.async", "content");
+        var accessor = LanguageServiceAccessor.getInstance(myFixture.getProject());
+        assertSize(1, accessor.getLanguageServers(file, null, null).get(10, TimeUnit.SECONDS));
+
+        assertSize(1, accessor.getLanguageServers(file, null, null, definition).get(10, TimeUnit.SECONDS));
+    }
+
+    public void testARestartConnectsTheOpenFileAgain() throws Exception {
+        PsiFile file = myFixture.configureByText("test.async", "content");
+        var servers = LanguageServiceAccessor.getInstance(myFixture.getProject()).getLanguageServers(file, null, null)
+                .get(10, TimeUnit.SECONDS);
+        assertSize(1, servers);
+        var wrapper = servers.get(0).getServerWrapper();
+        assertTrue(wrapper.isSynchronizing(file.getVirtualFile()));
+
+        wrapper.restart();
+
+        PlatformTestUtil.waitWithEventsDispatching("The open file must be connected again after the restart",
+                () -> wrapper.getServerStatus() == ServerStatus.started && wrapper.isSynchronizing(file.getVirtualFile()), 10);
+    }
+}
