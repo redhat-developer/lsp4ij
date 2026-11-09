@@ -62,7 +62,7 @@ class LSPFileListener extends AbstractLSPFileListener {
     @Override
     public ChangeApplier prepareChange(@NotNull List<? extends VFileEvent> events) {
         var delegate = super.prepareChange(events);
-        var directories = events.stream().map(event -> {
+        var movedFiles = events.stream().map(event -> {
             if (event instanceof VFileMoveEvent move) {
                 return move.getFile();
             }
@@ -71,15 +71,19 @@ class LSPFileListener extends AbstractLSPFileListener {
                 return rename.getFile();
             }
             return null;
-        }).filter(Objects::nonNull).filter(VirtualFile::isDirectory).toList();
-        if (directories.isEmpty()) {
+        }).filter(Objects::nonNull).toList();
+        if (movedFiles.isEmpty()) {
             return delegate;
         }
+        var directories = movedFiles.stream().filter(VirtualFile::isDirectory).toList();
         return new ChangeApplier() {
             @Override
             public void beforeVfsChange() {
                 if (delegate != null) {
                     delegate.beforeVfsChange();
+                }
+                if (directories.isEmpty()) {
+                    return;
                 }
                 // Descendants do not receive individual VFS move events. Capture their URIs
                 // before the directory changes, and retire each document only once even when
@@ -96,11 +100,23 @@ class LSPFileListener extends AbstractLSPFileListener {
                 if (delegate != null) {
                     delegate.afterVfsChange();
                 }
+                if (!languageServerWrapper.isActive()) {
+                    // As the filter of the events, this leaves out a language server that isn't running: a connection
+                    // registers a document only once the language server is initialized, and a stop disconnects every
+                    // document, holding documentsLock, which this would wait for in the write action
+                    return;
+                }
+                // The move of a file takes its document along only if the file was open as the events were filtered,
+                // and the move of a directory takes the documents of its files along before the move. A document
+                // registered after either, and before the move, would stay at the earlier place of its file
+                var missed = languageServerWrapper.disconnectMovedDocuments(file -> movedFiles.stream()
+                        .anyMatch(moved -> VfsUtilCore.isAncestor(moved, file, false)));
+                missed.forEach(LSPFileListener.this::reconnectMovedDocument);
             }
         };
     }
 
-    private void reconnectMovedDocument(VirtualFile file) {
+    void reconnectMovedDocument(@NotNull VirtualFile file) {
         if (languageServerWrapper.getInstanceRoot() == null) {
             ApplicationManager.getApplication().invokeLater(() -> reconnectMovedDocument(languageServerWrapper, file), ModalityState.any());
             return;
@@ -138,7 +154,9 @@ class LSPFileListener extends AbstractLSPFileListener {
     }
 
     private void reconnectMovedDocument(@NotNull LanguageServerWrapper languageServer, @NotNull VirtualFile file) {
-        if (!isOpenDocument(languageServer, file)) {
+        if (!isOpenDocument(languageServer, file) || !languageServer.isEnabled()) {
+            // A language server that a stop switched off meanwhile gets no moved document, as it gets no opened one:
+            // the connection would start it again
             return;
         }
         URI uri = languageServer.toUri(file);

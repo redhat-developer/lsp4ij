@@ -79,6 +79,7 @@ import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.function.UnaryOperator;
 
 import static com.redhat.devtools.lsp4ij.LSPIJUtils.findResourceFor;
@@ -1184,8 +1185,11 @@ public class LanguageServerWrapper implements Disposable {
                 if ((chosenUrl != null && !chosenUrl.equals(url)) || !fileUrl.equals(url)) {
                     // The file moved since the connection was asked for, or since this instance was chosen for it.
                     // Opened with the URI of its earlier place, which the move found no document for, or on the
-                    // instance of its earlier place, it would stay with this language server. Its new place decides,
-                    // as the move connects an open file again, or as the next request asks
+                    // instance of its earlier place, it would stay with this language server. Its new place decides.
+                    // The move found no document to take along, so this connects an open file as the move connects a
+                    // moved document, once the lock is released
+                    ApplicationManager.getApplication().invokeLater(() -> fileListener.reconnectMovedDocument(file),
+                            ModalityState.any());
                     return CompletableFuture.completedFuture(null);
                 }
                 var hook = beforeRegistration;
@@ -1405,6 +1409,42 @@ public class LanguageServerWrapper implements Disposable {
             disconnect(fileUri, false);
             return true;
         }
+    }
+
+    /**
+     * Disconnects each document whose file the given filter accepts and has another URI now than the one that it was
+     * connected with, and returns their files. The documents are taken under documentsLock, as a connection checks the
+     * place of its file and registers the document: a connection then either registered the document before, which
+     * this finds, or checks the place of its file after, and sees where the file is now.
+     *
+     * @param files the filter of the files whose documents are checked.
+     * @return the files whose documents were disconnected.
+     */
+    @NotNull
+    List<VirtualFile> disconnectMovedDocuments(@NotNull Predicate<VirtualFile> files) {
+        Map<URI, OpenedDocument> documents = new HashMap<>();
+        synchronized (documentsLock) {
+            openedDocuments.forEach((uri, document) -> {
+                if (files.test(document.getFile())) {
+                    documents.put(uri, document);
+                }
+            });
+        }
+        List<VirtualFile> moved = new ArrayList<>();
+        documents.forEach((uri, document) -> {
+            // Outside the lock: the URI support can take a read action, and the write action of a move waits for
+            // the lock
+            if (uri.equals(toUri(document.getFile()))) {
+                return;
+            }
+            synchronized (documentsLock) {
+                if (openedDocuments.get(uri) == document) {
+                    disconnect(uri, false);
+                    moved.add(document.getFile());
+                }
+            }
+        });
+        return moved;
     }
 
     private void maybeShutdown() {

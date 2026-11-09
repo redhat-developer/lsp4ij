@@ -925,8 +925,9 @@ public class LanguageServiceAccessor implements Disposable {
                                        @NotNull Set<LanguageServerWrapper> matchedServers,
                                        @Nullable Predicate<LSPClientFeatures> beforeStartingServerFilter) {
         if (!choice.url().equals(file.getUrl())) {
-            // The file moved since the choice, which can be for its earlier place: its new place decides, as the move
-            // connects an open file again, or as the next request chooses
+            // The file moved since the choice, which can be for its earlier place: its new place decides. The move found
+            // no document of the file to take along, so an open file asks again, as the next request would
+            askAgainForTheInstanceOf(file, serverDefinition);
             return;
         }
         LanguageServerWrapper instance;
@@ -963,6 +964,55 @@ public class LanguageServiceAccessor implements Disposable {
             }
             matchedServers.add(instance);
         }
+    }
+
+    /**
+     * Asks again for the instance of the given definition for a file that moved since its request chose the instance,
+     * if the file is open: the move found no document of the file to take along. The request is made off this thread,
+     * which holds the monitor, and in a read action, as the open files of a replaced definition are connected again,
+     * and only a definition that still applies to the file at its new place answers.
+     */
+    private void askAgainForTheInstanceOf(@NotNull VirtualFile file, @NotNull LanguageServerDefinition serverDefinition) {
+        ReadAction.nonBlocking(() -> {
+                    var psiFile = isOpen(file) ? LSPIJUtils.getPsiFile(file, project) : null;
+                    if (psiFile == null) {
+                        return;
+                    }
+                    var url = file.getUrl();
+                    // The ordinary request, kept to this definition: unlike a request for one definition, it also
+                    // takes a definition that matches the file asynchronously
+                    getLanguageServers(psiFile, features -> features.getServerDefinition() == serverDefinition, null)
+                            .whenComplete((servers, failure) -> {
+                                if (failure != null) {
+                                    // As an asynchronous match that fails: the file would stay without the language
+                                    // server, and nothing else reports it
+                                    var cause = failure instanceof CompletionException ? failure.getCause() : failure;
+                                    if (!(cause instanceof CancellationException || cause instanceof ProcessCanceledException)) {
+                                        LOGGER.warn("Cannot connect moved file {} to '{}'", url,
+                                                serverDefinition.getDisplayName(), failure);
+                                    }
+                                    return;
+                                }
+                                ApplicationManager.getApplication().invokeLater(() -> {
+                                    // The request counts the closes of the editors from its start, after the file was
+                                    // found open, so a file whose last editor closed in between is disconnected here
+                                    if (isOpen(file)) {
+                                        return;
+                                    }
+                                    for (var server : servers) {
+                                        var languageServer = server.getServerWrapper();
+                                        languageServer.disconnect(file, !languageServer.isDisposed());
+                                    }
+                                }, ModalityState.any());
+                            });
+                })
+                .expireWhen(project::isDisposed)
+                .submit(AppExecutorUtil.getAppExecutorService());
+    }
+
+    private boolean isOpen(@NotNull VirtualFile file) {
+        return file.isValid() && (FileEditorManager.getInstance(project).isFileOpen(file)
+                || LSPIJUtils.editorsForFile(file, project).length > 0);
     }
 
     /**
