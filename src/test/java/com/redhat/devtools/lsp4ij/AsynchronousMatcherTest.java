@@ -13,9 +13,11 @@ import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiFile;
 import com.intellij.testFramework.PlatformTestUtil;
 import com.redhat.devtools.lsp4ij.fixtures.LSPCodeInsightFixtureTestCase;
+import com.redhat.devtools.lsp4ij.mock.MockLanguageServer;
 import com.redhat.devtools.lsp4ij.mock.MockLanguageServerDefinition;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
 import com.redhat.devtools.lsp4ij.server.definition.ServerFileNamePatternMapping;
+import org.eclipse.lsp4j.DidOpenTextDocumentParams;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
@@ -122,16 +124,29 @@ public class AsynchronousMatcherTest extends LSPCodeInsightFixtureTestCase {
     }
 
     public void testARestartConnectsTheOpenFileAgain() throws Exception {
+        var opened = expectDidOpenOf("test.async");
         PsiFile file = myFixture.configureByText("test.async", "content");
         var servers = LanguageServiceAccessor.getInstance(myFixture.getProject()).getLanguageServers(file, null, null)
                 .get(10, TimeUnit.SECONDS);
         assertSize(1, servers);
         var wrapper = servers.get(0).getServerWrapper();
-        assertTrue(wrapper.isSynchronizing(file.getVirtualFile()));
+        PlatformTestUtil.waitWithEventsDispatching("The language server must get the file's didOpen", opened::isDone, 10);
 
+        var reopened = expectDidOpenOf("test.async");
         wrapper.restart();
 
-        PlatformTestUtil.waitWithEventsDispatching("The open file must be connected again after the restart",
-                () -> wrapper.getServerStatus() == ServerStatus.started && wrapper.isSynchronizing(file.getVirtualFile()), 10);
+        PlatformTestUtil.waitWithEventsDispatching("The restarted language server must get the file's didOpen again",
+                () -> wrapper.getServerStatus() == ServerStatus.started && reopened.isDone(), 10);
+    }
+
+    /**
+     * Expects the next didOpen of the file with the given name, which the mock language server completes the returned
+     * future with.
+     */
+    private static CompletableFuture<DidOpenTextDocumentParams> expectDidOpenOf(@NotNull String fileName) {
+        var opened = new CompletableFuture<DidOpenTextDocumentParams>();
+        MockLanguageServer.INSTANCE.getTextDocumentService().setDidOpenCallback(opened,
+                params -> params.getTextDocument().getUri().endsWith("/" + fileName));
+        return opened;
     }
 }
