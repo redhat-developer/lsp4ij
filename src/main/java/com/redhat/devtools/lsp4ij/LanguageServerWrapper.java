@@ -1185,8 +1185,11 @@ public class LanguageServerWrapper implements Disposable {
                 if ((chosenUrl != null && !chosenUrl.equals(url)) || !fileUrl.equals(url)) {
                     // The file moved since the connection was asked for, or since this instance was chosen for it.
                     // Opened with the URI of its earlier place, which the move found no document for, or on the
-                    // instance of its earlier place, it would stay with this language server. Its new place decides,
-                    // as the move connects an open file again, or as the next request asks
+                    // instance of its earlier place, it would stay with this language server. Its new place decides.
+                    // The move found no document to take along, so this connects an open file as the move connects a
+                    // moved document, once the lock is released
+                    ApplicationManager.getApplication().invokeLater(() -> fileListener.reconnectMovedDocument(file),
+                            ModalityState.any());
                     return CompletableFuture.completedFuture(null);
                 }
                 var hook = beforeRegistration;

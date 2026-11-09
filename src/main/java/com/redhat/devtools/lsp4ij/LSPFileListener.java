@@ -116,7 +116,7 @@ class LSPFileListener extends AbstractLSPFileListener {
         };
     }
 
-    private void reconnectMovedDocument(VirtualFile file) {
+    void reconnectMovedDocument(@NotNull VirtualFile file) {
         if (languageServerWrapper.getInstanceRoot() == null) {
             ApplicationManager.getApplication().invokeLater(() -> reconnectMovedDocument(languageServerWrapper, file), ModalityState.any());
             return;

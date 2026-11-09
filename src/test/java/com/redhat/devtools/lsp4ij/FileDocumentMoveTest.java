@@ -37,7 +37,9 @@ import java.io.UncheckedIOException;
 import java.net.URI;
 import java.util.Collections;
 import java.util.List;
+import java.util.Queue;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -153,6 +155,31 @@ public class FileDocumentMoveTest extends LSPCodeInsightFixtureTestCase {
             assertFalse("The document must not stay at the earlier place of its file", wrapper.isConnectedTo(earlierUri));
         } finally {
             wrapper.setBeforeRegistration(null);
+            EditorFactory.getInstance().releaseEditor(editor);
+        }
+    }
+
+    public void testAnOpenFileWhoseConnectionAMoveDropsIsConnectedAtItsNewPlace() throws Exception {
+        var wrapper = connect(myFixture.getTempDirFixture().createFile("source/other.foo", "other")).wrapper();
+        var file = myFixture.getTempDirFixture().createFile("source/test.foo", "disk");
+        var destination = myFixture.getTempDirFixture().findOrCreateDir("destination");
+        var editor = EditorFactory.getInstance().createEditor(LSPIJUtils.getDocument(file), myFixture.getProject());
+        Queue<Runnable> waiting = new ConcurrentLinkedQueue<>();
+        wrapper.setConnectionExecutor(waiting::add);
+        try {
+            var servers = connectLater(file);
+            PlatformTestUtil.waitWithEventsDispatching("The connection must wait", () -> !waiting.isEmpty(), 10);
+
+            // The language server has no document of the file yet, so the move takes none along, and the connection
+            // then sees that its file moved
+            write(() -> file.move(this, destination));
+            wrapper.setConnectionExecutor(AppExecutorUtil.getAppExecutorService());
+            waiting.forEach(AppExecutorUtil.getAppExecutorService()::execute);
+
+            PlatformTestUtil.waitWithEventsDispatching("The open file must be connected at its new place",
+                    () -> servers.isDone() && wrapper.isSynchronizing(file), 10);
+        } finally {
+            wrapper.setConnectionExecutor(AppExecutorUtil.getAppExecutorService());
             EditorFactory.getInstance().releaseEditor(editor);
         }
     }
