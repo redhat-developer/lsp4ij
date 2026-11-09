@@ -207,7 +207,7 @@ public class DAPDataBreakpointHandler extends BreakpointHandlerBase<XBreakpoint<
                     for (int i = 0; i < Math.min(breakpoints.length, ijBreakpoints.size()); i++) {
                         var ijBreakpoint = ijBreakpoints.get(i);
                         ijBreakpoint.putUserData(DAP_BREAKPOINT_ID, breakpoints[i].getId());
-                        updateBreakpoint(breakpoints[i], ijBreakpoint);
+                        updateBreakpoint(debugProtocolServer, breakpoints[i], ijBreakpoint);
                     }
                     return null;
                 });

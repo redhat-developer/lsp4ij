@@ -20,34 +20,8 @@ import java.util.concurrent.CompletableFuture;
 /** Exercises the actual LSP4IJ request conversion with real IntelliJ breakpoints. */
 public class DAPBreakpointHandlerBaseTest extends HeavyPlatformTestCase {
     public void testRemovalReplacesBreakpointsPerSource() throws Exception {
-        var type = Arrays.stream(com.intellij.execution.configurations.ConfigurationType.CONFIGURATION_TYPE_EP.getExtensions())
-            .filter(t -> t.getId().equals("DAPConfiguration")).findFirst().orElseThrow();
-        var config = type.getConfigurationFactories()[0].createTemplateConfiguration(getProject());
-        var environment = ExecutionEnvironmentBuilder.create(getProject(), DefaultDebugExecutor.getDebugExecutorInstance(), config).build();
-        var descriptor = new com.redhat.devtools.lsp4ij.dap.descriptors.DebugAdapterDescriptor(new DAPRunConfigurationOptions(), environment, null) {
-            @Override
-            public com.intellij.execution.process.ProcessHandler startServer() {
-                throw new UnsupportedOperationException();
-            }
-            @Override
-            public String getId() {
-                return "breakpoint-regression";
-            }
-            @Override
-            public Map<String, Object> getDapParameters() {
-                return Map.of();
-            }
-            @Override
-            public com.intellij.openapi.fileTypes.FileType getFileType() {
-                return com.intellij.openapi.fileTypes.PlainTextFileType.INSTANCE;
-            }
-            @Override
-            public boolean isDebuggableFile(com.intellij.openapi.vfs.VirtualFile file, com.intellij.openapi.project.Project project) {
-                return true;
-            }
-        };
         var session = (XDebugSession)Proxy.newProxyInstance(XDebugSession.class.getClassLoader(),new Class<?>[]{XDebugSession.class}, (p, m, a) -> null);
-        var handler = new DAPBreakpointHandlerBase<XLineBreakpoint<DAPBreakpointProperties>>(DAPBreakpointType.class, session, descriptor, getProject()) {};
+        var handler = handler(session);
         var requests = new ArrayList<SetBreakpointsArguments>();
         var server = (IDebugProtocolServer)Proxy.newProxyInstance(IDebugProtocolServer.class.getClassLoader(),new Class<?>[]{IDebugProtocolServer.class}, (p, m, a) -> {
             if (m.getName().equals("setBreakpoints")) {
@@ -92,6 +66,95 @@ public class DAPBreakpointHandlerBaseTest extends HeavyPlatformTestCase {
             com.intellij.openapi.util.io.FileUtil.delete(dir.toFile());
         }
     }
+    /**
+     * A debug adapter which runs a tree of sessions, such as vscode-js-debug with a child session per target, sends
+     * every breakpoint to every session, and only the session which owns the target binds it: the answers of the
+     * other sessions must not show a bound breakpoint as invalid.
+     */
+    public void testBreakpointBoundByOneSessionStaysVerified() throws Exception {
+        var states = new ArrayList<String>();
+        var session = (XDebugSession)Proxy.newProxyInstance(XDebugSession.class.getClassLoader(),new Class<?>[]{XDebugSession.class}, (p, m, a) -> {
+            switch (m.getName()) {
+                case "setBreakpointVerified" -> states.add("verified");
+                case "setBreakpointInvalid" -> states.add("invalid: " + a[1]);
+                default -> { }
+            }
+            return null;
+        });
+        var handler = handler(session);
+        var dir = Files.createTempDirectory("dap-breakpoints-");
+        var a = breakpoint(dir.resolve("a.lua"), 0);
+        try {
+            handler.registerBreakpoint(a);
+            handler.initialize(server(false), new Capabilities()).join();
+            assertEquals(List.of("invalid: Unbound breakpoint"), states);
+            handler.initialize(server(true), new Capabilities()).join();
+            assertEquals("verified", states.get(states.size() - 1));
+            // A later session which cannot bind the breakpoint answers last
+            handler.initialize(server(false), new Capabilities()).join();
+            assertEquals("verified", states.get(states.size() - 1));
+        } finally {
+            handler.dispose();
+            com.intellij.openapi.util.io.FileUtil.delete(dir.toFile());
+        }
+    }
+
+    private DAPBreakpointHandlerBase<XLineBreakpoint<DAPBreakpointProperties>> handler(XDebugSession session) throws Exception {
+        var type = Arrays.stream(com.intellij.execution.configurations.ConfigurationType.CONFIGURATION_TYPE_EP.getExtensions())
+            .filter(t -> t.getId().equals("DAPConfiguration")).findFirst().orElseThrow();
+        var config = type.getConfigurationFactories()[0].createTemplateConfiguration(getProject());
+        var environment = ExecutionEnvironmentBuilder.create(getProject(), DefaultDebugExecutor.getDebugExecutorInstance(), config).build();
+        var descriptor = new com.redhat.devtools.lsp4ij.dap.descriptors.DebugAdapterDescriptor(new DAPRunConfigurationOptions(), environment, null) {
+            @Override
+            public com.intellij.execution.process.ProcessHandler startServer() {
+                throw new UnsupportedOperationException();
+            }
+            @Override
+            public String getId() {
+                return "breakpoint-regression";
+            }
+            @Override
+            public Map<String, Object> getDapParameters() {
+                return Map.of();
+            }
+            @Override
+            public com.intellij.openapi.fileTypes.FileType getFileType() {
+                return com.intellij.openapi.fileTypes.PlainTextFileType.INSTANCE;
+            }
+            @Override
+            public boolean isDebuggableFile(com.intellij.openapi.vfs.VirtualFile file, com.intellij.openapi.project.Project project) {
+                return true;
+            }
+        };
+        return new DAPBreakpointHandlerBase<>(DAPBreakpointType.class, session, descriptor, getProject()) {};
+    }
+
+    /**
+     * Returns a DAP server which answers each 'setBreakpoints' request with the given 'verified' flag, as a session of
+     * vscode-js-debug which owns the target (true) or not (false).
+     */
+    private static IDebugProtocolServer server(boolean verified) {
+        return (IDebugProtocolServer)Proxy.newProxyInstance(IDebugProtocolServer.class.getClassLoader(),new Class<?>[]{IDebugProtocolServer.class}, (p, m, a) -> {
+            if (m.getName().equals("setBreakpoints")) {
+                var arguments = (SetBreakpointsArguments) a[0];
+                var breakpoints = Arrays.stream(arguments.getBreakpoints()).map(source -> {
+                    var breakpoint = new Breakpoint();
+                    breakpoint.setId(1);
+                    breakpoint.setLine(source.getLine());
+                    breakpoint.setVerified(verified);
+                    breakpoint.setMessage(verified ? null : "Unbound breakpoint");
+                    return breakpoint;
+                }).toArray(Breakpoint[]::new);
+                var response = new SetBreakpointsResponse();
+                response.setBreakpoints(breakpoints);
+                return CompletableFuture.completedFuture(response);
+            }
+            if (m.getName().equals("equals")) return p == a[0];
+            if (m.getName().equals("hashCode")) return System.identityHashCode(p);
+            throw new AssertionError(m.getName());
+        });
+    }
+
     private XLineBreakpoint<DAPBreakpointProperties> breakpoint(Path path, int line) throws Exception {
         Files.writeString(path, "local a = 1\nlocal b = 2\n");
         var file = LocalFileSystem.getInstance().refreshAndFindFileByNioFile(path);

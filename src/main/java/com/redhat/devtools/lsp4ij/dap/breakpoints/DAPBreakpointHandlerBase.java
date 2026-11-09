@@ -297,7 +297,7 @@ public abstract class DAPBreakpointHandlerBase<B extends XBreakpoint<?>> extends
                             // a late response must not give it back the DAP id it had
                             if (ijBreakpoint != null && !shadowedBreakpoints.contains(ijBreakpoint)) {
                                 ijBreakpoint.putUserData(DAP_BREAKPOINT_ID, breakpointResponse.getId());
-                                updateBreakpoint(breakpointResponse, ijBreakpoint);
+                                updateBreakpoint(debugProtocolServer, breakpointResponse, ijBreakpoint);
                             }
                         }
                     }

@@ -36,7 +36,9 @@ import java.util.Collections;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Base class for DAP/Disassembly breakpoint handler.
@@ -56,6 +58,9 @@ public abstract class BreakpointHandlerBase<B extends XBreakpoint<?>> extends XB
     protected final List<IDebugProtocolServer> debugProtocolServers = ContainerUtil.createConcurrentList();
     protected final List<B> breakpoints = ContainerUtil.createConcurrentList();
     private final Map<IDebugProtocolServer, Capabilities> capabilities = Collections.synchronizedMap(new IdentityHashMap<>());
+    // The sessions which report each breakpoint as bound: in a session tree only one session can bind it
+    private final Map<B, Set<Object>> verifiedBy = new ConcurrentHashMap<>();
+    private static final Object UNKNOWN_SESSION = new Object();
     // The temporary breakpoint, as of "Run to Cursor", from when it is registered until it is unregistered: each
     // 'setBreakpoints' request for its source keeps it, as when the user adds a breakpoint to the source meanwhile
     private @Nullable XSourcePosition registeredTemporaryBreakpoint;
@@ -157,6 +162,7 @@ public abstract class BreakpointHandlerBase<B extends XBreakpoint<?>> extends XB
     public void dispose() {
         debugProtocolServers.clear();
         capabilities.clear();
+        verifiedBy.clear();
     }
 
     // Sends take turns, so the debug adapter gets them in the order in which they read the breakpoints: a request
@@ -192,6 +198,22 @@ public abstract class BreakpointHandlerBase<B extends XBreakpoint<?>> extends XB
      */
     public void updateBreakpoint(@NotNull Breakpoint breakpoint,
                                  @Nullable B ijBreakpoint) {
+        updateBreakpoint(null, breakpoint, ijBreakpoint);
+    }
+
+    /**
+     * Update IntelliJ breakpoint with the given DAP breakpoint information, as answered by the given DAP server.
+     * <p>
+     * The breakpoint is verified while at least one server reports it bound, and invalid once none does: in a tree of
+     * sessions, such as vscode-js-debug starts, the sessions which do not own the target answer 'verified=false'.
+     *
+     * @param debugProtocolServer the DAP server which answered, or null when it is not known.
+     * @param breakpoint          the DAP breakpoint information.
+     * @param ijBreakpoint        the IJ Breakpoint and null otherwise.
+     */
+    public void updateBreakpoint(@Nullable IDebugProtocolServer debugProtocolServer,
+                                 @NotNull Breakpoint breakpoint,
+                                 @Nullable B ijBreakpoint) {
         if (ijBreakpoint == null) {
             // Retrieve the IntelliJ breakpoint by the id.
             ijBreakpoint = findBreakpointById(breakpoint.getId());
@@ -199,8 +221,14 @@ public abstract class BreakpointHandlerBase<B extends XBreakpoint<?>> extends XB
         if (ijBreakpoint == null) {
             return;
         }
-        // Update the IntelliJ breakpoint according the DAP breakpoint 'verified' flag.
+        Object session = debugProtocolServer != null ? debugProtocolServer : UNKNOWN_SESSION;
+        Set<Object> sessions = verifiedBy.computeIfAbsent(ijBreakpoint, key -> ConcurrentHashMap.newKeySet());
         if (breakpoint.isVerified()) {
+            sessions.add(session);
+        } else {
+            sessions.remove(session);
+        }
+        if (!sessions.isEmpty()) {
             setBreakpointVerified(ijBreakpoint);
         } else {
             setBreakpointInvalid(ijBreakpoint, breakpoint.getMessage());
@@ -238,6 +266,17 @@ public abstract class BreakpointHandlerBase<B extends XBreakpoint<?>> extends XB
         }
     }
 
+
+    /**
+     * Forgets which breakpoints the given DAP server reported bound. Call it when its session terminates.
+     *
+     * @param debugProtocolServer the DAP server of the terminated session.
+     */
+    public void forgetSessionVerdicts(@NotNull IDebugProtocolServer debugProtocolServer) {
+        for (var sessions : verifiedBy.values()) {
+            sessions.remove(debugProtocolServer);
+        }
+    }
 
     /**
      * Returns the IntelliJ breakpoint from the DAP breakpoint id and null otherwise.
