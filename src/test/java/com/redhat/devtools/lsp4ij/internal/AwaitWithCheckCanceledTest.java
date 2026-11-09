@@ -9,7 +9,9 @@ package com.redhat.devtools.lsp4ij.internal;
 
 import com.intellij.openapi.progress.EmptyProgressIndicator;
 import com.intellij.openapi.progress.ProcessCanceledException;
+import com.intellij.openapi.progress.ProgressIndicator;
 import com.intellij.openapi.progress.ProgressManager;
+import com.intellij.openapi.progress.util.ProgressIndicatorBase;
 import com.intellij.testFramework.fixtures.BasePlatformTestCase;
 import com.intellij.util.ThrowableRunnable;
 import com.intellij.util.concurrency.AppExecutorUtil;
@@ -86,6 +88,24 @@ public class AwaitWithCheckCanceledTest extends BasePlatformTestCase {
         assertInstanceOf(thrown, ProcessCanceledException.class);
     }
 
+    /**
+     * The wait checks a progress whose own checks don't throw, as one that cannot be cancelled, and throws a
+     * ProcessCanceledException when it is cancelled: the wait throws it, although the future is cancelled too.
+     */
+    public void testACanceledProgressWhoseChecksDontThrowThrowsAProcessCanceledExceptionWhenTheFutureIsCancelledToo() {
+        var indicator = progressWhoseChecksDontThrow();
+        var future = cancelledWhileItIsAwaited();
+
+        var thrown = thrownBy(() -> ProgressManager.getInstance().executeProcessUnderProgress(
+                () -> {
+                    indicator.cancel();
+                    CompletableFutures.awaitWithCheckCanceled(future);
+                },
+                indicator));
+
+        assertInstanceOf(thrown, ProcessCanceledException.class);
+    }
+
     public void testAFutureCancelledInAPreviousStageThrowsAProcessCanceledException() {
         var previous = new CompletableFuture<>();
         var future = previous.thenApply(result -> result);
@@ -144,6 +164,34 @@ public class AwaitWithCheckCanceledTest extends BasePlatformTestCase {
         };
         future.cancel(true);
         return future;
+    }
+
+    /**
+     * Returns a cancelled future which isn't done yet when its wait checks the progress, as when it is cancelled while
+     * it is awaited.
+     */
+    public static <T> CompletableFuture<T> cancelledWhileItIsAwaited() {
+        var future = new CompletableFuture<T>() {
+            @Override
+            public boolean isDone() {
+                return false;
+            }
+        };
+        future.cancel(true);
+        return future;
+    }
+
+    /**
+     * Returns a progress whose checkCanceled() doesn't throw once it is cancelled, as for a progress that cannot be
+     * cancelled, which ProgressManager.checkCanceled() doesn't report either.
+     */
+    public static ProgressIndicator progressWhoseChecksDontThrow() {
+        return new ProgressIndicatorBase() {
+            @Override
+            protected boolean isCancelable() {
+                return false;
+            }
+        };
     }
 
     private static Throwable thrownBy(ThrowableRunnable<?> wait) {

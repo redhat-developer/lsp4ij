@@ -27,6 +27,7 @@ import com.redhat.devtools.lsp4ij.LanguageServerWrapper;
 import com.redhat.devtools.lsp4ij.features.files.WillRenameFilesPreparation.FileRenamePlan;
 import com.redhat.devtools.lsp4ij.features.files.watcher.FileSystemWatcherManager;
 import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
+import com.redhat.devtools.lsp4ij.internal.CompletableFutures;
 import com.redhat.devtools.lsp4ij.settings.GlobalLanguageServerSettings;
 import org.eclipse.lsp4j.*;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
@@ -493,7 +494,7 @@ public abstract class AbstractLSPFileListener implements FileEditorManagerListen
             }
             return result;
         } catch (ProcessCanceledException e) {
-            if (future.isCancelled()) {
+            if (CompletableFutures.cancellationOf(future, e) != null) {
                 // The request itself was cancelled, which the platform reports as a ProcessCanceledException since
                 // Java 25: no edit from this language server, as when its request fails. A progress cancelled too still
                 // stops collectWillEdits.

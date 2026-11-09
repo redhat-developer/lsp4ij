@@ -12,6 +12,7 @@ package com.redhat.devtools.lsp4ij.features.files;
 
 import com.intellij.openapi.progress.EmptyProgressIndicator;
 import com.intellij.openapi.progress.ProcessCanceledException;
+import com.intellij.openapi.progress.ProgressIndicator;
 import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.testFramework.fixtures.BasePlatformTestCase;
 import com.redhat.devtools.lsp4ij.internal.AwaitWithCheckCanceledTest;
@@ -194,6 +195,25 @@ public class GetWorkspaceEditTest extends BasePlatformTestCase {
         CompletableFuture<WorkspaceEdit> future = AwaitWithCheckCanceledTest.cancelledAsOnJava25();
         long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
         EmptyProgressIndicator indicator = new EmptyProgressIndicator();
+
+        try {
+            ProgressManager.getInstance().runProcess(
+                    () -> {
+                        indicator.cancel();
+                        return AbstractLSPFileListener.getWorkspaceEdit(future, deadline);
+                    },
+                    indicator);
+            fail("Should have thrown ProcessCanceledException");
+        } catch (ProcessCanceledException expected) {
+            // the progress was cancelled
+        }
+    }
+
+    public void testRethrowsProcessCancelledExceptionWhenAnIndicatorWhoseChecksDontThrowAndTheRequestAreCancelled() {
+        // The wait reports the cancelled progress, although its own checks don't throw and the request is cancelled too
+        CompletableFuture<WorkspaceEdit> future = AwaitWithCheckCanceledTest.cancelledWhileItIsAwaited();
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+        ProgressIndicator indicator = AwaitWithCheckCanceledTest.progressWhoseChecksDontThrow();
 
         try {
             ProgressManager.getInstance().runProcess(

@@ -148,14 +148,13 @@ public class CompletableFutures {
         try {
             ProgressIndicatorUtils.awaitWithCheckCanceled(future);
         } catch (ProcessCanceledException e) {
-            if (future.isCancelled()) {
-                // The future itself was cancelled: since Java 25, its get() throws a CancellationException caused by the
-                // future's, which the platform reports as a ProcessCanceledException, the cancellation of the operation.
-                // A progress cancelled too still throws its own.
-                ProgressManager.checkCanceled();
-                throw cancellationOf(e);
+            CancellationException cancellation = cancellationOf(future, e);
+            if (cancellation == null) {
+                throw e;
             }
-            throw e;
+            // A progress cancelled too still throws its own
+            ProgressManager.checkCanceled();
+            throw cancellation;
         } catch (CancellationException e) {
             // Since 2024.2 ProcessCanceledException extends CancellationException
             throw e;
@@ -169,13 +168,24 @@ public class CompletableFutures {
     }
 
     /**
-     * Returns the cancellation of a cancelled future, which the platform reported as the given ProcessCanceledException:
-     * the future's CancellationException, which is its cause, or a new one.
+     * Returns the cancellation of the given future when the given ProcessCanceledException, thrown by a wait for it,
+     * reports it, and null when it reports the cancellation of the operation, such as a cancelled progress.
+     * <p>
+     * Since Java 25, the get() of a cancelled future throws a CancellationException caused by the future's, which the
+     * platform reports as a ProcessCanceledException caused by that one. A cancelled progress is reported without it,
+     * even when the future is cancelled too, and even when the progress's own checks don't throw.
+     *
+     * @param future the awaited future.
+     * @param e      the ProcessCanceledException thrown by the wait.
+     * @return the future's cancellation, or null.
      */
-    private static @NotNull CancellationException cancellationOf(@NotNull ProcessCanceledException e) {
-        return e.getCause() instanceof CancellationException cancellation && !(cancellation instanceof ProcessCanceledException)
+    public static @Nullable CancellationException cancellationOf(@NotNull Future<?> future,
+                                                                 @NotNull ProcessCanceledException e) {
+        return future.isCancelled()
+                && e.getCause() instanceof CancellationException cancellation
+                && !(cancellation instanceof ProcessCanceledException)
                 ? cancellation
-                : new CancellationException();
+                : null;
     }
 
     /**
