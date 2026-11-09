@@ -45,7 +45,7 @@ public class TypeScriptHoverTest extends LSPHoverFixtureTestCase {
                                       "character": 8
                                     }
                                   }
-                                }   
+                                }
                         """,
                 """
                         \n```typescript\n(method) String.charAt(pos: number): string\n```\nReturns the character at the specified index.\n\n*@param* `pos` — The zero-based index of the desired character."""
@@ -74,7 +74,7 @@ public class TypeScriptHoverTest extends LSPHoverFixtureTestCase {
                                       "character": 8
                                     }
                                   }
-                                }   
+                                }
                         """,
                 """
                         <pre><span style="">(</span><span style="">method)&#32;String.charAt(pos:&#32;number):&#32;string<br></span></pre>
@@ -92,8 +92,8 @@ public class TypeScriptHoverTest extends LSPHoverFixtureTestCase {
                         """,
                 """
                                 {
-                                    "contents": []     
-                                }  
+                                    "contents": []
+                                }
                         """,
                 null
         );
@@ -105,8 +105,8 @@ public class TypeScriptHoverTest extends LSPHoverFixtureTestCase {
                         """,
                 """
                                 {
-                                    "contents": {}     
-                                }  
+                                    "contents": {}
+                                }
                         """,
                 null
         );
@@ -134,7 +134,7 @@ public class TypeScriptHoverTest extends LSPHoverFixtureTestCase {
                                       "character": 8
                                     }
                                   }
-                                }  
+                                }
                         """,
                 null
         );
@@ -155,7 +155,7 @@ public class TypeScriptHoverTest extends LSPHoverFixtureTestCase {
                                  },
                                  ""
                             ]
-                        }  
+                        }
                         """,
                 null
         );
@@ -169,8 +169,8 @@ public class TypeScriptHoverTest extends LSPHoverFixtureTestCase {
                         """,
                 """
                                 {
-                                    "contents": []     
-                                }  
+                                    "contents": []
+                                }
                         """,
                 null
         );
@@ -182,8 +182,8 @@ public class TypeScriptHoverTest extends LSPHoverFixtureTestCase {
                         """,
                 """
                                 {
-                                    "contents": {}     
-                                }  
+                                    "contents": {}
+                                }
                         """,
                 null
         );
@@ -211,7 +211,7 @@ public class TypeScriptHoverTest extends LSPHoverFixtureTestCase {
                                       "character": 8
                                     }
                                   }
-                                }  
+                                }
                         """,
                 null
         );
@@ -232,7 +232,7 @@ public class TypeScriptHoverTest extends LSPHoverFixtureTestCase {
                                  },
                                  ""
                             ]
-                        }  
+                        }
                         """,
                 null
         );

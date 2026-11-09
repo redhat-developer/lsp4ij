@@ -30,7 +30,7 @@ public class MarkdownConverterTest extends LSPCodeInsightFixtureTestCase {
 
         String markdown = """
                 Does something, `somewhere`:
-                                
+
                 |                    |                    |
                 |--------------------|--------------------|
                 | Row One - Cell One | Row One - Cell Two |
@@ -62,7 +62,7 @@ public class MarkdownConverterTest extends LSPCodeInsightFixtureTestCase {
         String markdown = """
                  *  Coffee
                  *  Tea
-                 *  Milk 
+                 *  Milk
                 """;
         String html = """
                 <ul>
@@ -103,7 +103,7 @@ public class MarkdownConverterTest extends LSPCodeInsightFixtureTestCase {
 
         markdown = """
                 multi
-                                
+
                 line `HTML` stuff
                 """;
 
@@ -117,7 +117,7 @@ public class MarkdownConverterTest extends LSPCodeInsightFixtureTestCase {
     public void testSimpleCodeBlockConversion() {
         String markdown = """
                 Here's some java code:
-                                
+
                 ```my-java
                     @Test
                     public void linksConversion() {
@@ -141,7 +141,7 @@ public class MarkdownConverterTest extends LSPCodeInsightFixtureTestCase {
 
         markdown = """
                 Here's some XML code:
-                                
+
                 ```my-xml
                 <?xml version="1.0" encoding="UTF-8"?>
                 <note>
@@ -170,7 +170,7 @@ public class MarkdownConverterTest extends LSPCodeInsightFixtureTestCase {
         // Test with XML syntax coloration which uses a custom lexer (not TextMate)
         String markdown = """
                 Here's some XML code:
-                                
+
                 ```xml
                 <?xml version="1.0" encoding="UTF-8"?>
                 <note>
@@ -193,7 +193,7 @@ public class MarkdownConverterTest extends LSPCodeInsightFixtureTestCase {
         // Test with TypeScript syntax coloration which uses TextMate
         String markdown = """
                 Here's some TypeScript code:
-                                
+
                 ```ts
                 const s = '';
                 ```
@@ -210,7 +210,7 @@ public class MarkdownConverterTest extends LSPCodeInsightFixtureTestCase {
         // When blockquote is not indented, the syntax coloration is not applied (like vscode)
         String markdown = """
                 Here's some TypeScript code:
-                                
+
                 > const s = '';
                 """;
         String html = """
@@ -228,7 +228,7 @@ public class MarkdownConverterTest extends LSPCodeInsightFixtureTestCase {
         // Test with TypeScript syntax coloration which uses TextMate
         String markdown = """
                 Here's some TypeScript code:
-                                
+
                 >     const s = '';
                 """;
         String html = """
@@ -247,7 +247,7 @@ public class MarkdownConverterTest extends LSPCodeInsightFixtureTestCase {
         // Test with XML syntax coloration which uses a custom lexer (not TextMate)
         String markdown = """
                 Here's some XML code:
-                                
+
                 >     <?xml version="1.0" encoding="UTF-8"?>
                 """;
         String html = """
