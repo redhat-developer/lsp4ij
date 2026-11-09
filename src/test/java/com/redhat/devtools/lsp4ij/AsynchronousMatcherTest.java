@@ -21,7 +21,7 @@ import org.jetbrains.annotations.NotNull;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
-import java.util.function.Predicate;
+import java.util.function.Function;
 
 /**
  * A language server definition that matches a file only through a mapping that is matched asynchronously.
@@ -38,12 +38,12 @@ public class AsynchronousMatcherTest extends LSPCodeInsightFixtureTestCase {
     protected void setUp() throws Exception {
         super.setUp();
         definition = LanguageServersRegistry.getInstance().getServerDefinition("mock-server-id");
-        registerAsynchronousMapping(definition, "*.async", file -> true);
+        registerAsynchronousMapping(definition, "*.async", file -> CompletableFuture.completedFuture(true));
     }
 
     private static void registerAsynchronousMapping(@NotNull LanguageServerDefinition definition,
                                                     @NotNull String fileNamePattern,
-                                                    @NotNull Predicate<VirtualFile> matches) {
+                                                    @NotNull Function<VirtualFile, CompletableFuture<Boolean>> matches) {
         LanguageServersRegistry.getInstance().registerAssociation(definition,
                 new ServerFileNamePatternMapping(List.of(fileNamePattern), definition.getId(), null, new DocumentMatcher() {
                     @Override
@@ -58,7 +58,7 @@ public class AsynchronousMatcherTest extends LSPCodeInsightFixtureTestCase {
 
                     @Override
                     public @NotNull CompletableFuture<Boolean> matchAsync(@NotNull VirtualFile file, @NotNull Project project) {
-                        return CompletableFuture.completedFuture(matches.test(file));
+                        return matches.apply(file);
                     }
                 }));
     }
@@ -73,16 +73,32 @@ public class AsynchronousMatcherTest extends LSPCodeInsightFixtureTestCase {
         LanguageServersRegistry.getInstance().addServerDefinition(project, other, List.of());
         Disposer.register(getTestRootDisposable(),
                 () -> LanguageServersRegistry.getInstance().removeServerDefinition(project, other));
-        registerAsynchronousMapping(other, "*.both", file -> file.getName().equals("test.both"));
+        registerAsynchronousMapping(other, "*.both", file -> CompletableFuture.completedFuture(file.getName().equals("test.both")));
         return other;
     }
 
-    public void testARequestForTheDefinitionGetsItsLanguageServer() throws Exception {
-        PsiFile file = myFixture.configureByText("test.async", "content");
+    public void testARequestForTheDefinitionStartsItsLanguageServer() throws Exception {
+        // Not opened in an editor, which would connect it
+        PsiFile file = myFixture.addFileToProject("test.async", "content");
         var accessor = LanguageServiceAccessor.getInstance(myFixture.getProject());
-        assertSize(1, accessor.getLanguageServers(file, null, null).get(10, TimeUnit.SECONDS));
+        assertFalse(accessor.getStartedServers().stream()
+                .anyMatch(server -> server.getServerDefinition() == definition && server.isActive()));
 
         assertSize(1, accessor.getLanguageServers(file, null, null, definition).get(10, TimeUnit.SECONDS));
+        // As the request without a definition
+        assertSize(1, accessor.getLanguageServers(file, null, null).get(10, TimeUnit.SECONDS));
+    }
+
+    public void testARequestForTheDefinitionWaitsForAMatcherThatAnswersLater() throws Exception {
+        var answer = new CompletableFuture<Boolean>();
+        registerAsynchronousMapping(definition, "*.later", file -> answer);
+        PsiFile file = myFixture.configureByText("test.later", "content");
+
+        var servers = LanguageServiceAccessor.getInstance(myFixture.getProject()).getLanguageServers(file, null, null, definition);
+        assertFalse("The request must wait for the matcher", servers.isDone());
+        answer.complete(true);
+
+        assertSize(1, servers.get(10, TimeUnit.SECONDS));
     }
 
     public void testARequestForTheDefinitionGetsNoOtherDefinitionThatMatchesTheFileAsynchronously() throws Exception {
