@@ -15,6 +15,7 @@ import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.fileEditor.FileDocumentManager;
 import com.intellij.openapi.fileEditor.FileEditorManagerListener;
 import com.intellij.openapi.progress.ProcessCanceledException;
+import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.progress.util.ProgressIndicatorUtils;
 import com.intellij.openapi.vfs.AsyncFileListener;
 import com.intellij.openapi.vfs.VirtualFile;
@@ -26,6 +27,7 @@ import com.redhat.devtools.lsp4ij.LanguageServerWrapper;
 import com.redhat.devtools.lsp4ij.features.files.WillRenameFilesPreparation.FileRenamePlan;
 import com.redhat.devtools.lsp4ij.features.files.watcher.FileSystemWatcherManager;
 import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
+import com.redhat.devtools.lsp4ij.internal.CompletableFutures;
 import com.redhat.devtools.lsp4ij.settings.GlobalLanguageServerSettings;
 import org.eclipse.lsp4j.*;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
@@ -492,6 +494,13 @@ public abstract class AbstractLSPFileListener implements FileEditorManagerListen
             }
             return result;
         } catch (ProcessCanceledException e) {
+            if (CompletableFutures.cancellationOf(future, e) != null) {
+                // The request itself was cancelled, which the platform reports as a ProcessCanceledException since
+                // Java 25: no edit from this language server, as when its request fails. A progress cancelled too still
+                // stops collectWillEdits.
+                ProgressManager.checkCanceled();
+                return null;
+            }
             // The enclosing progress indicator was cancelled (e.g. the VFS
             // operation is being aborted). Cancel the LSP future and rethrow
             // so collectWillEdits stops immediately instead of trying the
