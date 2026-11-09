@@ -43,6 +43,7 @@ import com.redhat.devtools.lsp4ij.mock.MockLanguageServerDefinition;
 import com.redhat.devtools.lsp4ij.server.CannotStartProcessException;
 import com.redhat.devtools.lsp4ij.server.StreamConnectionProvider;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinitionListener;
+import com.redhat.devtools.lsp4ij.server.definition.ServerFileNamePatternMapping;
 import com.redhat.devtools.lsp4ij.settings.LanguageServerSettings;
 import com.redhat.devtools.lsp4ij.settings.LanguageServerSettingsListener;
 import com.redhat.devtools.lsp4ij.settings.ProjectLanguageServerSettings;
@@ -449,17 +450,7 @@ public class LanguageServerInstancesTest extends LSPCodeInsightFixtureTestCase {
         var bDirectory = file("b/other.per-folder").getVirtualFile().getParent();
         var editor = EditorFactory.getInstance().createEditor(LSPIJUtils.getDocument(virtualFile), myFixture.getProject());
         try {
-            definition.strategy.afterAsked = asked -> {
-                if (asked.equals(virtualFile)) {
-                    definition.strategy.afterAsked = null;
-                    // Once the strategy has chosen the folder of the file, before the request takes its instance
-                    try {
-                        move(asked, bDirectory);
-                    } catch (IOException e) {
-                        throw new UncheckedIOException(e);
-                    }
-                }
-            };
+            moveAsTheFolderOfTheFileIsChosen(virtualFile, bDirectory);
 
             assertEmpty(serversOf(file));
 
@@ -470,6 +461,88 @@ public class LanguageServerInstancesTest extends LSPCodeInsightFixtureTestCase {
         } finally {
             EditorFactory.getInstance().releaseEditor(editor);
         }
+    }
+
+    public void testAMovedFileWhoseEditorClosesAsItIsAskedForAgainIsNotConnected() throws Exception {
+        var file = file("a/one.per-folder");
+        var virtualFile = file.getVirtualFile();
+        var bDirectory = file("b/other.per-folder").getVirtualFile().getParent();
+        var editor = EditorFactory.getInstance().createEditor(LSPIJUtils.getDocument(virtualFile), myFixture.getProject());
+        var released = false;
+        try {
+            moveAsTheFolderOfTheFileIsChosen(virtualFile, bDirectory);
+            // The instance of the new place answers its initialize only once the editor closed
+            var initialize = new CompletableFuture<Void>();
+            definition.initializeGate = initialize;
+
+            assertEmpty(serversOf(file));
+            PlatformTestUtil.waitWithEventsDispatching("The file must be asked for again", () -> !definition.servers.isEmpty(), 10);
+            EditorFactory.getInstance().releaseEditor(editor);
+            released = true;
+            initialize.complete(null);
+
+            var server = definition.servers.get(0);
+            PlatformTestUtil.waitWithEventsDispatching("The file must be closed again, as its editor closed", () -> server
+                    .getTextDocumentService().getOpenCloseNotifications().stream().anyMatch(notification -> !notification.open()), 10);
+            assertTrue(instances().stream().noneMatch(instance -> instance.isConnectedTo(instance.toUri(virtualFile))));
+        } finally {
+            if (!released) {
+                EditorFactory.getInstance().releaseEditor(editor);
+            }
+        }
+    }
+
+    public void testAnOpenFileOfAnAsynchronousMatcherThatMovesAsItsInstanceIsChosenIsConnectedAtItsNewPlace()
+            throws Exception {
+        LanguageServersRegistry.getInstance().registerAssociation(definition,
+                new ServerFileNamePatternMapping(List.of("*.per-folder-async"), definition.getId(), null, new DocumentMatcher() {
+                    @Override
+                    public boolean match(@NotNull VirtualFile file, @NotNull Project project) {
+                        throw new AssertionError("An asynchronous matcher must be asked with matchAsync");
+                    }
+
+                    @Override
+                    public boolean shouldBeMatchedAsynchronously(@NotNull Project project) {
+                        return true;
+                    }
+
+                    @Override
+                    public @NotNull CompletableFuture<Boolean> matchAsync(@NotNull VirtualFile file, @NotNull Project project) {
+                        return CompletableFuture.completedFuture(true);
+                    }
+                }));
+        var file = file("a/one.per-folder-async");
+        var virtualFile = file.getVirtualFile();
+        var bDirectory = file("b/other.per-folder").getVirtualFile().getParent();
+        var editor = EditorFactory.getInstance().createEditor(LSPIJUtils.getDocument(virtualFile), myFixture.getProject());
+        try {
+            moveAsTheFolderOfTheFileIsChosen(virtualFile, bDirectory);
+
+            assertEmpty(serversOf(file));
+
+            PlatformTestUtil.waitWithEventsDispatching("The open file must be connected at its new place",
+                    () -> instances().stream().anyMatch(instance -> instance.getInstanceRoot() != null
+                            && "b".equals(instance.getInstanceRoot().getName()) && instance.isSynchronizing(virtualFile)), 10);
+        } finally {
+            EditorFactory.getInstance().releaseEditor(editor);
+        }
+    }
+
+    /**
+     * Moves the given file to the given directory once the strategy has chosen the folder of the file for the first
+     * time, before the request takes its instance.
+     */
+    private void moveAsTheFolderOfTheFileIsChosen(@NotNull VirtualFile file, @NotNull VirtualFile directory) {
+        definition.strategy.afterAsked = asked -> {
+            if (asked.equals(file)) {
+                definition.strategy.afterAsked = null;
+                try {
+                    move(asked, directory);
+                } catch (IOException e) {
+                    throw new UncheckedIOException(e);
+                }
+            }
+        };
     }
 
     public void testAFileThatMovesWhileItsInstanceStartsIsNotConnectedToIt() throws Exception {

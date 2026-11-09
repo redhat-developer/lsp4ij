@@ -968,19 +968,38 @@ public class LanguageServiceAccessor implements Disposable {
 
     /**
      * Asks again for the instance of the given definition for a file that moved since its request chose the instance,
-     * if the file is open: the move found no document of the file to take along. This happens off the monitor, as a
-     * request does, and only if the definition still applies to the file at its new place.
+     * if the file is open: the move found no document of the file to take along. The request is made off this thread,
+     * which holds the monitor, and in a read action, as the open files of a replaced definition are connected again,
+     * and only a definition that still applies to the file at its new place answers.
      */
     private void askAgainForTheInstanceOf(@NotNull VirtualFile file, @NotNull LanguageServerDefinition serverDefinition) {
-        ReadAction.nonBlocking(() -> file.isValid() && (FileEditorManager.getInstance(project).isFileOpen(file)
-                        || LSPIJUtils.editorsForFile(file, project).length > 0) ? LSPIJUtils.getPsiFile(file, project) : null)
-                .expireWhen(project::isDisposed)
-                .submit(AppExecutorUtil.getAppExecutorService())
-                .onSuccess(psiFile -> {
-                    if (psiFile != null) {
-                        getLanguageServers(psiFile, null, null, serverDefinition);
+        ReadAction.nonBlocking(() -> {
+                    var psiFile = isOpen(file) ? LSPIJUtils.getPsiFile(file, project) : null;
+                    if (psiFile == null) {
+                        return;
                     }
-                });
+                    // The ordinary request, kept to this definition: unlike a request for one definition, it also
+                    // takes a definition that matches the file asynchronously
+                    getLanguageServers(psiFile, features -> features.getServerDefinition() == serverDefinition, null)
+                            .thenAccept(servers -> ApplicationManager.getApplication().invokeLater(() -> {
+                                // The request counts the closes of the editors from its start, after the file was found
+                                // open, so a file whose last editor closed in between is disconnected here
+                                if (isOpen(file)) {
+                                    return;
+                                }
+                                for (var server : servers) {
+                                    var languageServer = server.getServerWrapper();
+                                    languageServer.disconnect(file, !languageServer.isDisposed());
+                                }
+                            }, ModalityState.any()));
+                })
+                .expireWhen(project::isDisposed)
+                .submit(AppExecutorUtil.getAppExecutorService());
+    }
+
+    private boolean isOpen(@NotNull VirtualFile file) {
+        return file.isValid() && (FileEditorManager.getInstance(project).isFileOpen(file)
+                || LSPIJUtils.editorsForFile(file, project).length > 0);
     }
 
     /**
