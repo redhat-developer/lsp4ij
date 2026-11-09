@@ -12,6 +12,7 @@ package com.redhat.devtools.lsp4ij.server.definition.launching;
 
 import com.intellij.execution.ExecutionException;
 import com.intellij.execution.configurations.GeneralCommandLine;
+import com.intellij.execution.process.ProcessNotCreatedException;
 import com.intellij.openapi.util.SystemInfo;
 import com.intellij.openapi.util.io.FileUtil;
 import com.intellij.util.EnvironmentUtil;
@@ -216,11 +217,11 @@ public class CommandUtilsTest {
 
         // As before the lookup: the platform reports the missing executable when the process starts
         GeneralCommandLine commandLine = CommandUtils.createCommandLine("\"\"", workingDirectory, Map.of(), true);
-        Assertions.assertThrows(ExecutionException.class, commandLine::createProcess);
+        assertNoExecutable(commandLine);
 
         GeneralCommandLine withoutExecutable = new GeneralCommandLine().withWorkDirectory(workingDirectory);
         Assertions.assertDoesNotThrow(() -> CommandUtils.resolveExecutable(withoutExecutable));
-        Assertions.assertThrows(ExecutionException.class, withoutExecutable::createProcess);
+        assertNoExecutable(withoutExecutable);
     }
 
     @Test
@@ -426,6 +427,16 @@ public class CommandUtilsTest {
         Path file = Files.writeString(directory.resolve(name), "");
         Assertions.assertTrue(file.toFile().setExecutable(true));
         return file;
+    }
+
+    /**
+     * Asserts that the command line still has no executable: starting it fails as the platform reports a missing one,
+     * not as an executable that the lookup set could fail to start ({@link ProcessNotCreatedException}). Asking for
+     * the executable itself throws, as {@link GeneralCommandLine#getExePath()} is {@code @NotNull}.
+     */
+    private static void assertNoExecutable(GeneralCommandLine commandLine) {
+        ExecutionException failure = Assertions.assertThrows(ExecutionException.class, commandLine::createProcess);
+        Assertions.assertFalse(failure instanceof ProcessNotCreatedException, failure.toString());
     }
 
     private static void assertSameFile(Path expected, File actual) throws Exception {
