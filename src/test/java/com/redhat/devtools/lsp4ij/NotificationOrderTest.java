@@ -9,9 +9,12 @@ package com.redhat.devtools.lsp4ij;
 
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.editor.EditorFactory;
+import com.intellij.openapi.editor.event.DocumentEvent;
+import com.intellij.openapi.editor.event.DocumentListener;
 import com.intellij.openapi.util.Disposer;
 import com.intellij.testFramework.LightPlatformTestCase;
 import com.intellij.testFramework.LightVirtualFile;
+import com.intellij.util.concurrency.AppExecutorUtil;
 import com.redhat.devtools.lsp4ij.mock.MockLanguageServer;
 import com.redhat.devtools.lsp4ij.mock.MockLanguageServerDefinition;
 import com.redhat.devtools.lsp4ij.mock.MockTextDocumentService;
@@ -25,11 +28,13 @@ import org.eclipse.lsp4j.TextDocumentSyncOptions;
 import org.eclipse.lsp4j.services.LanguageServer;
 import org.eclipse.lsp4j.services.TextDocumentService;
 import org.eclipse.lsp4j.services.WorkspaceService;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.IntStream;
 
 /**
@@ -80,6 +85,44 @@ public class NotificationOrderTest extends LightPlatformTestCase {
 
         assertEquals(List.of("open:1:first", "close", "open:2:first", "change:3:reopened"),
                 wrapper.sentSoFar());
+    }
+
+    /**
+     * A close sends the pending changes of its document without reading it, so it doesn't wait for a write action: a
+     * stop disconnects its documents under documentsLock on a thread without read access, and a write action that
+     * disconnects a document, as a move does, waits for that lock (#1902). The changes still reach the server before
+     * the didClose.
+     */
+    public void testAClosingDocumentSendsItsPendingChangesBeforeItsCloseWithoutWaitingForAWriteAction() throws Exception {
+        var wrapper = new InitializingWrapper(TextDocumentSyncKind.Incremental);
+        wrapper.initialized.complete(null);
+        var document = EditorFactory.getInstance().createDocument("first");
+        var synchronizer = new DocumentContentSynchronizer(wrapper, "file:///order.test",
+                new LightVirtualFile("order.test"), document, null, "test");
+        Disposer.register(getTestRootDisposable(), synchronizer);
+        // Only the change is queued, as before the document is committed, so it stays pending
+        document.addDocumentListener(new DocumentListener() {
+            @Override
+            public void beforeDocumentChange(@NotNull DocumentEvent event) {
+                synchronizer.beforeDocumentChange(event);
+            }
+        }, synchronizer);
+        synchronizer.getDidOpenFuture().get(10, TimeUnit.SECONDS);
+
+        AtomicReference<CompletableFuture<Void>> closed = new AtomicReference<>();
+        ApplicationManager.getApplication().runWriteAction(() -> {
+            document.setText("second");
+            // As a stop's disconnection, on a thread without read access, while a write action runs
+            closed.set(CompletableFuture.runAsync(synchronizer::documentClosed, AppExecutorUtil.getAppExecutorService()));
+            try {
+                closed.get().get(5, TimeUnit.SECONDS);
+            } catch (Exception e) {
+                fail("The close waited for the write action: " + e);
+            }
+        });
+        closed.get().get(10, TimeUnit.SECONDS);
+
+        assertEquals(List.of("open:1:first", "change:2:second", "close"), wrapper.sentSoFar());
     }
 
     private DocumentContentSynchronizer synchronizer(InitializingWrapper wrapper) {
@@ -144,8 +187,15 @@ public class NotificationOrderTest extends LightPlatformTestCase {
             }
         };
 
+        private final TextDocumentSyncKind syncKind;
+
         InitializingWrapper() {
+            this(TextDocumentSyncKind.Full);
+        }
+
+        InitializingWrapper(TextDocumentSyncKind syncKind) {
             super(NotificationOrderTest.this.getProject(), new MockLanguageServerDefinition("notification-order", false));
+            this.syncKind = syncKind;
             Disposer.register(getTestRootDisposable(), this);
         }
 
@@ -158,7 +208,7 @@ public class NotificationOrderTest extends LightPlatformTestCase {
         public TextDocumentSyncOptions getSyncOptions() {
             var options = new TextDocumentSyncOptions();
             options.setOpenClose(true);
-            options.setChange(TextDocumentSyncKind.Full);
+            options.setChange(syncKind);
             return options;
         }
 
