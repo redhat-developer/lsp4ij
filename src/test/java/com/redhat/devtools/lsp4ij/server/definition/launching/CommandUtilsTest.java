@@ -10,6 +10,7 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.server.definition.launching;
 
+import com.intellij.execution.ExecutionException;
 import com.intellij.execution.configurations.GeneralCommandLine;
 import com.intellij.openapi.util.SystemInfo;
 import com.intellij.openapi.util.io.FileUtil;
@@ -207,6 +208,19 @@ public class CommandUtilsTest {
         CommandUtils.resolveExecutable(commandLine);
 
         Assertions.assertEquals(executable, commandLine.getExePath());
+    }
+
+    @Test
+    public void testACommandWithoutPartsIsLeftToThePlatformWithAWorkingDirectory() {
+        String workingDirectory = System.getProperty("java.io.tmpdir");
+
+        // As before the lookup: the platform reports the missing executable when the process starts
+        GeneralCommandLine commandLine = CommandUtils.createCommandLine("\"\"", workingDirectory, Map.of(), true);
+        Assertions.assertThrows(ExecutionException.class, commandLine::createProcess);
+
+        GeneralCommandLine withoutExecutable = new GeneralCommandLine().withWorkDirectory(workingDirectory);
+        Assertions.assertDoesNotThrow(() -> CommandUtils.resolveExecutable(withoutExecutable));
+        Assertions.assertThrows(ExecutionException.class, withoutExecutable::createProcess);
     }
 
     @Test

@@ -147,7 +147,11 @@ public class CommandUtils {
             // No directory to take the environment from
             return;
         }
-        String executable = commandLine.getExePath();
+        String executable = getExecutable(commandLine);
+        if (executable == null) {
+            // No executable, as for a command without parts: the platform reports it when the process starts
+            return;
+        }
         if (executable.indexOf('/') != -1 || executable.indexOf(File.separatorChar) != -1) {
             // A path to the executable, which the platform doesn't look up either. Windows takes '/' as a separator too.
             return;
@@ -162,6 +166,20 @@ public class CommandUtils {
                 : PathEnvironmentVariableUtil.findInPath(executable, path, null);
         if (found != null) {
             commandLine.setExePath(found.getPath());
+        }
+    }
+
+    /**
+     * Returns the executable of the command line, or null if it has none, as a command without parts. The platform
+     * annotates {@link GeneralCommandLine#getExePath()} with {@code @NotNull}, and its instrumented build throws an
+     * {@link IllegalStateException} there when no executable is set.
+     */
+    private static @Nullable String getExecutable(@NotNull GeneralCommandLine commandLine) {
+        try {
+            String executable = commandLine.getExePath();
+            return StringUtil.isEmptyOrSpaces(executable) ? null : executable;
+        } catch (IllegalStateException noExecutable) {
+            return null;
         }
     }
 
