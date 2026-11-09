@@ -120,7 +120,10 @@ public class LanguageServerProcessNodesTest extends LSPCodeInsightFixtureTestCas
     @Override
     protected void tearDown() throws Exception {
         try {
-            ToolWindowManager.getInstance(project).unregisterToolWindow(LANGUAGE_SERVERS_TOOL_WINDOW_ID);
+            var toolWindow = ToolWindowManager.getInstance(project).getToolWindow(LANGUAGE_SERVERS_TOOL_WINDOW_ID);
+            if (toolWindow != null) {
+                toolWindow.remove();
+            }
             Disposer.dispose(panel);
             definition.setEnabled(true, project);
             for (var server : definition.servers) {

@@ -106,18 +106,19 @@ public class ConnectDocumentToLanguageServerSetupParticipant implements FileEdit
                     // Execute in non-blocking ReadAction since getPsiFile and connectToLanguageServer require it
                     ReadAction.nonBlocking(() -> {
                                 if (project.isDisposed()) {
-                                    return;
+                                    return null;
                                 }
                                 if (!FileEditorManager.getInstance(project).isFileOpen(file)) {
                                     // The tab was closed before this ran, and its file has no editor to connect for
-                                    return;
+                                    return null;
                                 }
                                 PsiFile psiFile = LSPIJUtils.getPsiFile(file, project);
                                 if (psiFile == null || LSPFileSupport.hasSupport(psiFile)) {
                                     // No PsiFile available, or the file is already connected to a Language Server.
-                                    return;
+                                    return null;
                                 }
                                 connectToLanguageServer(psiFile, project);
+                                return null;
                             })
                             .expireWhen(() -> project.isDisposed())
                             .submit(AppExecutorUtil.getAppExecutorService());
@@ -136,12 +137,13 @@ public class ConnectDocumentToLanguageServerSetupParticipant implements FileEdit
         }
         ReadAction.nonBlocking(() -> {
                     if (project.isDisposed()) {
-                        return;
+                        return null;
                     }
                     PsiFile psiFile = LSPIJUtils.getPsiFile(file, project);
                     if (psiFile != null && LSPFileSupport.hasSupport(psiFile)) {
                         LSPFileSupport.getSupport(psiFile).dispose();
                     }
+                    return null;
                 })
                 .coalesceBy(this, file, project)
                 .expireWhen(() -> project.isDisposed())

@@ -75,7 +75,10 @@ public class ApplicationUtils {
      * @param parentDisposable the parent disposable to expire the read action when disposed
      */
     public static void runCancellableReadAction(@NotNull Runnable action, @NotNull Disposable parentDisposable) {
-        ReadAction.nonBlocking(action)
+        ReadAction.nonBlocking(() -> {
+                    action.run();
+                    return null;
+                })
                 .expireWith(parentDisposable)
                 .executeSynchronously();
     }

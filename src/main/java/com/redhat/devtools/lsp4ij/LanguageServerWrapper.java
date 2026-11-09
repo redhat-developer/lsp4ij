@@ -2614,6 +2614,7 @@ public class LanguageServerWrapper implements Disposable {
                             LSPFileSupport.getSupport(psiFile).dispose();
                         }
                     }
+                    return null;
                 })
                 .expireWith(project)
                 .submit(AppExecutorUtil.getAppExecutorService());

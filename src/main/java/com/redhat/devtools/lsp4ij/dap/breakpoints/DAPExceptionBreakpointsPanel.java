@@ -55,7 +55,7 @@ public class DAPExceptionBreakpointsPanel extends BorderLayoutPanel implements D
         this.myModel.setSortable(true);
         this.myTable = new TableView<>(this.myModel);
         this.addToCenter(ScrollPaneFactory.createScrollPane(this.myTable));
-        TableUtil.setupCheckboxColumn(this.myTable.getColumnModel().getColumn(0));
+        TableUtil.setupCheckboxColumn(this.myTable, 0);
 
         // Load table view with DAP exceptions breakpoints filter
         // stored in settings

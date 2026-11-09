@@ -111,7 +111,8 @@ public class LSPColorProvider extends AbstractLSPInlayHintsProvider {
                             inlayHintsSink.addInlineElement(
                                     offset,
                                     false,
-                                    toPresentation(list, psiFile, factory, editor))
+                                    toPresentation(list, psiFile, factory, editor),
+                                    false)
                     );
         }
     }
