@@ -14,6 +14,7 @@ import com.intellij.openapi.fileEditor.FileEditorManager;
 import com.intellij.openapi.progress.EmptyProgressIndicator;
 import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.vfs.VirtualFile;
+import com.intellij.openapi.vfs.newvfs.ManagingFS;
 import com.intellij.psi.PsiManager;
 import com.intellij.testFramework.EdtTestUtil;
 import com.intellij.testFramework.PlatformTestUtil;
@@ -37,7 +38,9 @@ import java.net.URI;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public class FileDocumentMoveTest extends LSPCodeInsightFixtureTestCase {
     public FileDocumentMoveTest() {
@@ -127,6 +130,109 @@ public class FileDocumentMoveTest extends LSPCodeInsightFixtureTestCase {
         } finally {
             EditorFactory.getInstance().releaseEditor(editor);
         }
+    }
+
+    public void testADocumentRegisteredAsItsFileMovesIsTakenAlongWithoutFileOperations() throws Exception {
+        // Without file operations, the move sees the document of a file only if it was open as the events were filtered
+        MockLanguageServer.reset();
+        var wrapper = connect(myFixture.getTempDirFixture().createFile("source/other.foo", "other")).wrapper();
+        var file = myFixture.getTempDirFixture().createFile("source/test.foo", "disk");
+        var destination = myFixture.getTempDirFixture().findOrCreateDir("destination");
+        var earlierUri = wrapper.toUri(file);
+        var editor = EditorFactory.getInstance().createEditor(LSPIJUtils.getDocument(file), myFixture.getProject());
+        try {
+            var hold = holdRegistrationUntilMoved(wrapper);
+            var servers = connectLater(file);
+            PlatformTestUtil.waitWithEventsDispatching("The connection must check the place of the file", hold.holding::get, 10);
+
+            hold.beforeMove();
+            write(() -> file.move(this, destination));
+
+            PlatformTestUtil.waitWithEventsDispatching("The document must be connected at the new place of its file",
+                    () -> servers.isDone() && wrapper.isSynchronizing(file), 10);
+            assertFalse("The document must not stay at the earlier place of its file", wrapper.isConnectedTo(earlierUri));
+        } finally {
+            wrapper.setBeforeRegistration(null);
+            EditorFactory.getInstance().releaseEditor(editor);
+        }
+    }
+
+    public void testAMoveDoesNotWaitForTheDocumentsOfALanguageServerThatIsNotRunning() throws Exception {
+        var wrapper = connect(myFixture.getTempDirFixture().createFile("source/other.foo", "other")).wrapper();
+        var file = myFixture.getTempDirFixture().createFile("source/test.foo", "disk");
+        wrapper.stop().get(10, TimeUnit.SECONDS);
+        assertFalse(wrapper.isActive());
+        var documentsLock = documentsLock(wrapper);
+        var held = new CountDownLatch(1);
+        var released = new CountDownLatch(1);
+        var waitedFor = new AtomicBoolean();
+        // As a stop holds the lock while it disconnects the documents
+        var holder = AppExecutorUtil.getAppExecutorService().submit(() -> {
+            synchronized (documentsLock) {
+                held.countDown();
+                try {
+                    waitedFor.set(!released.await(5, TimeUnit.SECONDS));
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+            }
+        });
+        assertTrue(held.await(10, TimeUnit.SECONDS));
+
+        WriteCommandAction.writeCommandAction(myFixture.getProject()).run(() -> file.rename(this, "renamed.foo"));
+        released.countDown();
+
+        holder.get(10, TimeUnit.SECONDS);
+        assertFalse("The move must not wait for the documents of a language server that isn't running", waitedFor.get());
+    }
+
+    private static Object documentsLock(LanguageServerWrapper wrapper) throws ReflectiveOperationException {
+        var field = LanguageServerWrapper.class.getDeclaredField("documentsLock");
+        field.setAccessible(true);
+        return field.get(wrapper);
+    }
+
+    /**
+     * Holds the next registration of a document, once its connection has checked the place of its file, until a move
+     * that the hold is told of changed the parent of a file. The hold reads nothing of the VFS: a thread that reads the
+     * parent of a file without read access as the file moves can make the file keep its earlier parent. A move raises
+     * the structure modification count of the VFS once it changed the parent, before any listener hears of the move.
+     */
+    static RegistrationHold holdRegistrationUntilMoved(LanguageServerWrapper wrapper) {
+        var hold = new RegistrationHold();
+        wrapper.setBeforeRegistration(() -> {
+            if (hold.holding.compareAndSet(false, true)) {
+                var deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+                while (!hold.moved() && System.nanoTime() < deadline) {
+                    Thread.onSpinWait();
+                }
+            }
+        });
+        return hold;
+    }
+
+    static final class RegistrationHold {
+
+        final AtomicBoolean holding = new AtomicBoolean();
+        private volatile boolean moving;
+        private volatile int countBeforeMove;
+
+        /**
+         * Tells the hold of the move that ends it, right before the move.
+         */
+        void beforeMove() {
+            countBeforeMove = ManagingFS.getInstance().getStructureModificationCount();
+            moving = true;
+        }
+
+        private boolean moved() {
+            return moving && ManagingFS.getInstance().getStructureModificationCount() != countBeforeMove;
+        }
+    }
+
+    private CompletableFuture<List<LanguageServerItem>> connectLater(VirtualFile file) {
+        return LanguageServiceAccessor.getInstance(myFixture.getProject())
+                .getLanguageServers(PsiManager.getInstance(myFixture.getProject()).findFile(file), null, null);
     }
 
     private record Context(VirtualFile file, LanguageServerWrapper wrapper) {}

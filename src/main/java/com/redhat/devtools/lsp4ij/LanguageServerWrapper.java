@@ -79,6 +79,7 @@ import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.function.UnaryOperator;
 
 import static com.redhat.devtools.lsp4ij.LSPIJUtils.findResourceFor;
@@ -1405,6 +1406,42 @@ public class LanguageServerWrapper implements Disposable {
             disconnect(fileUri, false);
             return true;
         }
+    }
+
+    /**
+     * Disconnects each document whose file the given filter accepts and has another URI now than the one that it was
+     * connected with, and returns their files. The documents are taken under documentsLock, as a connection checks the
+     * place of its file and registers the document: a connection then either registered the document before, which
+     * this finds, or checks the place of its file after, and sees where the file is now.
+     *
+     * @param files the filter of the files whose documents are checked.
+     * @return the files whose documents were disconnected.
+     */
+    @NotNull
+    List<VirtualFile> disconnectMovedDocuments(@NotNull Predicate<VirtualFile> files) {
+        Map<URI, OpenedDocument> documents = new HashMap<>();
+        synchronized (documentsLock) {
+            openedDocuments.forEach((uri, document) -> {
+                if (files.test(document.getFile())) {
+                    documents.put(uri, document);
+                }
+            });
+        }
+        List<VirtualFile> moved = new ArrayList<>();
+        documents.forEach((uri, document) -> {
+            // Outside the lock: the URI support can take a read action, and the write action of a move waits for
+            // the lock
+            if (uri.equals(toUri(document.getFile()))) {
+                return;
+            }
+            synchronized (documentsLock) {
+                if (openedDocuments.get(uri) == document) {
+                    disconnect(uri, false);
+                    moved.add(document.getFile());
+                }
+            }
+        });
+        return moved;
     }
 
     private void maybeShutdown() {

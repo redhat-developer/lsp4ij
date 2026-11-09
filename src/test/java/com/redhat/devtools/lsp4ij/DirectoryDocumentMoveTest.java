@@ -9,8 +9,10 @@ package com.redhat.devtools.lsp4ij;
 
 import com.intellij.openapi.command.WriteCommandAction;
 import com.intellij.openapi.command.undo.UndoManager;
+import com.intellij.openapi.editor.EditorFactory;
 import com.intellij.openapi.fileEditor.FileEditorManager;
 import com.intellij.openapi.vfs.VirtualFile;
+import com.intellij.psi.PsiManager;
 import com.intellij.testFramework.PlatformTestUtil;
 import com.redhat.devtools.lsp4ij.fixtures.LSPCodeInsightFixtureTestCase;
 import com.redhat.devtools.lsp4ij.mock.MockLanguageServer;
@@ -97,6 +99,35 @@ public class DirectoryDocumentMoveTest extends LSPCodeInsightFixtureTestCase {
         });
         PlatformTestUtil.dispatchAllInvocationEventsInIdeEventQueue();
         assertTrue(context.wrapper().getOpenedDocuments().isEmpty());
+    }
+
+    public void testADocumentRegisteredAsItsDirectoryMovesIsTakenAlong() throws Exception {
+        var project = myFixture.getProject();
+        var accessor = LanguageServiceAccessor.getInstance(project);
+        var other = myFixture.getTempDirFixture().createFile("source/other.foo", "other");
+        var wrapper = accessor.getLanguageServers(PsiManager.getInstance(project).findFile(other), null, null)
+                .get(5, TimeUnit.SECONDS).get(0).getServerWrapper();
+        var file = myFixture.getTempDirFixture().createFile("source/nested/test.foo", "disk");
+        var target = myFixture.getTempDirFixture().findOrCreateDir("destination");
+        var earlierUri = wrapper.toUri(file);
+        var editor = EditorFactory.getInstance().createEditor(LSPIJUtils.getDocument(file), project);
+        try {
+            // The move of the directory takes the documents of its files along before the move, and this one is
+            // registered after
+            var hold = FileDocumentMoveTest.holdRegistrationUntilMoved(wrapper);
+            var servers = accessor.getLanguageServers(PsiManager.getInstance(project).findFile(file), null, null);
+            PlatformTestUtil.waitWithEventsDispatching("The connection must check the place of the file", hold.holding::get, 10);
+
+            hold.beforeMove();
+            WriteCommandAction.writeCommandAction(project).run(() -> file.getParent().move(this, target));
+
+            PlatformTestUtil.waitWithEventsDispatching("The document must be connected at the new place of its file",
+                    () -> servers.isDone() && wrapper.isSynchronizing(file), 10);
+            assertFalse("The document must not stay at the earlier place of its file", wrapper.isConnectedTo(earlierUri));
+        } finally {
+            wrapper.setBeforeRegistration(null);
+            EditorFactory.getInstance().releaseEditor(editor);
+        }
     }
 
     private record Context(VirtualFile file, LanguageServerWrapper wrapper) {}
