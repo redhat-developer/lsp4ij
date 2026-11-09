@@ -123,12 +123,12 @@ kotlin {
 
 // Maintain compatibility with Java 17 runtimes, ensuring the built plugin 
 // can run on older IDEs even though the toolchain uses Java 21 for the 253 platform.
-tasks.withType<JavaCompile> {
+tasks.withType<JavaCompile>().configureEach {
     options.release.set(17)
 }
 
 // Set Kotlin JVM language level to match Java compatibility.
-tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile> {
+tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
     compilerOptions {
         jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
         apiVersion.set(org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_1_9)
@@ -232,7 +232,7 @@ changelog {
     repositoryUrl = properties("pluginRepositoryUrl")
 }
 
-tasks.withType<Test> {
+tasks.withType<Test>().configureEach {
     useJUnitPlatform()
     environment("GRADLE_RELEASE_REPOSITORY","https://services.gradle.org/distributions")
     systemProperty("idea.log.leaked.projects.in.tests", "false")
