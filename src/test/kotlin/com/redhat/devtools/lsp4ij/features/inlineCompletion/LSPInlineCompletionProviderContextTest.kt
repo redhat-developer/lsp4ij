@@ -10,6 +10,7 @@ package com.redhat.devtools.lsp4ij.features.inlineCompletion
 import com.intellij.codeInsight.inline.completion.InlineCompletionEvent
 import com.intellij.codeInsight.inline.completion.InlineCompletionRequest
 import com.intellij.codeInsight.lookup.LookupEvent
+import com.intellij.openapi.editor.Editor
 import com.redhat.devtools.lsp4ij.fixtures.LSPCompletionFixtureTestCase
 import org.eclipse.lsp4j.CompletionItem
 import org.eclipse.lsp4j.CompletionList
@@ -84,7 +85,22 @@ class LSPInlineCompletionProviderContextTest : LSPCompletionFixtureTestCase("*.i
 
     private fun lookupRequest(): InlineCompletionRequest {
         val lookup = myFixture.lookup
-        val event = InlineCompletionEvent.LookupChange(LookupEvent(lookup, lookup.currentItem, ' '))
-        return event.toRequest()!!
+        return lookupChange(LookupEvent(lookup, lookup.currentItem, ' ')).toRequest()!!
+    }
+
+    /**
+     * Creates a [InlineCompletionEvent.LookupChange], which takes the lookup event up to 2025.2 and the editor with it
+     * since 2025.3, so that the test compiles against both.
+     */
+    private fun lookupChange(event: LookupEvent): InlineCompletionEvent.LookupChange {
+        val type = InlineCompletionEvent.LookupChange::class.java
+        val change = type.constructors.firstNotNullOfOrNull { constructor ->
+            when (constructor.parameterTypes.toList()) {
+                listOf(LookupEvent::class.java) -> constructor.newInstance(event)
+                listOf(Editor::class.java, LookupEvent::class.java) -> constructor.newInstance(myFixture.editor, event)
+                else -> null
+            }
+        }
+        return type.cast(checkNotNull(change) { "No known constructor of ${type.name}" })
     }
 }
