@@ -52,6 +52,13 @@ public class UserDefinedLanguageServerDefinition extends LanguageServerDefinitio
 
     private static final Logger LOGGER = LoggerFactory.getLogger(UserDefinedLanguageServerDefinition.class);
     private static final String LOOPBACK_HOST = InetAddress.getLoopbackAddress().getHostAddress();
+
+    /**
+     * The root of the language server in its command and its working directory: with {@code serverInstances}, the
+     * root of each instance, and otherwise the project's directory, as {@code $PROJECT_DIR$}. A root in an archive is
+     * the project's directory too.
+     */
+    public static final @NotNull String INSTANCE_ROOT_MACRO = "${instanceRoot}";
     private final String templateId;
     @SerializedName("displayName")
     private String name;
@@ -139,7 +146,8 @@ public class UserDefinedLanguageServerDefinition extends LanguageServerDefinitio
 
     @Override
     public @NotNull StreamConnectionProvider createConnectionProvider(@NotNull Project project) {
-        return createConnectionProvider(project, (String) null);
+        // The one language server of the project has the project's directory as root
+        return createConnectionProvider(project, project.getBasePath(), null);
     }
 
     @Override
@@ -147,15 +155,18 @@ public class UserDefinedLanguageServerDefinition extends LanguageServerDefinitio
                                                                       @NotNull WorkspaceFolder instanceRoot) {
         // Without a configured working directory, an instance runs in its root, unless that is inside an archive
         var root = LSPIJUtils.findResourceFor(instanceRoot.getUri());
-        return createConnectionProvider(project, root != null && root.isInLocalFileSystem() ? root.getPath() : null);
+        String directory = root != null && root.isInLocalFileSystem() ? root.getPath() : null;
+        // A root in an archive is no directory to run in or to name: the project's directory stands for it
+        return createConnectionProvider(project, directory != null ? directory : project.getBasePath(), directory);
     }
 
     private @NotNull StreamConnectionProvider createConnectionProvider(@NotNull Project project,
+                                                                       @Nullable String root,
                                                                        @Nullable String defaultWorkingDir) {
-        String resolvedWorkingDir = workingDir != null && !workingDir.isBlank() ? resolveCommandLine(workingDir, project) : defaultWorkingDir;
+        String resolvedWorkingDir = workingDir != null && !workingDir.isBlank() ? resolve(workingDir, project, root) : defaultWorkingDir;
         var transport = this.transport;
         return switch (transport.mode()) {
-            case STDIO -> new UserDefinedStreamConnectionProvider(resolveCommandLine(commandLine, project),
+            case STDIO -> new UserDefinedStreamConnectionProvider(resolve(commandLine, project, root),
                     resolvedWorkingDir,
                     userEnvironmentVariables,
                     includeSystemEnvironmentVariables,
@@ -174,13 +185,27 @@ public class UserDefinedLanguageServerDefinition extends LanguageServerDefinitio
                     LOOPBACK_HOST,
                     transport.port(),
                     // The command line takes the port, which LSP4IJ may only choose when it starts the language server
-                    port -> createCommandLine(resolveCommandLine(UserDefinedTransport.withPort(commandLine, port), project),
+                    port -> createCommandLine(resolve(UserDefinedTransport.withPort(commandLine, port), project, root),
                             resolvedWorkingDir,
                             userEnvironmentVariables,
                             includeSystemEnvironmentVariables),
                     this,
                     project);
         };
+    }
+
+    /**
+     * Expands the macros of the command or the working directory, then sets the root for {@link #INSTANCE_ROOT_MACRO}:
+     * after the macros, so that a root whose path has a {@code $} isn't taken for one.
+     *
+     * @param text    the command or the working directory.
+     * @param project the project.
+     * @param root    the root of the language server, or null if it has none.
+     * @return the text with its macros resolved.
+     */
+    static @NotNull String resolve(@NotNull String text, @NotNull Project project, @Nullable String root) {
+        String resolved = resolveCommandLine(text, project);
+        return root != null ? resolved.replace(INSTANCE_ROOT_MACRO, root) : resolved;
     }
 
     /**

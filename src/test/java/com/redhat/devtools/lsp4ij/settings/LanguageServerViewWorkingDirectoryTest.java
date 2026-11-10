@@ -90,6 +90,13 @@ public class LanguageServerViewWorkingDirectoryTest extends BasePlatformTestCase
         assertEquals("", preview().getText());
     }
 
+    public void testADirectoryUnderTheRootOfEachInstanceIsNotTold() {
+        // a directory for each instance, which the line can't tell
+        view.setWorkingDir("${instanceRoot}/server");
+
+        assertEquals("", preview().getText());
+    }
+
     /**
      * Returns the line below the working directory field.
      */
