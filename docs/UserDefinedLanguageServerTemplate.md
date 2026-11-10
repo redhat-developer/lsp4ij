@@ -64,6 +64,12 @@ The template descriptor (`template.json`) is a JSON file used to define:
     "default": "sh -c \"typescript-language-server --stdio\"",
     "windows": "typescript-language-server.cmd --stdio"
   },
+  "transports": [
+    {
+      "mode": "stdio",
+      "argument": "--stdio"
+    }
+  ],
   "fileTypeMappings": [
     {
       "fileType": {
@@ -106,9 +112,17 @@ experimental, whose `mode` is one of the [transports](./UserDefinedLanguageServe
 * `startAndConnect`: LSP4IJ starts the language server, which listens on the port, and connects to it.
 * `startAndAccept`: LSP4IJ listens on the port and starts the language server, which connects to it.
 
-The command of a language server which LSP4IJ starts takes the port as `${port}`, and a `port` of 0, or none, lets
-LSP4IJ choose a free one. A value LSP4IJ can't use, such as an unknown `mode` or a `port` that isn't a number from 0 to
-65535, is shown as a warning in the New Language Server dialog, which says what LSP4IJ does instead:
+| Field  | Value                                                      | Default                                         |
+|--------|------------------------------------------------------------|-------------------------------------------------|
+| `mode` | `attach`, `startAndConnect`, `startAndAccept`, or `stdio`  | none: standard input and output, with a warning |
+| `host` | a plain host name or IP address, used by `attach` only     | the loopback address                            |
+| `port` | a number from 0 to 65535; 0 lets LSP4IJ choose a free port | 0                                               |
+
+A `mode` of `stdio` is the same as no `socket`. The command of a language server which LSP4IJ starts takes the port as
+`${port}`, and a `port` of 0, or none, lets LSP4IJ choose a free one. With `attach`, LSP4IJ can't choose the port, so
+the New Language Server dialog asks for one. A value LSP4IJ can't use, such as a missing or unknown `mode` or a `port`
+that isn't a number from 0 to 65535, is shown as a warning in the New Language Server dialog, which says what LSP4IJ
+does instead:
 
 ```json
 {
@@ -130,8 +144,16 @@ A template can list the transports which its language server supports, in `trans
 with its `mode` (`stdio` or one of the socket modes above) and the `argument` of the command for it. The New Language
 Server dialog then helps with the transport: Socket is disabled for a language server which lists only `stdio`, and
 for one which lists a socket mode, a hint below the socket modes names the mode and the argument. Without
-`transports`, every transport can be chosen. The CSS language server, for instance, is started over its standard input
-and output, and also talks over a socket it connects to:
+`transports`, every transport can be chosen.
+
+| Field      | Value                                                                 | Required |
+|------------|-----------------------------------------------------------------------|----------|
+| `mode`     | `stdio`, `attach`, `startAndConnect` or `startAndAccept`              | yes      |
+| `argument` | the argument of the command for this mode, such as `--socket=${port}` | no       |
+
+An entry with a missing or unknown `mode` is skipped, and shown as a warning in the New Language Server dialog. Without
+an `argument`, the hint names only the mode. The hint shows the first socket mode of the list. The CSS language server,
+for instance, is started over its standard input and output, and also talks over a socket it connects to:
 
 ```json
 {
@@ -151,6 +173,14 @@ and output, and also talks over a socket it connects to:
   ]
 }
 ```
+
+#### Socket and transports
+
+`socket` and `transports` answer two questions. `socket` is the transport which the New Language Server dialog
+preselects, and which an [exported](./UserDefinedLanguageServer.md#exporting-templates) language server keeps.
+`transports` lists what the language server supports, and only changes what the dialog offers and hints. LSP4IJ
+doesn't check one against the other: a `socket` whose `mode` isn't in `transports` is still preselected, without a
+warning. Keep them in line, for instance with the `socket` mode as the socket mode of `transports`.
 
 ## Installer descriptor
 

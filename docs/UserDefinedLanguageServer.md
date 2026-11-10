@@ -140,6 +140,10 @@ An [installer](#installer-tab) which sets the `Command` writes the command of it
 input and output unless it takes the port as `${port}`. A language server which LSP4IJ starts over a socket is then
 switched back to the standard input and output; set the socket again with a command that takes the port.
 
+A [template](./UserDefinedLanguageServerTemplate.md#template-descriptor) sets the transport in its
+[`socket`](./UserDefinedLanguageServerTemplate.md#socket), and lists the transports which its language server supports
+in [`transports`](./UserDefinedLanguageServerTemplate.md#transports), both experimental.
+
 LSP4IJ listens on the loopback address only. The output of a language server which LSP4IJ starts is shown in the `Log`
 tab of the [LSP console](./UserGuide.md#lsp-console), since the socket carries the protocol: its standard output as
 information, and its standard error as errors. As with any TCP transport
@@ -449,6 +453,11 @@ Users can export their own language servers to a zip file, where each language s
 This can be done from the LSP console, by selecting one or more language servers and selecting the export option from the context menu.
 
 These directories can then be used as a template for a new language server by [importing a custom template](#custom-template).
+
+The `template.json` of a language server which talks over a socket has its
+[`socket`](./UserDefinedLanguageServerTemplate.md#socket): the `mode`, the `port` (0 for `Auto`), and the `host` when
+one is set. Export doesn't write [`transports`](./UserDefinedLanguageServerTemplate.md#transports), since a language
+server keeps only its transport, not the list of its template.
 
 ![Export Language Servers to a Zip](./images/user-defined-ls/ExportUserDefinedLanguageServer.png)
 
