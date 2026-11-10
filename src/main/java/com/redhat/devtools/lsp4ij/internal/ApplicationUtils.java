@@ -46,6 +46,11 @@ public class ApplicationUtils {
      * See <a href="https://blog.jetbrains.com/platform/2026/03/ui-freezes-and-the-dangers-of-non-cancellable-read-actions-in-background-threads/">
      * UI Freezes and the Dangers of Non-Cancellable Read Actions in Background Threads</a>
      * </p>
+     * <p>
+     * On the EDT, which can't run a non-blocking read action synchronously, this runs a plain read action. In IntelliJ
+     * 2026.3, the EDT doesn't always have read access, so a caller that reads directly only when it has read access gets
+     * here on the EDT too.
+     * </p>
      *
      * @param action           the read action to execute
      * @param parentDisposable the parent disposable to expire the read action when disposed
@@ -53,6 +58,9 @@ public class ApplicationUtils {
      * @return the result of the read action
      */
     public static <T> T runCancellableReadAction(@NotNull Callable<T> action, @NotNull Disposable parentDisposable) {
+        if (ApplicationManager.getApplication().isDispatchThread()) {
+            return ReadAction.compute(() -> call(action));
+        }
         return ReadAction
                 .nonBlocking(action)
                 .expireWith(parentDisposable)
@@ -62,7 +70,7 @@ public class ApplicationUtils {
     /**
      * Executes a read action in a cancellable way to avoid UI freezes.
      * <p>
-     * This method uses {@link ReadAction#nonBlocking(Runnable)} which creates a cancellable
+     * This method uses {@link ReadAction#nonBlocking(Callable)} which creates a cancellable
      * read action, preventing UI freezes when the operation takes too long or when the user
      * performs actions that require write access.
      * </p>
@@ -70,16 +78,36 @@ public class ApplicationUtils {
      * See <a href="https://blog.jetbrains.com/platform/2026/03/ui-freezes-and-the-dangers-of-non-cancellable-read-actions-in-background-threads/">
      * UI Freezes and the Dangers of Non-Cancellable Read Actions in Background Threads</a>
      * </p>
+     * <p>
+     * On the EDT, this runs a plain read action, as {@link #runCancellableReadAction(Callable, Disposable)} does.
+     * </p>
      *
      * @param action           the read action to execute
      * @param parentDisposable the parent disposable to expire the read action when disposed
      */
     public static void runCancellableReadAction(@NotNull Runnable action, @NotNull Disposable parentDisposable) {
+        if (ApplicationManager.getApplication().isDispatchThread()) {
+            ReadAction.run(action::run);
+            return;
+        }
         ReadAction.nonBlocking(() -> {
                     action.run();
                     return null;
                 })
                 .expireWith(parentDisposable)
                 .executeSynchronously();
+    }
+
+    /**
+     * Calls the given action, and throws a checked exception that it throws wrapped, as a non-blocking read action does.
+     */
+    private static <T> T call(@NotNull Callable<T> action) {
+        try {
+            return action.call();
+        } catch (RuntimeException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
     }
 }
