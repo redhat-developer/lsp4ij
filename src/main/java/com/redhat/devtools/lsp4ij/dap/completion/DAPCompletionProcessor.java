@@ -53,11 +53,8 @@ public class DAPCompletionProcessor extends CompletionContributor {
     public void fillCompletionVariants(@NotNull CompletionParameters parameters,
                                        @NotNull CompletionResultSet result) {
         PsiFile psiFile = parameters.getOriginalFile();
-        if (psiFile instanceof DAPExpressionCodeFragment dapFile) {
-            DAPStackFrame stackFrame = dapFile.getCurrentDapStackFrame();
-            if (stackFrame == null) {
-                return;
-            }
+        DAPStackFrame stackFrame = DAPExpressionCodeFragment.getCurrentDapStackFrame(psiFile);
+        if (stackFrame != null) {
             DAPClient client = stackFrame.getClient();
             if (!client.isSupportsCompletionsRequest()) {
                 // DAP server doesn't support "completion" request.
