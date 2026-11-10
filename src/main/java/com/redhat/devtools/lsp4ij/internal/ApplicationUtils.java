@@ -13,6 +13,7 @@ package com.redhat.devtools.lsp4ij.internal;
 import com.intellij.openapi.Disposable;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.ReadAction;
+import com.intellij.openapi.util.Computable;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.concurrent.Callable;
@@ -59,7 +60,8 @@ public class ApplicationUtils {
      */
     public static <T> T runCancellableReadAction(@NotNull Callable<T> action, @NotNull Disposable parentDisposable) {
         if (ApplicationManager.getApplication().isDispatchThread()) {
-            return ReadAction.compute(() -> call(action));
+            // Not ReadAction.compute, which IntelliJ 2026.3 deprecates
+            return ApplicationManager.getApplication().runReadAction((Computable<T>) () -> call(action));
         }
         return ReadAction
                 .nonBlocking(action)
@@ -87,7 +89,7 @@ public class ApplicationUtils {
      */
     public static void runCancellableReadAction(@NotNull Runnable action, @NotNull Disposable parentDisposable) {
         if (ApplicationManager.getApplication().isDispatchThread()) {
-            ReadAction.run(action::run);
+            ApplicationManager.getApplication().runReadAction(action);
             return;
         }
         ReadAction.nonBlocking(() -> {
