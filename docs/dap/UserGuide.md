@@ -94,6 +94,30 @@ Here are some useful standard built-in macros that you can use:
 
 Macro expansion is applied to string values in DAP parameters, including values nested inside objects and arrays.
 
+### LSP4IJ placeholders
+
+Next to the IntelliJ macros, LSP4IJ replaces placeholders of its own:
+
+- `${port}`, in the `Command` of the `Server` tab: a free port, which LSP4IJ chooses as it starts the DAP server. The
+  client then connects to the server on that port.
+- `${address}` and `${port}`, in the `Log pattern before proceeding` of the `Server` tab, as in
+  `DAP server listening at: ${address}:${port}`: the client connects to the address and the port that the DAP server
+  writes in their place (see the [Go Delve example](./user-defined-dap/go-delve.md)).
+- `${file}`, in the `DAP parameters (JSON)` of the `Configuration` tab: the `File` of that tab, the one to run or
+  debug.
+- `${workspaceFolder}`, in the `DAP parameters (JSON)`: the `Working directory` of the `Configuration` tab. For a
+  configuration created from a file, that is the project's directory (see the note above), not the folder of the
+  file.
+
+For example:
+
+```json
+{
+  "program": "${file}",
+  "cwd": "${workspaceFolder}"
+}
+```
+
 
 
 
