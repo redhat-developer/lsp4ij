@@ -18,6 +18,7 @@ import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.application.impl.NonBlockingReadActionImpl;
 import com.intellij.openapi.command.WriteCommandAction;
+import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.fileEditor.FileEditor;
 import com.intellij.psi.PsiDocumentManager;
 import com.intellij.psi.PsiFile;
@@ -40,6 +41,7 @@ import org.eclipse.lsp4j.Range;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
 import org.jetbrains.annotations.NotNull;
 
+import java.lang.reflect.Method;
 import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -73,7 +75,7 @@ public class CodeActionsOnTheEdtTest extends LSPCodeInsightFixtureTestCase {
         var daemon = (DaemonCodeAnalyzerImpl) DaemonCodeAnalyzer.getInstance(myFixture.getProject());
         var editors = EditorTracker.getInstance(myFixture.getProject());
         // the daemon highlights the active editors once its timer runs, as when the editor is shown
-        editors.setActiveEditors(List.of(myFixture.getEditor()));
+        setActiveEditors(editors, List.of(myFixture.getEditor()));
         daemon.setUpdateByTimerEnabled(true);
         try {
             CompletableFuture<Void> release = hold();
@@ -91,7 +93,7 @@ public class CodeActionsOnTheEdtTest extends LSPCodeInsightFixtureTestCase {
                     () -> passes.get() > 0, 10);
         } finally {
             daemon.setUpdateByTimerEnabled(false);
-            editors.setActiveEditors(List.of());
+            setActiveEditors(editors, List.of());
             waitForDaemonCodeAnalyzerFinished();
         }
         // once the answer is in, the EDT has it at once
@@ -180,6 +182,20 @@ public class CodeActionsOnTheEdtTest extends LSPCodeInsightFixtureTestCase {
      * Asks the intention on the EDT for its availability and text while the server holds its answer, and checks that
      * they come at once: not available, and the placeholder text.
      */
+    /**
+     * Sets the active editors, which IntelliJ 2026.3 does with {@code setActiveEditorsInTests} rather than
+     * {@code setActiveEditors}.
+     */
+    private static void setActiveEditors(EditorTracker editors, List<Editor> active) throws Exception {
+        Method setter;
+        try {
+            setter = EditorTracker.class.getMethod("setActiveEditorsInTests", List.class);
+        } catch (NoSuchMethodException earlierVersion) {
+            setter = EditorTracker.class.getMethod("setActiveEditors", List.class);
+        }
+        setter.invoke(editors, active);
+    }
+
     private void assertNotWaitedFor(IntentionAction intention, PsiFile file, CompletableFuture<Void> release) {
         var textDocumentService = MockLanguageServer.INSTANCE.getTextDocumentService();
         assertTrue("The test must run on the EDT", ApplicationManager.getApplication().isDispatchThread());

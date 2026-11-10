@@ -13,7 +13,7 @@ import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.application.WriteAction;
 import com.intellij.openapi.command.WriteCommandAction;
 import com.intellij.openapi.editor.Document;
-import com.intellij.openapi.editor.impl.event.DocumentEventImpl;
+import com.intellij.openapi.editor.event.DocumentEvent;
 import com.intellij.openapi.util.Disposer;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.testFramework.PlatformTestUtil;
@@ -70,6 +70,50 @@ public class WorkspaceEditVersionTest extends LSPCodeInsightFixtureTestCase {
                 .getLanguageServers(file, null, null).get(30, TimeUnit.SECONDS).get(0);
         var wrapper = server.getServerWrapper();
         return new Context(wrapper, wrapper.toUri(file.getVirtualFile()), myFixture.getEditor().getDocument());
+    }
+
+    /**
+     * Returns the event of a change that replaces the whole text of the document, which isn't changed. Not a
+     * {@code DocumentEventImpl}, whose constructor IntelliJ 2026.3 changed.
+     */
+    private static DocumentEvent wholeTextReplaced(Document document, String oldText, String newText) {
+        long oldTimeStamp = document.getModificationStamp();
+        return new DocumentEvent(document) {
+            @Override
+            public int getOffset() {
+                return 0;
+            }
+
+            @Override
+            public int getOldLength() {
+                return oldText.length();
+            }
+
+            @Override
+            public int getNewLength() {
+                return newText.length();
+            }
+
+            @Override
+            public CharSequence getOldFragment() {
+                return oldText;
+            }
+
+            @Override
+            public CharSequence getNewFragment() {
+                return newText;
+            }
+
+            @Override
+            public long getOldTimeStamp() {
+                return oldTimeStamp;
+            }
+
+            @Override
+            public boolean isWholeTextReplaced() {
+                return true;
+            }
+        };
     }
 
     private static TextEdit replacement() {
@@ -185,8 +229,7 @@ public class WorkspaceEditVersionTest extends LSPCodeInsightFixtureTestCase {
         // Changes wait for the document's didOpen, so open it first; it reads the stamp too
         synchronizer.getDidOpenFuture().get(30, TimeUnit.SECONDS);
         readAccess.clear();
-        ReadAction.run(() -> synchronizer.beforeDocumentChange(new DocumentEventImpl(context.document(),
-                0, "before", "after", context.document().getModificationStamp(), true, 0, 6, 0)));
+        ReadAction.run(() -> synchronizer.beforeDocumentChange(wholeTextReplaced(context.document(), "before", "after")));
 
         // Observe access at the stamp read itself instead of depending on a race with a writer.
         var pending = ApplicationManager.getApplication().executeOnPooledThread(
@@ -212,8 +255,7 @@ public class WorkspaceEditVersionTest extends LSPCodeInsightFixtureTestCase {
         context.document().removeDocumentListener(synchronizer);
         try {
             var pending = WriteCommandAction.writeCommandAction(myFixture.getProject()).compute(() -> {
-                synchronizer.beforeDocumentChange(new DocumentEventImpl(context.document(),
-                        0, "before", "after}", context.document().getModificationStamp(), true, 0, 6, 0));
+                synchronizer.beforeDocumentChange(wholeTextReplaced(context.document(), "before", "after}"));
                 context.document().setText("after}");
                 var params = new DocumentOnTypeFormattingParams(new TextDocumentIdentifier(context.uri().toString()),
                         new FormattingOptions(4, true), new Position(0, 6), "}");
