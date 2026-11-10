@@ -32,6 +32,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Tests for {@link CommandUtils}.
@@ -255,11 +256,63 @@ public class CommandUtilsTest {
     }
 
     @Test
+    public void testThePathLookupTakesTheExecutableOfTheFirstDirectoryWhichHasOne() throws Exception {
+        Path empty = Files.createTempDirectory("empty");
+        Path first = Files.createTempDirectory("first");
+        Path second = Files.createTempDirectory("second");
+        try {
+            Path tool = createTool(first, "first");
+            createTool(second, "second");
+            String path = String.join(File.pathSeparator, empty.toString(), first.toString(), second.toString());
+
+            assertSameFile(tool, CommandUtils.findInPath(tool.getFileName().toString(), path));
+        } finally {
+            FileUtil.delete(empty.toFile());
+            FileUtil.delete(first.toFile());
+            FileUtil.delete(second.toFile());
+        }
+    }
+
+    @Test
+    @DisabledOnOs(OS.WINDOWS)
+    public void testThePathLookupSkipsAFileOfTheNameThatCannotBeExecuted() throws Exception {
+        Path first = Files.createTempDirectory("not-executable");
+        Path second = Files.createTempDirectory("executable");
+        try {
+            Path notExecutable = first.resolve("lsp4ij-tool");
+            Files.writeString(notExecutable, "#!/bin/sh\necho first");
+            Assertions.assertTrue(notExecutable.toFile().setExecutable(false));
+            Path tool = createTool(second, "second");
+
+            assertSameFile(tool, CommandUtils.findInPath("lsp4ij-tool", first + File.pathSeparator + second));
+        } finally {
+            FileUtil.delete(first.toFile());
+            FileUtil.delete(second.toFile());
+        }
+    }
+
+    @Test
+    public void testThePathLookupSkipsARelativeDirectory() throws Exception {
+        // A directory that the PATH gives relative to the current one, which also holds the tool
+        Path relative = Files.createTempDirectory(Path.of(""), "lsp4ij-tool-dir");
+        try {
+            Path tool = createTool(relative);
+            String name = tool.getFileName().toString();
+
+            Assertions.assertNull(CommandUtils.findInPath(name, relative.toString()));
+            assertSameFile(tool, CommandUtils.findInPath(name, relative + File.pathSeparator + relative.toAbsolutePath()));
+        } finally {
+            FileUtil.delete(relative.toFile());
+        }
+    }
+
+    @Test
     public void testACommandLineWithAWorkingDirectoryLooksUpItsExecutable() throws Exception {
         Path directory = Files.createTempDirectory("tool-dir");
         try {
             Path tool = createTool(directory);
-            Map<String, String> environment = Map.of("PATH", directory.toString());
+            String path = directory + File.pathSeparator + Objects.requireNonNullElse(System.getenv("PATH"), "");
+            Map<String, String> environment = Map.of("PATH", path);
 
             GeneralCommandLine withoutWorkingDirectory = CommandUtils.createCommandLine(
                     tool.getFileName().toString(), null, environment, true);
@@ -268,7 +321,10 @@ public class CommandUtilsTest {
 
             // Without a working directory, the platform looks it up when the process starts, as before
             Assertions.assertEquals(tool.getFileName().toString(), withoutWorkingDirectory.getExePath());
-            Assertions.assertEquals(tool.toFile().getCanonicalPath(), new File(withWorkingDirectory.getExePath()).getCanonicalPath());
+            // With one, it is looked up as the process starts, in the environment that the process gets there
+            Assertions.assertEquals(tool.getFileName().toString(), withWorkingDirectory.getExePath());
+            Assertions.assertEquals("ok", run(withWorkingDirectory));
+            assertSameFile(tool, new File(withWorkingDirectory.getExePath()));
         } finally {
             FileUtil.delete(directory.toFile());
         }
@@ -394,15 +450,7 @@ public class CommandUtilsTest {
             GeneralCommandLine commandLine = CommandUtils.createCommandLine("lsp4ij-tool", directory.toString(),
                     Map.of("PATH", path), true);
 
-            Process process = commandLine.createProcess();
-            String output;
-            try {
-                output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8).trim();
-            } finally {
-                Assertions.assertTrue(process.waitFor(30, TimeUnit.SECONDS), "The script must end");
-            }
-
-            Assertions.assertEquals("ok", output);
+            Assertions.assertEquals("ok", run(commandLine));
         } finally {
             FileUtil.delete(directory.toFile());
         }
@@ -440,9 +488,21 @@ public class CommandUtilsTest {
                 failure.getMessage());
     }
 
-    private static void assertSameFile(Path expected, File actual) throws Exception {
+    static void assertSameFile(Path expected, File actual) throws Exception {
         Assertions.assertNotNull(actual);
         Assertions.assertEquals(expected.toFile().getCanonicalPath(), actual.getCanonicalPath());
+    }
+
+    /**
+     * Starts the process of the command line and returns what it prints.
+     */
+    static String run(GeneralCommandLine commandLine) throws Exception {
+        Process process = commandLine.createProcess();
+        try {
+            return new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8).trim();
+        } finally {
+            Assertions.assertTrue(process.waitFor(30, TimeUnit.SECONDS), "The process must end");
+        }
     }
 
     /**
@@ -454,10 +514,38 @@ public class CommandUtilsTest {
             @Override
             protected void setupEnvironment(@NotNull Map<String, String> environment) {
                 super.setupEnvironment(environment);
-                String path = environment.get("PATH");
-                environment.put("PATH", path != null ? directory + File.pathSeparator + path : directory.toString());
+                putInFrontOfPath(environment, directory);
             }
         };
+    }
+
+    /**
+     * Returns a command line as LSP4IJ creates it, whose environment, once set up, has the directory in front of its
+     * PATH, as a CommandLineEnvCustomizer does for the working directory of a process since 2025.1, and which counts
+     * the customizations of its environment.
+     */
+    public static GeneralCommandLine customizedCommandLine(List<String> command, Path directory, AtomicInteger customizations) {
+        return new WorkingDirectoryCommandLine(command) {
+            @Override
+            protected void setupEnvironment(@NotNull Map<String, String> environment) {
+                super.setupEnvironment(environment);
+                customizations.incrementAndGet();
+                putInFrontOfPath(environment, directory);
+            }
+        };
+    }
+
+    /**
+     * Puts the directory in front of the PATH of the environment, whose name Windows compares without its case, and
+     * whose case the environment of a ProcessBuilder keeps.
+     */
+    private static void putInFrontOfPath(Map<String, String> environment, Path directory) {
+        String name = environment.keySet().stream()
+                .filter(variable -> SystemInfo.isWindows ? variable.equalsIgnoreCase("PATH") : variable.equals("PATH"))
+                .findFirst()
+                .orElse("PATH");
+        String path = environment.get(name);
+        environment.put(name, path != null ? directory + File.pathSeparator + path : directory.toString());
     }
 
     public static Path createTool(Path directory) throws Exception {

@@ -21,9 +21,11 @@ import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Regression tests for process ownership and terminal stop semantics.
@@ -114,6 +116,32 @@ public class OSProcessStreamConnectionProviderTest extends LightPlatformTestCase
             }
             FileUtil.delete(directory.toFile());
             FileUtil.delete(other.toFile());
+        }
+    }
+
+    /**
+     * A command line that LSP4IJ creates looks up its command as its process starts, so the customizers of the
+     * environment of its working directory run once for the start.
+     */
+    public void testStartRunsTheCustomizersOnceForACommandLineThatLsp4ijCreates() throws Exception {
+        Path directory = Files.createTempDirectory("tool-dir");
+        OSProcessStreamConnectionProvider provider = null;
+        try {
+            CommandUtilsTest.createTool(directory, "working-directory");
+            AtomicInteger customizations = new AtomicInteger();
+            provider = new OSProcessStreamConnectionProvider(CommandUtilsTest.customizedCommandLine(
+                    List.of("lsp4ij-tool"), directory, customizations)
+                    .withWorkDirectory(directory.toFile()));
+
+            provider.start();
+
+            assertEquals("working-directory", readLine(provider));
+            assertEquals(1, customizations.get());
+        } finally {
+            if (provider != null) {
+                reap(provider);
+            }
+            FileUtil.delete(directory.toFile());
         }
     }
 

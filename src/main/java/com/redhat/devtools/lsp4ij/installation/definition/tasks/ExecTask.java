@@ -20,6 +20,7 @@ import com.redhat.devtools.lsp4ij.installation.definition.InstallerContext;
 import com.redhat.devtools.lsp4ij.installation.definition.InstallerTask;
 import com.redhat.devtools.lsp4ij.installation.definition.ServerInstallerDescriptor;
 import com.redhat.devtools.lsp4ij.server.definition.launching.CommandUtils;
+import com.redhat.devtools.lsp4ij.server.definition.launching.WorkingDirectoryCommandLine;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -88,7 +89,8 @@ public class ExecTask extends InstallerTask {
                     .toList();
             context.print("> " + String.join(" ", resolvedCommand));
 
-            GeneralCommandLine cmdLine = new GeneralCommandLine(resolvedCommand)
+            // With a working directory, the tools which its environment selects, as the language server gets them
+            GeneralCommandLine cmdLine = new WorkingDirectoryCommandLine(resolvedCommand)
                     .withEnvironment(EnvironmentUtil.getEnvironmentMap());
             Path workingDir = getWorkingDir(this.workingDir, context);
             if (workingDir != null) {
@@ -97,8 +99,6 @@ public class ExecTask extends InstallerTask {
                 }
                 cmdLine = cmdLine
                         .withWorkDirectory(workingDir.toFile());
-                // The tools which the working directory's environment selects, as the language server gets them
-                CommandUtils.resolveExecutable(cmdLine);
             }
             cmdLine.setCharset(java.nio.charset.StandardCharsets.UTF_8);
 
