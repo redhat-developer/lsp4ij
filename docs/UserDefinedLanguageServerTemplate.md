@@ -102,6 +102,9 @@ The template descriptor (`template.json`) is a JSON file used to define:
 }
 ```
 
+This language server talks LSP over its standard input and output only, so the template lists `stdio` in its
+`transports` and has no `socket`. See [Socket](#socket) for a template with one.
+
 #### Socket
 
 `socket` is optional: without it, LSP4IJ talks to the language server over its standard input and output. A language
