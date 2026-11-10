@@ -35,7 +35,7 @@ If the language server defines an [installation procedure](./DeveloperGuide.md#i
 
 ### Language Servers preferences
 
-The preference page under `Preferences | Languages & Frameworks | Language Servers` allows power users 
+The preference page under `Preferences | Languages & Frameworks | Language Servers (LSP4IJ)` allows power users 
 to configure mappings, language servers debugging and tracing:
 
 ![Language Server preferences](./images/LanguageServerPreferences.png)
