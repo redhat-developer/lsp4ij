@@ -203,7 +203,7 @@ public class CommandUtils {
         }
         return SystemInfo.isWindows
                 ? findInWindowsPath(executable, path, getVariable(environment, "PATHEXT"))
-                : PathEnvironmentVariableUtil.findInPath(executable, path, null);
+                : findInPath(executable, path);
     }
 
     /**
@@ -245,13 +245,32 @@ public class CommandUtils {
                 .map(extension -> extension.toLowerCase(Locale.ROOT))
                 .toList();
         if (extensions.stream().anyMatch(extension -> StringUtil.endsWithIgnoreCase(executable, extension))) {
-            return PathEnvironmentVariableUtil.findInPath(executable, path, null);
+            return findInPath(executable, path);
         }
         return PathEnvironmentVariableUtil.getPathDirs(path).stream()
                 .map(File::new)
                 .filter(File::isAbsolute)
                 .flatMap(directory -> extensions.stream().map(extension -> new File(directory, executable + extension)))
                 .filter(File::isFile)
+                .findFirst()
+                .orElse(null);
+    }
+
+    /**
+     * Looks up an executable in the given PATH: the file of that name that can be executed in the first of its
+     * directories which has one, as {@code PathEnvironmentVariableUtil.findInPath} does. IntelliJ 2026.3 schedules
+     * {@code findInPath} for removal, and the {@code findFirst} which replaces it doesn't exist in IntelliJ 2024.2.
+     *
+     * @param executable the name of the executable, without a path.
+     * @param path       the PATH to look it up in.
+     * @return the executable, or null if none is found.
+     */
+    static @Nullable File findInPath(@NotNull String executable, @NotNull String path) {
+        return PathEnvironmentVariableUtil.getPathDirs(path).stream()
+                .map(File::new)
+                .filter(directory -> directory.isAbsolute() && directory.isDirectory())
+                .map(directory -> new File(directory, executable))
+                .filter(file -> file.isFile() && file.canExecute())
                 .findFirst()
                 .orElse(null);
     }

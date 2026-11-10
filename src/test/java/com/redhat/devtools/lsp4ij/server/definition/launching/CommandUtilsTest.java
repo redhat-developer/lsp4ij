@@ -256,6 +256,57 @@ public class CommandUtilsTest {
     }
 
     @Test
+    public void testThePathLookupTakesTheExecutableOfTheFirstDirectoryWhichHasOne() throws Exception {
+        Path empty = Files.createTempDirectory("empty");
+        Path first = Files.createTempDirectory("first");
+        Path second = Files.createTempDirectory("second");
+        try {
+            Path tool = createTool(first, "first");
+            createTool(second, "second");
+            String path = String.join(File.pathSeparator, empty.toString(), first.toString(), second.toString());
+
+            assertSameFile(tool, CommandUtils.findInPath(tool.getFileName().toString(), path));
+        } finally {
+            FileUtil.delete(empty.toFile());
+            FileUtil.delete(first.toFile());
+            FileUtil.delete(second.toFile());
+        }
+    }
+
+    @Test
+    @DisabledOnOs(OS.WINDOWS)
+    public void testThePathLookupSkipsAFileOfTheNameThatCannotBeExecuted() throws Exception {
+        Path first = Files.createTempDirectory("not-executable");
+        Path second = Files.createTempDirectory("executable");
+        try {
+            Path notExecutable = first.resolve("lsp4ij-tool");
+            Files.writeString(notExecutable, "#!/bin/sh\necho first");
+            Assertions.assertTrue(notExecutable.toFile().setExecutable(false));
+            Path tool = createTool(second, "second");
+
+            assertSameFile(tool, CommandUtils.findInPath("lsp4ij-tool", first + File.pathSeparator + second));
+        } finally {
+            FileUtil.delete(first.toFile());
+            FileUtil.delete(second.toFile());
+        }
+    }
+
+    @Test
+    public void testThePathLookupSkipsARelativeDirectory() throws Exception {
+        // A directory that the PATH gives relative to the current one, which also holds the tool
+        Path relative = Files.createTempDirectory(Path.of(""), "lsp4ij-tool-dir");
+        try {
+            Path tool = createTool(relative);
+            String name = tool.getFileName().toString();
+
+            Assertions.assertNull(CommandUtils.findInPath(name, relative.toString()));
+            assertSameFile(tool, CommandUtils.findInPath(name, relative + File.pathSeparator + relative.toAbsolutePath()));
+        } finally {
+            FileUtil.delete(relative.toFile());
+        }
+    }
+
+    @Test
     public void testACommandLineWithAWorkingDirectoryLooksUpItsExecutable() throws Exception {
         Path directory = Files.createTempDirectory("tool-dir");
         try {
