@@ -13,8 +13,9 @@ import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.util.Disposer;
 import com.intellij.openapi.util.ThrowableComputable;
 import com.intellij.testFramework.fixtures.BasePlatformTestCase;
+import kotlin.jvm.functions.Function0;
+import org.jetbrains.annotations.NotNull;
 
-import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
@@ -48,26 +49,18 @@ public class ApplicationUtilsTest extends BasePlatformTestCase {
 
     /**
      * On the EDT without read access, as the settings page of a language server was in IntelliJ 2026.3, both overloads
-     * take the write-intent lock, which gives them read access, rather than a read lock. IntelliJ 2024.2 can take the write-intent lock away from the EDT for a while, with
-     * {@code ApplicationEx.runUnlockingIntendedWrite}, which IntelliJ 2026.3 no longer has: there, this checks nothing.
+     * take the write-intent lock, which gives them read access, rather than a read lock.
      */
     public void testAReadActionOnTheEdtWithoutReadAccessTakesTheWriteIntentLock() throws Exception {
-        Method unlockingIntendedWrite;
-        try {
-            unlockingIntendedWrite = ApplicationEx.class.getMethod("runUnlockingIntendedWrite", ThrowableComputable.class);
-        } catch (NoSuchMethodException laterVersion) {
-            return;
-        }
         var application = ApplicationManager.getApplication();
         var access = new ArrayList<Boolean>();
 
-        unlockingIntendedWrite.invoke(application, (ThrowableComputable<Object, RuntimeException>) () -> {
+        runWithoutTheWriteIntentLock(() -> {
             access.add(application.isReadAccessAllowed());
             access.add(ApplicationUtils.runCancellableReadAction(() -> hasWriteIntentLock(), getTestRootDisposable()));
             var writeIntent = new AtomicBoolean();
             ApplicationUtils.runCancellableReadAction(() -> writeIntent.set(hasWriteIntentLock()), getTestRootDisposable());
             access.add(writeIntent.get());
-            return null;
         });
 
         assertEquals("The EDT has no read access, and both overloads take the write-intent lock", List.of(false, true, true), access);
@@ -95,6 +88,31 @@ public class ApplicationUtilsTest extends BasePlatformTestCase {
         }).get(10, TimeUnit.SECONDS);
 
         assertNotNull("A read action whose disposable is disposed must not run", cancellation);
+    }
+
+    /**
+     * Runs the action on the EDT, which holds the write-intent lock in these tests, without it. IntelliJ 2025.3 and
+     * 2026.3 take it away with {@code ThreadingSupport.releaseTheAcquiredWriteIntentLockThenExecuteActionAndTakeWriteIntentLockBack},
+     * and IntelliJ 2024.2, which doesn't have it, with {@code ApplicationEx.runUnlockingIntendedWrite}, which 2026.3
+     * no longer has, and which leaves the EDT read access in 2025.3.
+     */
+    private static void runWithoutTheWriteIntentLock(@NotNull Runnable action) throws Exception {
+        var application = ApplicationManager.getApplication();
+        try {
+            var threadingSupport = application.getClass().getMethod("getThreadingSupport").invoke(application);
+            Class.forName("com.intellij.openapi.application.ThreadingSupport")
+                    .getMethod("releaseTheAcquiredWriteIntentLockThenExecuteActionAndTakeWriteIntentLockBack", Function0.class)
+                    .invoke(threadingSupport, (Function0<Object>) () -> {
+                        action.run();
+                        return null;
+                    });
+        } catch (NoSuchMethodException earlierVersion) {
+            ApplicationEx.class.getMethod("runUnlockingIntendedWrite", ThrowableComputable.class)
+                    .invoke(application, (ThrowableComputable<Object, RuntimeException>) () -> {
+                        action.run();
+                        return null;
+                    });
+        }
     }
 
     /**
