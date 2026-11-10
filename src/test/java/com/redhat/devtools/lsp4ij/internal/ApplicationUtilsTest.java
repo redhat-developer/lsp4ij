@@ -22,29 +22,31 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
- * A cancellable read action on the EDT is no non-blocking read action, which the platform doesn't run synchronously
- * there. A non-blocking read action runs at once on a thread that has read access, as the EDT has in these tests, but
- * fails with "Access from Event Dispatch Thread (EDT) is not allowed" on the EDT without it, as the settings page of a
- * language server did in IntelliJ 2026.3. Off the EDT, it is still a non-blocking read action, which expires with its
- * disposable.
+ * A non-blocking read action runs at once on a thread that has read access, as the EDT has in these tests, but fails
+ * with "Access from Event Dispatch Thread (EDT) is not allowed" on the EDT without it, as the settings page of a
+ * language server did in IntelliJ 2026.3. On the EDT without read access, a cancellable read action takes the
+ * write-intent lock first. On the EDT and off it, it is a non-blocking read action, which expires with its disposable.
  */
 public class ApplicationUtilsTest extends BasePlatformTestCase {
 
     private static final String NON_BLOCKING_READ_ACTION = "com.intellij.openapi.application.impl.NonBlockingReadActionImpl";
 
-    public void testAReadActionWithAResultOnTheEdtIsNoNonBlockingReadAction() {
+    public void testAReadActionOnTheEdtExpiresWithItsDisposable() {
         assertTrue(ApplicationManager.getApplication().isDispatchThread());
+        var ran = new AtomicBoolean();
 
-        assertFalse(ApplicationUtils.runCancellableReadAction(() -> isNonBlockingReadAction(), getTestRootDisposable()));
+        assertEquals("Both overloads must be cancelled", List.of(true, true), cancellationsOfBothOverloads(ran));
+        assertFalse("A read action whose disposable is disposed must not run", ran.get());
     }
 
-    public void testAReadActionWithoutAResultOnTheEdtIsNoNonBlockingReadAction() {
-        assertTrue(ApplicationManager.getApplication().isDispatchThread());
-        var nonBlocking = new AtomicBoolean(true);
+    public void testAReadActionOnTheEdtWithoutReadAccessExpiresWithItsDisposable() throws Exception {
+        var ran = new AtomicBoolean();
+        var cancellations = new ArrayList<Boolean>();
 
-        ApplicationUtils.runCancellableReadAction(() -> nonBlocking.set(isNonBlockingReadAction()), getTestRootDisposable());
+        runWithoutTheWriteIntentLock(() -> cancellations.addAll(cancellationsOfBothOverloads(ran)));
 
-        assertFalse(nonBlocking.get());
+        assertEquals("Both overloads must be cancelled", List.of(true, true), cancellations);
+        assertFalse("A read action whose disposable is disposed must not run", ran.get());
     }
 
     /**
@@ -88,6 +90,26 @@ public class ApplicationUtilsTest extends BasePlatformTestCase {
         }).get(10, TimeUnit.SECONDS);
 
         assertNotNull("A read action whose disposable is disposed must not run", cancellation);
+    }
+
+    /**
+     * Runs both overloads with a disposed disposable, and returns whether each was cancelled.
+     */
+    private static List<Boolean> cancellationsOfBothOverloads(AtomicBoolean ran) {
+        var disposable = Disposer.newDisposable();
+        Disposer.dispose(disposable);
+        return List.of(
+                isCancelled(() -> ApplicationUtils.runCancellableReadAction(() -> ran.getAndSet(true), disposable)),
+                isCancelled(() -> ApplicationUtils.runCancellableReadAction(() -> ran.set(true), disposable)));
+    }
+
+    private static boolean isCancelled(Runnable action) {
+        try {
+            action.run();
+            return false;
+        } catch (ProcessCanceledException e) {
+            return true;
+        }
     }
 
     /**
