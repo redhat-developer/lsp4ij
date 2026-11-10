@@ -7,6 +7,7 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.server.definition.launching;
 
+import com.intellij.execution.configurations.GeneralCommandLine;
 import com.intellij.openapi.util.Disposer;
 import com.intellij.openapi.util.io.FileUtil;
 import com.intellij.openapi.vfs.JarFileSystem;
@@ -115,15 +116,7 @@ public class UserDefinedServerInstancesTest extends BasePlatformTestCase {
     }
 
     public void testAnInstanceWithARootInAnArchiveGetsNoWorkingDirectory() throws IOException {
-        var jar = localDirectory().toNioPath().resolve("archive.jar");
-        try (var archive = new ZipOutputStream(Files.newOutputStream(jar))) {
-            archive.putNextEntry(new ZipEntry("one.user-defined"));
-            archive.closeEntry();
-        }
-        var localJar = LocalFileSystem.getInstance().refreshAndFindFileByNioFile(jar);
-        assertNotNull(localJar);
-        var folder = JarFileSystem.getInstance().getJarRootForLocalFile(localJar);
-        assertNotNull(folder);
+        var folder = archiveRoot();
         addDefinition(null, "{\"serverInstances\": {}}");
 
         assertNull(workDirectoryOfInstance(folder));
@@ -137,16 +130,84 @@ public class UserDefinedServerInstancesTest extends BasePlatformTestCase {
         assertNull(provider.getCommandLine().getWorkDirectory());
     }
 
+    public void testTheInstanceRootMacroIsTheRootOfEachInstance() throws IOException {
+        var first = localDirectory();
+        var second = localDirectory();
+        addDefinition(UserDefinedLanguageServerDefinition.INSTANCE_ROOT_MACRO, "{\"serverInstances\": {}}");
+
+        assertEquals(new File(first.getPath()), workDirectoryOfInstance(first));
+        assertEquals(new File(second.getPath()), workDirectoryOfInstance(second));
+    }
+
+    public void testTheInstanceRootMacroNamesADirectoryUnderTheRootOfEachInstance() throws IOException {
+        var folder = localDirectory();
+        addDefinition("${instanceRoot}/server", "{\"serverInstances\": {}}");
+
+        assertEquals(new File(folder.getPath(), "server"), workDirectoryOfInstance(folder));
+    }
+
+    public void testTheCommandGetsTheRootOfTheInstance() throws IOException {
+        var folder = localDirectory();
+        addDefinition("my-server --root=\"${instanceRoot}\"", null, "{\"serverInstances\": {}}");
+
+        assertEquals(List.of("--root=" + folder.getPath()), commandLineOfInstance(folder).getParametersList().getList());
+    }
+
+    public void testWithoutInstancesTheInstanceRootMacroIsTheProjectDirectory() {
+        addDefinition("${instanceRoot}/server", null);
+
+        var provider = (OSProcessStreamConnectionProvider) definition.createConnectionProvider(getProject());
+
+        assertEquals(new File(getProject().getBasePath(), "server"), provider.getCommandLine().getWorkDirectory());
+    }
+
+    public void testTheInstanceRootMacroOfARootInAnArchiveIsTheProjectDirectory() throws IOException {
+        var folder = archiveRoot();
+        addDefinition(UserDefinedLanguageServerDefinition.INSTANCE_ROOT_MACRO, "{\"serverInstances\": {}}");
+
+        assertEquals(new File(getProject().getBasePath()), workDirectoryOfInstance(folder));
+    }
+
+    public void testARootWithADollarIsNotTakenForAMacro() {
+        var root = "/projects/$PROJECT_DIR$/module";
+
+        assertEquals(root + "/server", UserDefinedLanguageServerDefinition.resolve("${instanceRoot}/server", getProject(), root));
+    }
+
     private @Nullable File workDirectoryOfInstance(@NotNull VirtualFile folder) {
+        return commandLineOfInstance(folder).getWorkDirectory();
+    }
+
+    private @NotNull GeneralCommandLine commandLineOfInstance(@NotNull VirtualFile folder) {
         var instanceRoot = new WorkspaceFolder(FileUriSupport.DEFAULT.toString(folder), folder.getName());
         var provider = (OSProcessStreamConnectionProvider) definition.createConnectionProvider(getProject(), instanceRoot);
-        return provider.getCommandLine().getWorkDirectory();
+        return provider.getCommandLine();
     }
 
     private void addDefinition(@Nullable String workingDir, @Nullable String configuration) {
+        addDefinition("my-server --stdio", workingDir, configuration);
+    }
+
+    private void addDefinition(@NotNull String command, @Nullable String workingDir, @Nullable String configuration) {
         definition = new UserDefinedLanguageServerDefinition("user-defined-instances", null, "User-defined per folder", null, null,
-                "my-server --stdio", workingDir, Map.of(), false, null, false, null, null, null, null, null, configuration);
+                command, workingDir, Map.of(), false, null, false, null, null, null, null, null, configuration);
         LanguageServersRegistry.getInstance().addServerDefinition(getProject(), definition, MAPPINGS);
+    }
+
+    /**
+     * Returns the root of an archive, which an instance of a language server can have as root.
+     */
+    private @NotNull VirtualFile archiveRoot() throws IOException {
+        var jar = localDirectory().toNioPath().resolve("archive.jar");
+        try (var archive = new ZipOutputStream(Files.newOutputStream(jar))) {
+            archive.putNextEntry(new ZipEntry("one.user-defined"));
+            archive.closeEntry();
+        }
+        var localJar = LocalFileSystem.getInstance().refreshAndFindFileByNioFile(jar);
+        assertNotNull(localJar);
+        var folder = JarFileSystem.getInstance().getJarRootForLocalFile(localJar);
+        assertNotNull(folder);
+        return folder;
     }
 
     private void update(@Nullable String configuration) {

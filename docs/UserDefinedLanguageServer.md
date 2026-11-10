@@ -94,6 +94,15 @@ Here are some useful standard [built-in macros](https://www.jetbrains.com/help/i
  * `$PROJECT_DIR$`: The root of the project where run.json is located. A project is typically a collection of files for developing and building an application such as a Maven or Node.js project.
  * `$USER_HOME$`: User home directory.
 
+LSP4IJ adds placeholders of its own:
+
+ * `${instanceRoot}`, in the command and the working directory: the root of the language server. With
+   [several instances](#several-language-server-instances), it is the root of each instance, and otherwise the
+   project's directory, as `$PROJECT_DIR$`. In the command, a root with spaces needs quotes, as in
+   `"${instanceRoot}/server.js"`.
+ * `${port}`, in the command of a language server that LSP4IJ starts and talks to over a socket: the port of that
+   socket, see [Transport](#transport).
+
 Here is an example with Scala Language Server's `metals.bat` stored at the root of the project:
 
 ![Macro syntax](images/user-defined-ls/Macro.png)
@@ -333,7 +342,10 @@ Files with the same root share an instance:
  * It's initialized with its root as `rootUri`.
  * A file without a root gets no instance, so this language server provides no features for it. LSP4IJ says so once, when such a file is open in an editor.
  * With markers, the search stops at the project: a file without a marker up to its topmost content root has that content root as its root, so no instance runs above the project. In a project with content roots, a file outside all of them has no root then.
- * All instances use the same command. If no working directory is configured, an instance runs in its root.
+ * All instances use the same command. If no working directory is configured, an instance runs in its root. A
+   configured working directory applies to every instance, so all of them get the environment of that one directory.
+   With `${instanceRoot}` in it, as in `${instanceRoot}/server`, each instance runs in a directory of its own root,
+   with the environment of that directory.
  * Stop on an instance in the Language Servers view, or too many failed starts of it, switch off that instance only, and the others keep working. Restart switches it on again, and so does a changed configuration.
  * Each instance needs a connection of its own. Over a socket, use an automatic port, and let LSP4IJ start the language server: the settings don't save `serverInstances` with a language server that runs already, or with a fixed port.
 
