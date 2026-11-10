@@ -134,7 +134,7 @@ public class DAPClientExceptionHintTest {
 
     private IDebugProtocolServer server(CompletableFuture<ExceptionInfoResponse> answer) {
         return (IDebugProtocolServer) Proxy.newProxyInstance(IDebugProtocolServer.class.getClassLoader(),
-                new Class[]{IDebugProtocolServer.class}, (proxy, method, args) -> switch (method.getName()) {
+                new Class<?>[]{IDebugProtocolServer.class}, (proxy, method, args) -> switch (method.getName()) {
                     case "exceptionInfo" -> {
                         asked.add(((ExceptionInfoArguments) args[0]).getThreadId());
                         yield answer;

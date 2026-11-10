@@ -51,7 +51,7 @@ public class DAPClientPauseTest {
 
     private static IDebugProtocolServer server(ThreadsResponse threads, List<Integer> paused) {
         return (IDebugProtocolServer) Proxy.newProxyInstance(IDebugProtocolServer.class.getClassLoader(),
-                new Class[]{IDebugProtocolServer.class}, (proxy, method, args) -> switch (method.getName()) {
+                new Class<?>[]{IDebugProtocolServer.class}, (proxy, method, args) -> switch (method.getName()) {
                     case "threads" -> CompletableFuture.completedFuture(threads);
                     case "pause" -> {
                         paused.add(((PauseArguments) args[0]).getThreadId());

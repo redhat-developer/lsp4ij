@@ -84,7 +84,7 @@ public class DAPClientConsoleLineTest {
     private static IDebugProtocolServer server(List<EvaluateArguments> requests,
                                                CompletableFuture<EvaluateResponse> response) {
         return (IDebugProtocolServer) Proxy.newProxyInstance(IDebugProtocolServer.class.getClassLoader(),
-                new Class[]{IDebugProtocolServer.class}, (proxy, method, args) -> switch (method.getName()) {
+                new Class<?>[]{IDebugProtocolServer.class}, (proxy, method, args) -> switch (method.getName()) {
                     case "evaluate" -> {
                         requests.add((EvaluateArguments) args[0]);
                         yield response;

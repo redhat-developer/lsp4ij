@@ -25,7 +25,7 @@ public class ClojureFormattingTest extends LSPFormattingFixtureTestCase {
     public void testFormatting() {
         // Test with TextEdit end which is outside the document length (uses of 999999)
         assertFormatting("test.clj",
-                """                
+                """
                         (let
                                             [binding ""])""",
                 """
@@ -44,8 +44,8 @@ public class ClojureFormattingTest extends LSPFormattingFixtureTestCase {
                                "newText": "(let\\n [binding \\"\\"])"
                              }
                         ]
-                                        """,
-                """                
+                        """,
+                """
                         (let
                          [binding ""])""");
     }

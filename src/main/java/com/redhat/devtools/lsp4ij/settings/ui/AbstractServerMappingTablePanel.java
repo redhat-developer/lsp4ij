@@ -40,7 +40,7 @@ public abstract class AbstractServerMappingTablePanel extends BorderLayoutPanel 
 
     public AbstractServerMappingTablePanel(ColumnInfo<ServerMappingSettings, String> columnId, boolean editable) {
         ListTableModel<ServerMappingSettings> model = new ListTableModel<>(
-                new ColumnInfo[]{columnId, new LanguageIdColumn(editable)},
+                new ColumnInfo<?, ?>[]{columnId, new LanguageIdColumn(editable)},
                 new ArrayList<>(),
                 0);
         table = new TableView<>(model);

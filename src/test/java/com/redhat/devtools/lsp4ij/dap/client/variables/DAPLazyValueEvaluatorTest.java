@@ -136,7 +136,7 @@ public class DAPLazyValueEvaluatorTest extends LightPlatformTestCase {
     @SafeVarargs
     private IDebugProtocolServer server(CompletableFuture<VariablesResponse>... answers) {
         return (IDebugProtocolServer) Proxy.newProxyInstance(IDebugProtocolServer.class.getClassLoader(),
-                new Class[]{IDebugProtocolServer.class}, (proxy, method, args) -> switch (method.getName()) {
+                new Class<?>[]{IDebugProtocolServer.class}, (proxy, method, args) -> switch (method.getName()) {
                     case "variables" -> {
                         var variablesArgs = (VariablesArguments) args[0];
                         asked.add(variablesArgs.getVariablesReference());
@@ -151,7 +151,7 @@ public class DAPLazyValueEvaluatorTest extends LightPlatformTestCase {
 
     private XFullValueEvaluationCallback callback() {
         return (XFullValueEvaluationCallback) Proxy.newProxyInstance(XFullValueEvaluationCallback.class.getClassLoader(),
-                new Class[]{XFullValueEvaluationCallback.class}, (proxy, method, args) -> switch (method.getName()) {
+                new Class<?>[]{XFullValueEvaluationCallback.class}, (proxy, method, args) -> switch (method.getName()) {
                     case "evaluated" -> {
                         evaluated.add((String) args[0]);
                         yield null;

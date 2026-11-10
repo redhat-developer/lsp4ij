@@ -323,7 +323,7 @@ public class CancellationSupport implements CancelChecker {
      */
     public static <T> T awaitWithCheckCanceled(@NotNull Future<T> future) {
         ProgressIndicator indicator = ProgressManager.getInstance().getProgressIndicator();
-        return (T)awaitWithCheckCanceled(future, indicator);
+        return awaitWithCheckCanceled(future, indicator);
     }
 
     public static <T> T awaitWithCheckCanceled(@NotNull Future<T> future, @Nullable ProgressIndicator indicator) {

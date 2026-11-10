@@ -81,7 +81,7 @@ public class LSPHoverSupport extends AbstractLSPDocumentFeatureSupport<HoverPara
     public static @NotNull CompletableFuture<List<HoverData>> mergeInOneFuture(@NotNull List<CompletableFuture<HoverData>> futures,
                                                                                @NotNull CancellationSupport cancellationSupport) {
         CompletableFuture<Void> allFutures = cancellationSupport
-                .execute(CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])));
+                .execute(CompletableFuture.allOf(futures.toArray(new CompletableFuture<?>[0])));
         return allFutures.thenApply(Void -> {
             List<HoverData> mergedDataList = new ArrayList<>(futures.size());
             for (CompletableFuture<HoverData> dataListFuture : futures) {

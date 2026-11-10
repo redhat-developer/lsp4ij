@@ -43,7 +43,7 @@ public class InlineValueRefreshTest extends LightPlatformTestCase {
     }
 
     private static XDebugSession session(String name, boolean suspended, XStackFrame currentFrame, List<String> rebuilt) {
-        return (XDebugSession) Proxy.newProxyInstance(XDebugSession.class.getClassLoader(), new Class[]{XDebugSession.class},
+        return (XDebugSession) Proxy.newProxyInstance(XDebugSession.class.getClassLoader(), new Class<?>[]{XDebugSession.class},
                 (proxy, method, args) -> switch (method.getName()) {
                     case "isSuspended" -> suspended;
                     case "getCurrentStackFrame" -> currentFrame;

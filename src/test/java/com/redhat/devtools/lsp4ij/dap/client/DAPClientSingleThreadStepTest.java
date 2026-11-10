@@ -99,7 +99,7 @@ public class DAPClientSingleThreadStepTest {
 
     private static IDebugProtocolServer server(List<Object> requests) {
         return (IDebugProtocolServer) Proxy.newProxyInstance(IDebugProtocolServer.class.getClassLoader(),
-                new Class[]{IDebugProtocolServer.class}, (proxy, method, args) -> switch (method.getName()) {
+                new Class<?>[]{IDebugProtocolServer.class}, (proxy, method, args) -> switch (method.getName()) {
                     case "next", "stepIn", "stepOut" -> {
                         requests.add(args[0]);
                         yield CompletableFuture.completedFuture(null);

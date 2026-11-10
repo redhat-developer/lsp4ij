@@ -117,7 +117,7 @@ public class DAPClientExceptionStopTest extends BasePlatformTestCase {
         info.setExceptionId("IllegalArgument");
         info.setDescription("bad 5");
         return (IDebugProtocolServer) Proxy.newProxyInstance(IDebugProtocolServer.class.getClassLoader(),
-                new Class[]{IDebugProtocolServer.class}, (proxy, method, args) -> switch (method.getName()) {
+                new Class<?>[]{IDebugProtocolServer.class}, (proxy, method, args) -> switch (method.getName()) {
                     case "exceptionInfo" -> {
                         asked.add(((ExceptionInfoArguments) args[0]).getThreadId());
                         yield CompletableFuture.completedFuture(info);

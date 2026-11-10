@@ -42,7 +42,7 @@ public class LSPCodeInsightTestFixtureImpl extends CodeInsightTestFixtureImpl im
 
     @Override
     public void selectItem(@NotNull LookupElement item, final char completionChar) {
-        final LookupImpl lookup = (LookupImpl) getLookup();
+        final LookupImpl lookup = getLookup();
         lookup.setCurrentItem(item);
         if (LookupEvent.isSpecialCompletionChar(completionChar)) {
             lookup.finishLookup(completionChar);

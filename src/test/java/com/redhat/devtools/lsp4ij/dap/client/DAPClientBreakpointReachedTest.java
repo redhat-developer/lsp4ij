@@ -172,7 +172,7 @@ public class DAPClientBreakpointReachedTest {
 
     @SuppressWarnings("unchecked")
     private static <T> T proxy(Class<T> type, Answer answer) {
-        return (T) Proxy.newProxyInstance(type.getClassLoader(), new Class[]{type}, (proxy, method, args) -> switch (method.getName()) {
+        return (T) Proxy.newProxyInstance(type.getClassLoader(), new Class<?>[]{type}, (proxy, method, args) -> switch (method.getName()) {
             case "equals" -> proxy == args[0];
             case "hashCode" -> System.identityHashCode(proxy);
             case "toString" -> type.getSimpleName();

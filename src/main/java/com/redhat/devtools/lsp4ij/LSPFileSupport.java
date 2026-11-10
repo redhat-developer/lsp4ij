@@ -101,7 +101,7 @@ public class LSPFileSupport extends UserDataHolderBase implements Disposable {
     private final LSPPrepareTypeHierarchySupport prepareTypeHierarchySupport;
     private final LSPTypeHierarchySubtypesSupport typeHierarchySubtypesSupport;
     private final LSPTypeHierarchySupertypesSupport typeHierarchySupertypesSupport;
-    private final List<Key> keys = new ArrayList<>();
+    private final List<Key<?>> keys = new ArrayList<>();
     private volatile Alarm refreshPsiFileAlarm = null;
     private boolean disposed;
 

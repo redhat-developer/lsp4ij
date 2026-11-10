@@ -66,9 +66,9 @@ public class LSPDocumentSymbolStructureViewModel extends StructureViewModelBase 
     }
 
     @Override
-    protected Class @NotNull [] getSuitableClasses() {
+    protected Class<?> @NotNull [] getSuitableClasses() {
         // Any PSI element
-        return new Class[]{PsiElement.class};
+        return new Class<?>[]{PsiElement.class};
     }
 
     /**

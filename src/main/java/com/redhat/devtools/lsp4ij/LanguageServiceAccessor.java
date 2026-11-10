@@ -319,7 +319,7 @@ public class LanguageServiceAccessor implements Disposable {
                                 EditorFeatureManager.getInstance(project)
                                         .refreshEditorFeature(file, EditorFeatureType.ALL, true, new PsiFileCancelChecker(file));
                             });
-
+                    return null;
                 })
                 .coalesceBy(this, file)
                 .submit(AppExecutorUtil.getAppExecutorService());
@@ -970,7 +970,7 @@ public class LanguageServiceAccessor implements Disposable {
         ReadAction.nonBlocking(() -> {
                     var psiFile = isOpen(file) ? LSPIJUtils.getPsiFile(file, project) : null;
                     if (psiFile == null) {
-                        return;
+                        return null;
                     }
                     var url = file.getUrl();
                     // The ordinary request, kept to this definition: unlike a request for one definition, it also
@@ -999,6 +999,7 @@ public class LanguageServiceAccessor implements Disposable {
                                     }
                                 }, ModalityState.any());
                             });
+                    return null;
                 })
                 .expireWhen(project::isDisposed)
                 .submit(AppExecutorUtil.getAppExecutorService());

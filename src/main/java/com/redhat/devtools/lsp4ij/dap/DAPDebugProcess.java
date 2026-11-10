@@ -609,7 +609,7 @@ public class DAPDebugProcess extends XDebugProcess implements Disposable {
         handlers.add(disassemblyBreakpointHandler);
         // Forward native line breakpoints (JS, Python, …) on DAP-mapped files while this session runs.
         handlers.addAll(forwardedBreakpointHandlers);
-        return handlers.toArray(new XBreakpointHandler[0]);
+        return handlers.toArray(new XBreakpointHandler<?>[0]);
     }
 
     public @NotNull DAPBreakpointHandlerBase<?> getBreakpointHandler() {

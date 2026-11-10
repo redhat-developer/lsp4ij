@@ -98,7 +98,7 @@ public class DAPClientBreakpointStopTest {
     }
 
     private static XBreakpoint<?> breakpoint(String name, SuspendPolicy suspendPolicy) {
-        return (XBreakpoint<?>) Proxy.newProxyInstance(XBreakpoint.class.getClassLoader(), new Class[]{XBreakpoint.class},
+        return (XBreakpoint<?>) Proxy.newProxyInstance(XBreakpoint.class.getClassLoader(), new Class<?>[]{XBreakpoint.class},
                 (proxy, method, args) -> switch (method.getName()) {
                     case "getSuspendPolicy" -> suspendPolicy;
                     case "toString" -> name;

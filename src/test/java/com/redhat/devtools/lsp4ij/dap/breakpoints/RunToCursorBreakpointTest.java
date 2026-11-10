@@ -221,13 +221,13 @@ public class RunToCursorBreakpointTest extends HeavyPlatformTestCase {
                 return true;
             }
         };
-        var session = (XDebugSession) Proxy.newProxyInstance(XDebugSession.class.getClassLoader(), new Class[]{XDebugSession.class}, (p, m, a) -> null);
+        var session = (XDebugSession) Proxy.newProxyInstance(XDebugSession.class.getClassLoader(), new Class<?>[]{XDebugSession.class}, (p, m, a) -> null);
         return new DAPBreakpointHandlerBase<>(DAPBreakpointType.class, session, descriptor, getProject()) {
         };
     }
 
     private IDebugProtocolServer server() {
-        return (IDebugProtocolServer) Proxy.newProxyInstance(IDebugProtocolServer.class.getClassLoader(), new Class[]{IDebugProtocolServer.class}, (p, m, a) -> {
+        return (IDebugProtocolServer) Proxy.newProxyInstance(IDebugProtocolServer.class.getClassLoader(), new Class<?>[]{IDebugProtocolServer.class}, (p, m, a) -> {
             if (m.getName().equals("setBreakpoints")) {
                 beforeRequest.run();
                 requests.add((SetBreakpointsArguments) a[0]);

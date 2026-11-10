@@ -27,13 +27,13 @@ public class GoCompletionTest extends LSPCompletionFixtureTestCase {
         assertCompletion("test.go",
                 """
                         package src
-                         
+
                         import "math/rand"
-                         
+
                         func foo() {
                           for<caret>
                         }
-                        """, """                
+                        """, """
                         {
                              "isIncomplete": true,
                              "items": [
@@ -146,17 +146,17 @@ public class GoCompletionTest extends LSPCompletionFixtureTestCase {
                                }
                              ]
                            }
-                          """
+                        """
                 , "format");
         // 2. Test new editor content after applying the first completion item
         assertApplyCompletionItem(0, """
                 package src
-                 
+
                 import (
                 	"go/format"
                 	"math/rand"
                 )
-                
+
                 func foo() {
                   format<caret>
                 }
@@ -168,16 +168,16 @@ public class GoCompletionTest extends LSPCompletionFixtureTestCase {
         assertCompletion("test.go",
                 """
                         package src
-                         
+
                         import (
                         	"math/rand"
                         )
-                         
+
                         func foo() {
                          var s = "";
                          s.<caret>
                         }
-                        """, """                
+                        """, """
                         {
                               "isIncomplete": true,
                               "items": [
@@ -327,17 +327,17 @@ public class GoCompletionTest extends LSPCompletionFixtureTestCase {
                                 }
                               ]
                             }
-                          """
+                        """
                 , "print!", "split!", "var!");
         // 2. Test new editor content after applying the first completion item
         assertApplyCompletionItem(0, """
                 package src
-                                
+
                 import (
                 	"fmt"
                 	"math/rand"
                 )
-                                
+
                 func foo() {
                  var s = "";
                  fmt.Printf("s: %v\\n", s)<caret>
@@ -350,16 +350,16 @@ public class GoCompletionTest extends LSPCompletionFixtureTestCase {
         assertCompletion("test.go",
                 """
                         package src
-                         
+
                         import (
-                        	
+
                         )
-                         
+
                         func foo() {
                          const s = "";
                          s.<caret>
                         }
-                        """, """                
+                        """, """
                         {
                                "isIncomplete": true,
                                "items": [
@@ -457,14 +457,14 @@ public class GoCompletionTest extends LSPCompletionFixtureTestCase {
                                  }
                                ]
                              }
-                          """
+                        """
                 , "print!", "var!");
         // 2. Test new editor content after applying the first completion item
         assertApplyCompletionItem(0, """
                 package src
-                                
+
                 import "fmt"
-                                
+
                 func foo() {
                  const s = "";
                  fmt.Printf("s: %v\\n", s)<caret>

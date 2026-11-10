@@ -28,9 +28,9 @@ public class LSPIJUtils_applyWorkspaceEdit_GoTest extends BasePlatformTestCase {
         Path filePath = Files.createTempFile(null, ".go");
         String content = """
                 package src
-                               
+
                 import "fmt"
-                               
+
                 func main() {
                 	fmt.Println("Hello, world")
                 }
@@ -66,9 +66,9 @@ public class LSPIJUtils_applyWorkspaceEdit_GoTest extends BasePlatformTestCase {
                 """.formatted(filePath.toUri().toASCIIString());
         String expected = """
                 package src
-                               
+
                 import "fmt"
-                               
+
                 func main() {
                 	fmt.Println(`Hello, world`)
                 }
@@ -80,9 +80,9 @@ public class LSPIJUtils_applyWorkspaceEdit_GoTest extends BasePlatformTestCase {
         Path filePath = Files.createTempFile(null, ".go");
         String content = """
                 package src
-                
+
                 import "fmt"
-                
+
                 func main() {
                 	fmt.Println("Hello, world")
                 }
@@ -196,16 +196,16 @@ public class LSPIJUtils_applyWorkspaceEdit_GoTest extends BasePlatformTestCase {
                 """.formatted(filePath.toUri().toASCIIString());
         String expected = """
                 package src
-                
+
                 import (
                 	"fmt"
                 	"os"
                 )
-                
+
                 func main() {
                 	fmt.Fprintln(os.Stdout, []any{"Hello, world"}...)
                 }
-                
+
                 """;
         assertApplyWorkspaceEdit(filePath, content, json, expected,getProject());
     }

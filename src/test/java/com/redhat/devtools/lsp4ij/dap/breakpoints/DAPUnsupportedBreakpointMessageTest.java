@@ -27,7 +27,7 @@ public class DAPUnsupportedBreakpointMessageTest extends HeavyPlatformTestCase {
 
     public void testBreakpointInFileNotDebuggableIsMarkedInvalid() throws Exception {
         var messages = new ArrayList<String>();
-        var session = (XDebugSession) Proxy.newProxyInstance(XDebugSession.class.getClassLoader(), new Class[]{XDebugSession.class}, (p, m, a) -> {
+        var session = (XDebugSession) Proxy.newProxyInstance(XDebugSession.class.getClassLoader(), new Class<?>[]{XDebugSession.class}, (p, m, a) -> {
             if (m.getName().equals("setBreakpointInvalid")) {
                 messages.add((String) a[1]);
             }

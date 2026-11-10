@@ -147,7 +147,7 @@ public class LSPOnTypeFormattingSupport extends AbstractLSPDocumentFeatureSuppor
         }
 
         // Wait for all flush operations to complete
-        return CompletableFuture.allOf(flushFutures.toArray(new CompletableFuture[0]));
+        return CompletableFuture.allOf(flushFutures.toArray(new CompletableFuture<?>[0]));
     }
 
     private static CompletableFuture<Void> flushPendingChanges(@NotNull VirtualFile file,

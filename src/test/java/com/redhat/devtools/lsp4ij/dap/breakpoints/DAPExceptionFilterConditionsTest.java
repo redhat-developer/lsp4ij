@@ -138,13 +138,13 @@ public class DAPExceptionFilterConditionsTest extends HeavyPlatformTestCase {
                 return true;
             }
         };
-        var session = (XDebugSession) Proxy.newProxyInstance(XDebugSession.class.getClassLoader(), new Class[]{XDebugSession.class}, (p, m, a) -> null);
+        var session = (XDebugSession) Proxy.newProxyInstance(XDebugSession.class.getClassLoader(), new Class<?>[]{XDebugSession.class}, (p, m, a) -> null);
         return new DAPBreakpointHandlerBase<>(DAPBreakpointType.class, session, descriptor, getProject()) {
         };
     }
 
     private static IDebugProtocolServer server(List<SetExceptionBreakpointsArguments> requests) {
-        return (IDebugProtocolServer) Proxy.newProxyInstance(IDebugProtocolServer.class.getClassLoader(), new Class[]{IDebugProtocolServer.class}, (p, m, a) -> {
+        return (IDebugProtocolServer) Proxy.newProxyInstance(IDebugProtocolServer.class.getClassLoader(), new Class<?>[]{IDebugProtocolServer.class}, (p, m, a) -> {
             if (m.getName().equals("setExceptionBreakpoints")) {
                 requests.add((SetExceptionBreakpointsArguments) a[0]);
                 return CompletableFuture.completedFuture(new SetExceptionBreakpointsResponse());

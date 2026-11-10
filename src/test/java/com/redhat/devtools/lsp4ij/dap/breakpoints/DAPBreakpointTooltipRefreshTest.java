@@ -186,7 +186,7 @@ public class DAPBreakpointTooltipRefreshTest extends HeavyPlatformTestCase {
             }
         };
         // The presentation itself is checked by the other breakpoint tests
-        var session = (XDebugSession) Proxy.newProxyInstance(XDebugSession.class.getClassLoader(), new Class[]{XDebugSession.class}, (p, m, a) -> null);
+        var session = (XDebugSession) Proxy.newProxyInstance(XDebugSession.class.getClassLoader(), new Class<?>[]{XDebugSession.class}, (p, m, a) -> null);
         if (refreshed == null) {
             return new DAPBreakpointHandlerBase<>(DAPBreakpointType.class, session, descriptor, getProject()) {};
         }
@@ -203,7 +203,7 @@ public class DAPBreakpointTooltipRefreshTest extends HeavyPlatformTestCase {
      * given message, or with no breakpoints if the message is null.
      */
     private static IDebugProtocolServer server(@Nullable String pendingMessage) {
-        return (IDebugProtocolServer) Proxy.newProxyInstance(IDebugProtocolServer.class.getClassLoader(), new Class[]{IDebugProtocolServer.class}, (p, m, a) -> {
+        return (IDebugProtocolServer) Proxy.newProxyInstance(IDebugProtocolServer.class.getClassLoader(), new Class<?>[]{IDebugProtocolServer.class}, (p, m, a) -> {
             if (m.getName().equals("setBreakpoints")) {
                 var arguments = (SetBreakpointsArguments) a[0];
                 var response = new SetBreakpointsResponse();

@@ -26,12 +26,12 @@ public class GoRenameTest extends LSPRenameFixtureTestCase {
     public void testRenameWithPrepareRenameResult() {
         // Go LS uses prepare rename response (range + placeholder)
         assertRename("test.go",
-                """                
+                """
                         package src
-                         
+
                         func m<caret>ain() {
                         }""",
-                """ 
+                """
                         {
                           "range": {
                             "start": {
@@ -47,7 +47,7 @@ public class GoRenameTest extends LSPRenameFixtureTestCase {
                         }
                         """, // Prepare rename managed by Go LS
                 "main", // expected placeholder returned by prepare rename
-                """                
+                """
                         {
                               "changes": {},
                               "documentChanges": [
@@ -74,9 +74,9 @@ public class GoRenameTest extends LSPRenameFixtureTestCase {
                                 }
                               ]
                             }""",
-                """                
+                """
                         package src
-                         
+
                         func foo() {
                         }""");
     }
@@ -85,18 +85,18 @@ public class GoRenameTest extends LSPRenameFixtureTestCase {
         // Go LS uses prepare rename default behavior which delegates
         // prepare rename to the LSP client (word range at)
         assertRename("test.go",
-                """                
+                """
                         package src
-                         
+
                         func m<caret>ain() {
                         }""",
-                """ 
+                """
                         {
                           "defaultBehavior": true
                         }
                         """, // Prepare rename managed by LSP4IJ (client side)
                 "main", // expected placeholder returned by prepare rename
-                """                
+                """
                         {
                               "changes": {},
                               "documentChanges": [
@@ -123,9 +123,9 @@ public class GoRenameTest extends LSPRenameFixtureTestCase {
                                 }
                               ]
                             }""",
-                """                
+                """
                         package src
-                         
+
                         func foo() {
                         }""");
     }
@@ -135,9 +135,9 @@ public class GoRenameTest extends LSPRenameFixtureTestCase {
         // and it returns a null prepare rename when
         // user tries to rename keyword like 'func'
         assertRenameWithError("test.go",
-                """                
+                """
                         package src
-                         
+
                         f<caret>unc main() {
                         }""",
                 PREPARE_RENAME_NO_RESULT,
@@ -150,14 +150,14 @@ public class GoRenameTest extends LSPRenameFixtureTestCase {
         // Emulate that Go LS doesn't support prepare rename and throws an exception
         // when element to rename cannot be renamed.
         assertRenameWithError("test.go",
-                """                
+                """
                         package src
-                         
+
                         f<caret>unc main() {
                         }""",
                 null,
                 "func",
-                """ 
+                """
                         {
                            "code": -32602,
                            "message": "no identifier found"

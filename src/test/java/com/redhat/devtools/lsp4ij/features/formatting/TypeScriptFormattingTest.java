@@ -25,7 +25,7 @@ public class TypeScriptFormattingTest extends LSPFormattingFixtureTestCase {
     public void testFormatting() {
         // 1. Test completion items response
         assertFormatting("test.ts",
-                """                
+                """
                            function foo() {
                         const s = ''
                         }""",
@@ -58,8 +58,8 @@ public class TypeScriptFormattingTest extends LSPFormattingFixtureTestCase {
                             "newText": "    "
                           }
                         ]
-                                        """,
-                """                
+                        """,
+                """
                         function foo() {
                             const s = ''
                         }""");

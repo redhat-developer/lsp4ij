@@ -25,11 +25,11 @@ public class RustRenameTest extends LSPRenameFixtureTestCase {
     public void testRenameWithPrepareNameRange() {
         // Rust LS uses range as prepare rename response
         assertRename("test.rs",
-                """                
+                """
                         fn m<caret>ain() {
-                              
+
                         }""",
-                """ 
+                """
                         {
                           "start": {
                             "line": 0,
@@ -42,7 +42,7 @@ public class RustRenameTest extends LSPRenameFixtureTestCase {
                         }
                         """, // Prepare rename managed by Rust LS
                 "main", // expected placeholder returned by prepare rename
-                """                
+                """
                         {
                              "changes": {},
                              "documentChanges": [
@@ -69,20 +69,20 @@ public class RustRenameTest extends LSPRenameFixtureTestCase {
                                }
                              ]
                            }""",
-                """                
+                """
                         fn foo() {
-                              
+
                         }""");
     }
 
     public void testErrorWhilePrepareRenaming() {
         // Rust LS throws a ResponseError exception when prepare rename is not valid.
         assertRenameWithError("test.rs",
-                """                
+                """
                         f|n main() {
-                              
+
                         }""",
-                """ 
+                """
                         {
                            "code": -32602,
                            "message": "No references found at position"

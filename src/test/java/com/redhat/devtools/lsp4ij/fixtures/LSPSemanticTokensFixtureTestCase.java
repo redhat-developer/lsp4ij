@@ -72,7 +72,7 @@ public abstract class LSPSemanticTokensFixtureTestCase extends LSPCodeInsightFix
 
             MockLanguageServer.INSTANCE.setTimeToProceedQueries(200);
 
-            var serverCapabilities = MockLanguageServer.INSTANCE.defaultServerCapabilities();
+            var serverCapabilities = MockLanguageServer.defaultServerCapabilities();
             serverCapabilities.setSemanticTokensProvider(semanticProvider);
             MockLanguageServer.reset(() -> serverCapabilities);
             MockLanguageServer.INSTANCE.setSemanticTokens(semanticTokens);
