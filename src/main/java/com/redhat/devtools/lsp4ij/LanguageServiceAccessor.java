@@ -973,9 +973,8 @@ public class LanguageServiceAccessor implements Disposable {
                         return null;
                     }
                     var url = file.getUrl();
-                    // The ordinary request, kept to this definition: unlike a request for one definition, it also
-                    // takes a definition that matches the file asynchronously
-                    getLanguageServers(psiFile, features -> features.getServerDefinition() == serverDefinition, null)
+                    // A request for this definition only, so that no other definition chooses an instance for the file
+                    getLanguageServers(psiFile, null, null, serverDefinition)
                             .whenComplete((servers, failure) -> {
                                 if (failure != null) {
                                     // As an asynchronous match that fails: the file would stay without the language
@@ -989,13 +988,15 @@ public class LanguageServiceAccessor implements Disposable {
                                 }
                                 ApplicationManager.getApplication().invokeLater(() -> {
                                     // The request counts the closes of the editors from its start, after the file was
-                                    // found open, so a file whose last editor closed in between is disconnected here
+                                    // found open, so a file whose last editor closed in between is disconnected here.
+                                    // An operation that connected the file in a scope since keeps it until its scope
+                                    // ends
                                     if (isOpen(file)) {
                                         return;
                                     }
                                     for (var server : servers) {
                                         var languageServer = server.getServerWrapper();
-                                        languageServer.disconnect(file, !languageServer.isDisposed());
+                                        languageServer.disconnectUnlessScoped(file, !languageServer.isDisposed());
                                     }
                                 }, ModalityState.any());
                             });

@@ -14,6 +14,7 @@ import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.ModalityState;
 import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.fileEditor.FileEditorManager;
+import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.vfs.VfsUtilCore;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.openapi.vfs.newvfs.events.VFileEvent;
@@ -23,6 +24,7 @@ import com.intellij.util.concurrency.AppExecutorUtil;
 import com.redhat.devtools.lsp4ij.features.files.AbstractLSPFileListener;
 import org.eclipse.lsp4j.*;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -30,6 +32,9 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.CancellationException;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 
 /**
  * {@code LSPFileListener} bridges IntelliJ Virtual File System (VFS) events
@@ -117,46 +122,109 @@ class LSPFileListener extends AbstractLSPFileListener {
     }
 
     void reconnectMovedDocument(@NotNull VirtualFile file) {
-        if (languageServerWrapper.getInstanceRoot() == null) {
-            ApplicationManager.getApplication().invokeLater(() -> reconnectMovedDocument(languageServerWrapper, file), ModalityState.any());
-            return;
-        }
-        // The new place of the document can belong to another language server instance or to none. The workspace
-        // folder strategy can need read access and do I/O, so it is asked in the background, after the move
+        // The definition may no longer match the document at the new place of its file, which can also belong to
+        // another language server instance or to none. A document matcher and the workspace folder strategy can need
+        // read access and do I/O, so they are asked in the background, after the move, for the same place
         var serverDefinition = languageServerWrapper.getServerDefinition();
         var accessor = LanguageServiceAccessor.getInstance(languageServerWrapper.getProject());
-        // A document that was closed meanwhile gets no instance
+        boolean instances = languageServerWrapper.getInstanceRoot() != null;
+        // A document that was closed meanwhile is not matched, and gets no instance
         ReadAction.nonBlocking(() -> isOpenDocument(languageServerWrapper, file)
-                        ? accessor.chooseInstance(file, serverDefinition)
+                        ? new NewPlace(file.getUrl(), accessor.isFileMappedToServer(file, serverDefinition),
+                        instances ? accessor.chooseInstance(file, serverDefinition) : null)
                         : null)
                 .expireWith(languageServerWrapper)
                 .submit(AppExecutorUtil.getAppExecutorService())
-                .onSuccess(choice -> ApplicationManager.getApplication().invokeLater(() -> {
-                    if (choice == null || !isOpenDocument(languageServerWrapper, file)) {
-                        // Nor does a document that was closed since the choice, or the document of a language server
-                        // that is gone meanwhile, as when its definition was removed
+                .onSuccess(place -> {
+                    if (place == null) {
+                        stopIfIdle(languageServerWrapper);
                         return;
                     }
-                    if (!choice.url().equals(file.getUrl())) {
-                        // The document moved again before it was connected, so no instance saw that move: its new
-                        // place decides again
-                        reconnectMovedDocument(file);
-                        return;
-                    }
-                    // Only now that the document is still there: an instance created for a place that it left before
-                    // it was connected would stay without a document
-                    var instance = accessor.getOrCreateInstanceOf(file, serverDefinition, choice);
-                    if (instance != null && instance.isEnabled()) {
-                        // An instance that a stop switched off gets no moved document, as it gets no opened one
-                        reconnectMovedDocument(instance, file);
-                    }
-                }, ModalityState.any()));
+                    // A document matcher can answer later
+                    place.matched().whenComplete((matched, failure) -> ApplicationManager.getApplication().invokeLater(() -> {
+                        if (!isOpenDocument(languageServerWrapper, file)) {
+                            // Nor is a document that was closed since connected, or the document of a language server
+                            // that is gone meanwhile, as when its definition was removed
+                            stopIfIdle(languageServerWrapper);
+                            return;
+                        }
+                        if (!place.url().equals(file.getUrl())) {
+                            // The document moved again before it was connected, so no language server saw that move:
+                            // its new place decides again
+                            reconnectMovedDocument(file);
+                            return;
+                        }
+                        if (failure != null) {
+                            reportMatchFailure(place.url(), failure);
+                            stopIfIdle(languageServerWrapper);
+                            return;
+                        }
+                        if (!matched) {
+                            // The definition no longer matches the file at its new place
+                            stopIfIdle(languageServerWrapper);
+                            return;
+                        }
+                        // Only now that the document is still there: an instance created for a place that it left
+                        // before it was connected would stay without a document
+                        var languageServer = place.choice() != null
+                                ? accessor.getOrCreateInstanceOf(file, serverDefinition, place.choice())
+                                : languageServerWrapper;
+                        if (languageServer != languageServerWrapper) {
+                            // The document goes to the instance of its new place, or to none
+                            stopIfIdle(languageServerWrapper);
+                        }
+                        if (languageServer != null) {
+                            reconnectMovedDocument(languageServer, file);
+                        }
+                    }, ModalityState.any()));
+                })
+                .onError(failure -> {
+                    // A document matcher or the workspace folder strategy that fails before it answers
+                    reportMatchFailure(file.getUrl(), failure);
+                    stopIfIdle(languageServerWrapper);
+                });
+    }
+
+    /**
+     * Reports a failure to match a moved document, as of a document matcher or a workspace folder strategy that fails:
+     * the document isn't connected again, and nothing else reports it. A cancellation isn't reported.
+     */
+    private void reportMatchFailure(@NotNull String url, @NotNull Throwable failure) {
+        var cause = failure instanceof CompletionException ? failure.getCause() : failure;
+        if (!(cause instanceof CancellationException || cause instanceof ProcessCanceledException)) {
+            LOGGER.warn("Cannot match moved document {} to '{}'", url,
+                    languageServerWrapper.getServerDefinition().getDisplayName(), failure);
+        }
+    }
+
+    /**
+     * Lets a language server that a moved document doesn't come back to stop once it has no document left, as the
+     * close of the last editor of a document does: the move disconnected the document without that, to connect it
+     * again.
+     */
+    private static void stopIfIdle(@NotNull LanguageServerWrapper languageServer) {
+        if (!languageServer.isDisposed() && languageServer.isActive()) {
+            languageServer.maybeShutdown();
+        }
+    }
+
+    /**
+     * The new place of a moved document: its URL, whether the definition matches the file there, and for a definition
+     * with several instances, the instance chosen for it.
+     */
+    private record NewPlace(@NotNull String url, @NotNull CompletableFuture<Boolean> matched,
+                            @Nullable LanguageServiceAccessor.InstanceChoice choice) {
     }
 
     private void reconnectMovedDocument(@NotNull LanguageServerWrapper languageServer, @NotNull VirtualFile file) {
-        if (!isOpenDocument(languageServer, file) || !languageServer.isEnabled()) {
+        if (!isOpenDocument(languageServer, file) || !languageServer.isEnabled()
+                || !languageServer.getClientFeatures().isEnabled(file)) {
             // A language server that a stop switched off meanwhile gets no moved document, as it gets no opened one:
-            // the connection would start it again
+            // the connection would start it again. Nor does one whose client features leave out the file at its new
+            // place, as a request leaves it out
+            if (languageServer == languageServerWrapper) {
+                stopIfIdle(languageServer);
+            }
             return;
         }
         URI uri = languageServer.toUri(file);
@@ -170,14 +238,23 @@ class LSPFileListener extends AbstractLSPFileListener {
                 return;
             }
             boolean open = isOpenDocument(languageServer, file);
-            if (!open || !Objects.equals(uri, languageServer.toUri(file))) {
+            boolean moved = !Objects.equals(uri, languageServer.toUri(file));
+            if (!open || moved) {
                 var opened = languageServer.getOpenedDocument(uri);
                 if (opened != null && opened.getFile() == file) {
-                    languageServer.disconnect(uri, false);
+                    if (moved) {
+                        languageServer.disconnect(uri, false);
+                    } else {
+                        // The last editor of the file closed meanwhile. An operation that connected the file in a
+                        // scope since keeps it until its scope ends
+                        languageServer.disconnectUnlessScoped(uri, false);
+                    }
                 }
                 if (open) {
                     // The file moved again: its new place decides again which instance gets it
                     reconnectMovedDocument(file);
+                } else {
+                    stopIfIdle(languageServer);
                 }
             } else if (failure != null) {
                 LOGGER.warn("Cannot reconnect moved document {}", uri, failure);
