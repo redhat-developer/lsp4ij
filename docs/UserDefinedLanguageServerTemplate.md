@@ -50,8 +50,8 @@ The template descriptor (`template.json`) is a JSON file used to define:
 
 * the server ID and name
 * the command to start the server
-* the socket of a language server which doesn't talk LSP over its standard input and output
-* the transports which the language server supports
+* the socket of a language server which doesn't talk LSP over its standard input and output (optional, experimental)
+* the transports which the language server supports (optional, experimental)
 * the file type mappings
 
 #### Example `template.json`
@@ -104,8 +104,9 @@ The template descriptor (`template.json`) is a JSON file used to define:
 
 #### Socket
 
-A language server which talks LSP over a TCP socket instead of its standard input and output has a `socket`, which is
-experimental, whose `mode` is one of the [transports](./UserDefinedLanguageServer.md#transport):
+`socket` is optional: without it, LSP4IJ talks to the language server over its standard input and output. A language
+server which talks LSP over a TCP socket instead has a `socket`, which is experimental, whose `mode` is one of the
+[transports](./UserDefinedLanguageServer.md#transport):
 
 * `attach`: LSP4IJ attaches to a language server which runs already and listens on `host` (the loopback address by
   default) and `port`.
@@ -140,11 +141,11 @@ does instead:
 
 #### Transports
 
-A template can list the transports which its language server supports, in `transports`, which is experimental, each
-with its `mode` (`stdio` or one of the socket modes above) and the `argument` of the command for it. The New Language
-Server dialog then helps with the transport: Socket is disabled for a language server which lists only `stdio`, and
-for one which lists a socket mode, a hint below the socket modes names the mode and the argument. Without
-`transports`, every transport can be chosen.
+`transports` is optional. A template can list the transports which its language server supports, in `transports`,
+which is experimental, each with its `mode` (`stdio` or one of the socket modes above) and the `argument` of the
+command for it. The New Language Server dialog then helps with the transport: Socket is disabled for a language server
+which lists only `stdio`, and for one which lists a socket mode, a hint below the socket modes names the mode and the
+argument. Without `transports`, every transport can be chosen.
 
 | Field      | Value                                                                 | Required |
 |------------|-----------------------------------------------------------------------|----------|
