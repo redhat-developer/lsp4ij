@@ -8,10 +8,15 @@
 package com.redhat.devtools.lsp4ij.internal;
 
 import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.application.ex.ApplicationEx;
 import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.util.Disposer;
+import com.intellij.openapi.util.ThrowableComputable;
 import com.intellij.testFramework.fixtures.BasePlatformTestCase;
 
+import java.lang.reflect.Method;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -41,6 +46,33 @@ public class ApplicationUtilsTest extends BasePlatformTestCase {
         assertFalse(nonBlocking.get());
     }
 
+    /**
+     * On the EDT without read access, as the settings page of a language server was in IntelliJ 2026.3, both overloads
+     * take the write-intent lock, which gives them read access, rather than a read lock. IntelliJ 2024.2 can take the write-intent lock away from the EDT for a while, with
+     * {@code ApplicationEx.runUnlockingIntendedWrite}, which IntelliJ 2026.3 no longer has: there, this checks nothing.
+     */
+    public void testAReadActionOnTheEdtWithoutReadAccessTakesTheWriteIntentLock() throws Exception {
+        Method unlockingIntendedWrite;
+        try {
+            unlockingIntendedWrite = ApplicationEx.class.getMethod("runUnlockingIntendedWrite", ThrowableComputable.class);
+        } catch (NoSuchMethodException laterVersion) {
+            return;
+        }
+        var application = ApplicationManager.getApplication();
+        var access = new ArrayList<Boolean>();
+
+        unlockingIntendedWrite.invoke(application, (ThrowableComputable<Object, RuntimeException>) () -> {
+            access.add(application.isReadAccessAllowed());
+            access.add(ApplicationUtils.runCancellableReadAction(() -> hasWriteIntentLock(), getTestRootDisposable()));
+            var writeIntent = new AtomicBoolean();
+            ApplicationUtils.runCancellableReadAction(() -> writeIntent.set(hasWriteIntentLock()), getTestRootDisposable());
+            access.add(writeIntent.get());
+            return null;
+        });
+
+        assertEquals("The EDT has no read access, and both overloads take the write-intent lock", List.of(false, true, true), access);
+    }
+
     public void testAReadActionOffTheEdtIsANonBlockingReadAction() throws Exception {
         var nonBlocking = ApplicationManager.getApplication().executeOnPooledThread(
                 () -> ApplicationUtils.runCancellableReadAction(() -> isNonBlockingReadAction(), getTestRootDisposable())
@@ -63,6 +95,15 @@ public class ApplicationUtilsTest extends BasePlatformTestCase {
         }).get(10, TimeUnit.SECONDS);
 
         assertNotNull("A read action whose disposable is disposed must not run", cancellation);
+    }
+
+    /**
+     * Returns whether the caller holds the write-intent lock, and checks that it has read access.
+     */
+    private static boolean hasWriteIntentLock() {
+        var application = ApplicationManager.getApplication();
+        assertTrue("The action must have read access", application.isReadAccessAllowed());
+        return application.isWriteIntentLockAcquired();
     }
 
     /**

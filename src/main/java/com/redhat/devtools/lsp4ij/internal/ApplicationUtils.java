@@ -13,6 +13,7 @@ package com.redhat.devtools.lsp4ij.internal;
 import com.intellij.openapi.Disposable;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.ReadAction;
+import com.intellij.openapi.application.WriteIntentReadAction;
 import com.intellij.openapi.util.Computable;
 import org.jetbrains.annotations.NotNull;
 
@@ -48,9 +49,11 @@ public class ApplicationUtils {
      * UI Freezes and the Dangers of Non-Cancellable Read Actions in Background Threads</a>
      * </p>
      * <p>
-     * On the EDT, which can't run a non-blocking read action synchronously, this runs a plain read action. In IntelliJ
-     * 2026.3, the EDT doesn't always have read access, so a caller that reads directly only when it has read access gets
-     * here on the EDT too.
+     * On the EDT, which can't run a non-blocking read action synchronously, this runs the action at once if the EDT has
+     * read access, and otherwise in a {@link WriteIntentReadAction}. Since IntelliJ 2026.1, the EDT doesn't always hold
+     * the write-intent lock, which lets it read, so a caller that reads directly only when it has read access gets here
+     * on the EDT too. JetBrains advises such code on the EDT to take that lock: it holds off no write action, which runs
+     * on the EDT, unlike a read action in a background thread, which this method keeps non-blocking.
      * </p>
      *
      * @param action           the read action to execute
@@ -59,9 +62,13 @@ public class ApplicationUtils {
      * @return the result of the read action
      */
     public static <T> T runCancellableReadAction(@NotNull Callable<T> action, @NotNull Disposable parentDisposable) {
-        if (ApplicationManager.getApplication().isDispatchThread()) {
-            // Not ReadAction.compute, which IntelliJ 2026.3 deprecates
-            return ApplicationManager.getApplication().runReadAction((Computable<T>) () -> call(action));
+        var application = ApplicationManager.getApplication();
+        if (application.isDispatchThread()) {
+            // With read access, the action runs at once: in a read action, taking the write-intent lock could deadlock.
+            // Without it, the action takes the write-intent lock, as JetBrains advises for the EDT, not a read lock
+            return application.isReadAccessAllowed()
+                    ? call(action)
+                    : WriteIntentReadAction.compute((Computable<T>) () -> call(action));
         }
         return ReadAction
                 .nonBlocking(action)
@@ -81,15 +88,21 @@ public class ApplicationUtils {
      * UI Freezes and the Dangers of Non-Cancellable Read Actions in Background Threads</a>
      * </p>
      * <p>
-     * On the EDT, this runs a plain read action, as {@link #runCancellableReadAction(Callable, Disposable)} does.
+     * On the EDT, this runs the action at once if the EDT has read access, and otherwise in a
+     * {@link WriteIntentReadAction}, as {@link #runCancellableReadAction(Callable, Disposable)} does.
      * </p>
      *
      * @param action           the read action to execute
      * @param parentDisposable the parent disposable to expire the read action when disposed
      */
     public static void runCancellableReadAction(@NotNull Runnable action, @NotNull Disposable parentDisposable) {
-        if (ApplicationManager.getApplication().isDispatchThread()) {
-            ApplicationManager.getApplication().runReadAction(action);
+        var application = ApplicationManager.getApplication();
+        if (application.isDispatchThread()) {
+            if (application.isReadAccessAllowed()) {
+                action.run();
+            } else {
+                WriteIntentReadAction.run(action);
+            }
             return;
         }
         ReadAction.nonBlocking(() -> {
