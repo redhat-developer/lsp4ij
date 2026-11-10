@@ -173,7 +173,7 @@ You can have 2 kinds of errors:
  * an error coming from the language server.
 
 For the second case, you can customize the error reporting with the `Debug / Error reporting` combo box 
-by opening the `Languages & Frameworks / Language Servers` preferences:
+by opening the `Languages & Frameworks / Language Servers (LSP4IJ)` preferences:
 
 ![Error reporting combo box](./docs/images/troubleshooting/LanguageServerErrorReportingSetting.png)
 
