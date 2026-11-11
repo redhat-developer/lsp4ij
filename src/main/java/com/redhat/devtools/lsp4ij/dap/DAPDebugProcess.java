@@ -226,7 +226,7 @@ public class DAPDebugProcess extends XDebugProcess implements Disposable {
 
             @Override
             public void run(@NotNull ProgressIndicator indicator) {
-                DAPDebugProcess.this.status = Status.STARTING;
+                advanceStatus(Status.STARTING);
                 print(taskTitle, ConsoleViewContentType.SYSTEM_OUTPUT);
 
                 // The Debug server is launched, create a DAP client and connect to the server when it is ready:
@@ -265,7 +265,7 @@ public class DAPDebugProcess extends XDebugProcess implements Disposable {
 
                         // Wait for DAP client is connecting to the DAP server...
                         ProgressIndicatorUtils.awaitWithCheckCanceled(connectToServerFuture);
-                        DAPDebugProcess.this.status = Status.STARTED;
+                        advanceStatus(Status.STARTED);
 
                         // Refresh Threads panel
                         parentClient
@@ -446,6 +446,20 @@ public class DAPDebugProcess extends XDebugProcess implements Disposable {
             }
             status = Status.STOPPING;
             return true;
+        }
+    }
+
+    /**
+     * Advances a starting debug process to the given status, unless it has been asked to stop meanwhile: a stop which
+     * runs while the debug process starts must not be undone.
+     *
+     * @param next the next status, STARTING or STARTED.
+     */
+    private void advanceStatus(@NotNull Status next) {
+        synchronized (statusLock) {
+            if (status != Status.STOPPING && status != Status.STOPPED) {
+                status = next;
+            }
         }
     }
 
