@@ -690,6 +690,24 @@ public class DAPDebugProcess extends XDebugProcess implements Disposable {
     }
 
     /**
+     * Returns the IntelliJ breakpoint, a line, a function or a data breakpoint, to which one of the DAP servers gave
+     * the given DAP breakpoint id, and null otherwise.
+     *
+     * @param id the DAP breakpoint id.
+     * @return the IntelliJ breakpoint of the given DAP breakpoint id, and null otherwise.
+     * @deprecated each session of a tree numbers its breakpoints itself, so two sessions can give two breakpoints the
+     * same id: use {@link #findBreakpointById(IDebugProtocolServer, Integer)} with the DAP server which names it.
+     */
+    @Deprecated
+    public @Nullable XBreakpoint<?> findBreakpointById(@Nullable Integer id) {
+        XBreakpoint<?> breakpoint = breakpointHandler.findBreakpointById(id);
+        if (breakpoint == null) {
+            breakpoint = functionBreakpointHandler.findBreakpointById(id);
+        }
+        return breakpoint != null ? breakpoint : dataBreakpointHandler.findBreakpointById(id);
+    }
+
+    /**
      * Returns the temporary breakpoint of "Run to Cursor", which the program removes when it next stops.
      *
      * @return the temporary breakpoint of "Run to Cursor".
