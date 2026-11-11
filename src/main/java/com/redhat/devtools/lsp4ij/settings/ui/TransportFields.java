@@ -302,10 +302,17 @@ final class TransportFields {
 
     /**
      * Returns true if the given text is an IP address, IPv6 too, or a host name: letters, digits, hyphens and
-     * underscores, in labels which dots separate. A scheme such as {@code http://}, a port, or a space fails it.
+     * underscores, in labels which dots separate, the last of which isn't a number, so that a mistyped IP address such
+     * as {@code 999.1.1.1} fails it, and a host name such as {@code 3d-printer} passes. A scheme such as
+     * {@code http://}, a port, or a space fails it too.
      */
     private static boolean isHost(@NotNull String text) {
-        return InetAddresses.isInetAddress(text) || HOST_NAME.matcher(text).matches();
+        if (InetAddresses.isInetAddress(text)) {
+            return true;
+        }
+        String name = text.endsWith(".") ? text.substring(0, text.length() - 1) : text;
+        String lastLabel = name.substring(name.lastIndexOf('.') + 1);
+        return HOST_NAME.matcher(text).matches() && !lastLabel.chars().allMatch(Character::isDigit);
     }
 
     private @NotNull JBRadioButton modeButton(@NotNull UserDefinedTransport.Mode mode) {

@@ -13,13 +13,20 @@
  *******************************************************************************/
 package com.redhat.devtools.lsp4ij.launching.ui;
 
+import com.intellij.notification.Notification;
+import com.intellij.notification.NotificationType;
+import com.intellij.notification.Notifications;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.project.ProjectManager;
+import com.redhat.devtools.lsp4ij.LSPNotificationConstants;
+import com.redhat.devtools.lsp4ij.LanguageServerBundle;
 import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
+import com.redhat.devtools.lsp4ij.console.explorer.actions.EditServerAction;
 import com.redhat.devtools.lsp4ij.installation.CommandLineUpdater;
 import com.redhat.devtools.lsp4ij.launching.UserDefinedLanguageServerSettings;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinitionListener;
 import com.redhat.devtools.lsp4ij.server.definition.launching.UserDefinedLanguageServerDefinition;
+import com.redhat.devtools.lsp4ij.server.definition.launching.UserDefinedTransport;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -48,8 +55,9 @@ public class UICommandLineUpdater implements CommandLineUpdater {
     @Override
     public void setCommandLine(String commandLine) {
         // The installer's command is written for the standard input and output, unless it takes the port
-        var transport = definition.getTransport().forInstalledCommand(commandLine);
-        if (Objects.equals(commandLine, getCommandLine()) && transport.equals(definition.getTransport())) {
+        var previousTransport = definition.getTransport();
+        var transport = previousTransport.forInstalledCommand(commandLine);
+        if (Objects.equals(commandLine, getCommandLine()) && transport.equals(previousTransport)) {
             return;
         }
         definition.setCommandLine(commandLine);
@@ -72,6 +80,22 @@ public class UICommandLineUpdater implements CommandLineUpdater {
                 sendNotification(project);
             }
         }
+        if (previousTransport.mode() != UserDefinedTransport.Mode.STDIO && transport.mode() == UserDefinedTransport.Mode.STDIO) {
+            warnOfTheSwitchToStandardInputAndOutput();
+        }
+    }
+
+    /**
+     * Tells the user that the installer's command doesn't take the port, so that the language server now runs over its
+     * standard input and output instead of the socket it had.
+     */
+    private void warnOfTheSwitchToStandardInputAndOutput() {
+        var notification = new Notification(LSPNotificationConstants.LSP4IJ_GENERAL_NOTIFICATIONS_ID,
+                definition.getDisplayName(),
+                LanguageServerBundle.message("language.server.installer.transport.stdio"),
+                NotificationType.WARNING);
+        notification.addAction(new EditServerAction(definition));
+        Notifications.Bus.notify(notification, project);
     }
 
     private void sendNotification(@NotNull Project project) {

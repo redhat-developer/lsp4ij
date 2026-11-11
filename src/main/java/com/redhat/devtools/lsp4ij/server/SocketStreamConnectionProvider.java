@@ -30,6 +30,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.ConnectException;
+import java.net.Inet4Address;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
@@ -280,9 +281,13 @@ public class SocketStreamConnectionProvider implements StreamConnectionProvider,
             // The language server runs already: it listens, or it doesn't
             try {
                 install(connectOnce(port, connectTimeout()));
+            } catch (ConnectException refused) {
+                throw new CannotStartProcessException("Nothing listens on " + address(port) + " (" + refused.getMessage()
+                        + "): " + this + ipv6Hint(" Set the host to ::1 for one which listens on ::1."));
             } catch (SocketTimeoutException noAnswer) {
-                throw new CannotStartProcessException("No answer from " + host + ":" + port + " within "
-                        + connectTimeout().toSeconds() + " s: " + this);
+                throw new CannotStartProcessException("No answer from " + address(port) + " within "
+                        + connectTimeout().toSeconds() + " s: " + this
+                        + ipv6Hint(" Set the host to ::1 for one which listens on ::1."));
             }
             return;
         }
@@ -302,8 +307,9 @@ public class SocketStreamConnectionProvider implements StreamConnectionProvider,
             } catch (ConnectException notListeningYet) {
                 long remaining = TimeUnit.NANOSECONDS.toMillis(deadline - System.nanoTime());
                 if (remaining <= 0) {
-                    throw new CannotStartProcessException("The language server didn't accept a connection on port "
-                            + port + " within " + startTimeout.toSeconds() + " s: " + this);
+                    throw new CannotStartProcessException("The language server didn't accept a connection on "
+                            + address(port) + " within " + startTimeout.toSeconds() + " s: " + this
+                            + ipv6Hint(" Let it listen on " + host + " instead."));
                 }
                 boolean ended = handler.waitFor(Math.min(pause, remaining));
                 checkNotStopped();
@@ -313,6 +319,26 @@ public class SocketStreamConnectionProvider implements StreamConnectionProvider,
                 pause = Math.min(pause * 2, MAX_RETRY_PAUSE_MILLIS);
             }
         }
+    }
+
+    /**
+     * Returns the host and the given port, as {@code host:port}, or {@code [host]:port} for an IPv6 address.
+     */
+    private @NotNull String address(int port) {
+        return (host.indexOf(':') >= 0 ? "[" + host + "]" : host) + ":" + port;
+    }
+
+    /**
+     * Returns, when LSP4IJ connects to the IPv4 loopback address, a hint that the language server may listen on the IPv6
+     * loopback address, ::1, only, as Node.js may do for {@code localhost}, followed by the given advice; and an empty
+     * string otherwise.
+     */
+    private @NotNull String ipv6Hint(@NotNull String advice) {
+        boolean ipv4Loopback = host.equalsIgnoreCase("localhost") || host.startsWith("127.");
+        return ipv4Loopback
+                ? " A language server which listens on localhost may listen on ::1 only, the IPv6 loopback address, to"
+                + " which LSP4IJ doesn't connect." + advice
+                : "";
     }
 
     private void checkNothingListens(int port) throws CannotStartProcessException {
@@ -370,8 +396,12 @@ public class SocketStreamConnectionProvider implements StreamConnectionProvider,
             server.setSoTimeout(timeoutMillis());
             accepted = server.accept();
         } catch (SocketTimeoutException e) {
-            throw new CannotStartProcessException("The language server didn't connect to port " + boundPort
-                    + " within " + startTimeout.toSeconds() + " s: " + this);
+            throw new CannotStartProcessException("The language server didn't connect to "
+                    + server.getInetAddress().getHostAddress() + ":" + boundPort + " within " + startTimeout.toSeconds()
+                    + " s: " + this + (server.getInetAddress() instanceof Inet4Address
+                    ? " A language server which connects to localhost may try ::1, the IPv6 loopback address, on which"
+                    + " LSP4IJ doesn't listen. Let it connect to " + server.getInetAddress().getHostAddress() + " instead."
+                    : ""));
         } catch (SocketException e) {
             checkNotStopped();
             if (handler != null && handler.isProcessTerminated()) {
