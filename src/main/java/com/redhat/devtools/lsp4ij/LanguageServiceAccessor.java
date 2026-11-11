@@ -968,7 +968,10 @@ public class LanguageServiceAccessor implements Disposable {
         }
         boolean accepted = false;
         try {
-            accepted = beforeStartingServerFilter == null || beforeStartingServerFilter.test(instance.getClientFeatures());
+            // The client features of a new instance can decide by its root, so only they can tell whether it takes the
+            // file: an instance that leaves out the file which it is created for would stay without a document
+            accepted = (beforeStartingServerFilter == null || beforeStartingServerFilter.test(instance.getClientFeatures()))
+                    && (!created || instance.getClientFeatures().isEnabled(file));
         } finally {
             // As for a language server without instances: also when the filter throws, as a cancellation does
             if (created && !accepted) {
