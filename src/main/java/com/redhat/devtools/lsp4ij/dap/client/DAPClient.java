@@ -65,6 +65,7 @@ import java.util.*;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -120,6 +121,9 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
     private IDebugProtocolServer debugProtocolServer;
     private @NotNull
     final List<DAPClient> childrenClient;
+    // Child sessions which sent 'terminated': out of childrenClient so they get no more requests, kept to be disposed
+    private final List<DAPClient> terminatedChildren = new CopyOnWriteArrayList<>();
+    private volatile boolean terminatedReceived;
     private boolean sentTerminateRequest;
     // Whether the loaded sources and modules were asked for. They are asked for at the first stop, and then follow the
     // 'loadedSource' and 'module' events: asking at each stop would get all of them again at each step.
@@ -141,7 +145,7 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
         this.debugMode = debugMode;
         this.serverTrace = serverTrace;
         this.parentClient = parentClient;
-        this.childrenClient = new ArrayList<>();
+        this.childrenClient = new CopyOnWriteArrayList<>();
     }
 
     @NotNull
@@ -801,8 +805,44 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
 
     @Override
     public void terminated(TerminatedEventArguments args) {
+        // A debug adapter may run a session per target, as vscode-js-debug does with 'startDebugging': when an iframe or
+        // a worker goes away only its session terminates, and the debug process must go on for the others
+        terminatedReceived = true;
+        DAPClient root = this;
+        while (root.parentClient != null) {
+            root = root.parentClient;
+        }
+        if (parentClient != null) {
+            // In one list or the other at any time, so that a parent being disposed meanwhile disposes it
+            parentClient.terminatedChildren.add(this);
+            parentClient.childrenClient.remove(this);
+        }
         // TODO : manage args.getRestart()
-        debugProcess.stop();
+        if (root.hasLiveSession()) {
+            return;
+        }
+        root.debugProcess.stop();
+    }
+
+    /**
+     * Returns true when this session, or a session below it, has not sent 'terminated' yet.
+     */
+    private boolean hasLiveSession() {
+        if (!terminatedReceived) {
+            return true;
+        }
+        for (DAPClient child : childrenClient) {
+            if (child.hasLiveSession()) {
+                return true;
+            }
+        }
+        // A terminated child may still have live children of its own
+        for (DAPClient child : terminatedChildren) {
+            if (child.hasLiveSession()) {
+                return true;
+            }
+        }
+        return false;
     }
 
     @Override
@@ -825,6 +865,9 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
         RunInTerminalManager.getInstance(getProject()).releaseClientTerminals(this);
         threadPool.shutdown();
         for (DAPClient child : childrenClient) {
+            child.dispose();
+        }
+        for (DAPClient child : terminatedChildren) {
             child.dispose();
         }
     }
