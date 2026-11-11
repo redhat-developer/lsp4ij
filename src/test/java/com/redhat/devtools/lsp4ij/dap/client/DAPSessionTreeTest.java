@@ -207,10 +207,11 @@ public class DAPSessionTreeTest extends HeavyPlatformTestCase {
         // The sessions which no test has taken yet, and all of them
         private final LinkedBlockingQueue<Session> sessions = new LinkedBlockingQueue<>();
         private final List<Session> all = new CopyOnWriteArrayList<>();
+        private final Future<?> accepting;
 
         SessionServer() throws IOException {
             this.serverSocket = new ServerSocket(0, 4, InetAddress.getLoopbackAddress());
-            executor.execute(() -> {
+            this.accepting = executor.submit(() -> {
                 try {
                     while (!serverSocket.isClosed()) {
                         var session = new Session(serverSocket.accept(), executor);
@@ -237,6 +238,8 @@ public class DAPSessionTreeTest extends HeavyPlatformTestCase {
                         () -> all.stream().allMatch(session -> session.listening.isDone()), BOUND_SECONDS);
             } finally {
                 serverSocket.close();
+                // A connection accepted just before is registered by the loop: let the loop end before closing them
+                accepting.get(BOUND_SECONDS, TimeUnit.SECONDS);
                 for (var session : all) {
                     session.socket.close();
                 }
