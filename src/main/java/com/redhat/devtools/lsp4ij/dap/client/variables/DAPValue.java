@@ -16,10 +16,12 @@ import com.intellij.xdebugger.frame.presentation.XValuePresentation;
 import com.redhat.devtools.lsp4ij.dap.client.DAPClient;
 import com.redhat.devtools.lsp4ij.dap.client.DAPStackFrame;
 import org.eclipse.lsp4j.debug.Variable;
+import org.eclipse.lsp4j.debug.VariablePresentationHintAttributes;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import javax.swing.*;
+import java.util.Arrays;
 
 /**
  * Debug Adapter Protocol (DAP) value.
@@ -92,11 +94,36 @@ public class DAPValue extends XNamedValue {
     @Nullable
     @Override
     public XValueModifier getModifier() {
-        if (!getClient().isSupportsSetVariable()) {
-            // The DAP server doesn't support the setting variable, Disable the 'Set Value...' menu.
+        if (!canSetValue(getClient().isSupportsSetVariable(), variable)) {
+            // Disable the 'Set Value...' menu and F2.
             return null;
         }
         return new DAPValueModifier(this);
+    }
+
+    /**
+     * Returns true if the user can set the value of the given variable, and false otherwise: the DAP server must
+     * support setting a variable, and must not mark this variable as read-only.
+     *
+     * @param supportsSetVariable true if the DAP server supports the 'setVariable' request.
+     * @param variable            the DAP variable.
+     * @return true if the user can set the value of the given variable, and false otherwise.
+     */
+    static boolean canSetValue(boolean supportsSetVariable, @NotNull Variable variable) {
+        return supportsSetVariable && !isReadOnly(variable);
+    }
+
+    /**
+     * Returns true if the DAP server marks the given variable as read-only with the 'readOnly' presentation hint
+     * attribute, and false otherwise.
+     *
+     * @param variable the DAP variable.
+     * @return true if the DAP server marks the given variable as read-only, and false otherwise.
+     */
+    static boolean isReadOnly(@NotNull Variable variable) {
+        var hint = variable.getPresentationHint();
+        var attributes = hint != null ? hint.getAttributes() : null;
+        return attributes != null && Arrays.asList(attributes).contains(VariablePresentationHintAttributes.READ_ONLY);
     }
 
     @NotNull
