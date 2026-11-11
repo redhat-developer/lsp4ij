@@ -9,6 +9,7 @@ import com.intellij.testFramework.HeavyPlatformTestCase;
 import com.intellij.xdebugger.XDebugSession;
 import com.intellij.xdebugger.XDebuggerManager;
 import com.intellij.xdebugger.breakpoints.XLineBreakpoint;
+import com.redhat.devtools.lsp4ij.dap.DAPBundle;
 import com.redhat.devtools.lsp4ij.dap.configurations.DAPRunConfigurationOptions;
 import org.eclipse.lsp4j.debug.*;
 import org.eclipse.lsp4j.debug.services.IDebugProtocolServer;
@@ -91,7 +92,10 @@ public class DAPBreakpointHandlerBaseTest extends HeavyPlatformTestCase {
         }
     }
 
-    /** Once the only session which bound a breakpoint has terminated, a session which cannot bind it decides. */
+    /**
+     * Once the only session which bound a breakpoint has terminated, the breakpoint is shown as invalid, and a session
+     * which cannot bind it decides.
+     */
     public void testAForgottenSessionNoLongerKeepsTheBreakpointVerified() throws Exception {
         var states = new ArrayList<String>();
         var handler = handler(recordingSession(states));
@@ -103,6 +107,7 @@ public class DAPBreakpointHandlerBaseTest extends HeavyPlatformTestCase {
             handler.initialize(bound, new Capabilities()).join();
             assertEquals(List.of("verified"), states);
             handler.forgetSessionVerdicts(bound);
+            assertEquals(List.of("verified", "invalid: " + DAPBundle.message("dap.breakpoints.session.ended")), states);
             handler.initialize(server(false), new Capabilities()).join();
             assertEquals("invalid: Unbound breakpoint", states.get(states.size() - 1));
         } finally {

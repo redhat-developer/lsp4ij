@@ -225,15 +225,19 @@ public abstract class BreakpointHandlerBase<B extends XBreakpoint<?>> extends XB
         }
         Object session = debugProtocolServer != null ? debugProtocolServer : UNKNOWN_SESSION;
         Set<Object> sessions = verifiedBy.computeIfAbsent(ijBreakpoint, key -> ConcurrentHashMap.newKeySet());
-        if (breakpoint.isVerified()) {
-            sessions.add(session);
-        } else {
-            sessions.remove(session);
-        }
-        if (!sessions.isEmpty()) {
-            setBreakpointVerified(ijBreakpoint);
-        } else {
-            setBreakpointInvalid(ijBreakpoint, breakpoint.getMessage());
+        // The answers of the sessions arrive on their own threads: the answer, the check and the presentation of
+        // one session must not interleave with those of another
+        synchronized (sessions) {
+            if (breakpoint.isVerified()) {
+                sessions.add(session);
+            } else {
+                sessions.remove(session);
+            }
+            if (!sessions.isEmpty()) {
+                setBreakpointVerified(ijBreakpoint);
+            } else {
+                setBreakpointInvalid(ijBreakpoint, breakpoint.getMessage());
+            }
         }
     }
 
@@ -270,13 +274,19 @@ public abstract class BreakpointHandlerBase<B extends XBreakpoint<?>> extends XB
 
 
     /**
-     * Forgets which breakpoints the given DAP server reported bound. Call it when its session terminates.
+     * Forgets which breakpoints the given DAP server reported bound, and shows as invalid each breakpoint which no
+     * other server has bound. Call it when its session terminates.
      *
      * @param debugProtocolServer the DAP server of the terminated session.
      */
     public void forgetSessionVerdicts(@NotNull IDebugProtocolServer debugProtocolServer) {
-        for (var sessions : verifiedBy.values()) {
-            sessions.remove(debugProtocolServer);
+        for (var entry : verifiedBy.entrySet()) {
+            Set<Object> sessions = entry.getValue();
+            synchronized (sessions) {
+                if (sessions.remove(debugProtocolServer) && sessions.isEmpty()) {
+                    setBreakpointInvalid(entry.getKey(), DAPBundle.message("dap.breakpoints.session.ended"));
+                }
+            }
         }
     }
 
