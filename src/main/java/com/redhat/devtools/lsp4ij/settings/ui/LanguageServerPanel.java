@@ -65,7 +65,6 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Comparator;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -514,9 +513,10 @@ public class LanguageServerPanel implements Disposable {
 
     /**
      * Swaps the argument of a transport in the command for that of the transport which the user has just chosen, as
-     * the template lists them, such as {@code --stdio} for {@code --socket=${port}}. The argument is matched as whole
-     * words, and its last occurrence is replaced. A command which has none of the template's arguments stays as it is,
-     * and so does the command when the panel shows a transport itself, as when it loads a template or saved settings.
+     * the template lists them, such as {@code --stdio} for {@code --socket=${port}}. The arguments are matched as
+     * whole words, and the one which comes last in the command is replaced. A command which has none of the template's
+     * arguments stays as it is, and so does the command when the panel shows a transport itself, as when it loads a
+     * template or saved settings.
      */
     private void swapTransportArgument() {
         if (showingTransport || commandLine == null || supportedTransports.isEmpty()) {
@@ -528,26 +528,27 @@ public class LanguageServerPanel implements Disposable {
             return;
         }
         String command = commandLine.getText();
-        // The longest first, so that an argument is never taken for a shorter one which it contains
-        var arguments = supportedTransports.stream()
-                .map(TransportSupport::argument)
-                .filter(candidate -> candidate != null && !candidate.isBlank())
-                .sorted(Comparator.comparingInt(String::length).reversed())
-                .toList();
-        for (String present : arguments) {
-            Matcher matcher = Pattern.compile("(?<=^|\\s)" + Pattern.quote(present) + "(?=\\s|$)").matcher(command);
-            int start = -1;
-            int end = -1;
+        // The occurrence which ends last, and of those which end there, the longest: an argument is never taken for a
+        // shorter one which it contains
+        String present = null;
+        int start = -1;
+        int end = -1;
+        for (TransportSupport support : supportedTransports) {
+            String candidate = support.argument();
+            if (candidate == null || candidate.isBlank()) {
+                continue;
+            }
+            Matcher matcher = Pattern.compile("(?<=^|\\s)" + Pattern.quote(candidate) + "(?=\\s|$)").matcher(command);
             while (matcher.find()) {
-                start = matcher.start();
-                end = matcher.end();
-            }
-            if (start >= 0) {
-                if (!present.equals(argument)) {
-                    commandLine.setText(command.substring(0, start) + argument + command.substring(end));
+                if (matcher.end() > end || matcher.end() == end && matcher.start() < start) {
+                    present = candidate;
+                    start = matcher.start();
+                    end = matcher.end();
                 }
-                return;
             }
+        }
+        if (present != null && !present.equals(argument)) {
+            commandLine.setText(command.substring(0, start) + argument + command.substring(end));
         }
     }
 

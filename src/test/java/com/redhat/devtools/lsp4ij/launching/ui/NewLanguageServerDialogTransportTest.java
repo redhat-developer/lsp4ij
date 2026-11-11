@@ -107,6 +107,17 @@ public class NewLanguageServerDialogTransportTest extends BasePlatformTestCase {
         }
     }
 
+    public void testTheArgumentWhichComesLastInTheCommandIsSwapped() {
+        // a command with the arguments of both transports, whichever is longer
+        var dialog = dialog(template("node css.js --socket=${port} --stdio", UserDefinedTransport.STDIO, CSS));
+        try {
+            click(dialog, "language.server.transport.socket");
+            assertEquals("node css.js --socket=${port} --socket=${port}", command(dialog));
+        } finally {
+            dialog.close(DialogWrapper.CANCEL_EXIT_CODE);
+        }
+    }
+
     public void testARunningLanguageServerNeedsNoCommand() {
         var dialog = dialog(template("", RUNNING));
         try {
