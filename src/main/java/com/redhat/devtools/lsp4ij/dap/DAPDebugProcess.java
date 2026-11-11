@@ -178,6 +178,7 @@ public class DAPDebugProcess extends XDebugProcess implements Disposable {
 
     private @Nullable CompletableFuture<Void> connectToServerFuture;
     private volatile Status status;
+    private final Object statusLock = new Object();
     private Supplier<TransportStreams> streamsSupplier;
     private DAPClient parentClient;
     private final @NotNull DAPValueFormat valueFormat = new DAPValueFormat();
@@ -412,26 +413,49 @@ public class DAPDebugProcess extends XDebugProcess implements Disposable {
     @Override
     public void stop() {
         runToCursorBreakpoint.ended();
-        if (status != Status.STOPPED && status != Status.STOPPING) {
-            ApplicationManager.getApplication()
-                    .executeOnPooledThread(() -> {
-                        try {
-                            status = Status.STOPPING;
-                            dispose();
-                            print("Disconnected successfully from the debug server.",
-                                    ConsoleViewContentType.SYSTEM_OUTPUT);
-                        } catch (Exception e) {
-                            print("Disconnected exceptionally from the debug server: " + e.getMessage(),
-                                    ConsoleViewContentType.ERROR_OUTPUT);
-                        } finally {
-                            XDebugSession session = getSession();
-                            if (session != null) {
-                                session.stop();
-                            }
-                            status = Status.STOPPED;
-                        }
-                    });
+        if (!markStopping()) {
+            return;
         }
+        ApplicationManager.getApplication()
+                .executeOnPooledThread(() -> {
+                    try {
+                        dispose();
+                        print("Disconnected successfully from the debug server.",
+                                ConsoleViewContentType.SYSTEM_OUTPUT);
+                    } catch (Exception e) {
+                        print("Disconnected exceptionally from the debug server: " + e.getMessage(),
+                                ConsoleViewContentType.ERROR_OUTPUT);
+                    } finally {
+                        XDebugSession session = getSession();
+                        if (session != null) {
+                            session.stop();
+                        }
+                        status = Status.STOPPED;
+                    }
+                });
+    }
+
+    /**
+     * Marks the debug process as stopping, and returns true unless it was stopping or stopped already. Two sessions of
+     * a tree can end at the same time, and each asks the debug process to stop: only the first one disposes it.
+     */
+    private boolean markStopping() {
+        synchronized (statusLock) {
+            if (status == Status.STOPPING || status == Status.STOPPED) {
+                return false;
+            }
+            status = Status.STOPPING;
+            return true;
+        }
+    }
+
+    /**
+     * Returns true once the debug process has been asked to stop: it is stopping, or it has stopped.
+     *
+     * @return true once the debug process has been asked to stop, and false otherwise.
+     */
+    public boolean isStopping() {
+        return status == Status.STOPPING || status == Status.STOPPED;
     }
 
     @Override
