@@ -106,7 +106,7 @@ public class DAPBreakpointHandlerBaseTest extends HeavyPlatformTestCase {
             var bound = server(true);
             handler.initialize(bound, new Capabilities()).join();
             assertEquals(List.of("verified"), states);
-            handler.forgetSessionVerdicts(bound);
+            handler.forgetSession(bound);
             assertEquals(List.of("verified", "invalid: " + DAPBundle.message("dap.breakpoints.session.ended")), states);
             handler.initialize(server(false), new Capabilities()).join();
             assertEquals("invalid: Unbound breakpoint", states.get(states.size() - 1));
@@ -138,6 +138,53 @@ public class DAPBreakpointHandlerBaseTest extends HeavyPlatformTestCase {
         }
     }
 
+    /**
+     * Each session of a tree numbers its breakpoints itself, as vscode-js-debug does: a breakpoint has an id per
+     * session, and two breakpoints can have the same id in two sessions. A 'breakpoint' event reaches the breakpoint
+     * by the id which the session that sends it gave it.
+     */
+    public void testEachSessionNamesABreakpointByTheIdItGaveIt() throws Exception {
+        var states = new ArrayList<String>();
+        var handler = handler(recordingSessionByFile(states));
+        var dir = Files.createTempDirectory("dap-breakpoints-");
+        var a = breakpoint(dir.resolve("a.lua"), 0);
+        var b = breakpoint(dir.resolve("b.lua"), 0);
+        try {
+            handler.registerBreakpoint(a);
+            handler.registerBreakpoint(b);
+            // The page session binds neither breakpoint, and the worker session binds both, with the ids swapped
+            var page = server(false, Map.of("a.lua", 1, "b.lua", 2));
+            var worker = server(true, Map.of("a.lua", 2, "b.lua", 1));
+            handler.initialize(page, new Capabilities()).join();
+            handler.initialize(worker, new Capabilities()).join();
+            assertSame(a, handler.findBreakpointById(page, 1));
+            assertSame(b, handler.findBreakpointById(page, 2));
+            assertSame(b, handler.findBreakpointById(worker, 1));
+            assertSame(a, handler.findBreakpointById(worker, 2));
+            states.clear();
+
+            // The worker unbinds its breakpoint 1, which is b: the page doesn't bind it either
+            handler.updateBreakpoint(worker, answer(1, false, "Unbound breakpoint"), null);
+            assertEquals(List.of("b.lua invalid: Unbound breakpoint"), states);
+            states.clear();
+
+            // The page binds its breakpoint 1, which is a, not the worker's breakpoint 1
+            handler.updateBreakpoint(page, answer(1, true, null), null);
+            assertEquals(List.of("a.lua verified"), states);
+            states.clear();
+
+            // Once the worker's session has ended, its ids name nothing, and the page still keeps a verified
+            handler.forgetSession(worker);
+            assertNull(handler.findBreakpointById(worker, 1));
+            assertNull(handler.findBreakpointById(worker, 2));
+            assertSame(a, handler.findBreakpointById(page, 1));
+            assertEquals(List.of(), states);
+        } finally {
+            handler.dispose();
+            com.intellij.openapi.util.io.FileUtil.delete(dir.toFile());
+        }
+    }
+
     /** Returns a debug session which records, in the given list, each state the breakpoints are shown in. */
     private static XDebugSession recordingSession(List<String> states) {
         return (XDebugSession)Proxy.newProxyInstance(XDebugSession.class.getClassLoader(),new Class<?>[]{XDebugSession.class}, (p, m, a) -> {
@@ -148,6 +195,34 @@ public class DAPBreakpointHandlerBaseTest extends HeavyPlatformTestCase {
             }
             return null;
         });
+    }
+
+    /**
+     * Returns a debug session which records, in the given list, each state each breakpoint is shown in, after the name
+     * of its file.
+     */
+    private static XDebugSession recordingSessionByFile(List<String> states) {
+        return (XDebugSession)Proxy.newProxyInstance(XDebugSession.class.getClassLoader(),new Class<?>[]{XDebugSession.class}, (p, m, a) -> {
+            switch (m.getName()) {
+                case "setBreakpointVerified" -> states.add(fileName(a[0]) + " verified");
+                case "setBreakpointInvalid" -> states.add(fileName(a[0]) + " invalid: " + a[1]);
+                default -> { }
+            }
+            return null;
+        });
+    }
+
+    private static String fileName(Object breakpoint) {
+        String url = ((XLineBreakpoint<?>) breakpoint).getFileUrl();
+        return url.substring(url.lastIndexOf('/') + 1);
+    }
+
+    private static Breakpoint answer(int id, boolean verified, String message) {
+        var breakpoint = new Breakpoint();
+        breakpoint.setId(id);
+        breakpoint.setVerified(verified);
+        breakpoint.setMessage(message);
+        return breakpoint;
     }
 
     private DAPBreakpointHandlerBase<XLineBreakpoint<DAPBreakpointProperties>> handler(XDebugSession session) throws Exception {
@@ -185,12 +260,22 @@ public class DAPBreakpointHandlerBaseTest extends HeavyPlatformTestCase {
      * vscode-js-debug which owns the target (true) or not (false).
      */
     private static IDebugProtocolServer server(boolean verified) {
+        return server(verified, Map.of());
+    }
+
+    /**
+     * Returns a DAP server which answers each 'setBreakpoints' request with the given 'verified' flag, and gives the
+     * breakpoints of a file the id which the given map has for the name of that file, and 1 otherwise, as a session
+     * which numbers its breakpoints itself.
+     */
+    private static IDebugProtocolServer server(boolean verified, Map<String, Integer> idsByFile) {
         return (IDebugProtocolServer)Proxy.newProxyInstance(IDebugProtocolServer.class.getClassLoader(),new Class<?>[]{IDebugProtocolServer.class}, (p, m, a) -> {
             if (m.getName().equals("setBreakpoints")) {
                 var arguments = (SetBreakpointsArguments) a[0];
+                int id = idsByFile.getOrDefault(Path.of(arguments.getSource().getPath()).getFileName().toString(), 1);
                 var breakpoints = Arrays.stream(arguments.getBreakpoints()).map(source -> {
                     var breakpoint = new Breakpoint();
-                    breakpoint.setId(1);
+                    breakpoint.setId(id);
                     breakpoint.setLine(source.getLine());
                     breakpoint.setVerified(verified);
                     breakpoint.setMessage(verified ? null : "Unbound breakpoint");

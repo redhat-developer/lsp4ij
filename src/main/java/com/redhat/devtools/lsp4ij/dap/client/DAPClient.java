@@ -458,7 +458,7 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
         StackFrame topFrame = frames[0];
         DAPSuspendContext context = getSuspendContext(threads, stoppedThread, frames);
         var breakpointHandler = debugProcess.getBreakpointHandler();
-        XBreakpoint<?> breakpoint = getStopBreakpoint(args, debugProcess::findBreakpointById, () -> breakpointHandler.findBreakpoint(topFrame));
+        XBreakpoint<?> breakpoint = getStopBreakpoint(args, id -> debugProcess.findBreakpointById(server, id), () -> breakpointHandler.findBreakpoint(topFrame));
         if (breakpoint != null) {
             breakpointReached(getSession(), server, breakpoint, context, topFrame.getId(), stoppedThread.getId(),
                     singleThreadResumed ? Boolean.TRUE : null)
@@ -824,9 +824,9 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
     private void endSession() {
         var server = getDebugProtocolServer();
         if (server != null) {
-            debugProcess.getBreakpointHandler().forgetSessionVerdicts(server);
-            debugProcess.getFunctionBreakpointHandler().forgetSessionVerdicts(server);
-            debugProcess.getDataBreakpointHandler().forgetSessionVerdicts(server);
+            debugProcess.getBreakpointHandler().forgetSession(server);
+            debugProcess.getFunctionBreakpointHandler().forgetSession(server);
+            debugProcess.getDataBreakpointHandler().forgetSession(server);
         }
         // A debug adapter may run a session per target, as vscode-js-debug does with 'startDebugging': when an iframe or
         // a worker goes away only its session terminates, and the debug process must go on for the others

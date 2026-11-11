@@ -206,7 +206,7 @@ public class DAPDataBreakpointHandler extends BreakpointHandlerBase<XBreakpoint<
                     // The response has a breakpoint per data breakpoint of the request, in the same order
                     for (int i = 0; i < Math.min(breakpoints.length, ijBreakpoints.size()); i++) {
                         var ijBreakpoint = ijBreakpoints.get(i);
-                        ijBreakpoint.putUserData(DAP_BREAKPOINT_ID, breakpoints[i].getId());
+                        setBreakpointId(debugProtocolServer, ijBreakpoint, breakpoints[i].getId());
                         updateBreakpoint(debugProtocolServer, breakpoints[i], ijBreakpoint);
                     }
                     return null;

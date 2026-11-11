@@ -221,12 +221,12 @@ public class DAPShadowedBreakpointTest extends HeavyPlatformTestCase {
 
             // The late response for the native breakpoint arrives: it is ignored
             responses.get(0).complete(response(1, 1));
-            assertNull(nativeBreakpoint.getUserData(BreakpointHandlerBase.DAP_BREAKPOINT_ID));
+            assertNull(handler.getBreakpointId(server, nativeBreakpoint));
             assertTrue(presentations.isEmpty());
 
             // The response for the DAP breakpoint gives it its id
             responses.get(1).complete(response(2, 1));
-            assertEquals(Integer.valueOf(2), dapBreakpoint.getUserData(BreakpointHandlerBase.DAP_BREAKPOINT_ID));
+            assertEquals(Integer.valueOf(2), handler.getBreakpointId(server, dapBreakpoint));
             assertEquals(List.of("dap verified"), presentations);
             presentations.clear();
 

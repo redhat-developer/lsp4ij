@@ -87,6 +87,7 @@ import org.eclipse.lsp4j.debug.Source;
 import org.eclipse.lsp4j.debug.SteppingGranularity;
 import org.eclipse.lsp4j.debug.Thread;
 import org.eclipse.lsp4j.debug.ThreadEventArguments;
+import org.eclipse.lsp4j.debug.services.IDebugProtocolServer;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -674,17 +675,18 @@ public class DAPDebugProcess extends XDebugProcess implements Disposable {
 
     /**
      * Returns the IntelliJ breakpoint, a line, a function or a data breakpoint, of the given DAP breakpoint id, and
-     * null otherwise.
+     * null otherwise. Each session numbers its breakpoints itself, so the id is that which the given DAP server gave.
      *
-     * @param id the DAP breakpoint id.
+     * @param debugProtocolServer the DAP server which names the breakpoint.
+     * @param id                  the DAP breakpoint id.
      * @return the IntelliJ breakpoint of the given DAP breakpoint id, and null otherwise.
      */
-    public @Nullable XBreakpoint<?> findBreakpointById(@Nullable Integer id) {
-        XBreakpoint<?> breakpoint = breakpointHandler.findBreakpointById(id);
+    public @Nullable XBreakpoint<?> findBreakpointById(@NotNull IDebugProtocolServer debugProtocolServer, @Nullable Integer id) {
+        XBreakpoint<?> breakpoint = breakpointHandler.findBreakpointById(debugProtocolServer, id);
         if (breakpoint == null) {
-            breakpoint = functionBreakpointHandler.findBreakpointById(id);
+            breakpoint = functionBreakpointHandler.findBreakpointById(debugProtocolServer, id);
         }
-        return breakpoint != null ? breakpoint : dataBreakpointHandler.findBreakpointById(id);
+        return breakpoint != null ? breakpoint : dataBreakpointHandler.findBreakpointById(debugProtocolServer, id);
     }
 
     /**

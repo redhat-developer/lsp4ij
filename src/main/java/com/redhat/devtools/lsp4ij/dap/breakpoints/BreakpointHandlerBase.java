@@ -12,7 +12,6 @@ package com.redhat.devtools.lsp4ij.dap.breakpoints;
 
 import com.intellij.openapi.Disposable;
 import com.intellij.openapi.project.Project;
-import com.intellij.openapi.util.Key;
 import com.intellij.util.containers.ContainerUtil;
 import com.intellij.xdebugger.XDebugSession;
 import com.intellij.xdebugger.XDebugSessionListener;
@@ -50,7 +49,6 @@ public abstract class BreakpointHandlerBase<B extends XBreakpoint<?>> extends XB
     private static final Logger LOGGER = LoggerFactory.getLogger(BreakpointHandlerBase.class);
 
     protected static final CompletableFuture<?>[] EMPTY_COMPLETABLE_FUTURES = new CompletableFuture<?>[0];
-    protected static final @NotNull Key<Integer> DAP_BREAKPOINT_ID = Key.create("dap.breakpoint.id");
 
     protected final @NotNull XDebugSession debugSession;
     protected final @NotNull DebugAdapterDescriptor debugAdapterDescriptor;
@@ -60,6 +58,10 @@ public abstract class BreakpointHandlerBase<B extends XBreakpoint<?>> extends XB
     private final Map<IDebugProtocolServer, Capabilities> capabilities = Collections.synchronizedMap(new IdentityHashMap<>());
     // The sessions which report each breakpoint as bound: in a session tree only one session can bind it
     private final Map<B, Set<Object>> verifiedBy = new ConcurrentHashMap<>();
+    // The id which each session gave each breakpoint: each session of a tree numbers its breakpoints itself, as
+    // vscode-js-debug does, so a breakpoint has an id per session, and two breakpoints can have the same id in two
+    // sessions
+    private final Map<B, Map<Object, Integer>> breakpointIds = new ConcurrentHashMap<>();
     private static final Object UNKNOWN_SESSION = new Object();
     // The temporary breakpoint, as of "Run to Cursor", from when it is registered until it is unregistered: each
     // 'setBreakpoints' request for its source keeps it, as when the user adds a breakpoint to the source meanwhile
@@ -177,6 +179,7 @@ public abstract class BreakpointHandlerBase<B extends XBreakpoint<?>> extends XB
         debugProtocolServers.clear();
         capabilities.clear();
         verifiedBy.clear();
+        breakpointIds.clear();
     }
 
     // Sends take turns, so the debug adapter gets them in the order in which they read the breakpoints: a request
@@ -229,14 +232,14 @@ public abstract class BreakpointHandlerBase<B extends XBreakpoint<?>> extends XB
                                  @NotNull Breakpoint breakpoint,
                                  @Nullable B ijBreakpoint) {
         if (ijBreakpoint == null) {
-            // Retrieve the IntelliJ breakpoint by the id.
-            ijBreakpoint = findBreakpointById(breakpoint.getId());
+            // Retrieve the IntelliJ breakpoint by the id which this DAP server gave it.
+            ijBreakpoint = findBreakpointById(debugProtocolServer, breakpoint.getId());
         }
         if (ijBreakpoint == null || !breakpoints.contains(ijBreakpoint)) {
             // A late answer for an unregistered breakpoint must not keep its verdicts
             return;
         }
-        Object session = debugProtocolServer != null ? debugProtocolServer : UNKNOWN_SESSION;
+        Object session = session(debugProtocolServer);
         Set<Object> sessions = verifiedBy.computeIfAbsent(ijBreakpoint, key -> ConcurrentHashMap.newKeySet());
         // The answers of the sessions arrive on their own threads: the answer, the check and the presentation of
         // one session must not interleave with those of another
@@ -307,12 +310,12 @@ public abstract class BreakpointHandlerBase<B extends XBreakpoint<?>> extends XB
     }
 
     /**
-     * Forgets which breakpoints the given DAP server reported bound, and shows as invalid each breakpoint which no
-     * other server has bound. Call it when its session terminates.
+     * Forgets what the given DAP server answered: which breakpoints it reported bound, and the ids it gave them. Shows
+     * as invalid each breakpoint which no other server has bound. Call it when its session terminates.
      *
      * @param debugProtocolServer the DAP server of the terminated session.
      */
-    public void forgetSessionVerdicts(@NotNull IDebugProtocolServer debugProtocolServer) {
+    public void forgetSession(@NotNull IDebugProtocolServer debugProtocolServer) {
         for (var entry : verifiedBy.entrySet()) {
             Set<Object> sessions = entry.getValue();
             synchronized (sessions) {
@@ -321,26 +324,93 @@ public abstract class BreakpointHandlerBase<B extends XBreakpoint<?>> extends XB
                 }
             }
         }
+        breakpointIds.values().forEach(ids -> ids.remove(debugProtocolServer));
     }
 
     /**
-     * Returns the IntelliJ breakpoint from the DAP breakpoint id and null otherwise.
+     * Keeps the id which the given DAP server gave the given breakpoint, or forgets it when the id is null.
+     *
+     * @param debugProtocolServer the DAP server which answered, or null when it is not known.
+     * @param ijBreakpoint        the IJ breakpoint.
+     * @param id                  the DAP breakpoint id, or null.
+     */
+    protected void setBreakpointId(@Nullable IDebugProtocolServer debugProtocolServer,
+                                   @NotNull B ijBreakpoint,
+                                   @Nullable Integer id) {
+        Object session = session(debugProtocolServer);
+        if (id != null) {
+            breakpointIds.computeIfAbsent(ijBreakpoint, key -> new ConcurrentHashMap<>()).put(session, id);
+        } else {
+            var ids = breakpointIds.get(ijBreakpoint);
+            if (ids != null) {
+                ids.remove(session);
+            }
+        }
+    }
+
+    /**
+     * Forgets the ids which the DAP servers gave the given breakpoint, as when it is not sent anymore.
+     *
+     * @param ijBreakpoint the IJ breakpoint.
+     */
+    protected void forgetBreakpointIds(@NotNull B ijBreakpoint) {
+        breakpointIds.remove(ijBreakpoint);
+    }
+
+    /**
+     * Returns the id which the given DAP server gave the given breakpoint, and null otherwise.
+     *
+     * @param debugProtocolServer the DAP server.
+     * @param ijBreakpoint        the IJ breakpoint.
+     * @return the id which the given DAP server gave the given breakpoint, and null otherwise.
+     */
+    @Nullable
+    Integer getBreakpointId(@NotNull IDebugProtocolServer debugProtocolServer, @NotNull XBreakpoint<?> ijBreakpoint) {
+        var ids = breakpointIds.get(ijBreakpoint);
+        return ids != null ? ids.get(debugProtocolServer) : null;
+    }
+
+    /**
+     * Returns the IntelliJ breakpoint from the DAP breakpoint id which one of the DAP servers gave it, and null
+     * otherwise. Prefer {@link #findBreakpointById(IDebugProtocolServer, Integer)}: two sessions can give two
+     * breakpoints the same id.
      *
      * @param id the DAP breakpoint id.
      * @return the IntelliJ breakpoint from the DAP breakpoint id and null otherwise.
      */
     @Nullable
     public B findBreakpointById(@Nullable Integer id) {
+        return findBreakpointById(null, id);
+    }
+
+    /**
+     * Returns the IntelliJ breakpoint from the DAP breakpoint id which the given DAP server gave it, and null
+     * otherwise.
+     *
+     * @param debugProtocolServer the DAP server which names the breakpoint, or null to match the id which any DAP
+     *                            server gave it.
+     * @param id                  the DAP breakpoint id.
+     * @return the IntelliJ breakpoint from the DAP breakpoint id and null otherwise.
+     */
+    @Nullable
+    public B findBreakpointById(@Nullable IDebugProtocolServer debugProtocolServer, @Nullable Integer id) {
         if (id == null) {
             return null;
         }
         for (var breakpoint : breakpoints) {
-            Integer breakpointId = breakpoint.getUserData(DAP_BREAKPOINT_ID);
-            if (id.equals(breakpointId)) {
+            var ids = breakpointIds.get(breakpoint);
+            if (ids != null && (debugProtocolServer != null ? id.equals(ids.get(debugProtocolServer)) : ids.containsValue(id))) {
                 return breakpoint;
             }
         }
         return null;
+    }
+
+    /**
+     * Returns the key of the given DAP server in the answers of the sessions.
+     */
+    private static @NotNull Object session(@Nullable IDebugProtocolServer debugProtocolServer) {
+        return debugProtocolServer != null ? debugProtocolServer : UNKNOWN_SESSION;
     }
 
     /**
