@@ -196,7 +196,7 @@ public class DAPDataBreakpointHandler extends BreakpointHandlerBase<XBreakpoint<
                         return null;
                     }
                     if (error != null) {
-                        ijBreakpoints.forEach(ijBreakpoint -> setBreakpointInvalid(ijBreakpoint, getCause(error).getMessage()));
+                        updateBreakpointsOfFailedRequest(debugProtocolServer, ijBreakpoints, getCause(error).getMessage());
                         return null;
                     }
                     var breakpoints = response != null ? response.getBreakpoints() : null;

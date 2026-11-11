@@ -287,6 +287,26 @@ public abstract class BreakpointHandlerBase<B extends XBreakpoint<?>> extends XB
 
 
     /**
+     * Takes a failed request of the given DAP server for the given breakpoints as its answer that it binds none of
+     * them: a breakpoint which another server has bound stays verified, and the others are shown as invalid with the
+     * given message.
+     *
+     * @param debugProtocolServer the DAP server whose request failed.
+     * @param ijBreakpoints       the IJ breakpoints of the request.
+     * @param message             the message of the failure, or null.
+     */
+    protected void updateBreakpointsOfFailedRequest(@NotNull IDebugProtocolServer debugProtocolServer,
+                                                    @NotNull List<B> ijBreakpoints,
+                                                    @Nullable String message) {
+        for (B ijBreakpoint : ijBreakpoints) {
+            var unbound = new Breakpoint();
+            unbound.setVerified(false);
+            unbound.setMessage(message);
+            updateBreakpoint(debugProtocolServer, unbound, ijBreakpoint);
+        }
+    }
+
+    /**
      * Forgets which breakpoints the given DAP server reported bound, and shows as invalid each breakpoint which no
      * other server has bound. Call it when its session terminates.
      *

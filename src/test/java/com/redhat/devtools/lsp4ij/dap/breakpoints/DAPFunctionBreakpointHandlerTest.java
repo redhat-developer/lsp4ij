@@ -167,6 +167,32 @@ public class DAPFunctionBreakpointHandlerTest extends HeavyPlatformTestCase {
         }
     }
 
+    /**
+     * In a tree of sessions, the failed request of one session doesn't show as invalid a breakpoint which another
+     * session has bound.
+     */
+    public void testAFailedRequestKeepsTheBreakpointsWhichAnotherSessionBoundVerified() throws Exception {
+        var twice = breakpoint("twice");
+        var nope = breakpoint("nope");
+        var handler = handler();
+        try {
+            handler.registerBreakpoint(twice);
+            handler.registerBreakpoint(nope);
+            handler.initialize(server(arguments -> new Breakpoint[]{
+                    answer(11, true, null),
+                    answer(12, false, "No method named 'nope'")}), supported()).join();
+            shown.clear();
+
+            handler.initialize(server(arguments -> {
+                throw new IllegalStateException("cannot set function breakpoints");
+            }), supported()).join();
+
+            assertEquals(List.of("verified twice", "invalid nope: cannot set function breakpoints"), shown);
+        } finally {
+            handler.dispose();
+        }
+    }
+
     public void testTheAnswerToAnOlderRequestChangesNothing() throws Exception {
         var twice = breakpoint("twice");
         var move = breakpoint("Point.move");

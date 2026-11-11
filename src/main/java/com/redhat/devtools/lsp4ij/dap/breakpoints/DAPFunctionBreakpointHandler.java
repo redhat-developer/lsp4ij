@@ -117,7 +117,7 @@ public class DAPFunctionBreakpointHandler extends BreakpointHandlerBase<XBreakpo
                     if (error != null) {
                         Throwable cause = error instanceof CompletionException && error.getCause() != null ? error.getCause() : error;
                         String message = cause.getMessage();
-                        ijBreakpoints.forEach(ijBreakpoint -> setBreakpointInvalid(ijBreakpoint, message));
+                        updateBreakpointsOfFailedRequest(debugProtocolServer, ijBreakpoints, message);
                         return null;
                     }
                     var breakpoints = response != null ? response.getBreakpoints() : null;
