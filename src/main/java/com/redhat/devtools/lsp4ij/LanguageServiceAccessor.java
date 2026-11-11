@@ -767,18 +767,22 @@ public class LanguageServiceAccessor implements Disposable {
     @Nullable
     LanguageServerWrapper getOrCreateInstanceOf(@NotNull VirtualFile file,
                                                 @NotNull LanguageServerDefinition serverDefinition) {
-        return getOrCreateInstanceOf(file, serverDefinition, chooseInstance(file, serverDefinition));
+        return getOrCreateInstanceOf(file, serverDefinition, chooseInstance(file, serverDefinition), null);
     }
 
     /**
      * Returns the language server instance of the given choice for a file: the one that has the file connected or
-     * provides it, or the one of its root, created if there is none. Returns null if no instance serves the file, or if
-     * the instances of the definition were replaced since the choice, which connects the open files again.
+     * provides it, or the one of its root, created if there is none and the given filter accepts its client features.
+     * The client features of an instance can decide by its root, so only those of the instance itself can tell. An
+     * instance that the filter doesn't accept is disposed, as for a request. Returns null if no instance serves the
+     * file, if the filter doesn't accept the instance that it would create, or if the instances of the definition were
+     * replaced since the choice, which connects the open files again.
      */
     @Nullable
     LanguageServerWrapper getOrCreateInstanceOf(@NotNull VirtualFile file,
                                                 @NotNull LanguageServerDefinition serverDefinition,
-                                                @NotNull InstanceChoice choice) {
+                                                @NotNull InstanceChoice choice,
+                                                @Nullable Predicate<LSPClientFeatures> beforeCreatingInstanceFilter) {
         if (choice.connected() == null && choice.root() == null) {
             return null;
         }
@@ -789,10 +793,29 @@ public class LanguageServiceAccessor implements Disposable {
                         ? choice.connected()
                         : findInstanceConnectedTo(file, serverDefinition);
             }
-            // As for a request: a replacement after the choice connects the open files again
-            return choice.replacements() == replacementsOf(serverDefinition)
-                    ? getOrCreateInstance(serverDefinition, choice.root())
-                    : null;
+            if (choice.replacements() != replacementsOf(serverDefinition)) {
+                // As for a request: a replacement after the choice connects the open files again
+                return null;
+            }
+            var instance = findInstance(serverDefinition, choice.root());
+            if (instance == null) {
+                instance = LanguageServerWrapper.forInstanceRoot(project, serverDefinition, choice.root());
+                boolean accepted = false;
+                try {
+                    accepted = beforeCreatingInstanceFilter == null
+                            || beforeCreatingInstanceFilter.test(instance.getClientFeatures());
+                } finally {
+                    // As for a request: also when the filter throws, as a cancellation does
+                    if (!accepted) {
+                        Disposer.dispose(instance);
+                    }
+                }
+                if (!accepted) {
+                    return null;
+                }
+                startedServers.add(instance);
+            }
+            return instance;
         }
     }
 

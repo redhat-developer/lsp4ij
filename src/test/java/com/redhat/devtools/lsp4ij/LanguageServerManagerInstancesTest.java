@@ -16,6 +16,7 @@ import com.intellij.openapi.application.impl.NonBlockingReadActionImpl;
 import com.intellij.openapi.command.WriteCommandAction;
 import com.intellij.openapi.editor.EditorFactory;
 import com.intellij.openapi.fileEditor.FileDocumentManager;
+import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiFile;
@@ -459,6 +460,48 @@ public class LanguageServerManagerInstancesTest extends LSPCodeInsightFixtureTes
         waitForStatus(a, ServerStatus.stopped);
     }
 
+    public void testAFileMovedToARootWhoseClientFeaturesLeaveItOutLeavesNoInstanceThere() throws Exception {
+        definition.disabledRoot = "b";
+        var file = file("a/moved.instances").getVirtualFile();
+        var a = openAndConnect(file);
+
+        move(file, myFixture.getTempDirFixture().findOrCreateDir("b"));
+
+        // As when the last editor of its last document closes: the file went to no instance
+        waitForStatus(a, ServerStatus.stopped);
+        dispatchAll();
+        assertNull(instanceConnectedTo(file));
+        assertEquals("No instance of b may stay without the file", List.of(a), instances());
+        assertTrue("The client features of the instance of b must be disposed", definition.disposedRoots.contains("b"));
+    }
+
+    public void testTheInstanceThatAMovedFileLeavesStopsWhenTheClientFeaturesOfItsNewRootAreCancelled() throws Exception {
+        definition.cancelledRoot = "b";
+        var file = file("a/moved.instances").getVirtualFile();
+        var a = openAndConnect(file);
+
+        move(file, myFixture.getTempDirFixture().findOrCreateDir("b"));
+
+        // As when they leave out the file
+        waitForStatus(a, ServerStatus.stopped);
+        dispatchAll();
+        assertNull(instanceConnectedTo(file));
+        assertEquals("No instance of b may stay without the file", List.of(a), instances());
+        assertTrue("The client features of the instance of b must be disposed", definition.disposedRoots.contains("b"));
+    }
+
+    public void testTheClientFeaturesOfTheInstanceOfItsNewRootDecideForAMovedFile() throws Exception {
+        var file = file("a/moved.instances").getVirtualFile();
+        var a = openAndConnect(file);
+        // Those of the instance that the file leaves would leave it out
+        definition.disabledRoot = "a";
+
+        move(file, myFixture.getTempDirFixture().findOrCreateDir("b"));
+
+        assertEquals("b", waitForTheInstanceConnectedTo(file).getInstanceRoot().getName());
+        assertFalse(a.isConnectedTo(a.toUri(file)));
+    }
+
     public void testAMovedFileWithoutARootIsConnectedToNoInstance() throws Exception {
         var file = file("a/moved.instances").getVirtualFile();
         var a = openAndConnect(file);
@@ -836,6 +879,13 @@ public class LanguageServerManagerInstancesTest extends LSPCodeInsightFixtureTes
         volatile @Nullable CompletableFuture<Void> installationGate;
         // Is given each file whose instance root the strategy is asked for
         volatile @Nullable Consumer<VirtualFile> instanceRootAsked;
+        // The name of the root whose client features leave out every file, which they tell by the root of their
+        // instance
+        volatile @Nullable String disabledRoot;
+        // The name of the root whose client features are cancelled as they are asked whether they take a file
+        volatile @Nullable String cancelledRoot;
+        // The names of the roots of the instances whose client features were disposed
+        final List<String> disposedRoots = new CopyOnWriteArrayList<>();
 
         InstancesDefinition() {
             super(ID, false);
@@ -860,7 +910,31 @@ public class LanguageServerManagerInstancesTest extends LSPCodeInsightFixtureTes
 
         @Override
         public @NotNull LSPClientFeatures createClientFeatures() {
-            var features = super.createClientFeatures().setWorkspaceFolderFeature(new LSPWorkspaceFolderFeature() {
+            var features = new LSPClientFeatures() {
+                @Override
+                public boolean isEnabled(@NotNull VirtualFile file) {
+                    var root = rootName();
+                    if (root != null && root.equals(cancelledRoot)) {
+                        throw new ProcessCanceledException();
+                    }
+                    return !Objects.equals(root, disabledRoot) && super.isEnabled(file);
+                }
+
+                @Override
+                public void dispose() {
+                    var root = rootName();
+                    super.dispose();
+                    if (root != null) {
+                        disposedRoots.add(root);
+                    }
+                }
+
+                private @Nullable String rootName() {
+                    var languageServer = getServerWrapper();
+                    var root = languageServer != null ? languageServer.getInstanceRoot() : null;
+                    return root != null ? root.getName() : null;
+                }
+            }.setWorkspaceFolderFeature(new LSPWorkspaceFolderFeature() {
                 @Override
                 protected @NotNull WorkspaceFolderStrategy createStrategy() {
                     return new InstancesStrategy(InstancesDefinition.this);

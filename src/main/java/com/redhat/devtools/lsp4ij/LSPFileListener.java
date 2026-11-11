@@ -165,13 +165,22 @@ class LSPFileListener extends AbstractLSPFileListener {
                             return;
                         }
                         // Only now that the document is still there: an instance created for a place that it left
-                        // before it was connected would stay without a document
-                        var languageServer = place.choice() != null
-                                ? accessor.getOrCreateInstanceOf(file, serverDefinition, place.choice())
-                                : languageServerWrapper;
-                        if (languageServer != languageServerWrapper) {
-                            // The document goes to the instance of its new place, or to none
-                            stopIfIdle(languageServerWrapper);
+                        // before it was connected would stay without a document. And only if the client features of
+                        // the new instance take the file, which they can decide by its root, so not those of the
+                        // instance that the document leaves: an instance that leaves out the file would stay without
+                        // it too
+                        LanguageServerWrapper languageServer = null;
+                        try {
+                            languageServer = place.choice() != null
+                                    ? accessor.getOrCreateInstanceOf(file, serverDefinition, place.choice(),
+                                    clientFeatures -> clientFeatures.isEnabled(file))
+                                    : languageServerWrapper;
+                        } finally {
+                            if (languageServer != languageServerWrapper) {
+                                // The document goes to the instance of its new place, or to none, also when the client
+                                // features of a new instance fail or are cancelled as they are asked
+                                stopIfIdle(languageServerWrapper);
+                            }
                         }
                         if (languageServer != null) {
                             reconnectMovedDocument(languageServer, file);
