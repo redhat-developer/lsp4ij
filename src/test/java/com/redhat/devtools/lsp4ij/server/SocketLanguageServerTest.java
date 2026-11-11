@@ -56,6 +56,10 @@ public class SocketLanguageServerTest extends LSPCodeInsightFixtureTestCase {
         super("*.unused");
     }
 
+    /**
+     * A language server which runs already and listens on a socket answers a hover, and LSP4IJ stops it when the
+     * language server closes the connection.
+     */
     public void testALanguageServerOverASocketAnswersRequestsAndStopsWhenItClosesTheConnection() throws Exception {
         var project = myFixture.getProject();
         try (var listening = new ServerSocket(0, 1, InetAddress.getLoopbackAddress())) {
@@ -104,6 +108,10 @@ public class SocketLanguageServerTest extends LSPCodeInsightFixtureTestCase {
                 var stopped = new CompletableFuture<Void>();
                 var lifecycle = LanguageServerLifecycleManager.getInstance(project);
                 var listener = new LanguageServerLifecycleListener() {
+                    /**
+                     * Notes the stop of the language server of this test. LSP4IJ calls it on the thread which changed
+                     * the status, right after the change.
+                     */
                     @Override
                     public void handleStatusChanged(@NotNull LanguageServerWrapper languageServer) {
                         if (languageServer == wrapper && languageServer.getServerStatus() == ServerStatus.stopped) {
