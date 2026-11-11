@@ -490,6 +490,19 @@ public class LanguageServerManagerInstancesTest extends LSPCodeInsightFixtureTes
         assertTrue("The client features of the instance of b must be disposed", definition.disposedRoots.contains("b"));
     }
 
+    public void testARequestCreatesNoInstanceWhoseClientFeaturesLeaveOutTheFile() throws Exception {
+        definition.disabledRoot = "b";
+        var file = file("b/left-out.instances");
+
+        // As a feature of an editor asks, with a filter of its own which takes every language server
+        var servers = waitFor(LanguageServiceAccessor.getInstance(myFixture.getProject())
+                .getLanguageServers(file, features -> true, null));
+
+        assertEmpty(servers);
+        assertEmpty("No instance of b may stay without the file", instances());
+        assertTrue("The client features of the instance of b must be disposed", definition.disposedRoots.contains("b"));
+    }
+
     public void testTheClientFeaturesOfTheInstanceOfItsNewRootDecideForAMovedFile() throws Exception {
         var file = file("a/moved.instances").getVirtualFile();
         var a = openAndConnect(file);
