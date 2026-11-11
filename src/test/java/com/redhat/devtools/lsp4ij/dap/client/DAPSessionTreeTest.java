@@ -1,0 +1,265 @@
+/*******************************************************************************
+ * Copyright (c) 2026 Red Hat, Inc.
+ * Distributed under license by Red Hat, Inc. All rights reserved.
+ * This program is made available under the terms of the
+ * Eclipse Public License v2.0 which accompanies this distribution,
+ * and is available at https://www.eclipse.org/legal/epl-v20.html
+ *
+ * Contributors:
+ * Red Hat, Inc. - initial API and implementation
+ ******************************************************************************/
+package com.redhat.devtools.lsp4ij.dap.client;
+
+import com.intellij.execution.RunManager;
+import com.intellij.execution.configurations.ConfigurationType;
+import com.intellij.execution.executors.DefaultDebugExecutor;
+import com.intellij.execution.runners.ExecutionEnvironmentBuilder;
+import com.intellij.testFramework.HeavyPlatformTestCase;
+import com.intellij.testFramework.PlatformTestUtil;
+import com.intellij.xdebugger.XDebugSession;
+import com.intellij.xdebugger.XDebuggerManager;
+import com.redhat.devtools.lsp4ij.dap.DebugMode;
+import com.redhat.devtools.lsp4ij.dap.configurations.DAPRunConfiguration;
+import org.eclipse.lsp4j.debug.Capabilities;
+import org.eclipse.lsp4j.debug.ConfigurationDoneArguments;
+import org.eclipse.lsp4j.debug.DisconnectArguments;
+import org.eclipse.lsp4j.debug.InitializeRequestArguments;
+import org.eclipse.lsp4j.debug.StartDebuggingRequestArguments;
+import org.eclipse.lsp4j.debug.StartDebuggingRequestArgumentsType;
+import org.eclipse.lsp4j.debug.TerminatedEventArguments;
+import org.eclipse.lsp4j.debug.ThreadsResponse;
+import org.eclipse.lsp4j.debug.launch.DSPLauncher;
+import org.eclipse.lsp4j.debug.services.IDebugProtocolClient;
+import org.eclipse.lsp4j.debug.services.IDebugProtocolServer;
+import org.jetbrains.annotations.NotNull;
+
+import java.io.IOException;
+import java.net.InetAddress;
+import java.net.ServerSocket;
+import java.net.Socket;
+import java.util.Arrays;
+import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.LinkedBlockingQueue;
+
+/**
+ * The sessions of a tree, which a debug adapter starts with 'startDebugging' as vscode-js-debug does for the iframes
+ * and the workers of a page, keep the debug session running while one of them is alive, and the last one to terminate
+ * stops it.
+ */
+public class DAPSessionTreeTest extends HeavyPlatformTestCase {
+
+    /**
+     * Bounds the waits for something to happen, so that a test fails instead of hanging.
+     */
+    private static final int BOUND_SECONDS = 120;
+
+    /**
+     * How long the debug session must keep running after a 'terminated' which must not stop it. A 'terminated' which
+     * stops it does so at once.
+     */
+    private static final long KEEPS_RUNNING_MILLIS = 2_000;
+
+    private SessionServer server;
+    private XDebugSession session;
+
+    @Override
+    protected void tearDown() throws Exception {
+        try {
+            if (session != null && !session.isStopped()) {
+                session.stop();
+            }
+            if (server != null) {
+                server.close();
+            }
+        } finally {
+            super.tearDown();
+        }
+    }
+
+    public void testTheDebugSessionKeepsRunningWhenAChildSessionTerminates() throws Exception {
+        var root = debug();
+        var child = startChildSession(root);
+
+        // As when an iframe or a worker of the page goes away
+        child.terminated();
+        assertTheDebugSessionKeepsRunning();
+
+        root.terminated();
+        waitForTheDebugSessionToStop();
+    }
+
+    public void testTheDebugSessionKeepsRunningWhileAChildSessionIsAlive() throws Exception {
+        var root = debug();
+        var child = startChildSession(root);
+
+        root.terminated();
+        assertTheDebugSessionKeepsRunning();
+
+        child.terminated();
+        waitForTheDebugSessionToStop();
+    }
+
+    public void testALiveSessionBelowATerminatedChildKeepsTheDebugSessionRunning() throws Exception {
+        var root = debug();
+        var child = startChildSession(root);
+        var grandchild = startChildSession(child);
+
+        child.terminated();
+        root.terminated();
+        assertTheDebugSessionKeepsRunning();
+
+        grandchild.terminated();
+        waitForTheDebugSessionToStop();
+    }
+
+    /**
+     * Starts debugging, attached to a new {@link SessionServer}, and returns the root session once it is configured.
+     */
+    private @NotNull Session debug() throws Exception {
+        server = new SessionServer();
+        var type = Arrays.stream(ConfigurationType.CONFIGURATION_TYPE_EP.getExtensions())
+                .filter(t -> t.getId().equals("DAPConfiguration")).findFirst().orElseThrow();
+        var settings = RunManager.getInstance(getProject()).createConfiguration("session tree", type.getConfigurationFactories()[0]);
+        var configuration = (DAPRunConfiguration) settings.getConfiguration();
+        configuration.setDebugMode(DebugMode.ATTACH);
+        configuration.setAttachAddress(InetAddress.getLoopbackAddress().getHostAddress());
+        configuration.setAttachPort(String.valueOf(server.getPort()));
+        configuration.setAttachConfiguration("{}");
+        // the debug process connects to the DAP server in the background, as it does outside tests
+        PlatformTestUtil.withSystemProperty("intellij.progress.task.ignoreHeadless", "true", () ->
+                ExecutionEnvironmentBuilder.create(getProject(), DefaultDebugExecutor.getDebugExecutorInstance(), configuration)
+                        .buildAndExecute());
+        var root = nextSession("the debug session connects");
+        PlatformTestUtil.waitWithEventsDispatching("the debug session starts and its root session is configured", () -> {
+            // no session tab is selected in tests, so there is no current session
+            var sessions = XDebuggerManager.getInstance(getProject()).getDebugSessions();
+            session = sessions.length == 1 ? sessions[0] : null;
+            return session != null && root.configured.isDone();
+        }, BOUND_SECONDS);
+        return root;
+    }
+
+    /**
+     * Asks the client of the given session to start a child session, and returns it once it is configured.
+     */
+    private @NotNull Session startChildSession(@NotNull Session parent) {
+        parent.startChildSession();
+        var child = nextSession("the child session connects");
+        PlatformTestUtil.waitWithEventsDispatching("the child session is configured", child.configured::isDone, BOUND_SECONDS);
+        return child;
+    }
+
+    /**
+     * Returns the next session that connects to the server, dispatching events meanwhile: the debug process may need
+     * them to connect.
+     */
+    private @NotNull Session nextSession(@NotNull String what) {
+        PlatformTestUtil.waitWithEventsDispatching(what, () -> !server.sessions.isEmpty(), BOUND_SECONDS);
+        return server.sessions.remove();
+    }
+
+    private void assertTheDebugSessionKeepsRunning() throws InterruptedException {
+        long end = System.currentTimeMillis() + KEEPS_RUNNING_MILLIS;
+        while (System.currentTimeMillis() < end) {
+            PlatformTestUtil.dispatchAllEventsInIdeEventQueue();
+            assertFalse("the debug session keeps running", session.isStopped());
+            Thread.sleep(20);
+        }
+    }
+
+    private void waitForTheDebugSessionToStop() {
+        PlatformTestUtil.waitWithEventsDispatching("the debug session stops", session::isStopped, BOUND_SECONDS);
+    }
+
+    /**
+     * A DAP server which accepts a connection per DAP session, as a debug adapter that starts child sessions with
+     * 'startDebugging' does.
+     */
+    private static class SessionServer {
+
+        private final ServerSocket serverSocket;
+        private final LinkedBlockingQueue<Session> sessions = new LinkedBlockingQueue<>();
+
+        SessionServer() throws IOException {
+            this.serverSocket = new ServerSocket(0, 4, InetAddress.getLoopbackAddress());
+            var accept = new Thread(() -> {
+                try {
+                    while (!serverSocket.isClosed()) {
+                        sessions.add(new Session(serverSocket.accept()));
+                    }
+                } catch (IOException e) {
+                    // closed by the test
+                }
+            }, "DAP server of the session tree tests");
+            accept.setDaemon(true);
+            accept.start();
+        }
+
+        int getPort() {
+            return serverSocket.getLocalPort();
+        }
+
+        void close() throws IOException {
+            serverSocket.close();
+        }
+    }
+
+    /**
+     * A DAP session of a {@link SessionServer}, over its own connection.
+     */
+    private static class Session implements IDebugProtocolServer {
+
+        private final IDebugProtocolClient client;
+        private final CompletableFuture<Void> configured = new CompletableFuture<>();
+
+        Session(@NotNull Socket socket) throws IOException {
+            var launcher = DSPLauncher.createServerLauncher(this, socket.getInputStream(), socket.getOutputStream());
+            this.client = launcher.getRemoteProxy();
+            launcher.startListening();
+        }
+
+        /**
+         * Asks the client to start a child session, which connects to the server on its own connection.
+         */
+        void startChildSession() {
+            var args = new StartDebuggingRequestArguments();
+            args.setConfiguration(Map.of());
+            args.setRequest(StartDebuggingRequestArgumentsType.ATTACH);
+            client.startDebugging(args);
+        }
+
+        void terminated() {
+            client.terminated(new TerminatedEventArguments());
+        }
+
+        @Override
+        public CompletableFuture<Capabilities> initialize(InitializeRequestArguments args) {
+            var capabilities = new Capabilities();
+            capabilities.setSupportsConfigurationDoneRequest(true);
+            return CompletableFuture.completedFuture(capabilities);
+        }
+
+        @Override
+        public CompletableFuture<Void> attach(Map<String, Object> args) {
+            return CompletableFuture.completedFuture(null).thenRun(client::initialized);
+        }
+
+        @Override
+        public CompletableFuture<Void> configurationDone(ConfigurationDoneArguments args) {
+            return CompletableFuture.completedFuture(null).thenRun(() -> configured.complete(null));
+        }
+
+        @Override
+        public CompletableFuture<ThreadsResponse> threads() {
+            var response = new ThreadsResponse();
+            response.setThreads(new org.eclipse.lsp4j.debug.Thread[0]);
+            return CompletableFuture.completedFuture(response);
+        }
+
+        @Override
+        public CompletableFuture<Void> disconnect(DisconnectArguments args) {
+            return CompletableFuture.completedFuture(null);
+        }
+    }
+}
