@@ -37,6 +37,20 @@ public class DAPValueReadOnlyTest extends TestCase {
         assertTrue(DAPValue.isReadOnly(variable(hint("static", "readOnly"))));
     }
 
+    public void testSetValueOfAWritableVariable() {
+        assertTrue(DAPValue.canSetValue(true, new Variable()));
+        assertTrue(DAPValue.canSetValue(true, variable(hint("static"))));
+    }
+
+    public void testNoSetValueOfAReadOnlyVariable() {
+        assertFalse(DAPValue.canSetValue(true, variable(hint("readOnly"))));
+    }
+
+    public void testNoSetValueWithoutSetVariable() {
+        assertFalse(DAPValue.canSetValue(false, new Variable()));
+        assertFalse(DAPValue.canSetValue(false, variable(hint("readOnly"))));
+    }
+
     private static VariablePresentationHint hint(String... attributes) {
         var hint = new VariablePresentationHint();
         hint.setAttributes(attributes);
