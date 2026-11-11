@@ -38,9 +38,15 @@ import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.TimeUnit;
 
 /**
  * The sessions of a tree, which a debug adapter starts with 'startDebugging' as vscode-js-debug does for the iframes
@@ -179,29 +185,48 @@ public class DAPSessionTreeTest extends HeavyPlatformTestCase {
     private static class SessionServer {
 
         private final ServerSocket serverSocket;
+        // Runs the loop which accepts the connections and the message loop of each session, so that close() can stop
+        // them all: the test framework reports the threads which a test leaves running
+        private final ExecutorService executor = Executors.newCachedThreadPool();
+        // The sessions which no test has taken yet, and all of them
         private final LinkedBlockingQueue<Session> sessions = new LinkedBlockingQueue<>();
+        private final List<Session> all = new CopyOnWriteArrayList<>();
 
         SessionServer() throws IOException {
             this.serverSocket = new ServerSocket(0, 4, InetAddress.getLoopbackAddress());
-            var accept = new Thread(() -> {
+            executor.execute(() -> {
                 try {
                     while (!serverSocket.isClosed()) {
-                        sessions.add(new Session(serverSocket.accept()));
+                        var session = new Session(serverSocket.accept(), executor);
+                        all.add(session);
+                        sessions.add(session);
                     }
                 } catch (IOException e) {
                     // closed by the test
                 }
-            }, "DAP server of the session tree tests");
-            accept.setDaemon(true);
-            accept.start();
+            });
         }
 
         int getPort() {
             return serverSocket.getLocalPort();
         }
 
-        void close() throws IOException {
-            serverSocket.close();
+        /**
+         * Waits until the client has closed the connection of each session, as it does once the debug session has
+         * stopped, then closes the server and its connections, and stops its threads.
+         */
+        void close() throws Exception {
+            try {
+                PlatformTestUtil.waitWithEventsDispatching("the client closes the connection of each session",
+                        () -> all.stream().allMatch(session -> session.listening.isDone()), BOUND_SECONDS);
+            } finally {
+                serverSocket.close();
+                for (var session : all) {
+                    session.socket.close();
+                }
+                executor.shutdownNow();
+                assertTrue("the threads of the DAP server stop", executor.awaitTermination(BOUND_SECONDS, TimeUnit.SECONDS));
+            }
         }
     }
 
@@ -210,13 +235,18 @@ public class DAPSessionTreeTest extends HeavyPlatformTestCase {
      */
     private static class Session implements IDebugProtocolServer {
 
+        private final Socket socket;
         private final IDebugProtocolClient client;
+        // Done once the client has closed the connection
+        private final Future<Void> listening;
         private final CompletableFuture<Void> configured = new CompletableFuture<>();
 
-        Session(@NotNull Socket socket) throws IOException {
-            var launcher = DSPLauncher.createServerLauncher(this, socket.getInputStream(), socket.getOutputStream());
+        Session(@NotNull Socket socket, @NotNull ExecutorService executor) throws IOException {
+            this.socket = socket;
+            var launcher = DSPLauncher.createServerLauncher(this, socket.getInputStream(), socket.getOutputStream(),
+                    executor, consumer -> consumer);
             this.client = launcher.getRemoteProxy();
-            launcher.startListening();
+            this.listening = launcher.startListening();
         }
 
         /**
