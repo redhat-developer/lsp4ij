@@ -6,6 +6,12 @@ on:
   # Trigger the workflow on any pull request
   pull_request:
 
+# A new push to a pull request cancels the runs of its older commits. A push to main gets a group of its own, since a
+# group keeps one pending run only and cancels any other: every commit of main is checked.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
 jobs:
 
   # Prepare environment and build the plugin
