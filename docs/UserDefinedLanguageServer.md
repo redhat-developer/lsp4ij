@@ -112,8 +112,7 @@ When commands contain macros, their resolved value is visible below the `Command
 #### Transport
 
 By default, LSP4IJ talks to the language server over the standard input and output (stdio) of its process. A language
-server which talks LSP over a TCP socket instead is configured with `Transport: Socket (experimental)`, in one of three
-ways, which are experimental:
+server which talks LSP over a TCP socket instead is configured with `Transport: Socket`, in one of three ways:
 
 ![Transport](./images/user-defined-ls/SocketTransportModes.png)
 
@@ -142,7 +141,7 @@ switched back to the standard input and output; set the socket again with a comm
 
 A [template](./UserDefinedLanguageServerTemplate.md#template-descriptor) sets the transport in its
 [`socket`](./UserDefinedLanguageServerTemplate.md#socket), and lists the transports which its language server supports
-in [`transports`](./UserDefinedLanguageServerTemplate.md#transports), both experimental.
+in [`transports`](./UserDefinedLanguageServerTemplate.md#transports).
 
 LSP4IJ listens on the loopback address only. The output of a language server which LSP4IJ starts is shown in the `Log`
 tab of the [LSP console](./UserGuide.md#lsp-console), since the socket carries the protocol: its standard output as
