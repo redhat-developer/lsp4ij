@@ -18,6 +18,7 @@ import com.intellij.testFramework.HeavyPlatformTestCase;
 import com.intellij.testFramework.PlatformTestUtil;
 import com.intellij.xdebugger.XDebugSession;
 import com.intellij.xdebugger.XDebuggerManager;
+import com.redhat.devtools.lsp4ij.dap.DAPDebugProcess;
 import com.redhat.devtools.lsp4ij.dap.DebugMode;
 import com.redhat.devtools.lsp4ij.dap.configurations.DAPRunConfiguration;
 import org.eclipse.lsp4j.debug.Capabilities;
@@ -31,6 +32,7 @@ import org.eclipse.lsp4j.debug.ThreadsResponse;
 import org.eclipse.lsp4j.debug.launch.DSPLauncher;
 import org.eclipse.lsp4j.debug.services.IDebugProtocolClient;
 import org.eclipse.lsp4j.debug.services.IDebugProtocolServer;
+import org.eclipse.lsp4j.jsonrpc.RemoteEndpoint;
 import org.jetbrains.annotations.NotNull;
 
 import java.io.IOException;
@@ -60,12 +62,6 @@ public class DAPSessionTreeTest extends HeavyPlatformTestCase {
      */
     private static final int BOUND_SECONDS = 120;
 
-    /**
-     * How long the debug session must keep running after a 'terminated' which must not stop it. A 'terminated' which
-     * stops it does so at once.
-     */
-    private static final long KEEPS_RUNNING_MILLIS = 2_000;
-
     private SessionServer server;
     private XDebugSession session;
 
@@ -89,10 +85,10 @@ public class DAPSessionTreeTest extends HeavyPlatformTestCase {
 
         // As when an iframe or a worker of the page goes away
         child.terminated();
-        assertTheDebugSessionKeepsRunning();
+        assertTheDebugSessionKeepsRunning(child);
 
         root.terminated();
-        waitForTheDebugSessionToStop();
+        assertTheDebugSessionStops(root);
     }
 
     public void testTheDebugSessionKeepsRunningWhileAChildSessionIsAlive() throws Exception {
@@ -100,10 +96,10 @@ public class DAPSessionTreeTest extends HeavyPlatformTestCase {
         var child = startChildSession(root);
 
         root.terminated();
-        assertTheDebugSessionKeepsRunning();
+        assertTheDebugSessionKeepsRunning(root);
 
         child.terminated();
-        waitForTheDebugSessionToStop();
+        assertTheDebugSessionStops(child);
     }
 
     public void testALiveSessionBelowATerminatedChildKeepsTheDebugSessionRunning() throws Exception {
@@ -113,10 +109,10 @@ public class DAPSessionTreeTest extends HeavyPlatformTestCase {
 
         child.terminated();
         root.terminated();
-        assertTheDebugSessionKeepsRunning();
+        assertTheDebugSessionKeepsRunning(child, root);
 
         grandchild.terminated();
-        waitForTheDebugSessionToStop();
+        assertTheDebugSessionStops(grandchild);
     }
 
     /**
@@ -165,17 +161,37 @@ public class DAPSessionTreeTest extends HeavyPlatformTestCase {
         return server.sessions.remove();
     }
 
-    private void assertTheDebugSessionKeepsRunning() throws InterruptedException {
-        long end = System.currentTimeMillis() + KEEPS_RUNNING_MILLIS;
-        while (System.currentTimeMillis() < end) {
-            PlatformTestUtil.dispatchAllEventsInIdeEventQueue();
-            assertFalse("the debug session keeps running", session.isStopped());
-            Thread.sleep(20);
-        }
+    /**
+     * Waits until the client has handled the messages which the given sessions sent, and asserts that nothing has asked
+     * the debug process to stop.
+     */
+    private void assertTheDebugSessionKeepsRunning(@NotNull Session... senders) {
+        waitUntilHandled(senders);
+        assertFalse("the debug session keeps running", getDebugProcess().isStopping());
     }
 
-    private void waitForTheDebugSessionToStop() {
-        PlatformTestUtil.waitWithEventsDispatching("the debug session stops", session::isStopped, BOUND_SECONDS);
+    /**
+     * Waits until the client has handled the messages which the given sessions sent, and asserts that they have asked
+     * the debug process to stop.
+     */
+    private void assertTheDebugSessionStops(@NotNull Session... senders) {
+        waitUntilHandled(senders);
+        assertTrue("the debug session stops", getDebugProcess().isStopping());
+    }
+
+    /**
+     * Waits until the client has handled the messages which each of the given sessions has sent: it handles the
+     * messages of a connection one after the other, so once it has answered a request which a session sends after
+     * them, it has handled them.
+     */
+    private static void waitUntilHandled(@NotNull Session... senders) {
+        var answers = Arrays.stream(senders).map(Session::ping).toList();
+        PlatformTestUtil.waitWithEventsDispatching("the client handles the messages of the sessions",
+                () -> answers.stream().allMatch(CompletableFuture::isDone), BOUND_SECONDS);
+    }
+
+    private @NotNull DAPDebugProcess getDebugProcess() {
+        return (DAPDebugProcess) session.getDebugProcess();
     }
 
     /**
@@ -237,6 +253,7 @@ public class DAPSessionTreeTest extends HeavyPlatformTestCase {
 
         private final Socket socket;
         private final IDebugProtocolClient client;
+        private final RemoteEndpoint remoteEndpoint;
         // Done once the client has closed the connection
         private final Future<Void> listening;
         private final CompletableFuture<Void> configured = new CompletableFuture<>();
@@ -246,6 +263,7 @@ public class DAPSessionTreeTest extends HeavyPlatformTestCase {
             var launcher = DSPLauncher.createServerLauncher(this, socket.getInputStream(), socket.getOutputStream(),
                     executor, consumer -> consumer);
             this.client = launcher.getRemoteProxy();
+            this.remoteEndpoint = launcher.getRemoteEndpoint();
             this.listening = launcher.startListening();
         }
 
@@ -261,6 +279,14 @@ public class DAPSessionTreeTest extends HeavyPlatformTestCase {
 
         void terminated() {
             client.terminated(new TerminatedEventArguments());
+        }
+
+        /**
+         * Sends the client a request which it doesn't know, and returns the future of its answer, an error: the client
+         * answers it once it has handled the messages which this session sent before.
+         */
+        CompletableFuture<Object> ping() {
+            return remoteEndpoint.request("lsp4ij/test/ping", null);
         }
 
         @Override
