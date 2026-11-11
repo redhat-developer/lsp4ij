@@ -185,6 +185,61 @@ public class DAPBreakpointHandlerBaseTest extends HeavyPlatformTestCase {
         }
     }
 
+    /**
+     * The answer to a request which a session got before it terminated changes nothing when it arrives after: it
+     * neither shows the breakpoint as bound by that session, nor gives it an id of that session.
+     */
+    public void testALateAnswerOfASessionWhichEndedIsIgnored() throws Exception {
+        var states = new ArrayList<String>();
+        var handler = handler(recordingSession(states));
+        var dir = Files.createTempDirectory("dap-breakpoints-");
+        var a = breakpoint(dir.resolve("a.lua"), 0);
+        try {
+            handler.registerBreakpoint(a);
+            var ended = server(true);
+            handler.initialize(ended, new Capabilities()).join();
+            handler.initialize(server(false), new Capabilities()).join();
+            handler.forgetSession(ended);
+            assertEquals("invalid: " + DAPBundle.message("dap.breakpoints.session.ended"), states.get(states.size() - 1));
+            var before = List.copyOf(states);
+
+            handler.setBreakpointId(ended, a, 7);
+            handler.updateBreakpoint(ended, answer(7, true, null), a);
+
+            assertEquals(before, states);
+            assertNull(handler.getBreakpointId(ended, a));
+            assertNull(handler.findBreakpointById(ended, 7));
+        } finally {
+            handler.dispose();
+            com.intellij.openapi.util.io.FileUtil.delete(dir.toFile());
+        }
+    }
+
+    /**
+     * An unregistered breakpoint forgets the ids which the sessions gave it, and a late answer doesn't give it one back,
+     * so that a late 'breakpoint' event doesn't reach it once it is registered again.
+     */
+    public void testAnUnregisteredBreakpointForgetsItsIds() throws Exception {
+        var handler = handler(recordingSession(new ArrayList<>()));
+        var dir = Files.createTempDirectory("dap-breakpoints-");
+        var a = breakpoint(dir.resolve("a.lua"), 0);
+        try {
+            handler.registerBreakpoint(a);
+            var server = server(true, Map.of("a.lua", 4));
+            handler.initialize(server, new Capabilities()).join();
+            assertSame(a, handler.findBreakpointById(server, 4));
+
+            handler.unregisterBreakpoint(a, false);
+            assertNull(handler.getBreakpointId(server, a));
+
+            handler.setBreakpointId(server, a, 4);
+            assertNull(handler.getBreakpointId(server, a));
+        } finally {
+            handler.dispose();
+            com.intellij.openapi.util.io.FileUtil.delete(dir.toFile());
+        }
+    }
+
     /** Returns a debug session which records, in the given list, each state the breakpoints are shown in. */
     private static XDebugSession recordingSession(List<String> states) {
         return (XDebugSession)Proxy.newProxyInstance(XDebugSession.class.getClassLoader(),new Class<?>[]{XDebugSession.class}, (p, m, a) -> {

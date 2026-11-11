@@ -62,6 +62,8 @@ public abstract class BreakpointHandlerBase<B extends XBreakpoint<?>> extends XB
     // vscode-js-debug does, so a breakpoint has an id per session, and two breakpoints can have the same id in two
     // sessions
     private final Map<B, Map<Object, Integer>> breakpointIds = new ConcurrentHashMap<>();
+    // The sessions which have terminated: a late answer of one of them must not count
+    private final Set<Object> endedSessions = ConcurrentHashMap.newKeySet();
     private static final Object UNKNOWN_SESSION = new Object();
     // The temporary breakpoint, as of "Run to Cursor", from when it is registered until it is unregistered: each
     // 'setBreakpoints' request for its source keeps it, as when the user adds a breakpoint to the source meanwhile
@@ -161,7 +163,8 @@ public abstract class BreakpointHandlerBase<B extends XBreakpoint<?>> extends XB
     }
 
     /**
-     * Removes the given breakpoint from the registered ones, and forgets which DAP servers reported it bound.
+     * Removes the given breakpoint from the registered ones, and forgets which DAP servers reported it bound and the
+     * ids they gave it: a late 'breakpoint' event must not reach it once it is registered again.
      *
      * @param breakpoint the IJ breakpoint.
      * @return true if the breakpoint was registered, and false otherwise.
@@ -171,6 +174,7 @@ public abstract class BreakpointHandlerBase<B extends XBreakpoint<?>> extends XB
             return false;
         }
         verifiedBy.remove(breakpoint);
+        breakpointIds.remove(breakpoint);
         return true;
     }
 
@@ -180,6 +184,7 @@ public abstract class BreakpointHandlerBase<B extends XBreakpoint<?>> extends XB
         capabilities.clear();
         verifiedBy.clear();
         breakpointIds.clear();
+        endedSessions.clear();
     }
 
     // Sends take turns, so the debug adapter gets them in the order in which they read the breakpoints: a request
@@ -244,6 +249,10 @@ public abstract class BreakpointHandlerBase<B extends XBreakpoint<?>> extends XB
         // The answers of the sessions arrive on their own threads: the answer, the check and the presentation of
         // one session must not interleave with those of another
         synchronized (sessions) {
+            if (endedSessions.contains(session)) {
+                // The answer of a session which has terminated since: forgetSession() has dropped its answers
+                return;
+            }
             if (breakpoint.isVerified()) {
                 sessions.add(session);
             } else {
@@ -316,6 +325,8 @@ public abstract class BreakpointHandlerBase<B extends XBreakpoint<?>> extends XB
      * @param debugProtocolServer the DAP server of the terminated session.
      */
     public void forgetSession(@NotNull IDebugProtocolServer debugProtocolServer) {
+        // Before its answers are dropped, so that an answer which arrives meanwhile is either dropped or ignored
+        endedSessions.add(debugProtocolServer);
         for (var entry : verifiedBy.entrySet()) {
             Set<Object> sessions = entry.getValue();
             synchronized (sessions) {
@@ -338,12 +349,20 @@ public abstract class BreakpointHandlerBase<B extends XBreakpoint<?>> extends XB
                                    @NotNull B ijBreakpoint,
                                    @Nullable Integer id) {
         Object session = session(debugProtocolServer);
-        if (id != null) {
-            breakpointIds.computeIfAbsent(ijBreakpoint, key -> new ConcurrentHashMap<>()).put(session, id);
-        } else {
+        if (id == null) {
             var ids = breakpointIds.get(ijBreakpoint);
             if (ids != null) {
                 ids.remove(session);
+            }
+            return;
+        }
+        breakpointIds.computeIfAbsent(ijBreakpoint, key -> new ConcurrentHashMap<>()).put(session, id);
+        // A late answer for a breakpoint which was unregistered since, or of a session which has terminated since,
+        // must not keep its id. Checked after the put, so that an answer which races with the removal is dropped too.
+        if (!breakpoints.contains(ijBreakpoint) || endedSessions.contains(session)) {
+            var ids = breakpointIds.get(ijBreakpoint);
+            if (ids != null) {
+                ids.remove(session, id);
             }
         }
     }
