@@ -53,7 +53,7 @@ import java.util.concurrent.TimeUnit;
 /**
  * The sessions of a tree, which a debug adapter starts with 'startDebugging' as vscode-js-debug does for the iframes
  * and the workers of a page, keep the debug session running while one of them is alive, and the last one to terminate
- * stops it.
+ * stops it. A session whose connection closes without a 'terminated' event ends as if it had sent one.
  */
 public class DAPSessionTreeTest extends HeavyPlatformTestCase {
 
@@ -113,6 +113,26 @@ public class DAPSessionTreeTest extends HeavyPlatformTestCase {
 
         grandchild.terminated();
         assertTheDebugSessionStops(grandchild);
+    }
+
+    public void testTheDebugSessionStopsWhenItsConnectionClosesWithoutTerminated() throws Exception {
+        var root = debug();
+
+        root.dropConnection();
+
+        waitForTheDebugSessionToStop();
+    }
+
+    public void testAChildSessionWhoseConnectionClosedNoLongerKeepsTheDebugSessionRunning() throws Exception {
+        var root = debug();
+        var child = startChildSession(root);
+
+        root.terminated();
+        assertTheDebugSessionKeepsRunning(root);
+
+        // As a debug adapter which crashed while debugging a worker
+        child.dropConnection();
+        waitForTheDebugSessionToStop();
     }
 
     /**
@@ -188,6 +208,14 @@ public class DAPSessionTreeTest extends HeavyPlatformTestCase {
         var answers = Arrays.stream(senders).map(Session::ping).toList();
         PlatformTestUtil.waitWithEventsDispatching("the client handles the messages of the sessions",
                 () -> answers.stream().allMatch(CompletableFuture::isDone), BOUND_SECONDS);
+    }
+
+    /**
+     * Waits until something asks the debug process to stop, as the end of a connection does: the client learns of it
+     * on a thread of its own, not in the order of the messages of a session.
+     */
+    private void waitForTheDebugSessionToStop() {
+        PlatformTestUtil.waitWithEventsDispatching("the debug session stops", getDebugProcess()::isStopping, BOUND_SECONDS);
     }
 
     private @NotNull DAPDebugProcess getDebugProcess() {
@@ -290,6 +318,13 @@ public class DAPSessionTreeTest extends HeavyPlatformTestCase {
          */
         CompletableFuture<Object> ping() {
             return remoteEndpoint.request("lsp4ij/test/ping", null);
+        }
+
+        /**
+         * Closes the connection without a 'terminated' event, as a debug adapter which crashed does.
+         */
+        void dropConnection() throws IOException {
+            socket.close();
         }
 
         @Override
