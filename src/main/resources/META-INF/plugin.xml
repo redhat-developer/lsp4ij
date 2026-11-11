@@ -20,7 +20,7 @@
       <li>Fixed freezes and deadlocks (#1689, #1811), orphaned language server processes at startup, and disposed language servers that started again (#1873)</li>
       <li>LSP inlay hints are listed in <code>Settings | Editor | Inlay Hints</code> (#1800), and the settings page is named <code>Language Servers (LSP4IJ)</code> (#1925)</li>
       <li>Replaced 17 of the 18 usages of API that IntelliJ 2026.3 schedules for removal (#1845)</li>
-      <li>For plugin developers: <code>DebugAdapterDescriptor.createStartServerCommandLine(String, Map, boolean)</code> is deprecated for the method that also takes the working directory (#1684), <code>DAPDebugProcess.findBreakpointById(Integer)</code> for <code>findBreakpointById(IDebugProtocolServer, Integer)</code>, and the protected key <code>BreakpointHandlerBase.DAP_BREAKPOINT_ID</code> is removed</li>
+      <li>For plugin developers: <code>DebugAdapterDescriptor.createStartServerCommandLine(String, Map, boolean)</code> is deprecated for the method that also takes the working directory (#1684), and <code>DAPDebugProcess.findBreakpointById(Integer)</code> for <code>findBreakpointById(IDebugProtocolServer, Integer)</code></li>
       <li>Added the SysML language server template</li>
     </ul>
 	See the full list of changes in the <a href="https://github.com/redhat-developer/lsp4ij/milestone/31?closed=1">changelog</a>.
