@@ -146,17 +146,30 @@ public abstract class BreakpointHandlerBase<B extends XBreakpoint<?>> extends XB
         // a changed breakpoint with its new location, which may not be supported anymore (ex: its file
         // was moved out of the mapped files). Checking it kept the breakpoint, which was then sent again
         // at its new location, while its old source was never cleared in the debug adapter.
-        if (!breakpoints.remove(breakpoint)) {
+        if (!removeBreakpoint(breakpoint)) {
             // Not registered (ex: not supported when it was registered)
             return;
         }
-        verifiedBy.remove(breakpoint);
         onBreakpointsChanged(breakpoint);
         // DAP replaces breakpoints per source, not per session. Include the removed
         // source even when other files still have breakpoints, so its last breakpoint
         // is cleared by an empty setBreakpoints request.
         var sourcePosition = breakpoint.getSourcePosition();
         sendBreakpoints(null, sourcePosition != null ? new TemporaryBreakpoint(sourcePosition, false) : null);
+    }
+
+    /**
+     * Removes the given breakpoint from the registered ones, and forgets which DAP servers reported it bound.
+     *
+     * @param breakpoint the IJ breakpoint.
+     * @return true if the breakpoint was registered, and false otherwise.
+     */
+    protected boolean removeBreakpoint(@NotNull B breakpoint) {
+        if (!breakpoints.remove(breakpoint)) {
+            return false;
+        }
+        verifiedBy.remove(breakpoint);
+        return true;
     }
 
     @Override

@@ -64,7 +64,7 @@ public class DAPFunctionBreakpointHandler extends BreakpointHandlerBase<XBreakpo
     public void unregisterBreakpoint(@NotNull XBreakpoint<DAPFunctionBreakpointProperties> breakpoint,
                                      boolean temporary) {
         // A function breakpoint has no source position, which the base class needs to remove a line breakpoint
-        if (breakpoints.remove(breakpoint)) {
+        if (removeBreakpoint(breakpoint)) {
             sendFunctionBreakpoints();
         }
     }

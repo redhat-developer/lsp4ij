@@ -191,6 +191,36 @@ public class DAPFunctionBreakpointHandlerTest extends HeavyPlatformTestCase {
         }
     }
 
+    /**
+     * A breakpoint which is unregistered and registered again, as when it is disabled and enabled, is no longer shown
+     * verified because of a DAP server which bound it before.
+     */
+    public void testAnUnregisteredBreakpointForgetsWhichServersBoundIt() throws Exception {
+        var twice = breakpoint("twice");
+        var handler = handler();
+        var binds = new boolean[]{true};
+        try {
+            handler.registerBreakpoint(twice);
+            handler.initialize(server(arguments -> {
+                if (!binds[0]) {
+                    throw new IllegalStateException("the DAP server is busy");
+                }
+                return new Breakpoint[]{answer(11, true, null)};
+            }), supported()).join();
+            handler.unregisterBreakpoint(twice, false);
+            binds[0] = false;
+            handler.registerBreakpoint(twice);
+            shown.clear();
+
+            // another DAP server answers that it cannot bind it
+            handler.updateBreakpoint(server(arguments -> new Breakpoint[0]), answer(21, false, "Unbound breakpoint"), twice);
+
+            assertEquals(List.of("invalid twice: Unbound breakpoint"), shown);
+        } finally {
+            handler.dispose();
+        }
+    }
+
     public void testEachChangeSendsAllTheBreakpoints() throws Exception {
         var twice = breakpoint("twice");
         var move = breakpoint("Point.move");

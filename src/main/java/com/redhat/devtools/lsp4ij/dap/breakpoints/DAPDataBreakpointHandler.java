@@ -135,7 +135,7 @@ public class DAPDataBreakpointHandler extends BreakpointHandlerBase<XBreakpoint<
     public void unregisterBreakpoint(@NotNull XBreakpoint<DAPDataBreakpointProperties> breakpoint,
                                      boolean temporary) {
         // A data breakpoint has no source position, which the base class needs to remove a line breakpoint
-        if (breakpoints.remove(breakpoint)) {
+        if (removeBreakpoint(breakpoint)) {
             sendDataBreakpoints();
         }
     }
