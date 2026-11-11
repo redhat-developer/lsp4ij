@@ -39,6 +39,8 @@ import org.jetbrains.annotations.Nullable;
 
 import java.nio.file.Path;
 import java.util.Arrays;
+import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -219,6 +221,38 @@ public class DAPStackFrame extends XStackFrame {
                 .filter(scope -> ScopePresentationHint.LOCALS.equals(scope.getPresentationHint()))
                 .findFirst()
                 .orElse(scopes.length > 0 ? scopes[0] : null);
+    }
+
+    /**
+     * Returns the object by which the Variables view recognizes this frame after it is rebuilt, for instance after
+     * "Set Value..." or a step. When it equals the one of the frame shown before, the expanded nodes and the selection
+     * are restored.
+     */
+    @Override
+    public @Nullable Object getEqualityObject() {
+        return getEqualityObject(stackFrame);
+    }
+
+    /**
+     * Returns the function name and the source of the given DAP stack frame. The frame id and the line aren't part of
+     * it: the id changes on each stop and the line on each step, while the user stays in the same function.
+     *
+     * @param stackFrame the DAP stack frame.
+     * @return the function name and the source of the DAP stack frame.
+     */
+    static @NotNull Object getEqualityObject(@NotNull StackFrame stackFrame) {
+        Source source = stackFrame.getSource();
+        String sourceKey = null;
+        if (source != null) {
+            if (StringUtils.isNotBlank(source.getPath())) {
+                sourceKey = source.getPath();
+            } else if (source.getSourceReference() != null && source.getSourceReference() > 0) {
+                sourceKey = "ref:" + source.getSourceReference();
+            } else {
+                sourceKey = source.getName();
+            }
+        }
+        return List.of(Objects.toString(stackFrame.getName(), ""), Objects.toString(sourceKey, ""));
     }
 
     public @NotNull DAPClient getClient() {
