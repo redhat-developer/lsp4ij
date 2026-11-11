@@ -42,6 +42,14 @@ public class DAPStackFrameEqualityTest extends TestCase {
                 .equals(DAPStackFrame.getEqualityObject(frame(1, "main", 3, referenceSource(6)))));
     }
 
+    public void testSourceWithNameOnly() {
+        // neither a path nor a source reference > 0: the source name is the key
+        assertEquals(DAPStackFrame.getEqualityObject(frame(1, "main", 3, nameSource("eval"))),
+                DAPStackFrame.getEqualityObject(frame(2, "main", 4, nameSource("eval"))));
+        assertFalse(DAPStackFrame.getEqualityObject(frame(1, "main", 3, nameSource("eval")))
+                .equals(DAPStackFrame.getEqualityObject(frame(1, "main", 3, nameSource("other")))));
+    }
+
     public void testWithoutSource() {
         assertEquals(DAPStackFrame.getEqualityObject(frame(1, "main", 3, null)),
                 DAPStackFrame.getEqualityObject(frame(2, "main", 4, null)));
@@ -60,6 +68,12 @@ public class DAPStackFrameEqualityTest extends TestCase {
         Source source = new Source();
         source.setPath(path);
         source.setName(path.substring(path.lastIndexOf('/') + 1));
+        return source;
+    }
+
+    private static Source nameSource(String name) {
+        Source source = new Source();
+        source.setName(name);
         return source;
     }
 
