@@ -36,6 +36,7 @@ import org.eclipse.lsp4j.jsonrpc.RemoteEndpoint;
 import org.jetbrains.annotations.NotNull;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
@@ -133,6 +134,18 @@ public class DAPSessionTreeTest extends HeavyPlatformTestCase {
         // As a debug adapter which crashed while debugging a worker
         child.dropConnection();
         waitForTheDebugSessionToStop();
+    }
+
+    public void testTheClientEndsItsChildSessionsWhenItsConnectionClosesBeforeDisconnectIsAnswered() throws Exception {
+        var root = debug();
+        var child = startChildSession(root);
+        // As a debug adapter which crashes, or exits, before it answers
+        root.dropConnectionOnDisconnect();
+
+        session.stop();
+
+        PlatformTestUtil.waitWithEventsDispatching("the client closes the connection of the child session",
+                child.listening::isDone, BOUND_SECONDS);
     }
 
     /**
@@ -288,6 +301,7 @@ public class DAPSessionTreeTest extends HeavyPlatformTestCase {
         // Done once the client has closed the connection
         private final Future<Void> listening;
         private final CompletableFuture<Void> configured = new CompletableFuture<>();
+        private volatile boolean dropConnectionOnDisconnect;
 
         Session(@NotNull Socket socket, @NotNull ExecutorService executor) throws IOException {
             this.socket = socket;
@@ -327,6 +341,13 @@ public class DAPSessionTreeTest extends HeavyPlatformTestCase {
             socket.close();
         }
 
+        /**
+         * Closes the connection when the client sends 'disconnect', without answering it.
+         */
+        void dropConnectionOnDisconnect() {
+            dropConnectionOnDisconnect = true;
+        }
+
         @Override
         public CompletableFuture<Capabilities> initialize(InitializeRequestArguments args) {
             var capabilities = new Capabilities();
@@ -353,6 +374,14 @@ public class DAPSessionTreeTest extends HeavyPlatformTestCase {
 
         @Override
         public CompletableFuture<Void> disconnect(DisconnectArguments args) {
+            if (dropConnectionOnDisconnect) {
+                try {
+                    dropConnection();
+                } catch (IOException e) {
+                    throw new UncheckedIOException(e);
+                }
+                return new CompletableFuture<>();
+            }
             return CompletableFuture.completedFuture(null);
         }
     }

@@ -129,6 +129,8 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
     private volatile boolean terminatedReceived;
     // Set once the client ends the session, with terminate() or dispose(): the end of its connection is expected then
     private volatile boolean ending;
+    // dispose() runs once: the end of the connection, which it causes, may dispose the client too
+    private final AtomicBoolean disposed = new AtomicBoolean();
     private boolean sentTerminateRequest;
     // Whether the loaded sources and modules were asked for. They are asked for at the first stop, and then follow the
     // 'loadedSource' and 'module' events: asking at each stop would get all of them again at each step.
@@ -862,7 +864,8 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
     /**
      * Ends this session when its connection closes without a 'terminated' event, as when the debug adapter crashed or
      * was killed, or when the socket of a child session dropped: otherwise the session would count as alive for good,
-     * and keep the debug process running and the breakpoints it bound shown as verified.
+     * and keep the debug process running and the breakpoints it bound shown as verified. When the client is ending the
+     * session itself, it disposes the client instead, since the answer which terminate() waits for won't come.
      *
      * @param listening the future of the message loop, which ends when the connection closes.
      */
@@ -876,7 +879,13 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
             } catch (CancellationException | ExecutionException e) {
                 // Cancelled by dispose(), or the connection failed: it is gone either way
             }
-            if (terminatedReceived || isEnding()) {
+            if (isEnding()) {
+                // terminate() disposes the client once the DAP server answers 'terminate' or 'disconnect', which it
+                // can't do now: the debug adapter exited or crashed meanwhile
+                dispose();
+                return;
+            }
+            if (terminatedReceived) {
                 return;
             }
             debugProcess.print(DAPBundle.message("dap.session.connection.closed"), ConsoleViewContentType.SYSTEM_OUTPUT);
@@ -885,15 +894,15 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
     }
 
     /**
-     * Returns true when the client ends this session, or a session above it, with terminate() or dispose().
-     */
-    /**
      * Returns true once the connection to the DAP server has closed, or dispose() has cancelled it.
      */
     private boolean isConnectionClosed() {
         return debugProtocolFuture != null && debugProtocolFuture.isDone();
     }
 
+    /**
+     * Returns true when the client ends this session, or a session above it, with terminate() or dispose().
+     */
     private boolean isEnding() {
         for (DAPClient client = this; client != null; client = client.parentClient) {
             if (client.ending) {
@@ -906,6 +915,9 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
     @Override
     public void dispose() {
         ending = true;
+        if (!disposed.compareAndSet(false, true)) {
+            return;
+        }
         if (debugProtocolFuture != null) {
             CancellationSupport.cancel(debugProtocolFuture);
 
