@@ -7,7 +7,11 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij;
 
+import com.intellij.notification.Notification;
+import com.intellij.notification.NotificationType;
+import com.intellij.notification.Notifications;
 import com.intellij.testFramework.LightPlatformTestCase;
+import com.intellij.util.ui.UIUtil;
 import com.redhat.devtools.lsp4ij.launching.UserDefinedLanguageServerSettings;
 import com.redhat.devtools.lsp4ij.launching.UserDefinedLanguageServerSettings.UserDefinedLanguageServerItemSettings;
 import com.redhat.devtools.lsp4ij.launching.ui.UICommandLineUpdater;
@@ -15,6 +19,8 @@ import com.redhat.devtools.lsp4ij.server.definition.launching.UserDefinedLanguag
 import com.redhat.devtools.lsp4ij.server.definition.launching.UserDefinedTransport;
 import org.jetbrains.annotations.NotNull;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -28,6 +34,20 @@ public class UICommandLineUpdaterTransportTest extends LightPlatformTestCase {
 
     private UserDefinedLanguageServerItemSettings settings;
     private UserDefinedLanguageServerDefinition definition;
+    private final List<Notification> warnings = new ArrayList<>();
+
+    @Override
+    protected void setUp() throws Exception {
+        super.setUp();
+        getProject().getMessageBus().connect(getTestRootDisposable()).subscribe(Notifications.TOPIC, new Notifications() {
+            @Override
+            public void notify(@NotNull Notification notification) {
+                if (notification.getType() == NotificationType.WARNING) {
+                    warnings.add(notification);
+                }
+            }
+        });
+    }
 
     @Override
     protected void tearDown() throws Exception {
@@ -48,6 +68,18 @@ public class UICommandLineUpdaterTransportTest extends LightPlatformTestCase {
         assertSame(UserDefinedTransport.STDIO, definition.getTransport());
         assertEquals("node server.js --stdio", settings.getCommandLine());
         assertSame(UserDefinedTransport.STDIO, settings.getTransport());
+        // and the user is told so
+        UIUtil.dispatchAllInvocationEvents();
+        assertEquals(1, warnings.size());
+        assertEquals(LanguageServerBundle.message("language.server.installer.transport.stdio"), warnings.get(0).getContent());
+        assertTrue(warnings.get(0).getContent().contains("${port}"));
+    }
+
+    public void testAnInstallerCommandForAServerOverItsStandardInputAndOutputSaysNothing() {
+        updater(UserDefinedTransport.STDIO, "node server.js --stdio").setCommandLine("/opt/node/bin/node server.js --stdio");
+
+        UIUtil.dispatchAllInvocationEvents();
+        assertEmpty(warnings);
     }
 
     public void testAnInstallerCommandWhichTakesThePortKeepsTheSocket() {
@@ -59,6 +91,8 @@ public class UICommandLineUpdaterTransportTest extends LightPlatformTestCase {
         assertEquals("/opt/server/bin/server --port ${port}", settings.getCommandLine());
         assertEquals(socket, definition.getTransport());
         assertEquals(socket, settings.getTransport());
+        UIUtil.dispatchAllInvocationEvents();
+        assertEmpty(warnings);
     }
 
     public void testALanguageServerWhichRunsAlreadyKeepsItsSocket() {
