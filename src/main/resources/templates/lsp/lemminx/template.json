@@ -2,20 +2,67 @@
   "id": "lemminx",
   "name": "XML Language Server",
   "dev": true,
-  "url": null,
-  "runtime": "java",
+  "url": "https://github.com/eclipse/lemminx",
   "programArgs": {
-    "default": "-classpath \"${BASE_DIR}/org.eclipse.lemminx-uber.jar\" org.eclipse.lemminx.XMLServerLauncher"
+    "default": "java -classpath \"$USER_HOME$/.lsp4ij/lsp/lemminx/org.eclipse.lemminx-uber.jar\""
   },
+  "transports": [
+    {
+      "mode": "stdio",
+      "argument": "org.eclipse.lemminx.XMLServerLauncher"
+    },
+    {
+      "mode": "startAndConnect",
+      "argument": "org.eclipse.lemminx.XMLServerSocketLauncher --port ${port}"
+    }
+  ],
   "languageMappings": [
     {
-      "language": "XML"
+      "language": "XML",
+      "languageId": "xml"
     },
     {
-      "language": "DTD"
+      "language": "DTD",
+      "languageId": "dtd"
+    }
+  ],
+  "fileTypeMappings": [
+    {
+      "fileType": {
+        "name": "XSD",
+        "patterns": [
+          "*.xsd"
+        ]
+      },
+      "languageId": "xml"
     },
     {
-      "language": "RELAX-NG"
+      "fileType": {
+        "name": "XSL",
+        "patterns": [
+          "*.xsl",
+          "*.xslt"
+        ]
+      },
+      "languageId": "xsl"
+    },
+    {
+      "fileType": {
+        "name": "RELAX NG",
+        "patterns": [
+          "*.rng"
+        ]
+      },
+      "languageId": "xml"
+    },
+    {
+      "fileType": {
+        "name": "RELAX NG Compact",
+        "patterns": [
+          "*.rnc"
+        ]
+      },
+      "languageId": "rnc"
     }
   ]
 }
