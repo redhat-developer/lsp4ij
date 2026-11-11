@@ -65,9 +65,9 @@ import java.util.concurrent.LinkedBlockingQueue;
 public class DAPStepOnlyCurrentThreadSessionTest extends HeavyPlatformTestCase {
 
     /**
-     * Bounds the waits for the session and the DAP server; it only ends a hang.
+     * Bounds the waits for the session and the DAP server, so that a test fails instead of hanging.
      */
-    private static final int HANG_BOUND_SECONDS = 3600;
+    private static final int BOUND_SECONDS = 120;
 
     private SteppingServer server;
     private XDebugSession session;
@@ -150,7 +150,7 @@ public class DAPStepOnlyCurrentThreadSessionTest extends HeavyPlatformTestCase {
             var sessions = XDebuggerManager.getInstance(getProject()).getDebugSessions();
             session = sessions.length == 1 ? sessions[0] : null;
             return isStopped();
-        }, HANG_BOUND_SECONDS);
+        }, BOUND_SECONDS);
     }
 
     private boolean isStopped() {
@@ -162,7 +162,7 @@ public class DAPStepOnlyCurrentThreadSessionTest extends HeavyPlatformTestCase {
      */
     private @NotNull Object step() throws InterruptedException {
         PlatformTestUtil.waitWithEventsDispatching("the step is sent and the program stops again",
-                () -> !server.steps.isEmpty() && isStopped(), HANG_BOUND_SECONDS);
+                () -> !server.steps.isEmpty() && isStopped(), BOUND_SECONDS);
         return server.steps.take();
     }
 
