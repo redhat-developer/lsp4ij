@@ -11,6 +11,7 @@
 package com.redhat.devtools.lsp4ij.settings.ui;
 
 import com.google.common.net.InetAddresses;
+import com.google.common.net.InternetDomainName;
 import com.intellij.openapi.ui.ValidationInfo;
 import com.intellij.ui.PortField;
 import com.intellij.ui.components.JBLabel;
@@ -32,7 +33,6 @@ import java.text.DecimalFormat;
 import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.regex.Pattern;
 
 import static com.redhat.devtools.lsp4ij.LanguageServerBundle.message;
 
@@ -45,8 +45,6 @@ final class TransportFields {
 
     private static final int GAP = 12;
     private static final int MAX_PORT = 65_535;
-    private static final Pattern HOST_NAME =
-            Pattern.compile("[A-Za-z0-9_]([A-Za-z0-9_-]*[A-Za-z0-9_])?(\\.[A-Za-z0-9_]([A-Za-z0-9_-]*[A-Za-z0-9_])?)*\\.?");
 
     private final JBRadioButton stdio = new JBRadioButton(message("language.server.transport.stdio"));
     private final JBRadioButton socket = new JBRadioButton(message("language.server.transport.socket"));
@@ -301,11 +299,12 @@ final class TransportFields {
     }
 
     /**
-     * Returns true if the given text is an IP address, IPv6 too, or a host name: letters, digits, hyphens and
-     * underscores, in labels which dots separate. A scheme such as {@code http://}, a port, or a space fails it.
+     * Returns true if the given text is an IP address, IPv6 too, or a host name, as Guava's {@link InternetDomainName}
+     * reads it: labels which dots separate, the last of which isn't a number, so that a mistyped IP address such as
+     * {@code 999.1.1.1} fails it. A scheme such as {@code http://}, a port, or a space fails it too.
      */
     private static boolean isHost(@NotNull String text) {
-        return InetAddresses.isInetAddress(text) || HOST_NAME.matcher(text).matches();
+        return InetAddresses.isInetAddress(text) || InternetDomainName.isValid(text);
     }
 
     private @NotNull JBRadioButton modeButton(@NotNull UserDefinedTransport.Mode mode) {

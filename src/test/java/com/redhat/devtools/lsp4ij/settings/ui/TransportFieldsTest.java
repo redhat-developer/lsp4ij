@@ -181,7 +181,7 @@ public class TransportFieldsTest extends LightPlatformTestCase {
         port().setNumber(6005);
 
         // they would only fail when the language server starts
-        for (String wrong : List.of("http://localhost", "tcp://127.0.0.1", "localhost:6005", "local host")) {
+        for (String wrong : List.of("http://localhost", "tcp://127.0.0.1", "localhost:6005", "local host", "999.1.1.1", "127.0.0.256")) {
             host().setText(wrong);
             var error = fields.validate();
             assertNotNull(wrong, error);
