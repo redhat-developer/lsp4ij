@@ -81,6 +81,14 @@ dependencies {
             // Since 2025.2, JetBrains moved spellchecker in a new "intellij.spellchecker" module
             bundledModule("intellij.spellchecker")
         }
+        if (ideaVersionInt >= 263) {
+            // In 2026.3, the debugger API is in modules of its own, and the structure view in a plugin of its own
+            bundledModule("intellij.platform.debugger")
+            bundledModule("intellij.platform.debugger.impl")
+            bundledModule("intellij.platform.debugger.impl.shared")
+            bundledModule("intellij.platform.debugger.impl.ui")
+            bundledPlugin("com.intellij.structureView")
+        }
 
         pluginVerifier()
         zipSigner()
@@ -113,11 +121,12 @@ dependencies {
     testRuntimeOnly("org.junit.platform:junit-platform-launcher:1.11.0")
 }
 
-// Set the JDK version used by the toolchain to build the project (Java 21 is required for platform 2025.3).
-// Output compatibility and API usage are restricted to Java 17 in the tasks below.
+// Set the JDK version used by the toolchain to build the project (Java 21 is required for platform 2025.3, and Java 25
+// for platform 2026.3, whose classes are Java 25 classes). Output compatibility and API usage are restricted to Java 17
+// in the tasks below.
 kotlin {
     jvmToolchain {
-        languageVersion = JavaLanguageVersion.of(21)
+        languageVersion = JavaLanguageVersion.of(if (ideaVersionInt >= 263) 25 else 21)
     }
 }
 
@@ -255,6 +264,14 @@ tasks {
         gradleVersion = properties("gradleVersion").get()
         // The default of 10 seconds is at times too short for a CI runner to download the distribution
         networkTimeout = 60_000
+    }
+
+    prepareTestSandbox {
+        // The tests load every plugin bundled with the IDE they run on. IntelliJ IDEA Ultimate and the unified IntelliJ
+        // IDEA, such as 2026.3, bundle plugins for JavaScript and CSS, which take over the .js, .ts and .css files of
+        // the tests that IntelliJ IDEA Community leaves to LSP4IJ. Community has neither plugin, so there, this changes
+        // nothing.
+        disabledPlugins.addAll("JavaScript", "com.intellij.css")
     }
 
     // TODO: Once LSP4IJ no longer supports 2023.*, the hotswap JVM args can be added unconditionally

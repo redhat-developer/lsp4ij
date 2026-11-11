@@ -12,12 +12,22 @@ on:
 jobs:
   # Run tests and upload a code coverage report
   test:
-    name: Test
+    name: Test (${{ matrix.os }}${{ matrix.platformVersion && format(', {0}', matrix.platformVersion) || '' }})
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
         os: [ ubuntu-latest, windows-latest, macos-latest ]
+        # The platform version of gradle.properties
+        platformVersion: [ '' ]
+        include:
+          # Two more releases, on Linux only, each as a job of its own that runs alongside the others:
+          # IntelliJ IDEA Community 2025.3, and the newest release, 2026.3, of the unified IntelliJ IDEA (IU)
+          - os: ubuntu-latest
+            platformVersion: '2025.3'
+          - os: ubuntu-latest
+            platformVersion: '2026.3'
+            platformType: IU
     env:
         NO_FS_ROOTS_ACCESS_CHECK: true
     steps:
@@ -39,19 +49,19 @@ jobs:
 
       # Run tests
       - name: Run Tests
-        run: ./gradlew check
+        run: ./gradlew check ${{ matrix.platformVersion && format('-PplatformVersion={0}', matrix.platformVersion) || '' }} ${{ matrix.platformType && format('-PplatformType={0}', matrix.platformType) || '' }}
 
       # Collect Tests Result
       - name: Collect Tests Result
         if: ${{ success() || failure()}}
         uses: actions/upload-artifact@v7
         with:
-          name: tests-result-${{runner.os}}
+          name: tests-result-${{runner.os}}${{ matrix.platformVersion && format('-{0}', matrix.platformVersion) || '' }}
           path: ${{ github.workspace }}/build/reports/tests
 
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@v7.1.1
-        if: runner.os == 'Linux'
+        if: runner.os == 'Linux' && matrix.platformVersion == ''
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           slug: redhat-developer/lsp4ij
