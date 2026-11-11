@@ -187,7 +187,7 @@ public class TransportFieldsTest extends LightPlatformTestCase {
             assertNotNull(wrong, error);
             assertEquals(message("language.server.validation.socket.host"), error.message);
         }
-        for (String right : List.of("localhost", "127.0.0.1", "::1", "my-server.example.com", "my_service")) {
+        for (String right : List.of("localhost", "127.0.0.1", "::1", "my-server.example.com", "my_service", "3d-printer")) {
             host().setText(right);
             assertNull(right, fields.validate());
         }
