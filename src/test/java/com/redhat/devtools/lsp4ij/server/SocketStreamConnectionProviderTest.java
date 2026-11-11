@@ -81,7 +81,14 @@ public class SocketStreamConnectionProviderTest extends LightPlatformTestCase {
         }
         var provider = SocketStreamConnectionProvider.attachTo(HOST, port);
 
-        assertThrows(CannotStartProcessException.class, provider::start);
+        try {
+            provider.start();
+            fail("nothing listens on port " + port);
+        } catch (CannotStartProcessException e) {
+            // it names the host and the port, and on the IPv4 loopback address, the IPv6 one
+            assertTrue(e.getMessage(), e.getMessage().contains(HOST + ":" + port));
+            assertEquals(e.getMessage(), HOST.startsWith("127."), e.getMessage().contains("::1"));
+        }
         assertFalse(provider.isAlive());
     }
 

@@ -120,7 +120,8 @@ server which talks LSP over a TCP socket instead is configured with `Transport: 
   runs in a debugger or inside another application. LSP4IJ doesn't start it, so the environment variables, the
   `Command` and the working directory are hidden, and stopping the language server only closes the connection. Without a host, LSP4IJ connects to the loopback address; a host is a plain host name or IP address, without a scheme,
   and the port has its own field. An attach that gets no answer within 10 seconds fails.
-  The port is needed, since LSP4IJ can't choose it.
+  The port is needed, since LSP4IJ can't choose it. The loopback address is `127.0.0.1`: for a language server which
+  listens on the IPv6 loopback address only, as Node.js may do for `localhost`, set the host to `::1`.
 * `Start the language server, LSP4IJ connects to it`: LSP4IJ starts the language server with the `Command`, and
   connects to the port once the language server accepts connections.
 * `Start the language server, it connects to LSP4IJ`: LSP4IJ listens on the port and starts the language server with
@@ -148,6 +149,9 @@ tab of the [LSP console](./UserGuide.md#lsp-console), since the socket carries t
 information, and its standard error as errors. As with any TCP transport
 of LSP, which has no handshake to authenticate its peer, any local process can connect to a loopback port: on a machine
 shared with other users, prefer the standard input and output.
+
+A language server which LSP4IJ starts must listen on, or connect to, `127.0.0.1`, not `localhost`, which Node.js may
+resolve to the IPv6 loopback address `::1`. When it doesn't, the start fails with an error which says so.
 
 ### Mappings tab
 
