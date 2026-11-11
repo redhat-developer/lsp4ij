@@ -37,6 +37,75 @@ public class NewLanguageServerDialogTransportTest extends BasePlatformTestCase {
 
     private static final UserDefinedTransport RUNNING =
             new UserDefinedTransport(UserDefinedTransport.Mode.ATTACH, "127.0.0.1", 6005);
+    // The transports of the CSS template, and of the LemMinX one, whose arguments are the launcher class
+    private static final List<TransportSupport> CSS = List.of(
+            new TransportSupport(UserDefinedTransport.Mode.STDIO, "--stdio"),
+            new TransportSupport(UserDefinedTransport.Mode.START_AND_ACCEPT, "--socket=${port}"));
+    private static final List<TransportSupport> LEMMINX = List.of(
+            new TransportSupport(UserDefinedTransport.Mode.STDIO, "org.eclipse.lemminx.XMLServerLauncher"),
+            new TransportSupport(UserDefinedTransport.Mode.START_AND_CONNECT,
+                    "org.eclipse.lemminx.XMLServerSocketLauncher --port ${port}"));
+
+    public void testTheTransportWhichTheUserChoosesSwapsItsArgumentInTheCommand() {
+        var dialog = dialog(template("node css.js --stdio", UserDefinedTransport.STDIO, CSS));
+        try {
+            click(dialog, "language.server.transport.socket");
+            assertEquals("node css.js --socket=${port}", command(dialog));
+            // a language server which runs already has no argument: the command waits as it is
+            click(dialog, "language.server.socket.attach");
+            assertEquals("node css.js --socket=${port}", command(dialog));
+            click(dialog, "language.server.transport.stdio");
+            assertEquals("node css.js --stdio", command(dialog));
+        } finally {
+            dialog.close(DialogWrapper.CANCEL_EXIT_CODE);
+        }
+    }
+
+    public void testASocketStartsInTheModeOfTheTemplateWithItsArgument() {
+        var dialog = dialog(template("java -classpath lemminx.jar org.eclipse.lemminx.XMLServerLauncher",
+                UserDefinedTransport.STDIO, LEMMINX));
+        try {
+            click(dialog, "language.server.transport.socket");
+            assertTrue("the mode which the template lists", radio(dialog, "language.server.socket.startAndConnect").isSelected());
+            assertEquals("java -classpath lemminx.jar org.eclipse.lemminx.XMLServerSocketLauncher --port ${port}",
+                    command(dialog));
+            click(dialog, "language.server.transport.stdio");
+            assertEquals("java -classpath lemminx.jar org.eclipse.lemminx.XMLServerLauncher", command(dialog));
+        } finally {
+            dialog.close(DialogWrapper.CANCEL_EXIT_CODE);
+        }
+    }
+
+    public void testATemplateLoadsWithItsCommandAsItIs() {
+        // a command without the argument of the transport, as a wrapper script has
+        var dialog = dialog(template("node css.js --node-ipc", UserDefinedTransport.STDIO, CSS));
+        try {
+            assertEquals("node css.js --node-ipc", command(dialog));
+        } finally {
+            dialog.close(DialogWrapper.CANCEL_EXIT_CODE);
+        }
+    }
+
+    public void testATemplateLoadedAfterAnotherGetsNoArgumentOfTheOther() {
+        var dialog = dialog(template("java -classpath lemminx.jar org.eclipse.lemminx.XMLServerLauncher",
+                UserDefinedTransport.STDIO, LEMMINX));
+        try {
+            dialog.loadFromTemplate(template("node css.js --stdio", UserDefinedTransport.STDIO, CSS));
+            assertEquals("node css.js --stdio", command(dialog));
+        } finally {
+            dialog.close(DialogWrapper.CANCEL_EXIT_CODE);
+        }
+    }
+
+    public void testTheArgumentIsSwappedAsAWholeWordAtItsLastPlace() {
+        var dialog = dialog(template("node /opt/--stdio/css.js --stdio", UserDefinedTransport.STDIO, CSS));
+        try {
+            click(dialog, "language.server.transport.socket");
+            assertEquals("node /opt/--stdio/css.js --socket=${port}", command(dialog));
+        } finally {
+            dialog.close(DialogWrapper.CANCEL_EXIT_CODE);
+        }
+    }
 
     public void testARunningLanguageServerNeedsNoCommand() {
         var dialog = dialog(template("", RUNNING));
@@ -216,6 +285,33 @@ public class NewLanguageServerDialogTransportTest extends BasePlatformTestCase {
         var dialog = new NewLanguageServerDialog(getProject());
         dialog.loadFromTemplate(template);
         return dialog;
+    }
+
+    private static @NotNull LanguageServerTemplate template(@NotNull String command,
+                                                            @NotNull UserDefinedTransport transport,
+                                                            @NotNull List<TransportSupport> supportedTransports) {
+        var template = template(command, transport);
+        template.setSupportedTransports(supportedTransports);
+        return template;
+    }
+
+    /**
+     * Clicks the radio button of the dialog with the text of the given key, as the user does.
+     */
+    private static void click(@NotNull NewLanguageServerDialog dialog, @NotNull String key) {
+        radio(dialog, key).doClick();
+    }
+
+    private static @NotNull JBRadioButton radio(@NotNull NewLanguageServerDialog dialog, @NotNull String key) {
+        return (JBRadioButton) form(dialog).stream()
+                .filter(component -> component instanceof JBRadioButton radio
+                        && LanguageServerBundle.message(key).equals(radio.getText()))
+                .findFirst().orElseThrow();
+    }
+
+    private static @NotNull String command(@NotNull NewLanguageServerDialog dialog) {
+        return ((CommandLineWidget) form(dialog).stream().filter(CommandLineWidget.class::isInstance).findFirst()
+                .orElseThrow()).getText();
     }
 
     private static @NotNull LanguageServerTemplate template(@NotNull String command, @NotNull UserDefinedTransport transport) {

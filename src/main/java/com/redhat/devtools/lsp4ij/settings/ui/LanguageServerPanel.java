@@ -65,6 +65,9 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Comparator;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import static com.redhat.devtools.lsp4ij.LanguageServerBundle.BUNDLE;
 import static com.redhat.devtools.lsp4ij.server.definition.launching.CommandUtils.resolveCommandLine;
@@ -100,7 +103,9 @@ public class LanguageServerPanel implements Disposable {
     private TextFieldWithBrowseButton workingDir;
     private @Nullable TransportFields transportFields;
     private @NotNull List<TransportSupport> supportedTransports = List.of();
-    private @Nullable UserDefinedTransport.Mode previousTransportMode;
+    // Set while the panel shows a transport, or the transports of a template, itself: only a change of the transport
+    // that the user makes swaps its argument in the command
+    private boolean showingTransport;
     private ServerMappingsPanel mappingsPanel;
     private @Nullable SchemaBackedJsonTextField configurationWidget;
     private String configurationSchemaContent;
@@ -504,34 +509,46 @@ public class LanguageServerPanel implements Disposable {
             form.revalidate();
             form.repaint();
         }
-        updateCommandLineForTransport();
+        swapTransportArgument();
     }
 
     /**
-     * Updates the command line when the transport mode changes: replaces the previous transport's argument with the
-     * new one, or appends the current transport's argument if not already present (on initial template load).
+     * Swaps the argument of a transport in the command for that of the transport which the user has just chosen, as
+     * the template lists them, such as {@code --stdio} for {@code --socket=${port}}. The argument is matched as whole
+     * words, and its last occurrence is replaced. A command which has none of the template's arguments stays as it is,
+     * and so does the command when the panel shows a transport itself, as when it loads a template or saved settings.
      */
-    private void updateCommandLineForTransport() {
-        if (commandLine == null || supportedTransports.isEmpty()) {
+    private void swapTransportArgument() {
+        if (showingTransport || commandLine == null || supportedTransports.isEmpty()) {
             return;
         }
-        UserDefinedTransport.Mode currentMode = getTransport().mode();
-        String currentArgument = getTransportArgument(currentMode);
-        if (previousTransportMode != null && previousTransportMode != currentMode) {
-            String oldArgument = getTransportArgument(previousTransportMode);
-            if (oldArgument != null && currentArgument != null) {
-                String currentCommand = commandLine.getText();
-                if (currentCommand.contains(oldArgument)) {
-                    commandLine.setText(currentCommand.replace(oldArgument, currentArgument));
-                }
+        String argument = getTransportArgument(getTransport().mode());
+        if (argument == null) {
+            // As for a language server which runs already, whose command isn't used
+            return;
+        }
+        String command = commandLine.getText();
+        // The longest first, so that an argument is never taken for a shorter one which it contains
+        var arguments = supportedTransports.stream()
+                .map(TransportSupport::argument)
+                .filter(candidate -> candidate != null && !candidate.isBlank())
+                .sorted(Comparator.comparingInt(String::length).reversed())
+                .toList();
+        for (String present : arguments) {
+            Matcher matcher = Pattern.compile("(?<=^|\\s)" + Pattern.quote(present) + "(?=\\s|$)").matcher(command);
+            int start = -1;
+            int end = -1;
+            while (matcher.find()) {
+                start = matcher.start();
+                end = matcher.end();
             }
-        } else if (currentArgument != null) {
-            String currentCommand = commandLine.getText();
-            if (!currentCommand.contains(currentArgument)) {
-                commandLine.setText(currentCommand.isEmpty() ? currentArgument : currentCommand + " " + currentArgument);
+            if (start >= 0) {
+                if (!present.equals(argument)) {
+                    commandLine.setText(command.substring(0, start) + argument + command.substring(end));
+                }
+                return;
             }
         }
-        previousTransportMode = currentMode;
     }
 
     private @Nullable String getTransportArgument(@NotNull UserDefinedTransport.Mode mode) {
@@ -636,7 +653,12 @@ public class LanguageServerPanel implements Disposable {
     public void setSupportedTransports(@NotNull List<TransportSupport> supportedTransports) {
         this.supportedTransports = List.copyOf(supportedTransports);
         if (transportFields != null) {
-            transportFields.setSupportedTransports(supportedTransports);
+            showingTransport = true;
+            try {
+                transportFields.setSupportedTransports(supportedTransports);
+            } finally {
+                showingTransport = false;
+            }
         }
     }
 
@@ -656,7 +678,12 @@ public class LanguageServerPanel implements Disposable {
      */
     public void setTransport(@NotNull UserDefinedTransport transport) {
         if (transportFields != null) {
-            transportFields.setTransport(transport);
+            showingTransport = true;
+            try {
+                transportFields.setTransport(transport);
+            } finally {
+                showingTransport = false;
+            }
         }
     }
 
