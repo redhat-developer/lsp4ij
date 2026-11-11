@@ -152,6 +152,23 @@ public class DebugAdapterDescriptorTest {
                 cmd.getCommandLineString().contains("--port=" + port));
     }
 
+    @Test
+    @SuppressWarnings("deprecation")
+    public void testTheDeprecatedCommandLineOfACommandAndAnEnvironmentHasNoWorkingDirectory() throws Exception {
+        // A descriptor built against 0.21.0 may still call it
+        GeneralCommandLine cmd = new TestDescriptor().createStartServerCommandLine(
+                "node server.js --port=${port}",
+                Map.of("DAP_TEST_VARIABLE", "1"),
+                false
+        );
+
+        Assert.assertNull(cmd.getWorkDirectory());
+        Assert.assertEquals("1", cmd.getEnvironment().get("DAP_TEST_VARIABLE"));
+        Integer port = cmd.getUserData(DebugAdapterDescriptor.SERVER_PORT);
+        Assert.assertNotNull(port);
+        Assert.assertTrue(cmd.getCommandLineString().contains("--port=" + port));
+    }
+
     @Test(expected = ExecutionException.class)
     public void testCreateStartServerCommandLineThrowsOnBlankCommand() throws Exception {
         TestDescriptor descriptor = new TestDescriptor();
