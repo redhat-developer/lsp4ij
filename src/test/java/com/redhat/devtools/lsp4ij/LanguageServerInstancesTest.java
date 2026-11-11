@@ -63,6 +63,7 @@ import org.jetbrains.annotations.Nullable;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.lang.management.ManagementFactory;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
@@ -715,14 +716,16 @@ public class LanguageServerInstancesTest extends LSPCodeInsightFixtureTestCase {
         var virtualFile = file.getVirtualFile();
         var bDirectory = file("b/other.per-folder").getVirtualFile().getParent();
         var earlierUri = a.toUri(virtualFile);
-        var earlierUrl = virtualFile.getUrl();
         var holding = new AtomicBoolean();
         // The connection has checked the place of the file, and waits until the file moved before it registers the
-        // document
+        // document: until the move, on this thread, waits for documentsLock, as its listener does once the file moved.
+        // It doesn't read the place of the file, which races with the write action of the move without read access
+        var mover = Thread.currentThread();
+        var lock = documentsLock(a);
         a.setBeforeRegistration(() -> {
             if (holding.compareAndSet(false, true)) {
                 var deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(TIMEOUT);
-                while (virtualFile.getUrl().equals(earlierUrl) && System.nanoTime() < deadline) {
+                while (!isWaitingFor(mover, lock) && System.nanoTime() < deadline) {
                     Thread.onSpinWait();
                 }
             }
@@ -1469,6 +1472,15 @@ public class LanguageServerInstancesTest extends LSPCodeInsightFixtureTestCase {
         var field = LanguageServerWrapper.class.getDeclaredField("documentsLock");
         field.setAccessible(true);
         return field.get(wrapper);
+    }
+
+    /**
+     * Returns true if the given thread waits for the monitor of the given object.
+     */
+    private static boolean isWaitingFor(@NotNull Thread thread, @NotNull Object monitor) {
+        var info = ManagementFactory.getThreadMXBean().getThreadInfo(thread.getId());
+        return info != null && info.getLockInfo() != null
+                && info.getLockInfo().getIdentityHashCode() == System.identityHashCode(monitor);
     }
 
     private @NotNull LanguageServerWrapper instanceOf(@NotNull PsiFile file) throws Exception {
