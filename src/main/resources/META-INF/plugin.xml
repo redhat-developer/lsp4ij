@@ -10,7 +10,7 @@
     <ul>
       <li><strong>Debugging (DAP)</strong>: added pause, function and data breakpoints, hit conditions, logpoints, Reset Frame, Step Only the Current Thread, a Debug console, inline values from the language server, lazy, paged and hexadecimal variables, and Loaded Sources and Modules tabs (see the <a href="https://github.com/redhat-developer/lsp4ij/blob/main/docs/dap/UserGuide.md">DAP user guide</a>)</li>
       <li><strong>Several instances of one language server per project</strong> (#1853), each with its own root and environment, configured with <code>serverInstances</code>, and <code>${instanceRoot}</code> in the command and the working directory (#1929)</li>
-      <li><strong>Language servers over a TCP socket</strong>, experimental (#1870): attach to a running language server, or let LSP4IJ start it</li>
+      <li><strong>Language servers over a TCP socket</strong> (#1870): attach to a running language server, or let LSP4IJ start it</li>
       <li>Added support for workspace diagnostics (#1703), <code>workspace/textDocumentContent</code> (#1749), <code>textDocument/willSave</code> and <code>willSaveWaitUntil</code> (#1746), and linked editing ranges (#1812)</li>
       <li>Added support for the inline value and folding range refresh requests (#1790), <code>workspaceSymbol/resolve</code> (#1788), and the per-signature <code>activeParameter</code> of signature help</li>
       <li>A language server or DAP server gets the environment of its working directory from the IDE's environment customizers, such as mise's (#1693)</li>
