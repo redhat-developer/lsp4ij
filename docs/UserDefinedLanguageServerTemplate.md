@@ -61,8 +61,8 @@ The template descriptor (`template.json`) is a JSON file used to define:
   "id": "typescript-language-server",
   "name": "TypeScript Language Server",
   "programArgs": {
-    "default": "sh -c \"typescript-language-server --stdio\"",
-    "windows": "typescript-language-server.cmd --stdio"
+    "default": "sh -c typescript-language-server --stdio",
+    "windows": "cmd /C typescript-language-server.cmd --stdio"
   },
   "transports": [
     {
@@ -116,11 +116,11 @@ server which talks LSP over a TCP socket instead has a `socket`, which is experi
 * `startAndConnect`: LSP4IJ starts the language server, which listens on the port, and connects to it.
 * `startAndAccept`: LSP4IJ listens on the port and starts the language server, which connects to it.
 
-| Field  | Value                                                      | Default                                         |
-|--------|------------------------------------------------------------|-------------------------------------------------|
-| `mode` | `attach`, `startAndConnect`, `startAndAccept`, or `stdio`  | none: standard input and output, with a warning |
-| `host` | a plain host name or IP address, used by `attach` only     | the loopback address                            |
-| `port` | a number from 0 to 65535; 0 lets LSP4IJ choose a free port | 0                                               |
+| Field  | Value                                                                          | Default                                         |
+|--------|--------------------------------------------------------------------------------|-------------------------------------------------|
+| `mode` | `attach`, `startAndConnect`, `startAndAccept`, or `stdio`                      | none: standard input and output, with a warning |
+| `host` | a plain host name or IP address, used by `attach` only                         | the loopback address                            |
+| `port` | a number from 0 to 65535; 0 lets LSP4IJ choose a free port (not with `attach`) | 0                                               |
 
 A `mode` of `stdio` is the same as no `socket`. The command of a language server which LSP4IJ starts takes the port as
 `${port}`, and a `port` of 0, or none, lets LSP4IJ choose a free one. With `attach`, LSP4IJ can't choose the port, so
