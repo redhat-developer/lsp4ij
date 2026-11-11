@@ -11,10 +11,13 @@ import com.intellij.openapi.project.Project;
 import com.intellij.testFramework.PlatformTestUtil;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
+import com.redhat.devtools.lsp4ij.LanguageServerWrapper;
 import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
 import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
 import com.redhat.devtools.lsp4ij.ServerStatus;
 import com.redhat.devtools.lsp4ij.fixtures.LSPCodeInsightFixtureTestCase;
+import com.redhat.devtools.lsp4ij.lifecycle.LanguageServerLifecycleListener;
+import com.redhat.devtools.lsp4ij.lifecycle.LanguageServerLifecycleManager;
 import com.redhat.devtools.lsp4ij.mock.MockLanguageServerDefinition;
 import com.redhat.devtools.lsp4ij.templates.ServerMappingSettings;
 import org.eclipse.lsp4j.Hover;
@@ -23,6 +26,8 @@ import org.eclipse.lsp4j.MarkupContent;
 import org.eclipse.lsp4j.MarkupKind;
 import org.eclipse.lsp4j.Position;
 import org.eclipse.lsp4j.TextDocumentIdentifier;
+import org.eclipse.lsp4j.jsonrpc.MessageConsumer;
+import org.eclipse.lsp4j.jsonrpc.messages.Message;
 import org.eclipse.lsp4j.launch.LSPLauncher;
 import org.jetbrains.annotations.NotNull;
 
@@ -42,9 +47,9 @@ import java.util.concurrent.TimeUnit;
 public class SocketLanguageServerTest extends LSPCodeInsightFixtureTestCase {
 
     /**
-     * Bounds the waits; it only ends a hang.
+     * Bounds the waits, so that a test fails instead of hanging.
      */
-    private static final int HANG_BOUND_SECONDS = 3600;
+    private static final int BOUND_SECONDS = 60;
 
     public SocketLanguageServerTest() {
         // the mock language server of the fixture takes no file of this test
@@ -82,7 +87,7 @@ public class SocketLanguageServerTest extends LSPCodeInsightFixtureTestCase {
                 var psiFile = myFixture.configureByText("main.sock", "main");
                 var file = psiFile.getVirtualFile();
                 LanguageServerItem item = LanguageServiceAccessor.getInstance(project).getLanguageServers(psiFile, null, null)
-                        .get(HANG_BOUND_SECONDS, TimeUnit.SECONDS).stream()
+                        .get(BOUND_SECONDS, TimeUnit.SECONDS).stream()
                         .filter(languageServer -> languageServer.getServerDefinition() == definition)
                         .findFirst()
                         .orElseThrow();
@@ -91,13 +96,45 @@ public class SocketLanguageServerTest extends LSPCodeInsightFixtureTestCase {
                 assertNull("LSP4IJ started no process", wrapper.getCurrentProcessId());
 
                 var params = new HoverParams(new TextDocumentIdentifier(LSPIJUtils.toUriAsString(file)), new Position(0, 0));
-                var hover = item.getServer().getTextDocumentService().hover(params).get(HANG_BOUND_SECONDS, TimeUnit.SECONDS);
+                var hover = item.getServer().getTextDocumentService().hover(params).get(BOUND_SECONDS, TimeUnit.SECONDS);
                 assertEquals("over a socket", hover.getContents().getRight().getValue());
 
-                // the language server closes the connection
-                connection.get(HANG_BOUND_SECONDS, TimeUnit.SECONDS).close();
-                PlatformTestUtil.waitWithEventsDispatching("the language server stops",
-                        () -> wrapper.getServerStatus() == ServerStatus.stopped, HANG_BOUND_SECONDS);
+                // The stop is seen as it happens: the editor asks for the language server again, which can start it
+                // again before a check of its status would see it stopped
+                var stopped = new CompletableFuture<Void>();
+                var lifecycle = LanguageServerLifecycleManager.getInstance(project);
+                var listener = new LanguageServerLifecycleListener() {
+                    @Override
+                    public void handleStatusChanged(@NotNull LanguageServerWrapper languageServer) {
+                        if (languageServer == wrapper && languageServer.getServerStatus() == ServerStatus.stopped) {
+                            stopped.complete(null);
+                        }
+                    }
+
+                    @Override
+                    public void handleLSPMessage(@NotNull Message message, @NotNull MessageConsumer consumer,
+                                                 @NotNull LanguageServerWrapper languageServer) {
+                    }
+
+                    @Override
+                    public void handleError(@NotNull LanguageServerWrapper languageServer, @NotNull Throwable exception) {
+                    }
+
+                    @Override
+                    public void dispose() {
+                    }
+                };
+                lifecycle.addLanguageServerLifecycleListener(listener);
+                try {
+                    // Nothing listens anymore, so that a start again fails at once instead of waiting on a connection
+                    // which nothing serves
+                    listening.close();
+                    // the language server closes the connection
+                    connection.get(BOUND_SECONDS, TimeUnit.SECONDS).close();
+                    PlatformTestUtil.waitWithEventsDispatching("the language server stops", stopped::isDone, BOUND_SECONDS);
+                } finally {
+                    lifecycle.removeLanguageServerLifecycleListener(listener);
+                }
             } finally {
                 server.waitBeforeTearDown();
                 LanguageServersRegistry.getInstance().removeServerDefinition(project, definition);
