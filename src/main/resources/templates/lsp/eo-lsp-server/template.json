@@ -3,7 +3,7 @@
   "name": "LSP Server for EOLANG",
   "programArgs": {
     "windows": "cmd /C eo-lsp-server.cmd --stdio",
-    "default": "sh -c eo-lsp-server --stdio"
+    "default": "eo-lsp-server --stdio"
   },
   "fileTypeMappings": [
     {
