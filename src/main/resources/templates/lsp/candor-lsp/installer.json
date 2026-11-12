@@ -25,8 +25,8 @@
         "configureServer": {
           "name": "Configure Candor Language Server command",
           "command": {
-            "windows": "${workingDir}/.bin/candor-lsp.cmd",
-            "default": "${workingDir}/.bin/candor-lsp"
+            "windows": "\"${workingDir}/.bin/candor-lsp.cmd\"",
+            "default": "\"${workingDir}/.bin/candor-lsp\""
           },
           "update": true
         }

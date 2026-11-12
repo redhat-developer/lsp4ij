@@ -55,7 +55,7 @@
       "onSuccess": {
         "configureServer": {
           "name": "Configure WSGL Language server command",
-          "command": "${output.dir}/${output.file.name}",
+          "command": "\"${output.dir}/${output.file.name}\"",
           "update": true
         }
       }

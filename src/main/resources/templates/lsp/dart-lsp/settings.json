@@ -18,14 +18,6 @@
   "dart.closeDevTools": "never",
   "dart.shareDevToolsWithFlutter": true,
   "dart.showInspectorNotificationsForWidgetErrors": true,
-  "dart.customDevTools": {
-    "path": "/path/to/devtools",
-    "args": [],
-    "env": {
-      "LOCAL_DART_SDK": "/path/to/dart-sdk",
-      "FLUTTER_ROOT": "/path/to/devtools/tool/flutter-sdk"
-    }
-  },
   "dart.autoImportCompletions": true,
   "dart.automaticCommentSlashes": "tripleSlash",
   "dart.closingLabels": true,

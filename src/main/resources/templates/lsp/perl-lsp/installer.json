@@ -58,7 +58,7 @@
       "onSuccess": {
         "configureServer": {
           "name": "Configure Perl Language server command",
-          "command": "${output.dir}/${output.file.name} --stdio",
+          "command": "\"${output.dir}/${output.file.name}\" --stdio",
           "update": true
         }
       }
