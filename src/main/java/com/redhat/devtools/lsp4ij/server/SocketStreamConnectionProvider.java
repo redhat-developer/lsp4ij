@@ -385,14 +385,15 @@ public class SocketStreamConnectionProvider implements StreamConnectionProvider,
     }
 
     private void checkNothingListens(int port) throws IOException, CannotStartProcessException {
-        for (InetAddress address : addresses()) {
-            try (var probe = new Socket()) {
-                probe.connect(new InetSocketAddress(address, port));
-            } catch (IOException nothingListens) {
-                continue;
-            }
-            throw new CannotStartProcessException("A process listens on port " + port + " already: " + this);
+        Socket listener;
+        try {
+            // Bounded, and closed by stop(), so that a host which drops packets doesn't hold the start up
+            listener = connectOnce(port, ATTACH_TIMEOUT.compareTo(startTimeout) < 0 ? ATTACH_TIMEOUT : startTimeout);
+        } catch (IOException nothingListens) {
+            return;
         }
+        closeQuietly(listener);
+        throw new CannotStartProcessException("A process listens on port " + port + " already: " + this);
     }
 
     /**
@@ -423,14 +424,24 @@ public class SocketStreamConnectionProvider implements StreamConnectionProvider,
     }
 
     /**
-     * Connects once to each address in turn, until one takes the connection. When none takes it, it fails as the first
-     * address did, as with "Connection refused", and the failures of the others are suppressed in it.
+     * Connects once to each address in turn, until one takes the connection, within the given timeout for all of
+     * them. When none takes it, it fails as the first address did, as with "Connection refused", and the failures of
+     * the others are suppressed in it.
      */
     private @NotNull Socket connectOnce(int port, @NotNull Duration timeout) throws IOException, CannotStartProcessException {
+        long deadline = System.nanoTime() + timeout.toNanos();
         IOException failure = null;
         for (InetAddress address : addresses()) {
+            long remaining = TimeUnit.NANOSECONDS.toMillis(deadline - System.nanoTime());
+            if (remaining <= 0) {
+                // An address which drops packets took the time of all
+                if (failure == null) {
+                    failure = new SocketTimeoutException("Connect timed out");
+                }
+                break;
+            }
             try {
-                return connectOnce(new InetSocketAddress(address, port), timeout);
+                return connectOnce(new InetSocketAddress(address, port), Duration.ofMillis(remaining));
             } catch (IOException e) {
                 // A stop closes the attempt: the start ends, without trying the next address
                 checkNotStopped();

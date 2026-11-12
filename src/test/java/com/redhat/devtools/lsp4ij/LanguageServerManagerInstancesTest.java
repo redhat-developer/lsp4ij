@@ -10,6 +10,8 @@ package com.redhat.devtools.lsp4ij;
 import com.intellij.codeHighlighting.TextEditorHighlightingPassRegistrar;
 import com.intellij.codeInsight.daemon.impl.DaemonCodeAnalyzerImpl;
 import com.intellij.codeInsight.daemon.impl.HighlightInfo;
+import com.intellij.notification.Notification;
+import com.intellij.notification.NotificationType;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.ModalityState;
 import com.intellij.openapi.application.impl.NonBlockingReadActionImpl;
@@ -22,6 +24,7 @@ import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiFile;
 import com.intellij.testFramework.EdtTestUtil;
 import com.intellij.testFramework.PlatformTestUtil;
+import com.intellij.testFramework.TestActionEvent;
 import com.redhat.devtools.lsp4ij.client.features.FileUriSupport;
 import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
 import com.redhat.devtools.lsp4ij.client.features.LSPWorkspaceFolderFeature;
@@ -39,6 +42,7 @@ import com.redhat.devtools.lsp4ij.mock.MockLanguageServer;
 import com.redhat.devtools.lsp4ij.mock.MockLanguageServerDefinition;
 import com.redhat.devtools.lsp4ij.server.LanguageServerException;
 import com.redhat.devtools.lsp4ij.server.StreamConnectionProvider;
+import com.redhat.devtools.lsp4ij.settings.actions.EnableAndStartLanguageServerAction;
 import com.redhat.devtools.lsp4ij.templates.ServerMappingSettings;
 import org.eclipse.lsp4j.Diagnostic;
 import org.eclipse.lsp4j.Position;
@@ -213,6 +217,29 @@ public class LanguageServerManagerInstancesTest extends LSPCodeInsightFixtureTes
         PlatformTestUtil.waitWithEventsDispatching("The open file of a must be connected again",
                 () -> a.isConnectedTo(a.toUri(aFile)), TIMEOUT);
         dispatchAll();
+        assertEquals(ServerStatus.stopped, b.getServerStatus());
+    }
+
+    public void testEnableAndStartOfAnInstanceWhichFailedStartsDisabledStartsNoOtherStoppedInstance() throws Exception {
+        var aFile = file("a/one.instances").getVirtualFile();
+        var a = openAndConnect(aFile);
+        var b = openAndConnect(file("b/one.instances").getVirtualFile());
+        stop(b);
+        // As too many failed starts do: a is switched off on its own
+        a.stopAndDisable();
+        waitForStatus(a, ServerStatus.stopped);
+        var notification = new Notification(ServerMessageHandler.LSP_WINDOW_SHOW_MESSAGE_GROUP_ID, "a", "disabled",
+                NotificationType.ERROR);
+
+        new EnableAndStartLanguageServerAction(a).actionPerformed(TestActionEvent.createTestEvent(), notification);
+
+        // a starts and connects its open files again, but not those of b, which would start b
+        waitForStatus(a, ServerStatus.started);
+        PlatformTestUtil.waitWithEventsDispatching("The open file of a must be connected again",
+                () -> a.isConnectedTo(a.toUri(aFile)), TIMEOUT);
+        dispatchAll();
+        assertTrue(a.isEnabled());
+        assertTrue(notification.isExpired());
         assertEquals(ServerStatus.stopped, b.getServerStatus());
     }
 
