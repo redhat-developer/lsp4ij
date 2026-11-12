@@ -306,14 +306,13 @@ public class SocketStreamConnectionProvider implements StreamConnectionProvider,
         long pause = FIRST_RETRY_PAUSE_MILLIS;
         while (true) {
             try {
-                install(connectOnce(port, connectTimeout()));
+                // Each attempt gets only the time which is left of the start
+                install(connectOnce(port, Duration.ofNanos(deadline - System.nanoTime())));
                 return;
             } catch (ConnectException notListeningYet) {
                 long remaining = TimeUnit.NANOSECONDS.toMillis(deadline - System.nanoTime());
                 if (remaining <= 0) {
-                    throw new CannotStartProcessException("The language server didn't accept a connection on "
-                            + address(port) + " within " + startTimeout.toSeconds() + " s: " + this
-                            + ipv6Hint(" Let it listen on " + host + " instead."));
+                    throw notAccepted(port);
                 }
                 boolean ended = handler.waitFor(Math.min(pause, remaining));
                 checkNotStopped();
@@ -321,8 +320,15 @@ public class SocketStreamConnectionProvider implements StreamConnectionProvider,
                     throw new CannotStartProcessException("The language server ended before it accepted a connection: " + this);
                 }
                 pause = Math.min(pause * 2, MAX_RETRY_PAUSE_MILLIS);
+            } catch (SocketTimeoutException startTimedOut) {
+                throw notAccepted(port);
             }
         }
+    }
+
+    private @NotNull CannotStartProcessException notAccepted(int port) {
+        return new CannotStartProcessException("The language server didn't accept a connection on " + address(port)
+                + " within " + startTimeout.toSeconds() + " s: " + this + ipv6Hint(" Let it listen on " + host + " instead."));
     }
 
     /**
@@ -398,8 +404,9 @@ public class SocketStreamConnectionProvider implements StreamConnectionProvider,
     }
 
     /**
-     * Returns how long one connection attempt waits: for a language server which runs already, the shorter of
-     * {@link #ATTACH_TIMEOUT} and the start timeout; for one which this provider starts, the start timeout.
+     * Returns how long LSP4IJ waits for the connection: for a language server which runs already, the shorter of
+     * {@link #ATTACH_TIMEOUT} and the start timeout; for one which this provider starts, the start timeout, which its
+     * attempts share.
      */
     @NotNull
     Duration connectTimeout() {
@@ -408,7 +415,8 @@ public class SocketStreamConnectionProvider implements StreamConnectionProvider,
 
     /**
      * Connects once to each address in turn, until one takes the connection, within the given timeout for all of
-     * them. When none takes it, it fails as the first address did, as with "Connection refused", and the failures of
+     * them. When none takes it, it fails with a {@link SocketTimeoutException} if the time ran out, as an address which
+     * drops packets makes it, and as the first address did otherwise, as with "Connection refused". The failures of
      * the others are suppressed in it.
      */
     private @NotNull Socket connectOnce(int port, @NotNull Duration timeout) throws IOException, CannotStartProcessException {
@@ -418,8 +426,8 @@ public class SocketStreamConnectionProvider implements StreamConnectionProvider,
             long remaining = TimeUnit.NANOSECONDS.toMillis(deadline - System.nanoTime());
             if (remaining <= 0) {
                 // An address which drops packets took the time of all
-                if (failure == null) {
-                    failure = new SocketTimeoutException("Connect timed out");
+                if (!(failure instanceof SocketTimeoutException)) {
+                    failure = withSuppressed(new SocketTimeoutException("Connect timed out"), failure);
                 }
                 break;
             }
@@ -428,14 +436,20 @@ public class SocketStreamConnectionProvider implements StreamConnectionProvider,
             } catch (IOException e) {
                 // A stop closes the attempt: the start ends, without trying the next address
                 checkNotStopped();
-                if (failure == null) {
-                    failure = e;
-                } else {
-                    failure.addSuppressed(e);
-                }
+                // A timeout is what failed, rather than a refusal of an address before it: something may listen there
+                failure = failure == null ? e
+                        : e instanceof SocketTimeoutException ? withSuppressed(e, failure)
+                        : withSuppressed(failure, e);
             }
         }
         throw Objects.requireNonNull(failure, "no address to connect to");
+    }
+
+    private static @NotNull IOException withSuppressed(@NotNull IOException failure, @Nullable IOException other) {
+        if (other != null) {
+            failure.addSuppressed(other);
+        }
+        return failure;
     }
 
     private @NotNull Socket connectOnce(@NotNull InetSocketAddress address, @NotNull Duration timeout)
