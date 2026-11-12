@@ -154,6 +154,25 @@ public class LanguageServerWrapperRestartTest extends UsefulTestCase {
         assertEquals(0, wrapper.getNumberOfRestartAttempts());
     }
 
+    public void testOnlyTheRestartsWithinTheWindowCountSoALanguageServerWhichFailsNowAndThenStaysEnabled() {
+        serverDefinition.failingConnections = Integer.MAX_VALUE;
+        var wrapper = new LanguageServerWrapper(myFixture.getProject(), serverDefinition);
+        Disposer.register(getTestRootDisposable(), wrapper);
+        wrapper.setRestartPauses(Duration.ZERO, Duration.ZERO);
+        // A window which each restart has left by the next start, as for a language server which crashes once a day
+        wrapper.setRestartWindow(Duration.ZERO);
+
+        // More failed starts than it takes to disable a language server whose restarts all count
+        int starts = wrapper.getMaxNumberOfRestartAttempts() + 5;
+        waitUntil(() -> {
+            wrapper.start();
+            return serverDefinition.connectionCount.get() >= starts || !wrapper.isEnabled();
+        }, "the language server should start " + starts + " times");
+
+        assertTrue(wrapper.isEnabled());
+        assertTrue(String.valueOf(wrapper.getNumberOfRestartAttempts()), wrapper.getNumberOfRestartAttempts() <= 1);
+    }
+
     public void testStartDoesNotAbortRestartInFlight() {
         var wrapper = new LanguageServerWrapper(myFixture.getProject(), serverDefinition);
         Disposer.register(getTestRootDisposable(), wrapper);

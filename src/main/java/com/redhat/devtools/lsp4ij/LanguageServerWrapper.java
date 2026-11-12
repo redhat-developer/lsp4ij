@@ -163,14 +163,18 @@ public class LanguageServerWrapper implements Disposable {
     protected StreamConnectionProvider lspStreamProvider;
     private volatile MessageBusConnection messageBusConnection;
     private Future<?> launcherFuture;
+    // The restarts within the last restart window
     private int numberOfRestartAttempts;
+    // When each restart within the last restart window began, as System.nanoTime(). An older restart no longer counts,
+    // so that a language server which fails now and then, as one which crashes once a day, is never disabled, while
+    // one which keeps failing is: its restarts, with their pauses, take about 7.5 minutes
+    private final ArrayDeque<Long> restartNanos = new ArrayDeque<>();
+    private @NotNull Duration restartWindow = Duration.ofMinutes(10);
     // A start which follows a failed restart too soon waits, so that the features of the open files, each of which
     // starts the language server, don't use up its restarts in a moment, as while a language server which LSP4IJ
     // attaches to doesn't run yet. The first restart is at once; from the second on, the pause doubles up to the last.
     private @NotNull Duration firstRestartPause = Duration.ofSeconds(1);
     private @NotNull Duration maxRestartPause = Duration.ofSeconds(30);
-    // When the last restart began, as System.nanoTime()
-    private long lastRestartNanos;
     private @Nullable CompletableFuture<Void> initializeFuture;
     private volatile LanguageServer languageServer;
     private LanguageClientImpl languageClient;
@@ -436,6 +440,7 @@ public class LanguageServerWrapper implements Disposable {
     }
 
     private synchronized void restart(boolean onItsOwn) {
+        restartNanos.clear();
         numberOfRestartAttempts = 0;
         serverError = null;
         setEnabled(true);
@@ -530,9 +535,14 @@ public class LanguageServerWrapper implements Disposable {
                 // See: https://github.com/redhat-developer/lsp4ij/issues/1673
                 return;
             }
+            long now = System.nanoTime();
+            while (!restartNanos.isEmpty() && now - restartNanos.peekFirst() >= restartWindow.toNanos()) {
+                restartNanos.pollFirst();
+            }
+            numberOfRestartAttempts = restartNanos.size();
             var pause = restartPause(numberOfRestartAttempts, firstRestartPause, maxRestartPause);
             // System.nanoTime() is only compared with an earlier one: before a first restart, there is none
-            if (!pause.isZero() && System.nanoTime() - lastRestartNanos < pause.toNanos()) {
+            if (!pause.isZero() && now - restartNanos.getLast() < pause.toNanos()) {
                 // Too soon after the last restart: the language server stays as its failed start left it, without a
                 // language server, and the start counts no restart
                 return;
@@ -546,8 +556,8 @@ public class LanguageServerWrapper implements Disposable {
                 showNotificationDisabled(serverError);
                 return;
             } else {
-                numberOfRestartAttempts++;
-                lastRestartNanos = System.nanoTime();
+                restartNanos.addLast(now);
+                numberOfRestartAttempts = restartNanos.size();
             }
         }
         final var filesToReconnect = new ArrayList<VirtualFile>();
@@ -816,6 +826,11 @@ public class LanguageServerWrapper implements Disposable {
     synchronized void setRestartPauses(@NotNull Duration first, @NotNull Duration max) {
         this.firstRestartPause = first;
         this.maxRestartPause = max;
+    }
+
+    @TestOnly
+    synchronized void setRestartWindow(@NotNull Duration restartWindow) {
+        this.restartWindow = restartWindow;
     }
 
     @TestOnly
