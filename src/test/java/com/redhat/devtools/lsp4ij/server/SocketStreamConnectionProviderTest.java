@@ -92,6 +92,55 @@ public class SocketStreamConnectionProviderTest extends LightPlatformTestCase {
         assertFalse(provider.isAlive());
     }
 
+    public void testWithoutAHostItReachesALanguageServerWhichListensOnTheIPv6LoopbackAddressOnly() throws Exception {
+        // As a language server which listens on localhost, which Node.js may bind to ::1 only
+        try (var server = new ServerSocket(0, 1, InetAddress.getByName("::1"))) {
+            var provider = new SocketStreamConnectionProvider(SocketStreamConnectionProvider.Direction.CONNECT, null,
+                    server.getLocalPort(), null);
+            try {
+                provider.start();
+                try (var accepted = server.accept()) {
+                    writeLine(provider.getOutputStream(), "ping");
+                    assertEquals("ping", readLine(accepted.getInputStream()));
+                }
+            } finally {
+                provider.stop();
+            }
+        }
+    }
+
+    public void testWithoutAHostTheErrorNamesBothLoopbackAddresses() throws Exception {
+        int port;
+        try (var server = new ServerSocket(0, 1, InetAddress.getLoopbackAddress())) {
+            port = server.getLocalPort();
+        }
+        var provider = new SocketStreamConnectionProvider(SocketStreamConnectionProvider.Direction.CONNECT, null, port,
+                null);
+
+        try {
+            provider.start();
+            fail("nothing listens on port " + port);
+        } catch (CannotStartProcessException e) {
+            assertTrue(e.getMessage(), e.getMessage().contains(HOST + ":" + port + " or [::1]:" + port)
+                    || e.getMessage().contains("[::1]:" + port + " or " + "127.0.0.1:" + port));
+            // LSP4IJ tried ::1: no advice to set it
+            assertFalse(e.getMessage(), e.getMessage().contains("Set the host to ::1"));
+        }
+    }
+
+    public void testAnIPv4AddressAsTheHostIsNotTriedOverIPv6() throws Exception {
+        try (var server = new ServerSocket(0, 1, InetAddress.getByName("::1"))) {
+            var provider = SocketStreamConnectionProvider.attachTo("127.0.0.1", server.getLocalPort());
+
+            try {
+                provider.start();
+                fail("LSP4IJ connects to the address it is given only");
+            } catch (CannotStartProcessException e) {
+                assertTrue(e.getMessage(), e.getMessage().contains("Set the host to ::1"));
+            }
+        }
+    }
+
     public void testALanguageServerThatClosesTheConnectionStopsUnexpectedlyOnce() throws Exception {
         try (var server = new ServerSocket(0, 1, InetAddress.getLoopbackAddress())) {
             var provider = SocketStreamConnectionProvider.attachTo(HOST, server.getLocalPort());
