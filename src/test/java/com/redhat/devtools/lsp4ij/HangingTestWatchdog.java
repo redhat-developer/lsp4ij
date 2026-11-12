@@ -16,7 +16,9 @@ import org.junit.platform.launcher.TestPlan;
 import java.io.FileDescriptor;
 import java.io.FileOutputStream;
 import java.io.PrintStream;
+import java.lang.management.LockInfo;
 import java.lang.management.ManagementFactory;
+import java.lang.management.MonitorInfo;
 import java.lang.management.ThreadInfo;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
@@ -94,17 +96,29 @@ public final class HangingTestWatchdog implements TestExecutionListener {
     static @NotNull String threadDump() {
         var dump = new StringBuilder();
         for (ThreadInfo thread : ManagementFactory.getThreadMXBean().dumpAllThreads(true, true)) {
-            dump.append('"').append(thread.getThreadName()).append("\" ").append(thread.getThreadState());
+            // The id tells apart two threads with the same name
+            dump.append('"').append(thread.getThreadName()).append("\" #").append(thread.getThreadId())
+                    .append(' ').append(thread.getThreadState());
             if (thread.getLockName() != null) {
                 dump.append(" on ").append(thread.getLockName());
             }
             if (thread.getLockOwnerName() != null) {
-                dump.append(" held by \"").append(thread.getLockOwnerName()).append('"');
+                dump.append(" held by \"").append(thread.getLockOwnerName()).append("\" #").append(thread.getLockOwnerId());
             }
             dump.append('\n');
-            // ThreadInfo.toString() would show 8 frames only
-            for (StackTraceElement frame : thread.getStackTrace()) {
-                dump.append("\tat ").append(frame).append('\n');
+            // ThreadInfo.toString() would show 8 frames only. Each monitor which the thread holds follows the frame which
+            // took it, as in jstack
+            StackTraceElement[] frames = thread.getStackTrace();
+            for (int depth = 0; depth < frames.length; depth++) {
+                dump.append("\tat ").append(frames[depth]).append('\n');
+                for (MonitorInfo monitor : thread.getLockedMonitors()) {
+                    if (monitor.getLockedStackDepth() == depth) {
+                        dump.append("\t- locked ").append(monitor).append('\n');
+                    }
+                }
+            }
+            for (LockInfo lock : thread.getLockedSynchronizers()) {
+                dump.append("\t- holds ").append(lock).append('\n');
             }
             dump.append('\n');
         }

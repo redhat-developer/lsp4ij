@@ -21,6 +21,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -57,6 +58,49 @@ public class HangingTestWatchdogTest {
         assertTrue(text.contains("\"" + Thread.currentThread().getName() + "\" "), "the report has every thread: " + text);
         // The bottom of this thread's stack, far below the 8 frames which ThreadInfo.toString() shows
         assertTrue(text.contains("org.junit.platform.launcher"), "the report has whole stacks: " + text);
+    }
+
+    @Test
+    void theStacksSayWhichThreadHoldsTheLockThatAnotherWaitsFor() throws Exception {
+        Object lock = new Object();
+        var holding = new CountDownLatch(1);
+        var release = new CountDownLatch(1);
+        var holder = new Thread(() -> {
+            synchronized (lock) {
+                holding.countDown();
+                try {
+                    release.await();
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+            }
+        }, "holder");
+        var waiter = new Thread(() -> {
+            synchronized (lock) {
+                // the lock is free again
+            }
+        }, "waiter");
+        holder.start();
+        try {
+            assertTrue(holding.await(30, TimeUnit.SECONDS));
+            waiter.start();
+            long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(30);
+            while (waiter.getState() != Thread.State.BLOCKED && System.nanoTime() < deadline) {
+                Thread.onSpinWait();
+            }
+            assertEquals(Thread.State.BLOCKED, waiter.getState());
+
+            String dump = HangingTestWatchdog.threadDump();
+
+            assertTrue(dump.contains("\"waiter\" #" + waiter.getId() + " BLOCKED on ")
+                    && dump.contains(" held by \"holder\" #" + holder.getId()), dump);
+            String holderStack = dump.substring(dump.indexOf("\"holder\" #" + holder.getId()));
+            assertTrue(holderStack.substring(0, holderStack.indexOf("\n\n")).contains("\t- locked java.lang.Object@"), dump);
+        } finally {
+            release.countDown();
+            holder.join(30_000);
+            waiter.join(30_000);
+        }
     }
 
     @Test
