@@ -1,0 +1,66 @@
+{
+  "id": "cpp_ls-installer",
+  "name": "cpp_ls",
+  "executeOnStartServer": false,
+  "properties": {
+    "serverDist": "$USER_HOME$/.lsp4ij/lsp/cpp_ls"
+  },
+  "check": {
+    "fileExists": {
+      "name": "Check if cpp_ls is installed",
+      "file": {
+        "windows": "${serverDist}/cpp_ls.exe",
+        "default": "${serverDist}/cpp_ls"
+      }
+    }
+  },
+  "run": {
+    "download": {
+      "name": "Download cpp_ls",
+      "github": {
+        "owner": "CppCXY",
+        "repository": "cpp_ls",
+        "prerelease": false,
+        "asset": {
+          "windows": {
+            "x86_64": "cpp_ls-win32-x64.zip",
+            "amd64": "cpp_ls-win32-x64.zip",
+            "x86": "cpp_ls-win32-ia32.zip",
+            "arm64": "cpp_ls-win32-arm64.zip",
+            "aarch64": "cpp_ls-win32-arm64.zip"
+          },
+          "unix": {
+            "x86_64": "cpp_ls-linux-x64-glibc*.tar.gz",
+            "amd64": "cpp_ls-linux-x64-glibc*.tar.gz",
+            "arm64": "cpp_ls-linux-aarch64-glibc*.tar.gz",
+            "aarch64": "cpp_ls-linux-aarch64-glibc*.tar.gz",
+            "riscv64": "cpp_ls-linux-riscv64.tar.gz"
+          },
+          "mac": {
+            "x86_64": "cpp_ls-darwin-x64.tar.gz",
+            "amd64": "cpp_ls-darwin-x64.tar.gz",
+            "arm64": "cpp_ls-darwin-arm64.tar.gz",
+            "aarch64": "cpp_ls-darwin-arm64.tar.gz"
+          }
+        }
+      },
+      "output": {
+        "dir": "${serverDist}",
+        "file": {
+          "name": {
+            "windows": "cpp_ls.exe",
+            "default": "cpp_ls"
+          },
+          "executable": true
+        }
+      },
+      "onSuccess": {
+        "configureServer": {
+          "name": "Configure cpp_ls server command",
+          "command": "${output.dir}/${output.file.name}",
+          "update": true
+        }
+      }
+    }
+  }
+}
