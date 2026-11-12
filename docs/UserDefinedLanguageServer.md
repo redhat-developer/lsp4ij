@@ -415,6 +415,7 @@ pre-filled with server name, command, mappings and potential configuration.
 * [CSS Language Server](./user-defined-ls/vscode-css-language-server.md)
 * [Clangd](./user-defined-ls/clangd.md) 
 * [Clojure LSP](./user-defined-ls/clojure-lsp.md)
+* [Cpp Language Server](./user-defined-ls/cpp_ls.md)
 * [Dart LSP](./user-defined-ls/dart-lsp.md) 
 * [Docker Language Server](./user-defined-ls/docker-language-server.md)
 * [EO LSP Server](./user-defined-ls/eo-lsp-server.md) 
