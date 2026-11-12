@@ -6,8 +6,8 @@
     "exec": {
       "name": "Check erlang runtime",
       "command": {
-        "windows": "where erlang",
-        "default": "which erlang"
+        "windows": "where escript",
+        "default": "which escript"
       }
     }
   },
