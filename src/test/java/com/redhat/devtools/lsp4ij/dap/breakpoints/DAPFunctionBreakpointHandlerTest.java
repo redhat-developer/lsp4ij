@@ -30,7 +30,9 @@ import com.intellij.xdebugger.impl.breakpoints.XBreakpointBase;
 import com.redhat.devtools.lsp4ij.dap.configurations.DAPRunConfigurationOptions;
 import com.redhat.devtools.lsp4ij.dap.descriptors.DebugAdapterDescriptor;
 import org.eclipse.lsp4j.debug.Breakpoint;
+import com.redhat.devtools.lsp4ij.dap.client.DAPCapabilities;
 import org.eclipse.lsp4j.debug.Capabilities;
+import org.eclipse.lsp4j.debug.CapabilitiesEventArguments;
 import org.eclipse.lsp4j.debug.FunctionBreakpoint;
 import org.eclipse.lsp4j.debug.SetFunctionBreakpointsArguments;
 import org.eclipse.lsp4j.debug.SetFunctionBreakpointsResponse;
@@ -71,6 +73,28 @@ public class DAPFunctionBreakpointHandlerTest extends HeavyPlatformTestCase {
             handler.unregisterBreakpoint(twice, false);
 
             assertEmpty(requests);
+        } finally {
+            handler.dispose();
+        }
+    }
+
+    public void testABreakpointAddedAfterACapabilitiesEventUsesTheCurrentCapabilities() throws Exception {
+        // the debug adapter enables function breakpoints with a 'capabilities' event, after its 'initialize' response
+        var capabilities = new DAPCapabilities();
+        capabilities.initialize(new Capabilities());
+        var handler = handler();
+        try {
+            handler.initialize(server(arguments -> new Breakpoint[0]), capabilities::get).join();
+            handler.registerBreakpoint(breakpoint("twice"));
+            assertEmpty(requests);
+
+            var event = new CapabilitiesEventArguments();
+            event.setCapabilities(supported());
+            capabilities.update(event);
+
+            // the next change sends the breakpoints with the current capabilities
+            handler.registerBreakpoint(breakpoint("Point.move"));
+            assertEquals(List.of(List.of("twice", "Point.move")), names());
         } finally {
             handler.dispose();
         }

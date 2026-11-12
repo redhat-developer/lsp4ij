@@ -32,6 +32,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.swing.*;
+import java.util.function.Supplier;
 import java.util.Collections;
 import java.util.IdentityHashMap;
 import java.util.List;
@@ -55,7 +56,8 @@ public abstract class BreakpointHandlerBase<B extends XBreakpoint<?>> extends XB
     protected final @NotNull Project project;
     protected final List<IDebugProtocolServer> debugProtocolServers = ContainerUtil.createConcurrentList();
     protected final List<B> breakpoints = ContainerUtil.createConcurrentList();
-    private final Map<IDebugProtocolServer, Capabilities> capabilities = Collections.synchronizedMap(new IdentityHashMap<>());
+    // The current capabilities of each DAP server, which its 'capabilities' events can change while the session runs
+    private final Map<IDebugProtocolServer, Supplier<Capabilities>> capabilities = Collections.synchronizedMap(new IdentityHashMap<>());
     // The temporary breakpoint, as of "Run to Cursor", from when it is registered until it is unregistered: each
     // 'setBreakpoints' request for its source keeps it, as when the user adds a breakpoint to the source meanwhile
     private @Nullable XSourcePosition registeredTemporaryBreakpoint;
@@ -89,6 +91,18 @@ public abstract class BreakpointHandlerBase<B extends XBreakpoint<?>> extends XB
 
     public CompletableFuture<@Nullable Void> initialize(@NotNull IDebugProtocolServer debugProtocolServer,
                                                         @NotNull Capabilities capabilities) {
+        return initialize(debugProtocolServer, () -> capabilities);
+    }
+
+    /**
+     * Sends the breakpoints to the given DAP server, and to it again on each change of them.
+     *
+     * @param debugProtocolServer the DAP server.
+     * @param capabilities        the current capabilities of the DAP server, read each time the breakpoints are sent.
+     * @return the future of the sent breakpoints.
+     */
+    public CompletableFuture<@Nullable Void> initialize(@NotNull IDebugProtocolServer debugProtocolServer,
+                                                        @NotNull Supplier<Capabilities> capabilities) {
         this.debugProtocolServers.add(debugProtocolServer);
         this.capabilities.put(debugProtocolServer, capabilities);
         return sendBreakpoints(debugProtocolServer, null);
@@ -102,7 +116,7 @@ public abstract class BreakpointHandlerBase<B extends XBreakpoint<?>> extends XB
      */
     protected @NotNull Capabilities getCapabilities(@NotNull IDebugProtocolServer debugProtocolServer) {
         var serverCapabilities = capabilities.get(debugProtocolServer);
-        return serverCapabilities != null ? serverCapabilities : new Capabilities();
+        return serverCapabilities != null ? serverCapabilities.get() : new Capabilities();
     }
 
     @Override

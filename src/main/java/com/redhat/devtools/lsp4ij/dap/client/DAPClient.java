@@ -236,7 +236,7 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
                         monitor.setText2("Sending breakpoints");
                         return debugProcess
                                 .getBreakpointHandler()
-                                .initialize(getDebugProtocolServer(), getCapabilities());
+                                .initialize(getDebugProtocolServer(), this::getCapabilities);
                     })
                     .thenCompose(v -> {
                         // client sends a setFunctionBreakpoints request
@@ -246,7 +246,7 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
                         monitor.setText2("Sending function breakpoints");
                         return debugProcess
                                 .getFunctionBreakpointHandler()
-                                .initialize(getDebugProtocolServer(), getCapabilities());
+                                .initialize(getDebugProtocolServer(), this::getCapabilities);
                     })
                     .thenCompose(v -> {
                         // client sends a setDataBreakpoints request
@@ -256,7 +256,7 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
                         monitor.setText2("Sending data breakpoints");
                         return debugProcess
                                 .getDataBreakpointHandler()
-                                .initialize(getDebugProtocolServer(), getCapabilities());
+                                .initialize(getDebugProtocolServer(), this::getCapabilities);
                     })
                     .thenCompose(v -> {
                         // client sends a setExceptionBreakpoints request
@@ -285,7 +285,7 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
                         monitor.setText2("Sending instruction breakpoints");
                         return debugProcess
                                 .getDisassemblyBreakpointHandler()
-                                .initialize(getDebugProtocolServer(), getCapabilities());
+                                .initialize(getDebugProtocolServer(), this::getCapabilities);
                     });
         }
         configurationDoneFuture = configurationDoneFuture

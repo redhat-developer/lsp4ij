@@ -38,6 +38,7 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import javax.swing.*;
+import java.util.function.Supplier;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -85,7 +86,7 @@ public class DAPDataBreakpointHandler extends BreakpointHandlerBase<XBreakpoint<
 
     @Override
     public CompletableFuture<@Nullable Void> initialize(@NotNull IDebugProtocolServer debugProtocolServer,
-                                                        @NotNull Capabilities capabilities) {
+                                                        @NotNull Supplier<Capabilities> capabilities) {
         sessionServers.add(debugProtocolServer);
         return super.initialize(debugProtocolServer, capabilities);
     }
