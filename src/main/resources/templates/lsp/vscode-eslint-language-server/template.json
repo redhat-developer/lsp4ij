@@ -2,7 +2,7 @@
   "id": "vscode-eslint-language-server",
   "name": "ESLint Language Server",
   "programArgs": {
-    "default": "node $USER_HOME$/.lsp4ij/lsp/vscode-eslint-language-server/node_modules/vscode-langservers-extracted/lib/eslint-language-server/eslintServer.js --stdio"
+    "default": "node \"$USER_HOME$/.lsp4ij/lsp/vscode-eslint-language-server/node_modules/vscode-langservers-extracted/lib/eslint-language-server/eslintServer.js\" --stdio"
   },
   "transports": [
     {

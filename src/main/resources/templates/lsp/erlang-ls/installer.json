@@ -33,7 +33,7 @@
       "onSuccess": {
         "configureServer": {
           "name": "Configure Erlang LS server command",
-          "command": "escript ${output.dir}/${output.file.name}",
+          "command": "escript \"${output.dir}/${output.file.name}\"",
           "update": true
         }
       }
