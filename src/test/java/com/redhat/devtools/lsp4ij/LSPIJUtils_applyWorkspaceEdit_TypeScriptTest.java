@@ -10,6 +10,7 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij;
 
+import com.intellij.openapi.util.io.FileUtil;
 import com.intellij.testFramework.fixtures.BasePlatformTestCase;
 import org.eclipse.lsp4j.WorkspaceEdit;
 
@@ -25,7 +26,7 @@ import static com.redhat.devtools.lsp4ij.LSP4IJAssert.assertApplyWorkspaceEdit;
 public class LSPIJUtils_applyWorkspaceEdit_TypeScriptTest extends BasePlatformTestCase {
 
     public void testRenameFunctionWithOneChanges() throws IOException {
-        Path filePath = Files.createTempFile(null, ".ts");
+        Path filePath = Files.createTempFile(Path.of(FileUtil.getTempDirectory()), null, ".ts");
         String content = """
                 function foo() {}
                 """;
@@ -58,7 +59,7 @@ public class LSPIJUtils_applyWorkspaceEdit_TypeScriptTest extends BasePlatformTe
     }
 
     public void testRenameFunctionWithTwoChanges() throws IOException {
-        Path filePath = Files.createTempFile(null, ".ts");
+        Path filePath = Files.createTempFile(Path.of(FileUtil.getTempDirectory()), null, ".ts");
         String content = """
                 function foo() {}
                 foo();
