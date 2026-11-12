@@ -71,6 +71,8 @@ Useful options, to add to the command if needed:
 * `--log-level` (`error`, `warn`, `info` (the default), `debug`, `trace`) and `--log-path` (the file to log to;
   `none`, the default, disables file logging) to diagnose a problem;
 * `--communication stdio` (the default) and `--communication tcp --port ${port}` to choose how the server talks LSP.
+  For TCP, also set `Transport` to `Socket` with `Start the language server, LSP4IJ connects to it`, since `cpp_ls`
+  listens on the port, and `Port` to `Auto` or a port; see [Transport](../UserDefinedLanguageServer.md#transport).
 
 LSP4IJ sends the name of the IDE as its client info, which the server recognizes for the IntelliJ based IDEs it
 knows; `--editor intellij` can be added to the command to force this mode.
