@@ -42,6 +42,9 @@ public class FileOperationEditSaveTest extends LSPCodeInsightFixtureTestCase {
 
     private static final String OLD_TEXT = "class Box";
     private static final String NEW_TEXT = "class Parcel";
+    // Only ends a hang: on a slow CI runner, the rename, its edit, the save and the notification can take more than
+    // a few seconds
+    private static final int BOUND_SECONDS = 60;
 
     public FileOperationEditSaveTest() {
         super("*.foo");
@@ -72,9 +75,9 @@ public class FileOperationEditSaveTest extends LSPCodeInsightFixtureTestCase {
         rename(renamed, "moved.foo");
 
         PlatformTestUtil.waitWithEventsDispatching("the willRenameFiles edit must be applied",
-                () -> NEW_TEXT.equals(FileDocumentManager.getInstance().getDocument(other).getText()), 10);
+                () -> NEW_TEXT.equals(FileDocumentManager.getInstance().getDocument(other).getText()), BOUND_SECONDS);
         PlatformTestUtil.waitWithEventsDispatching("the edited file without an editor must be saved",
-                () -> !FileDocumentManager.getInstance().isDocumentUnsaved(FileDocumentManager.getInstance().getDocument(other)), 10);
+                () -> !FileDocumentManager.getInstance().isDocumentUnsaved(FileDocumentManager.getInstance().getDocument(other)), BOUND_SECONDS);
         assertEquals(NEW_TEXT, VfsUtilCore.loadText(other));
     }
 
@@ -90,7 +93,7 @@ public class FileOperationEditSaveTest extends LSPCodeInsightFixtureTestCase {
 
         rename(renamed, "moved.foo");
 
-        PlatformTestUtil.waitWithEventsDispatching("the server must be told of the rename", textAtDidRename::isDone, 10);
+        PlatformTestUtil.waitWithEventsDispatching("the server must be told of the rename", textAtDidRename::isDone, BOUND_SECONDS);
         assertEquals("the edited file must be saved before the server is told of the rename",
                 NEW_TEXT, textAtDidRename.get());
     }
