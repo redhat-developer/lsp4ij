@@ -20,7 +20,6 @@ import com.intellij.execution.process.ProcessOutputType;
 import com.intellij.openapi.util.Key;
 import com.intellij.util.io.BaseOutputReader;
 import com.intellij.util.net.NetUtils;
-import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -74,10 +73,7 @@ import java.util.stream.Stream;
  * a loopback port: on a machine shared with other users, one of their processes could connect to the port LSP4IJ
  * listens on before the language server does, or listen on the port LSP4IJ connects to. Prefer the standard input and
  * output of the language server's process there.
- * <p>
- * This API is experimental: it may change in a future release.
  */
-@ApiStatus.Experimental
 public class SocketStreamConnectionProvider implements StreamConnectionProvider, ProcessDataProvider {
 
     /**
