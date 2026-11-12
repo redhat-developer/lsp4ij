@@ -32,12 +32,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.swing.*;
-import java.util.function.Supplier;
 import java.util.Collections;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.Supplier;
 
 /**
  * Base class for DAP/Disassembly breakpoint handler.
@@ -90,11 +90,12 @@ public abstract class BreakpointHandlerBase<B extends XBreakpoint<?>> extends XB
     }
 
     /**
-     * Sends the breakpoints to the given DAP server, and to it again on each change of them.
+     * Sends the breakpoints to the given DAP server, and to it again on each change of them, with the given
+     * capabilities.
      * <p>
-     * Called by {@link #initialize(IDebugProtocolServer, Supplier)} with the capabilities of then: a subclass can
-     * override it, and the breakpoints are still sent with the current capabilities. Called directly, the given
-     * capabilities are used each time.
+     * {@link #initialize(IDebugProtocolServer, Supplier)} calls it with the current capabilities, and then lets the
+     * handler read the current capabilities each time it sends the breakpoints, so that a subclass which overrides
+     * this method keeps working.
      *
      * @param debugProtocolServer the DAP server.
      * @param capabilities        the capabilities of the DAP server.
@@ -103,7 +104,7 @@ public abstract class BreakpointHandlerBase<B extends XBreakpoint<?>> extends XB
     public CompletableFuture<@Nullable Void> initialize(@NotNull IDebugProtocolServer debugProtocolServer,
                                                         @NotNull Capabilities capabilities) {
         this.debugProtocolServers.add(debugProtocolServer);
-        this.capabilities.putIfAbsent(debugProtocolServer, () -> capabilities);
+        this.capabilities.put(debugProtocolServer, () -> capabilities);
         return sendBreakpoints(debugProtocolServer, null);
     }
 
@@ -117,8 +118,10 @@ public abstract class BreakpointHandlerBase<B extends XBreakpoint<?>> extends XB
      */
     public CompletableFuture<@Nullable Void> initialize(@NotNull IDebugProtocolServer debugProtocolServer,
                                                         @NotNull Supplier<Capabilities> capabilities) {
+        var sent = initialize(debugProtocolServer, capabilities.get());
+        // After the method above, which keeps the capabilities it is given
         this.capabilities.put(debugProtocolServer, capabilities);
-        return initialize(debugProtocolServer, capabilities.get());
+        return sent;
     }
 
     /**

@@ -35,7 +35,7 @@ public class DAPClientCapabilitiesTest {
 
         capabilities.update(event(setVariable(true)));
 
-        assertTrue(DAPClient.isSupportsSetVariable(capabilities.get()));
+        assertEquals(Boolean.TRUE, capabilities.get().getSupportsSetVariable());
     }
 
     @Test
@@ -44,7 +44,7 @@ public class DAPClientCapabilitiesTest {
 
         capabilities.update(event(setVariable(true)));
 
-        assertTrue(DAPClient.isSupportsSetVariable(capabilities.get()));
+        assertEquals(Boolean.TRUE, capabilities.get().getSupportsSetVariable());
     }
 
     @Test
@@ -53,7 +53,6 @@ public class DAPClientCapabilitiesTest {
 
         capabilities.update(event(setVariable(false)));
 
-        assertFalse(DAPClient.isSupportsSetVariable(capabilities.get()));
         assertEquals(Boolean.FALSE, capabilities.get().getSupportsSetVariable());
     }
 
@@ -143,7 +142,7 @@ public class DAPClientCapabilitiesTest {
     void readsDefaultCapabilitiesBeforeTheInitializeResponse() {
         capabilities.update(event(setVariable(true)));
 
-        assertFalse(DAPClient.isSupportsSetVariable(capabilities.get()));
+        assertNull(capabilities.get().getSupportsSetVariable());
     }
 
     @Test

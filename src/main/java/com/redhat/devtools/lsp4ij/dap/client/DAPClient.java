@@ -51,7 +51,6 @@ import org.eclipse.lsp4j.jsonrpc.MessageConsumer;
 import org.eclipse.lsp4j.jsonrpc.messages.ResponseError;
 import org.eclipse.lsp4j.jsonrpc.messages.ResponseMessage;
 
-import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
@@ -1378,18 +1377,7 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
      * @return true if the debug adapter supports setting a variable to a value and false otherwise.
      */
     public boolean isSupportsSetVariable() {
-        return isSupportsSetVariable(getCapabilities());
-    }
-
-    /**
-     * Returns true if the given capabilities support setting a variable to a value and false otherwise.
-     *
-     * @param capabilities the debug adapter capabilities, as updated by the 'capabilities' events.
-     * @return true if the given capabilities support setting a variable to a value and false otherwise.
-     */
-    @ApiStatus.Internal
-    public static boolean isSupportsSetVariable(@NotNull Capabilities capabilities) {
-        return Boolean.TRUE.equals(capabilities.getSupportsSetVariable());
+        return Boolean.TRUE.equals(getCapabilities().getSupportsSetVariable());
     }
 
     /**

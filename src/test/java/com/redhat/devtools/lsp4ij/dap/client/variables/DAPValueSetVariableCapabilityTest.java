@@ -11,7 +11,6 @@
 package com.redhat.devtools.lsp4ij.dap.client.variables;
 
 import com.redhat.devtools.lsp4ij.dap.client.DAPCapabilities;
-import com.redhat.devtools.lsp4ij.dap.client.DAPClient;
 import org.eclipse.lsp4j.debug.Capabilities;
 import org.eclipse.lsp4j.debug.CapabilitiesEventArguments;
 import org.eclipse.lsp4j.debug.Variable;
@@ -81,7 +80,7 @@ public class DAPValueSetVariableCapabilityTest {
      * As DAPValue.getModifier(): the client reads 'supportsSetVariable' from its current capabilities.
      */
     private boolean canSetValue(Variable variable) {
-        return DAPValue.canSetValue(DAPClient.isSupportsSetVariable(capabilities.get()), variable);
+        return DAPValue.canSetValue(Boolean.TRUE.equals(capabilities.get().getSupportsSetVariable()), variable);
     }
 
     private void enableSetVariable(boolean supported) {
