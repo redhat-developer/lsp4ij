@@ -16,6 +16,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.util.List;
 import java.util.Objects;
@@ -59,6 +60,13 @@ public abstract class TransportStreams {
 	}
 
 	public static class SocketTransportStreams extends TransportStreams {
+
+		/**
+		 * How long the connection to an address, which another address follows, waits, as the wait for the socket of the
+		 * DAP server waits for each address.
+		 */
+		static final int CONNECT_TIMEOUT_MILLIS = 500;
+
 		private final Socket socket;
 
 		/**
@@ -77,15 +85,25 @@ public abstract class TransportStreams {
 		}
 
 		/**
-		 * Connects to the first of the given addresses which takes the connection. When none takes it, it fails as the
+		 * Connects to the first of the given addresses which takes the connection. Each address but the last waits
+		 * {@link #CONNECT_TIMEOUT_MILLIS}, so that one which drops the connection doesn't hold up the next ones; the last
+		 * one, as a single address, waits as long as the system does. When none takes the connection, it fails as the
 		 * first address did, as with "Connection refused", and the failures of the others are suppressed in it.
 		 */
 		private static @NotNull Socket connect(@NotNull List<InetAddress> addresses, int port) throws IOException {
 			IOException failure = null;
-			for (InetAddress address : addresses) {
+			for (int i = 0; i < addresses.size(); i++) {
+				var socket = new Socket();
 				try {
-					return new Socket(address, port);
+					socket.connect(new InetSocketAddress(addresses.get(i), port),
+							i < addresses.size() - 1 ? CONNECT_TIMEOUT_MILLIS : 0);
+					return socket;
 				} catch (IOException e) {
+					try {
+						socket.close();
+					} catch (IOException ignored) {
+						// The failure of the connection is the one to report
+					}
 					if (failure == null) {
 						failure = e;
 					} else {

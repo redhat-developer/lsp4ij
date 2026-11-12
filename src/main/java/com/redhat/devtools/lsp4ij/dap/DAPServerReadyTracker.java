@@ -111,7 +111,7 @@ public class DAPServerReadyTracker extends CompletableFuture<Void> implements Pr
         }
         for (InetAddress address : addresses) {
             try (Socket socket = new Socket()) {
-                socket.connect(new InetSocketAddress(address, port), 500);
+                socket.connect(new InetSocketAddress(address, port), TransportStreams.SocketTransportStreams.CONNECT_TIMEOUT_MILLIS);
                 return true;
             } catch (IOException e) {
                 // Not on this address: the next one
