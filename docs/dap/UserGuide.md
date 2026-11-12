@@ -99,7 +99,8 @@ Macro expansion is applied to string values in DAP parameters, including values 
 Next to the IntelliJ macros, LSP4IJ replaces placeholders of its own:
 
 - `${port}`, in the `Command` of the `Server` tab: a free port, which LSP4IJ chooses as it starts the DAP server. The
-  client then connects to the server on that port.
+  client then connects to the server on that port, on `127.0.0.1` or `::1`, so a DAP server which listens on
+  `localhost` is reached either way.
 - `${address}` and `${port}`, in the `Log pattern before proceeding` of the `Server` tab, as in
   `DAP server listening at: ${address}:${port}`: the client connects to the address and the port that the DAP server
   writes in their place (see the [Go Delve example](./user-defined-dap/go-delve.md)).

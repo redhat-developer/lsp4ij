@@ -17,6 +17,7 @@ import com.intellij.openapi.util.Key;
 import com.redhat.devtools.lsp4ij.dap.configurations.extractors.NetworkAddressExtractor;
 import com.redhat.devtools.lsp4ij.dap.descriptors.DebugAdapterDescriptor;
 import com.redhat.devtools.lsp4ij.dap.descriptors.ServerReadyConfig;
+import com.redhat.devtools.lsp4ij.internal.LoopbackAddresses;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -24,6 +25,8 @@ import java.io.IOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.Socket;
+import java.net.UnknownHostException;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
 /**
@@ -85,8 +88,7 @@ public class DAPServerReadyTracker extends CompletableFuture<Void> implements Pr
             while (!DAPServerReadyTracker.this.isDone()) {
                 // The tracker future has not been cancelled
                 // Check if socket is available for the given port
-                if (isSocketAvailable(address != null ? address : InetAddress.getLoopbackAddress().getHostAddress(),
-                        port)) {
+                if (isSocketAvailable(address, port)) {
                     // The socket is available, notify onServerReady
                     break;
                 }
@@ -96,13 +98,26 @@ public class DAPServerReadyTracker extends CompletableFuture<Void> implements Pr
         return this;
     }
 
-    private static boolean isSocketAvailable(String host, int port) {
-        try (Socket socket = new Socket()) {
-            socket.connect(new InetSocketAddress(host, port), 500);
-            return true;
-        } catch (IOException e) {
+    /**
+     * Returns true if the port of the host takes a connection on one of the host's addresses, or without a host, on one
+     * of the loopback addresses, 127.0.0.1 and ::1, which the client then connects to.
+     */
+    static boolean isSocketAvailable(@Nullable String host, int port) {
+        List<InetAddress> addresses;
+        try {
+            addresses = LoopbackAddresses.of(host);
+        } catch (UnknownHostException e) {
             return false;
         }
+        for (InetAddress address : addresses) {
+            try (Socket socket = new Socket()) {
+                socket.connect(new InetSocketAddress(address, port), 500);
+                return true;
+            } catch (IOException e) {
+                // Not on this address: the next one
+            }
+        }
+        return false;
     }
 
     private void onServerReady() {

@@ -92,7 +92,6 @@ import org.jetbrains.annotations.Nullable;
 
 import javax.swing.*;
 import java.io.IOException;
-import java.net.InetAddress;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.CancellationException;
@@ -344,7 +343,8 @@ public class DAPDebugProcess extends XDebugProcess implements Disposable {
                 // The DAP messages go through the socket, so the process output carries none
                 console.setSocketTransport();
             }
-            return new TransportStreams.SocketTransportStreams(address != null ? address : InetAddress.getLoopbackAddress().getHostAddress(), port);
+            // Without an address, both loopback addresses, as a DAP server which listens on localhost can have either
+            return new TransportStreams.SocketTransportStreams(address, port);
         }
         var processHandler = executionResult.getProcessHandler();
         DAPProcessListener processListener = new DAPProcessListener();
