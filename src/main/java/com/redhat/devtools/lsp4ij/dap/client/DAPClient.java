@@ -30,6 +30,7 @@ import com.intellij.xdebugger.breakpoints.XBreakpoint;
 import com.intellij.xdebugger.frame.XSuspendContext;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.console.explorer.TracingMessageConsumer;
+import com.redhat.devtools.lsp4ij.dap.DAPBundle;
 import com.redhat.devtools.lsp4ij.dap.DAPDebugProcess;
 import com.redhat.devtools.lsp4ij.dap.DebugMode;
 import com.redhat.devtools.lsp4ij.dap.TransportStreams;
@@ -63,10 +64,12 @@ import java.io.OutputStream;
 import java.lang.Thread;
 import java.util.*;
 import java.util.List;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
@@ -124,6 +127,10 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
     // Child sessions which sent 'terminated': out of childrenClient so they get no more requests, kept to be disposed
     private final List<DAPClient> terminatedChildren = new CopyOnWriteArrayList<>();
     private volatile boolean terminatedReceived;
+    // Set once the client ends the session, with terminate() or dispose(): the end of its connection is expected then
+    private volatile boolean ending;
+    // dispose() runs once: the end of the connection, which it causes, may dispose the client too
+    private final AtomicBoolean disposed = new AtomicBoolean();
     private boolean sentTerminateRequest;
     // Whether the loaded sources and modules were asked for. They are asked for at the first stop, and then follow the
     // 'loadedSource' and 'module' events: asking at each stop would get all of them again at each step.
@@ -179,6 +186,7 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
                 threadPool);
 
         debugProtocolFuture = debugProtocolLauncher.startListening();
+        endWhenTheConnectionCloses(debugProtocolFuture);
         debugProtocolServer = debugProtocolLauncher.getRemoteProxy();
 
         return initialize(dapParameters, indicator);
@@ -805,6 +813,15 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
 
     @Override
     public void terminated(TerminatedEventArguments args) {
+        // TODO : manage args.getRestart()
+        endSession();
+    }
+
+    /**
+     * Ends this session, as its 'terminated' event or the end of its connection says: stops the debug process unless
+     * another session of the tree is still alive.
+     */
+    private void endSession() {
         // A debug adapter may run a session per target, as vscode-js-debug does with 'startDebugging': when an iframe or
         // a worker goes away only its session terminates, and the debug process must go on for the others
         terminatedReceived = true;
@@ -817,7 +834,6 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
             parentClient.terminatedChildren.add(this);
             parentClient.childrenClient.remove(this);
         }
-        // TODO : manage args.getRestart()
         if (root.hasLiveSession()) {
             return;
         }
@@ -845,8 +861,63 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
         return false;
     }
 
+    /**
+     * Ends this session when its connection closes without a 'terminated' event, as when the debug adapter crashed or
+     * was killed, or when the socket of a child session dropped: otherwise the session would count as alive for good,
+     * and keep the debug process running and the breakpoints it bound shown as verified. When the client is ending the
+     * session itself, it disposes the client instead, since the answer which terminate() waits for won't come.
+     *
+     * @param listening the future of the message loop, which ends when the connection closes.
+     */
+    private void endWhenTheConnectionCloses(@NotNull Future<Void> listening) {
+        threadPool.execute(() -> {
+            try {
+                listening.get();
+            } catch (InterruptedException e) {
+                java.lang.Thread.currentThread().interrupt();
+                return;
+            } catch (CancellationException | ExecutionException e) {
+                // Cancelled by dispose(), or the connection failed: it is gone either way
+            }
+            if (isEnding()) {
+                // terminate() disposes the client once the DAP server answers 'terminate' or 'disconnect', which it
+                // can't do now: the debug adapter exited or crashed meanwhile
+                dispose();
+                return;
+            }
+            if (terminatedReceived) {
+                return;
+            }
+            debugProcess.print(DAPBundle.message("dap.session.connection.closed"), ConsoleViewContentType.SYSTEM_OUTPUT);
+            endSession();
+        });
+    }
+
+    /**
+     * Returns true once the connection to the DAP server has closed, or dispose() has cancelled it.
+     */
+    private boolean isConnectionClosed() {
+        return debugProtocolFuture != null && debugProtocolFuture.isDone();
+    }
+
+    /**
+     * Returns true when the client ends this session, or a session above it, with terminate() or dispose().
+     */
+    private boolean isEnding() {
+        for (DAPClient client = this; client != null; client = client.parentClient) {
+            if (client.ending) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     @Override
     public void dispose() {
+        ending = true;
+        if (!disposed.compareAndSet(false, true)) {
+            return;
+        }
         if (debugProtocolFuture != null) {
             CancellationSupport.cancel(debugProtocolFuture);
 
@@ -894,8 +965,10 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
      * from the debuggee but will allow it to continue."
      */
     public void terminate() {
+        ending = true;
         IDebugProtocolServer server = getDebugProtocolServer();
-        if (server == null) {
+        if (server == null || isConnectionClosed()) {
+            // A request over a closed connection would never be answered, and the client never disposed
             dispose();
             return;
         }
