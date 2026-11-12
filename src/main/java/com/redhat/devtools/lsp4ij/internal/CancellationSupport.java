@@ -21,12 +21,14 @@ import com.intellij.openapi.project.Project;
 import com.intellij.util.ConcurrencyUtil;
 import com.intellij.util.ExceptionUtil;
 import com.redhat.devtools.lsp4ij.LSP4IJWebsiteUrlConstants;
+import com.redhat.devtools.lsp4ij.LanguageServerBundle;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import com.redhat.devtools.lsp4ij.LanguageServerWrapper;
 import com.redhat.devtools.lsp4ij.ServerMessageHandler;
 import com.redhat.devtools.lsp4ij.settings.ErrorReportingKind;
 import com.redhat.devtools.lsp4ij.settings.ProjectLanguageServerSettings;
 import com.redhat.devtools.lsp4ij.settings.actions.DisableLanguageServerErrorAction;
+import com.redhat.devtools.lsp4ij.settings.actions.EnableAndStartLanguageServerAction;
 import com.redhat.devtools.lsp4ij.settings.actions.OpenUrlAction;
 import com.redhat.devtools.lsp4ij.settings.actions.ReportErrorInLogAction;
 import com.redhat.devtools.lsp4ij.settings.actions.ShowErrorLogAction;
@@ -217,14 +219,9 @@ public class CancellationSupport implements CancelChecker {
                                                      @NotNull Exception error) {
         var languageServerDefinition = languageServer.getServerDefinition();
         var project = languageServer.getProject();
-        String instanceLabel = languageServer.getInstanceLabel();
-        // An instance of the language server says which one it is
-        String languageServerName = instanceLabel != null
-                ? languageServerDefinition.getDisplayName() + " (" + instanceLabel + ")"
-                : languageServerDefinition.getDisplayName();
         String content = error.getMessage();
         Notification notification = new Notification(ServerMessageHandler.LSP_WINDOW_SHOW_MESSAGE_GROUP_ID,
-                languageServerName,
+                getLanguageServerName(languageServer),
                 content,
                 NotificationType.ERROR);
         notification.setSubtitle(subtitle);
@@ -235,6 +232,40 @@ public class CancellationSupport implements CancelChecker {
         notification.setIcon(AllIcons.General.Error);
         Notifications.Bus.notify(notification, project);
         return notification;
+    }
+
+    /**
+     * Shows that too many failed starts disabled the given language server, with the error of the last one, and an
+     * action which enables and starts it again: otherwise, only the Language Servers view would say so.
+     *
+     * @param languageServer the disabled language server.
+     * @param error          the error of its last start.
+     * @param failedStarts   how many starts failed.
+     * @return the shown notification.
+     */
+    @ApiStatus.Internal
+    public static Notification showNotificationDisabled(@NotNull LanguageServerWrapper languageServer,
+                                                        @NotNull Exception error,
+                                                        int failedStarts) {
+        Notification notification = new Notification(ServerMessageHandler.LSP_WINDOW_SHOW_MESSAGE_GROUP_ID,
+                getLanguageServerName(languageServer),
+                error.getMessage(),
+                NotificationType.ERROR);
+        notification.setSubtitle(LanguageServerBundle.message("language.server.disabled.after.failed.starts", failedStarts));
+        notification.addAction(new EnableAndStartLanguageServerAction(languageServer));
+        notification.addAction(new ShowErrorLogAction(languageServer));
+        notification.setIcon(AllIcons.General.Error);
+        Notifications.Bus.notify(notification, languageServer.getProject());
+        return notification;
+    }
+
+    /**
+     * Returns the name of the given language server, with the label of its instance, which says which one it is.
+     */
+    private static @NotNull String getLanguageServerName(@NotNull LanguageServerWrapper languageServer) {
+        String displayName = languageServer.getServerDefinition().getDisplayName();
+        String instanceLabel = languageServer.getInstanceLabel();
+        return instanceLabel != null ? displayName + " (" + instanceLabel + ")" : displayName;
     }
 
     /**

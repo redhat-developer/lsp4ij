@@ -528,6 +528,7 @@ public class LanguageServerWrapper implements Disposable {
             if (numberOfRestartAttempts > MAX_NUMBER_OF_RESTART_ATTEMPTS - 1) {
                 // Disable the language server
                 setEnabled(false);
+                showNotificationDisabled(serverError);
                 return;
             } else {
                 numberOfRestartAttempts++;
@@ -837,6 +838,23 @@ public class LanguageServerWrapper implements Disposable {
                 errorNotification = null;
                 notification.expire();
             }
+        }
+    }
+
+    /**
+     * Shows that too many failed starts disabled this language server, in place of the notification of its last
+     * failed start.
+     */
+    private void showNotificationDisabled(@NotNull Exception error) {
+        if (errorNotification != null && !errorNotification.isExpired()) {
+            errorNotification.expire();
+        }
+        var notification = CancellationSupport.showNotificationDisabled(this, error, MAX_NUMBER_OF_RESTART_ATTEMPTS);
+        // A start which succeeds, or a dispose, expires it
+        errorNotification = notification;
+        if (isDisposed()) {
+            errorNotification = null;
+            notification.expire();
         }
     }
 
