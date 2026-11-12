@@ -2,7 +2,7 @@
   "id": "rust-analyzer",
   "name": "Rust Language Server",
   "programArgs": {
-    "default": "sh -c ${BASE_DIR}/rust-analyzer",
+    "default": "${BASE_DIR}/rust-analyzer",
     "windows": "${BASE_DIR}/rust-analyzer.exe"
   },
   "expandConfiguration": true,

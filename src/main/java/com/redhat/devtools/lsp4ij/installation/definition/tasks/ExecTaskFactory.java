@@ -20,11 +20,11 @@ import com.redhat.devtools.lsp4ij.installation.definition.InstallerTaskFactoryBa
 import com.redhat.devtools.lsp4ij.installation.definition.ServerInstallerDescriptor;
 import com.redhat.devtools.lsp4ij.installation.definition.InstallerTask;
 import com.redhat.devtools.lsp4ij.launching.templates.LanguageServerTemplate;
+import com.redhat.devtools.lsp4ij.server.definition.launching.CommandUtils;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
@@ -64,7 +64,7 @@ public class ExecTaskFactory extends InstallerTaskFactoryBase {
                 serverInstallerDeclaration);
     }
 
-    private static @NotNull List<String> getCommand(@NotNull JsonObject json) {
+    static @NotNull List<String> getCommand(@NotNull JsonObject json) {
         if (!json.has(COMMAND_JSON_PROPERTY)) {
             return Collections.emptyList();
         }
@@ -112,9 +112,9 @@ public class ExecTaskFactory extends InstallerTaskFactoryBase {
                 }
             }
         } else if (command.isJsonPrimitive() && command.getAsJsonPrimitive().isString()) {
-            // ex: "windows": "where typescript-language-server",
-            var array = command.getAsString().split(" ");
-            commands.addAll(Arrays.asList(array));
+            // ex: "windows": "where typescript-language-server", split as the command which starts a language
+            // server, so that an argument in double quotes keeps its spaces
+            commands.addAll(CommandUtils.createCommands(command.getAsString()));
         }
     }
 

@@ -2,7 +2,7 @@
   "id": "sysml-lsp",
   "name": "SysML v2 Language Server",
   "programArgs": {
-    "default": "sh -c sysml-lsp --stdio",
+    "default": "sysml-lsp --stdio",
     "windows": "sysml-lsp --stdio"
   },
   "fileTypeMappings": [
