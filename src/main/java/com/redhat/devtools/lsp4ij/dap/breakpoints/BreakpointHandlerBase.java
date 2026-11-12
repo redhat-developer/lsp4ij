@@ -38,6 +38,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Supplier;
 
 /**
  * Base class for DAP/Disassembly breakpoint handler.
@@ -55,7 +56,8 @@ public abstract class BreakpointHandlerBase<B extends XBreakpoint<?>> extends XB
     protected final @NotNull Project project;
     protected final List<IDebugProtocolServer> debugProtocolServers = ContainerUtil.createConcurrentList();
     protected final List<B> breakpoints = ContainerUtil.createConcurrentList();
-    private final Map<IDebugProtocolServer, Capabilities> capabilities = Collections.synchronizedMap(new IdentityHashMap<>());
+    // The current capabilities of each DAP server, which its 'capabilities' events can change while the session runs
+    private final Map<IDebugProtocolServer, Supplier<Capabilities>> capabilities = Collections.synchronizedMap(new IdentityHashMap<>());
     // The sessions which report each breakpoint as bound: in a session tree only one session can bind it
     private final Map<B, Set<Object>> verifiedBy = new ConcurrentHashMap<>();
     // The id which each session gave each breakpoint: each session of a tree numbers its breakpoints itself, as
@@ -96,11 +98,39 @@ public abstract class BreakpointHandlerBase<B extends XBreakpoint<?>> extends XB
                 .forEach(this::clearIcon);
     }
 
+    /**
+     * Sends the breakpoints to the given DAP server, and to it again on each change of them, with the given
+     * capabilities.
+     * <p>
+     * {@link #initialize(IDebugProtocolServer, Supplier)} calls it with the current capabilities, and then lets the
+     * handler read the current capabilities each time it sends the breakpoints, so that a subclass which overrides
+     * this method keeps working.
+     *
+     * @param debugProtocolServer the DAP server.
+     * @param capabilities        the capabilities of the DAP server.
+     * @return the future of the sent breakpoints.
+     */
     public CompletableFuture<@Nullable Void> initialize(@NotNull IDebugProtocolServer debugProtocolServer,
                                                         @NotNull Capabilities capabilities) {
         this.debugProtocolServers.add(debugProtocolServer);
-        this.capabilities.put(debugProtocolServer, capabilities);
+        this.capabilities.put(debugProtocolServer, () -> capabilities);
         return sendBreakpoints(debugProtocolServer, null);
+    }
+
+    /**
+     * Sends the breakpoints to the given DAP server, and to it again on each change of them, with its current
+     * capabilities, which its 'capabilities' events can change while the session runs.
+     *
+     * @param debugProtocolServer the DAP server.
+     * @param capabilities        the current capabilities of the DAP server, read each time the breakpoints are sent.
+     * @return the future of the sent breakpoints.
+     */
+    public CompletableFuture<@Nullable Void> initialize(@NotNull IDebugProtocolServer debugProtocolServer,
+                                                        @NotNull Supplier<Capabilities> capabilities) {
+        var sent = initialize(debugProtocolServer, capabilities.get());
+        // After the method above, which keeps the capabilities it is given
+        this.capabilities.put(debugProtocolServer, capabilities);
+        return sent;
     }
 
     /**
@@ -111,7 +141,7 @@ public abstract class BreakpointHandlerBase<B extends XBreakpoint<?>> extends XB
      */
     protected @NotNull Capabilities getCapabilities(@NotNull IDebugProtocolServer debugProtocolServer) {
         var serverCapabilities = capabilities.get(debugProtocolServer);
-        return serverCapabilities != null ? serverCapabilities : new Capabilities();
+        return serverCapabilities != null ? serverCapabilities.get() : new Capabilities();
     }
 
     @Override

@@ -109,6 +109,10 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
      */
     private final CompletableFuture<@Nullable Capabilities> capabilitiesFuture = new CompletableFuture<>();
     /**
+     * The capabilities of the 'initialize' response, updated by the 'capabilities' events.
+     */
+    private final DAPCapabilities adapterCapabilities = new DAPCapabilities();
+    /**
      * Once we have received initialized event, this member will be "done" as a flag
      */
     private final CompletableFuture<@Nullable Void> initialized = new CompletableFuture<>();
@@ -209,7 +213,8 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
                                 + "A default Capabilities will be used instead.", ConsoleViewContentType.LOG_WARNING_OUTPUT);
                         capabilities = new Capabilities();
                     }
-                    capabilitiesFuture.complete(capabilities);
+                    // with the capabilities events which arrived before this response
+                    capabilitiesFuture.complete(adapterCapabilities.initialize(capabilities));
                 }).thenCompose(unused -> {
                     monitor.checkCanceled();
                     monitor.setFraction(20d / 100d);
@@ -238,7 +243,7 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
                         monitor.setText2("Sending breakpoints");
                         return debugProcess
                                 .getBreakpointHandler()
-                                .initialize(getDebugProtocolServer(), getCapabilities());
+                                .initialize(getDebugProtocolServer(), this::getCapabilities);
                     })
                     .thenCompose(v -> {
                         // client sends a setFunctionBreakpoints request
@@ -248,7 +253,7 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
                         monitor.setText2("Sending function breakpoints");
                         return debugProcess
                                 .getFunctionBreakpointHandler()
-                                .initialize(getDebugProtocolServer(), getCapabilities());
+                                .initialize(getDebugProtocolServer(), this::getCapabilities);
                     })
                     .thenCompose(v -> {
                         // client sends a setDataBreakpoints request
@@ -258,7 +263,7 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
                         monitor.setText2("Sending data breakpoints");
                         return debugProcess
                                 .getDataBreakpointHandler()
-                                .initialize(getDebugProtocolServer(), getCapabilities());
+                                .initialize(getDebugProtocolServer(), this::getCapabilities);
                     })
                     .thenCompose(v -> {
                         // client sends a setExceptionBreakpoints request
@@ -287,7 +292,7 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
                         monitor.setText2("Sending instruction breakpoints");
                         return debugProcess
                                 .getDisassemblyBreakpointHandler()
-                                .initialize(getDebugProtocolServer(), getCapabilities());
+                                .initialize(getDebugProtocolServer(), this::getCapabilities);
                     });
         }
         configurationDoneFuture = configurationDoneFuture
@@ -321,7 +326,7 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
      */
     @NotNull
     Capabilities getCapabilities() {
-        return capabilitiesFuture.getNow(new Capabilities());
+        return adapterCapabilities.get();
     }
 
     protected Launcher<? extends IDebugProtocolServer> createLauncher(UnaryOperator<MessageConsumer> wrapper,
@@ -333,6 +338,11 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
     @Override
     public void initialized() {
         initialized.complete(null);
+    }
+
+    @Override
+    public void capabilities(CapabilitiesEventArguments args) {
+        adapterCapabilities.update(args);
     }
 
     @Override
