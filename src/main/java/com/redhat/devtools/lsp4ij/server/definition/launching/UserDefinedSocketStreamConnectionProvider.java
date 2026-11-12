@@ -33,7 +33,7 @@ public class UserDefinedSocketStreamConnectionProvider extends SocketStreamConne
     private final @NotNull Project project;
 
     public UserDefinedSocketStreamConnectionProvider(@NotNull Direction direction,
-                                                     @NotNull String host,
+                                                     @Nullable String host,
                                                      int port,
                                                      @Nullable IntFunction<GeneralCommandLine> commandLine,
                                                      @NotNull UserDefinedLanguageServerDefinition serverDefinition,

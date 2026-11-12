@@ -118,11 +118,10 @@ server which talks LSP over a TCP socket instead is configured with `Transport: 
 
 * `Attach to a running language server`: the language server runs already and listens on `Host` and `Port`, as when it
   runs in a debugger or inside another application. LSP4IJ doesn't start it, so the environment variables, the
-  `Command` and the working directory are hidden, and stopping the language server only closes the connection. Without a host, LSP4IJ connects to the loopback address; a host is a plain host name or IP address, without a scheme,
-  and the port has its own field. An attach that gets no answer within 10 seconds fails.
-  The port is needed, since LSP4IJ can't choose it. The loopback address is that of the JVM, `127.0.0.1` unless Java
-  prefers IPv6 addresses (`-Djava.net.preferIPv6Addresses=true`): for a language server which listens on the IPv6
-  loopback address `::1` only, as Node.js may do for `localhost`, set the host to `::1`.
+  `Command` and the working directory are hidden, and stopping the language server only closes the connection. Without a host, LSP4IJ connects to the loopback address, `127.0.0.1`, and then to the IPv6 one, `::1`, which a
+  language server that listens on `localhost` may get, as Node.js may do. A host is a plain host name or IP address,
+  without a scheme, and LSP4IJ tries each of its addresses in turn; the port has its own field. An attach that gets no
+  answer within 10 seconds fails. The port is needed, since LSP4IJ can't choose it.
 * `Start the language server, LSP4IJ connects to it`: LSP4IJ starts the language server with the `Command`, and
   connects to the port once the language server accepts connections.
 * `Start the language server, it connects to LSP4IJ`: LSP4IJ listens on the port and starts the language server with
@@ -151,9 +150,11 @@ information, and its standard error as errors. As with any TCP transport
 of LSP, which has no handshake to authenticate its peer, any local process can connect to a loopback port: on a machine
 shared with other users, prefer the standard input and output.
 
-A language server which LSP4IJ starts must listen on, or connect to, the loopback address of the JVM: `127.0.0.1`,
-unless Java prefers IPv6 addresses, when it is `::1`. Give it that address rather than `localhost`, which Node.js may
-resolve to the other one. When the two don't match, the start fails with an error which says so.
+A language server which LSP4IJ starts may listen on either loopback address: LSP4IJ connects to `127.0.0.1` and then
+to `::1`. One which connects to LSP4IJ must connect to the loopback address of the JVM, `127.0.0.1` unless Java prefers
+IPv6 addresses (`-Djava.net.preferIPv6Addresses=true`), when it is `::1`: give it that address rather than
+`localhost`, which Node.js may resolve to the other one. When the two don't match, the start fails with an error which
+says so.
 
 ### Mappings tab
 
