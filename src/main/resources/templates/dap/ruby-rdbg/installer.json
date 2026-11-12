@@ -14,7 +14,7 @@
       "name": "Install Ruby Debug",
       "command": {
         "windows": "cmd /C gem install debug",
-        "default": "sh -s gem install debug"
+        "default": "gem install debug"
       }
     }
   }

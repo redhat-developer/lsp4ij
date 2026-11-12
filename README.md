@@ -111,6 +111,7 @@ Here are some projects that use LSP4IJ:
  * [ARO Programming Language](https://github.com/arolang/aro)
  * [BBj Language Support for IntelliJ](https://github.com/BBx-Kitchen/bbj-language-server)
  * [Ecstasy Language Support](https://plugins.jetbrains.com/plugin/31202-ecstasy-language-support)
+ * [Zig Pro](https://plugins.jetbrains.com/plugin/35677-zig-pro)
 
 ## Requirements
 

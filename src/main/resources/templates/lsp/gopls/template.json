@@ -2,7 +2,7 @@
   "id": "gopls",
   "name": "Go Language Server",
   "programArgs": {
-    "default": "sh -c gopls -mode=stdio",
+    "default": "gopls -mode=stdio",
     "windows": "gopls -mode=stdio"
   },
   "expandConfiguration": false,

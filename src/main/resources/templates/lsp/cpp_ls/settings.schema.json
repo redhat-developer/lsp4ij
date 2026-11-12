@@ -1,0 +1,25 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "LSP4IJ/cpp_ls/settings.schema.json",
+  "title": "LSP4IJ cpp_ls server settings JSON schema",
+  "description": "JSON schema for cpp_ls server settings.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "cppls": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "The settings answered to the workspace/configuration request of the server, in the 'cppls' section.",
+      "properties": {
+        "exclude": {
+          "type": "array",
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "description": "Glob patterns of the files and folders which the server must not analyse, for instance '**/build/**' or '**/third_party/**'."
+        }
+      }
+    }
+  }
+}

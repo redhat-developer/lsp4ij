@@ -59,10 +59,13 @@ It is also possible to add custom environment variables via the `Environment var
 
 ![Environment Variables](./images/user-defined-ls/EnvironmentVariables.png)
 
-Depending on your OS, the environment variables may not be accessible. To make sure they are accessible, you can fill out the order fields:
+LSP4IJ starts the command directly, without a shell, with these environment variables, and looks the command up in
+their `PATH` (see below for a working directory). `sh -c` doesn't add any variables: a non-interactive shell reads no
+profile, so it passes on the same environment. Use a shell only for shell syntax, such as `&&`, a pipe or `~`, and give
+it the whole command in double quotes, since `sh -c` runs only the argument right after `-c`:
 
-* with `Windows OS`: `cmd /c command_to_start_your_ls`
-* with `Linux`, `Mac OS`: `sh -c command_to_start_your_ls`
+* with `Linux`, `Mac OS`: `sh -c "cd server && ./start --stdio"`
+* with `Windows OS`: `cmd /c "cd server && start.cmd --stdio"`
 
 ##### Directory-specific environment variables
 
@@ -416,6 +419,7 @@ pre-filled with server name, command, mappings and potential configuration.
 * [CSS Language Server](./user-defined-ls/vscode-css-language-server.md)
 * [Clangd](./user-defined-ls/clangd.md) 
 * [Clojure LSP](./user-defined-ls/clojure-lsp.md)
+* [Cpp Language Server](./user-defined-ls/cpp_ls.md)
 * [Dart LSP](./user-defined-ls/dart-lsp.md) 
 * [Docker Language Server](./user-defined-ls/docker-language-server.md)
 * [EO LSP Server](./user-defined-ls/eo-lsp-server.md) 

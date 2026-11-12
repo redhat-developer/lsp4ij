@@ -2,7 +2,7 @@
   "id": "perl-lsp",
   "name": "Perl Language Server",
   "programArgs": {
-    "default": "sh -c ${BASE_DIR}/perllsp --stdio",
+    "default": "${BASE_DIR}/perllsp --stdio",
     "windows": "${BASE_DIR}/perllsp.exe --stdio"
   },
   "expandConfiguration": true,
