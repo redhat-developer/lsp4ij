@@ -44,7 +44,7 @@
       "onSuccess": {
         "configureServer": {
           "name": "Configure luau-lsp server command",
-          "command": "${output.dir}/${output.file.name} lsp --definitions=path/to/your/globalTypes.d.luau --docs=path/to/your/rb-docs.json",
+          "command": "${output.dir}/${output.file.name} lsp",
           "update": true
         }
       }
