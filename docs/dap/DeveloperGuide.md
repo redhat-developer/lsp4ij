@@ -330,6 +330,11 @@ The client connects with a socket when it knows a port: the port of `${port}`, t
 or the port that the pattern found in the server's output. Otherwise it reads and writes the DAP messages through the
 standard output and input of the process that `startServer()` returned.
 
+With a socket, the client tries each address of the host of the `ServerReadyConfig`, or of the address that the
+pattern found, in turn. Without an address, it tries both loopback addresses, `127.0.0.1` and then `::1`, so that it
+reaches a DAP server which listens on `localhost`, whichever of the two the server got. So does the wait for a socket to
+the port to open.
+
 A DAP server that is not a separate process, for example one that runs in your language server, can return its own
 `ProcessHandler`, with `new ServerReadyConfig(0)` and no port. The client reads the server's messages from the
 handler's standard output (`notifyTextAvailable` with `ProcessOutputTypes.STDOUT`), and writes its own to the

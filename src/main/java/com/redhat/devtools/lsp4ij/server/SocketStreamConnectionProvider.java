@@ -21,6 +21,7 @@ import com.intellij.openapi.util.Key;
 import com.intellij.util.concurrency.AppExecutorUtil;
 import com.intellij.util.io.BaseOutputReader;
 import com.intellij.util.net.NetUtils;
+import com.redhat.devtools.lsp4ij.internal.LoopbackAddresses;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -101,7 +102,7 @@ public class SocketStreamConnectionProvider implements StreamConnectionProvider,
 
     // Without a host, LSP4IJ connects to both loopback addresses, that of the JVM first: a language server which listens
     // on localhost may get either, as Node.js does, in the order in which the system resolves localhost
-    private static final List<InetAddress> LOOPBACK_ADDRESSES = loopbackAddresses();
+    private static final List<InetAddress> LOOPBACK_ADDRESSES = LoopbackAddresses.get();
 
     /**
      * How long a start waits for the connection by default.
@@ -403,17 +404,7 @@ public class SocketStreamConnectionProvider implements StreamConnectionProvider,
      * without a host, both loopback addresses.
      */
     private @NotNull List<InetAddress> addresses() throws UnknownHostException {
-        return host != null ? List.of(InetAddress.getAllByName(host)) : LOOPBACK_ADDRESSES;
-    }
-
-    private static @NotNull List<InetAddress> loopbackAddresses() {
-        InetAddress jvm = InetAddress.getLoopbackAddress();
-        try {
-            // An IP address is never looked up
-            return List.of(jvm, InetAddress.getByName(jvm instanceof Inet6Address ? "127.0.0.1" : "::1"));
-        } catch (UnknownHostException e) {
-            return List.of(jvm);
-        }
+        return LoopbackAddresses.of(host);
     }
 
     /**
