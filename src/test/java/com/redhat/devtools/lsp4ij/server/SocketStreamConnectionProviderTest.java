@@ -12,6 +12,7 @@ import com.intellij.openapi.application.PathManager;
 import com.intellij.testFramework.LightPlatformTestCase;
 import com.redhat.devtools.lsp4ij.server.SocketTestServers.ConnectingServer;
 import com.redhat.devtools.lsp4ij.server.SocketTestServers.EndingServer;
+import com.redhat.devtools.lsp4ij.server.SocketTestServers.IPv6ConnectingServer;
 import com.redhat.devtools.lsp4ij.server.SocketTestServers.ListeningServer;
 import com.redhat.devtools.lsp4ij.server.SocketTestServers.WaitingServer;
 
@@ -210,6 +211,18 @@ public class SocketStreamConnectionProviderTest extends LightPlatformTestCase {
             assertEquals("ping", readLine(provider.getInputStream()));
             // its standard error is errors
             awaitLog(log, "error: connecting to " + port);
+        } finally {
+            reap(provider);
+        }
+    }
+
+    public void testStartsALanguageServerThatConnectsToTheIPv6LoopbackAddressAndAcceptsItsConnection() throws Exception {
+        var provider = SocketStreamConnectionProvider.startAndAccept(0, port -> java(IPv6ConnectingServer.class, port));
+        try {
+            provider.start();
+
+            writeLine(provider.getOutputStream(), "ping");
+            assertEquals("ping", readLine(provider.getInputStream()));
         } finally {
             reap(provider);
         }
