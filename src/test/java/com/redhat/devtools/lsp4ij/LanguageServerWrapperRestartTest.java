@@ -50,7 +50,9 @@ import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -104,6 +106,17 @@ public class LanguageServerWrapperRestartTest extends UsefulTestCase {
         assertEquals(1, wrapper.getNumberOfRestartAttempts());
         assertEquals(2, serverDefinition.connectionCount.get());
         assertTrue(wrapper.isEnabled());
+        // A feature which asks for the language server gets the failure of the last start, as after a restart which
+        // fails: a feature doesn't keep a failed result, so it asks again after the pause, unlike an empty one
+        var initialized = wrapper.getInitializedServer();
+        assertTrue(initialized.isCompletedExceptionally());
+        try {
+            initialized.join();
+            fail("the request should fail as the last start did");
+        } catch (CompletionException e) {
+            assertSame(wrapper.getServerError(), e.getCause());
+        }
+        assertEquals(2, serverDefinition.connectionCount.get());
 
         // A restart by the user, as from the Language Servers view, doesn't wait
         wrapper.restart();
@@ -216,8 +229,14 @@ public class LanguageServerWrapperRestartTest extends UsefulTestCase {
         var initialized = runPooledThreadTasksHere(wrapper::getInitializedServer);
         waitUntil(() -> wrapper.getServerError() != null && wrapper.getServerStatus() == ServerStatus.stopped,
                 "the failed start should stop the server");
-        // The caller gets no server, not a NullPointerException from the failure handler
-        assertNull(initialized.get(10, TimeUnit.SECONDS));
+        // The caller gets the error of the start, as from a start which fails later, not a NullPointerException from
+        // the failure handler
+        try {
+            initialized.get(10, TimeUnit.SECONDS);
+            fail("the request should fail as the start did");
+        } catch (ExecutionException e) {
+            assertSame(wrapper.getServerError(), e.getCause());
+        }
 
         // The next start starts the server
         wrapper.start();

@@ -1691,6 +1691,13 @@ public class LanguageServerWrapper implements Disposable {
             // server that never initialized
             return initialized.thenApply(r -> this.languageServer);
         }
+        synchronized (this) {
+            if (this.languageServer == null && serverError != null && isEnabled()) {
+                // In the pause after a failed restart, where start() starts nothing, the request fails as the restart
+                // would have: a feature then keeps no empty result for the file, and asks again after the pause
+                return CompletableFuture.failedFuture(serverError);
+            }
+        }
         return CompletableFuture.completedFuture(this.languageServer);
     }
 
