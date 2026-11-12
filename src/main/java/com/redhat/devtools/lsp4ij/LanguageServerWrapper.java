@@ -74,6 +74,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.net.URI;
+import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -163,6 +164,13 @@ public class LanguageServerWrapper implements Disposable {
     private volatile MessageBusConnection messageBusConnection;
     private Future<?> launcherFuture;
     private int numberOfRestartAttempts;
+    // A start which follows a failed restart too soon waits, so that the features of the open files, each of which
+    // starts the language server, don't use up its restarts in a moment, as while a language server which LSP4IJ
+    // attaches to doesn't run yet. The first restart is at once; from the second on, the pause doubles up to the last.
+    private @NotNull Duration firstRestartPause = Duration.ofSeconds(1);
+    private @NotNull Duration maxRestartPause = Duration.ofSeconds(30);
+    // When the last restart began, as System.nanoTime()
+    private long lastRestartNanos;
     private @Nullable CompletableFuture<Void> initializeFuture;
     private volatile LanguageServer languageServer;
     private LanguageClientImpl languageClient;
@@ -522,6 +530,13 @@ public class LanguageServerWrapper implements Disposable {
                 // See: https://github.com/redhat-developer/lsp4ij/issues/1673
                 return;
             }
+            var pause = restartPause(numberOfRestartAttempts, firstRestartPause, maxRestartPause);
+            // System.nanoTime() is only compared with an earlier one: before a first restart, there is none
+            if (!pause.isZero() && System.nanoTime() - lastRestartNanos < pause.toNanos()) {
+                // Too soon after the last restart: the language server stays as its failed start left it, without a
+                // language server, and the start counts no restart
+                return;
+            }
             // Here the language server has been not possible
             // we stop it and attempts a new restart if needed
             stop();
@@ -532,6 +547,7 @@ public class LanguageServerWrapper implements Disposable {
                 return;
             } else {
                 numberOfRestartAttempts++;
+                lastRestartNanos = System.nanoTime();
             }
         }
         final var filesToReconnect = new ArrayList<VirtualFile>();
@@ -783,6 +799,25 @@ public class LanguageServerWrapper implements Disposable {
      *
      * @param connectionExecutor the executor.
      */
+    /**
+     * Returns how long a start waits after the last of the given number of restarts: not at all after none, the first
+     * pause after one, and from then on twice as long after each, up to the last pause.
+     */
+    static @NotNull Duration restartPause(int restarts, @NotNull Duration first, @NotNull Duration max) {
+        if (restarts == 0) {
+            return Duration.ZERO;
+        }
+        // No more doublings than it takes to reach any pause in practice, so that it never overflows
+        Duration pause = first.multipliedBy(1L << Math.min(restarts - 1, 20));
+        return pause.compareTo(max) > 0 ? max : pause;
+    }
+
+    @TestOnly
+    synchronized void setRestartPauses(@NotNull Duration first, @NotNull Duration max) {
+        this.firstRestartPause = first;
+        this.maxRestartPause = max;
+    }
+
     @TestOnly
     void setConnectionExecutor(@NotNull Executor connectionExecutor) {
         this.connectionExecutor = connectionExecutor;
