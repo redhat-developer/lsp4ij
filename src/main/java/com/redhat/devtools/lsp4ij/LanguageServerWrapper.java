@@ -804,12 +804,6 @@ public class LanguageServerWrapper implements Disposable {
     }
 
     /**
-     * Sets where the connection of a document runs once its start attempt is initialized, so that a test can run it
-     * when it chooses, as after a stop.
-     *
-     * @param connectionExecutor the executor.
-     */
-    /**
      * Returns how long a start waits after the last of the given number of restarts: not at all after none, the first
      * pause after one, and from then on twice as long after each, up to the last pause.
      */
@@ -833,6 +827,12 @@ public class LanguageServerWrapper implements Disposable {
         this.restartWindow = restartWindow;
     }
 
+    /**
+     * Sets where the connection of a document runs once its start attempt is initialized, so that a test can run it
+     * when it chooses, as after a stop.
+     *
+     * @param connectionExecutor the executor.
+     */
     @TestOnly
     void setConnectionExecutor(@NotNull Executor connectionExecutor) {
         this.connectionExecutor = connectionExecutor;
