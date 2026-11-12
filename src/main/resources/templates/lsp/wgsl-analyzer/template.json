@@ -2,7 +2,7 @@
   "id": "wgsl-analyzer",
   "name": "WGSL Analyzer",
   "programArgs": {
-    "default": "sh -c ${BASE_DIR}/wgsl-analyzer",
+    "default": "${BASE_DIR}/wgsl-analyzer",
     "windows": "${BASE_DIR}/wgsl-analyzer.exe"
   },
   "expandConfiguration": true,

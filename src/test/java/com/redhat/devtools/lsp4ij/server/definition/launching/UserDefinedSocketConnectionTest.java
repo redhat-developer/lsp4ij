@@ -48,7 +48,9 @@ public class UserDefinedSocketConnectionTest extends BasePlatformTestCase {
 
         assertSame(SocketStreamConnectionProvider.Direction.CONNECT, provider.getDirection());
         assertEquals(6005, provider.getPort());
+        // and then on the IPv6 one, as for a language server which listens on localhost and gets ::1
         assertTrue(provider.toString(), provider.toString().contains(LOOPBACK + ":6005"));
+        assertTrue(provider.toString(), provider.toString().contains("[::1]:6005"));
     }
 
     public void testABlankHostIsTheLoopbackAddress() {
@@ -58,6 +60,7 @@ public class UserDefinedSocketConnectionTest extends BasePlatformTestCase {
         var provider = definition.createConnectionProvider(getProject());
 
         assertTrue(provider.toString(), provider.toString().contains(LOOPBACK + ":6005"));
+        assertTrue(provider.toString(), provider.toString().contains("[::1]:6005"));
     }
 
     public void testALanguageServerWithoutSettingsHasNoInitializationOptions() {
@@ -80,6 +83,7 @@ public class UserDefinedSocketConnectionTest extends BasePlatformTestCase {
 
         assertSame(SocketStreamConnectionProvider.Direction.CONNECT, provider.getDirection());
         assertTrue(provider.toString(), provider.toString().contains(LOOPBACK + ":4389"));
+        assertTrue(provider.toString(), provider.toString().contains("[::1]:4389"));
     }
 
     public void testAStartedLanguageServerConnectsToTheFreePortItsCommandLineTakes() throws Exception {

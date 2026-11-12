@@ -9,6 +9,8 @@ package com.redhat.devtools.lsp4ij.features;
 
 import com.intellij.codeInsight.hints.InlayHintsSink;
 import com.intellij.codeInsight.hints.NoSettings;
+import com.intellij.notification.Notification;
+import com.intellij.notification.Notifications;
 import com.intellij.openapi.editor.EditorFactory;
 import com.intellij.openapi.editor.ScrollingModel;
 import com.intellij.openapi.editor.event.EditorFactoryEvent;
@@ -17,10 +19,14 @@ import com.intellij.openapi.editor.event.VisibleAreaListener;
 import com.intellij.openapi.editor.ex.EditorEx;
 import com.intellij.openapi.project.Project;
 import com.intellij.psi.PsiFile;
+import com.intellij.testFramework.PlatformTestUtil;
+import com.intellij.testFramework.TestActionEvent;
 import com.intellij.testFramework.UsefulTestCase;
 import com.intellij.testFramework.fixtures.IdeaProjectTestFixture;
 import com.intellij.testFramework.fixtures.IdeaTestFixtureFactory;
 import com.intellij.testFramework.fixtures.TestFixtureBuilder;
+import com.redhat.devtools.lsp4ij.LanguageServerBundle;
+import com.redhat.devtools.lsp4ij.LanguageServerWrapper;
 import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
 import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
 import com.redhat.devtools.lsp4ij.features.codeLens.CodeLensDataResult;
@@ -35,10 +41,12 @@ import com.redhat.devtools.lsp4ij.mock.MockConnectionProvider;
 import com.redhat.devtools.lsp4ij.mock.MockLanguageServerDefinition;
 import com.redhat.devtools.lsp4ij.server.CannotStartProcessException;
 import com.redhat.devtools.lsp4ij.server.StreamConnectionProvider;
+import com.redhat.devtools.lsp4ij.settings.actions.EnableAndStartLanguageServerAction;
 import com.redhat.devtools.lsp4ij.templates.ServerMappingSettings;
 import org.eclipse.lsp4j.CodeLensParams;
 import org.eclipse.lsp4j.TextDocumentIdentifier;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.awt.Rectangle;
 import java.lang.reflect.InvocationTargetException;
@@ -46,7 +54,9 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
  * A feature which waits for a language server which cannot start, as when its command is wrong, gets nothing. It
@@ -82,6 +92,46 @@ public class ServerStartFailureTest extends UsefulTestCase {
 
         assertEmpty(LSPFoldingRangeBuilder.getFoldingRanges(file));
         assertServerCannotStart(file.getProject());
+    }
+
+    public void testTooManyFailedStartsDisableTheLanguageServerWithANotificationWhichStartsItAgain() {
+        PsiFile file = myFixture.configureByText("main.foo", "a");
+        Project project = file.getProject();
+        List<Notification> notifications = new CopyOnWriteArrayList<>();
+        project.getMessageBus().connect(getTestRootDisposable()).subscribe(Notifications.TOPIC, new Notifications() {
+            @Override
+            public void notify(@NotNull Notification notification) {
+                notifications.add(notification);
+            }
+        });
+        var wrapper = startedServer(project);
+
+        // As the features of the open file do, each of which starts the language server: each start counts the failure
+        // of the one before, and once they are too many, disables it
+        PlatformTestUtil.waitWithEventsDispatching("the failed starts disable the language server", () -> {
+            if (wrapper.isEnabled()) {
+                wrapper.start();
+            }
+            return !wrapper.isEnabled();
+        }, 60);
+
+        var disabled = notifications.stream()
+                .filter(notification -> LanguageServerBundle.message("language.server.disabled.after.failed.starts",
+                        wrapper.getMaxNumberOfRestartAttempts()).equals(notification.getSubtitle()))
+                .toList();
+        assertSize(1, disabled);
+        assertEquals("Cannot run program \"missing\"", disabled.get(0).getContent());
+        var enableAndStart = disabled.get(0).getActions().stream()
+                .filter(EnableAndStartLanguageServerAction.class::isInstance)
+                .map(EnableAndStartLanguageServerAction.class::cast)
+                .findFirst()
+                .orElseThrow();
+
+        enableAndStart.actionPerformed(TestActionEvent.createTestEvent(), disabled.get(0));
+
+        assertTrue(disabled.get(0).isExpired());
+        assertTrue(wrapper.isEnabled());
+        assertEquals(0, wrapper.getNumberOfRestartAttempts());
     }
 
     public void testAScrollOfAnEditorWhoseCodeLensesFailedDoesNotThrow() {
@@ -168,12 +218,22 @@ public class ServerStartFailureTest extends UsefulTestCase {
     }
 
     private void assertServerCannotStart(@NotNull Project project) {
-        var wrapper = LanguageServiceAccessor.getInstance(project).getStartedServers()
+        assertInstanceOf(startedServer(project).getServerError(), CannotStartProcessException.class);
+    }
+
+    private @NotNull LanguageServerWrapper startedServer(@NotNull Project project) {
+        // A feature of the open file starts the language server in the background
+        PlatformTestUtil.waitWithEventsDispatching("a feature of the open file starts the language server",
+                () -> findStartedServer(project) != null, 60);
+        return Objects.requireNonNull(findStartedServer(project));
+    }
+
+    private @Nullable LanguageServerWrapper findStartedServer(@NotNull Project project) {
+        return LanguageServiceAccessor.getInstance(project).getStartedServers()
                 .stream()
                 .filter(server -> server.getServerDefinition() == serverDefinition)
                 .findFirst()
-                .orElseThrow();
-        assertInstanceOf(wrapper.getServerError(), CannotStartProcessException.class);
+                .orElse(null);
     }
 
     /**

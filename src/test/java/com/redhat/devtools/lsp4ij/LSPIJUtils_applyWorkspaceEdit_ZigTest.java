@@ -10,6 +10,7 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij;
 
+import com.intellij.openapi.util.io.FileUtil;
 import com.intellij.testFramework.fixtures.BasePlatformTestCase;
 import org.eclipse.lsp4j.WorkspaceEdit;
 
@@ -25,7 +26,7 @@ import static com.redhat.devtools.lsp4ij.LSP4IJAssert.assertApplyWorkspaceEdit;
 public class LSPIJUtils_applyWorkspaceEdit_ZigTest extends BasePlatformTestCase {
 
     public void testOptimizeImports() throws IOException {
-        Path filePath = Files.createTempFile(null, ".zig");
+        Path filePath = Files.createTempFile(Path.of(FileUtil.getTempDirectory()), null, ".zig");
         String content = """
                 const vk = @import("vulkan");
                 ///standard library

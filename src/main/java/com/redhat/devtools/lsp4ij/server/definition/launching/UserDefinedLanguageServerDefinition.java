@@ -37,7 +37,6 @@ import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.net.InetAddress;
 import java.util.Map;
 
 import static com.redhat.devtools.lsp4ij.server.definition.launching.CommandUtils.createCommandLine;
@@ -51,7 +50,6 @@ public class UserDefinedLanguageServerDefinition extends LanguageServerDefinitio
         ServerConfigurationContributor, ServerExperimentalContributor, ServerInitializationOptionsContributor {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(UserDefinedLanguageServerDefinition.class);
-    private static final String LOOPBACK_HOST = InetAddress.getLoopbackAddress().getHostAddress();
 
     /**
      * The root of the language server in its command and its working directory: with {@code serverInstances}, the
@@ -173,7 +171,8 @@ public class UserDefinedLanguageServerDefinition extends LanguageServerDefinitio
                     this,
                     project);
             case ATTACH -> new UserDefinedSocketStreamConnectionProvider(SocketStreamConnectionProvider.Direction.CONNECT,
-                    transport.host() != null && !transport.host().isBlank() ? transport.host() : LOOPBACK_HOST,
+                    // Without a host, both loopback addresses
+                    transport.host() != null && !transport.host().isBlank() ? transport.host() : null,
                     transport.port(),
                     null,
                     this,
@@ -182,7 +181,7 @@ public class UserDefinedLanguageServerDefinition extends LanguageServerDefinitio
                     transport.mode() == UserDefinedTransport.Mode.START_AND_CONNECT
                             ? SocketStreamConnectionProvider.Direction.CONNECT
                             : SocketStreamConnectionProvider.Direction.ACCEPT,
-                    LOOPBACK_HOST,
+                    null,
                     transport.port(),
                     // The command line takes the port, which LSP4IJ may only choose when it starts the language server
                     port -> createCommandLine(resolve(UserDefinedTransport.withPort(commandLine, port), project, root),
