@@ -89,7 +89,7 @@ public class DAPSessionTreeTest extends HeavyPlatformTestCase {
         assertTheDebugSessionKeepsRunning(child);
 
         root.terminated();
-        assertTheDebugSessionStops(root);
+        waitForTheDebugSessionToStop();
     }
 
     public void testTheDebugSessionKeepsRunningWhileAChildSessionIsAlive() throws Exception {
@@ -100,7 +100,7 @@ public class DAPSessionTreeTest extends HeavyPlatformTestCase {
         assertTheDebugSessionKeepsRunning(root);
 
         child.terminated();
-        assertTheDebugSessionStops(child);
+        waitForTheDebugSessionToStop();
     }
 
     public void testALiveSessionBelowATerminatedChildKeepsTheDebugSessionRunning() throws Exception {
@@ -113,7 +113,7 @@ public class DAPSessionTreeTest extends HeavyPlatformTestCase {
         assertTheDebugSessionKeepsRunning(child, root);
 
         grandchild.terminated();
-        assertTheDebugSessionStops(grandchild);
+        waitForTheDebugSessionToStop();
     }
 
     public void testTheDebugSessionStopsWhenItsConnectionClosesWithoutTerminated() throws Exception {
@@ -203,14 +203,6 @@ public class DAPSessionTreeTest extends HeavyPlatformTestCase {
         assertFalse("the debug session keeps running", getDebugProcess().isStopping());
     }
 
-    /**
-     * Waits until the client has handled the messages which the given sessions sent, and asserts that they have asked
-     * the debug process to stop.
-     */
-    private void assertTheDebugSessionStops(@NotNull Session... senders) {
-        waitUntilHandled(senders);
-        assertTrue("the debug session stops", getDebugProcess().isStopping());
-    }
 
     /**
      * Waits until the client has handled the messages which each of the given sessions has sent: it handles the
@@ -224,8 +216,9 @@ public class DAPSessionTreeTest extends HeavyPlatformTestCase {
     }
 
     /**
-     * Waits until something asks the debug process to stop, as the end of a connection does: the client learns of it
-     * on a thread of its own, not in the order of the messages of a session.
+     * Waits until something asks the debug process to stop, as the 'terminated' event of the last live session or the
+     * end of a connection does. A ping, as {@link #waitUntilHandled} sends, would not do: stopping the debug process
+     * closes the connections of the sessions, and may close the one of the ping before the client answers it.
      */
     private void waitForTheDebugSessionToStop() {
         PlatformTestUtil.waitWithEventsDispatching("the debug session stops", getDebugProcess()::isStopping, BOUND_SECONDS);
