@@ -10,7 +10,9 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.installation.definition;
 
+import com.intellij.testFramework.TestApplicationManager;
 import com.redhat.devtools.lsp4ij.installation.definition.tasks.*;
+import org.junit.BeforeClass;
 import org.junit.Test;
 
 import java.io.IOException;
@@ -24,6 +26,13 @@ import static org.junit.jupiter.api.Assertions.*;
  * Tests for {@link InstallerTaskRegistry} parsing of the {@code fileExists} task type.
  */
 public class InstallerTaskRegistryFileExistsTest {
+
+    // The download task looks up an application service, which an earlier platform test of the same JVM may have
+    // started, or not, as when this test runs on its own
+    @BeforeClass
+    public static void startTheApplication() {
+        TestApplicationManager.getInstance();
+    }
 
     private InstallerTaskRegistry createRegistry() {
         InstallerTaskRegistry registry = new InstallerTaskRegistry();

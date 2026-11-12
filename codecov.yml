@@ -1,9 +1,7 @@
 coverage:
+  # No status checks: they never blocked a merge (they were informational), and Codecov at times never completed them,
+  # which left pull requests waiting on a check that would not finish (#1972). The coverage stays in the comment that
+  # Codecov posts on each pull request, and on codecov.io.
   status:
-    project:
-      default:
-        target: 19%
-        informational: true
-    patch:
-      default:
-        informational: true
+    project: off
+    patch: off

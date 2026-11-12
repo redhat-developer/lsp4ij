@@ -21,20 +21,9 @@ import java.util.concurrent.CompletableFuture;
 /** Exercises the actual LSP4IJ request conversion with real IntelliJ breakpoints. */
 public class DAPBreakpointHandlerBaseTest extends HeavyPlatformTestCase {
     public void testRemovalReplacesBreakpointsPerSource() throws Exception {
-        var session = (XDebugSession)Proxy.newProxyInstance(XDebugSession.class.getClassLoader(),new Class<?>[]{XDebugSession.class}, (p, m, a) -> null);
-        var handler = handler(session);
+        var handler = handler();
         var requests = new ArrayList<SetBreakpointsArguments>();
-        var server = (IDebugProtocolServer)Proxy.newProxyInstance(IDebugProtocolServer.class.getClassLoader(),new Class<?>[]{IDebugProtocolServer.class}, (p, m, a) -> {
-            if (m.getName().equals("setBreakpoints")) {
-                requests.add((SetBreakpointsArguments) a[0]);
-                var response = new SetBreakpointsResponse();
-                response.setBreakpoints(new Breakpoint[0]);
-                return CompletableFuture.completedFuture(response);
-            }
-            if (m.getName().equals("equals")) return p == a[0];
-            if (m.getName().equals("hashCode")) return System.identityHashCode(p);
-            throw new AssertionError(m.getName());
-        });
+        var server = server(requests);
         var dir = Files.createTempDirectory("dap-breakpoints-");
         var a = breakpoint(dir.resolve("a.lua"), 0);
         var b = breakpoint(dir.resolve("b.lua"), 0);
@@ -132,6 +121,28 @@ public class DAPBreakpointHandlerBaseTest extends HeavyPlatformTestCase {
             late.setVerified(true);
             handler.updateBreakpoint(server, late, a);
             assertEquals(before, states);
+        } finally {
+            handler.dispose();
+            com.intellij.openapi.util.io.FileUtil.delete(dir.toFile());
+        }
+    }
+
+    public void testTheBreakpointsAreSentAgainToAnInitializedDebugAdapterOnly() throws Exception {
+        var handler = handler();
+        var requests = new ArrayList<SetBreakpointsArguments>();
+        var server = server(requests);
+        var dir = Files.createTempDirectory("dap-breakpoints-");
+        try {
+            handler.registerBreakpoint(breakpoint(dir.resolve("a.lua"), 0));
+            handler.initialize(server, new Capabilities()).join();
+            requests.clear();
+            // As after a 'capabilities' event of the DAP server.
+            handler.sendBreakpoints(server).join();
+            assertLines(requests, dir.resolve("a.lua"), 1);
+            // A DAP server which the handler was not initialized for gets them when it is.
+            var others = new ArrayList<SetBreakpointsArguments>();
+            handler.sendBreakpoints(server(others)).join();
+            assertEmpty(others);
         } finally {
             handler.dispose();
             com.intellij.openapi.util.io.FileUtil.delete(dir.toFile());
@@ -280,6 +291,10 @@ public class DAPBreakpointHandlerBaseTest extends HeavyPlatformTestCase {
         return breakpoint;
     }
 
+    private DAPBreakpointHandlerBase<XLineBreakpoint<DAPBreakpointProperties>> handler() throws Exception {
+        return handler((XDebugSession)Proxy.newProxyInstance(XDebugSession.class.getClassLoader(),new Class<?>[]{XDebugSession.class}, (p, m, a) -> null));
+    }
+
     private DAPBreakpointHandlerBase<XLineBreakpoint<DAPBreakpointProperties>> handler(XDebugSession session) throws Exception {
         var type = Arrays.stream(com.intellij.execution.configurations.ConfigurationType.CONFIGURATION_TYPE_EP.getExtensions())
             .filter(t -> t.getId().equals("DAPConfiguration")).findFirst().orElseThrow();
@@ -338,6 +353,20 @@ public class DAPBreakpointHandlerBaseTest extends HeavyPlatformTestCase {
                 }).toArray(Breakpoint[]::new);
                 var response = new SetBreakpointsResponse();
                 response.setBreakpoints(breakpoints);
+                return CompletableFuture.completedFuture(response);
+            }
+            if (m.getName().equals("equals")) return p == a[0];
+            if (m.getName().equals("hashCode")) return System.identityHashCode(p);
+            throw new AssertionError(m.getName());
+        });
+    }
+
+    private static IDebugProtocolServer server(List<SetBreakpointsArguments> requests) {
+        return (IDebugProtocolServer)Proxy.newProxyInstance(IDebugProtocolServer.class.getClassLoader(),new Class<?>[]{IDebugProtocolServer.class}, (p, m, a) -> {
+            if (m.getName().equals("setBreakpoints")) {
+                requests.add((SetBreakpointsArguments) a[0]);
+                var response = new SetBreakpointsResponse();
+                response.setBreakpoints(new Breakpoint[0]);
                 return CompletableFuture.completedFuture(response);
             }
             if (m.getName().equals("equals")) return p == a[0];

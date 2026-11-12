@@ -10,6 +10,7 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij;
 
+import com.intellij.openapi.util.io.FileUtil;
 import com.intellij.testFramework.fixtures.BasePlatformTestCase;
 import org.eclipse.lsp4j.WorkspaceEdit;
 
@@ -25,7 +26,7 @@ import static com.redhat.devtools.lsp4ij.LSP4IJAssert.assertApplyWorkspaceEdit;
 public class LSPIJUtils_applyWorkspaceEdit_ScalaTest extends BasePlatformTestCase {
 
     public void testRenameObjectWithOneDocumentChanges() throws IOException {
-        Path filePath = Files.createTempFile(null, ".scala");
+        Path filePath = Files.createTempFile(Path.of(FileUtil.getTempDirectory()), null, ".scala");
         String content = """
                 object Foo {}
                 """;

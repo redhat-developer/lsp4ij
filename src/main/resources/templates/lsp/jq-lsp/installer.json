@@ -23,9 +23,9 @@
           },
           "onFail": {
             "showMessage": {
-              "name": "Go Language Server install problem",
+              "name": "JQ Language Server install problem",
               "content": [
-                "<a href=\"https://go.dev/doc/install\">Install Go</a> to install the Go Language Server (<code>gopls</code>) using <code>go install</code>.",
+                "<a href=\"https://go.dev/doc/install\">Install Go</a> to install the JQ Language Server (<code>jq-lsp</code>) using <code>go install</code>.",
                 "Make sure <code>go</code> is in your PATH, then restart your IDE."
               ]
             }
@@ -42,7 +42,7 @@
     "onSuccess": {
       "configureServer": {
         "name": "Configure JQ Language Server command",
-        "command": "jq-lsp -mode=stdio",
+        "command": "jq-lsp",
         "update": true
       }
     }
