@@ -10,6 +10,7 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.commands;
 
+import com.intellij.openapi.util.io.FileUtil;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.openapi.vfs.VirtualFileManager;
 import com.intellij.testFramework.fixtures.BasePlatformTestCase;
@@ -124,7 +125,7 @@ public class CommandExecutorTest extends BasePlatformTestCase {
         LSPCommandContext context = new LSPCommandContext(cmd, getProject());
         context.setShowNotificationError(false);
 
-        Path filePath = Files.createTempFile(null, ".ts");
+        Path filePath = Files.createTempFile(Path.of(FileUtil.getTempDirectory()), null, ".ts");
         VirtualFile file = VirtualFileManager.getInstance().refreshAndFindFileByNioPath(filePath);
         context.setFile(file);
         CommandExecutor.LSPCommandResponse result = CommandExecutor.executeCommand(context);

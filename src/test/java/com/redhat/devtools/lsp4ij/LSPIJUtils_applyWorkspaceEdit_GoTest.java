@@ -10,6 +10,7 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij;
 
+import com.intellij.openapi.util.io.FileUtil;
 import com.intellij.testFramework.fixtures.BasePlatformTestCase;
 import org.eclipse.lsp4j.WorkspaceEdit;
 
@@ -25,7 +26,7 @@ import static com.redhat.devtools.lsp4ij.LSP4IJAssert.assertApplyWorkspaceEdit;
 public class LSPIJUtils_applyWorkspaceEdit_GoTest extends BasePlatformTestCase {
 
     public void testConvertToRawStringLiteral() throws IOException {
-        Path filePath = Files.createTempFile(null, ".go");
+        Path filePath = Files.createTempFile(Path.of(FileUtil.getTempDirectory()), null, ".go");
         String content = """
                 package src
 
@@ -77,7 +78,7 @@ public class LSPIJUtils_applyWorkspaceEdit_GoTest extends BasePlatformTestCase {
     }
 
     public void testInlineCallToPrintln() throws IOException {
-        Path filePath = Files.createTempFile(null, ".go");
+        Path filePath = Files.createTempFile(Path.of(FileUtil.getTempDirectory()), null, ".go");
         String content = """
                 package src
 
