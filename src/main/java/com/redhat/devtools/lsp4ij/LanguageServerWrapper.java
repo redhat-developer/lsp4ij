@@ -1192,15 +1192,18 @@ public class LanguageServerWrapper implements Disposable {
         // start language server if needed, and take the start attempt that the connection is for
         InitializingContext attempt;
         CompletableFuture<Void> initialized;
+        LanguageServerException failure;
         synchronized (this) {
             start();
             attempt = currentInitializingContext;
             initialized = this.initializeFuture;
+            failure = failureWithoutRestart();
         }
 
         if (initialized == null) {
-            // The "initialize" future is not initialized, return null as language server.
-            return CompletableFuture.completedFuture(null);
+            // The "initialize" future is not initialized: no language server, or in the pause after a failed restart,
+            // the error of the last start, as getInitializedServer() gives
+            return failure != null ? CompletableFuture.failedFuture(failure) : CompletableFuture.completedFuture(null);
         }
 
         return initialized.thenComposeAsync(theVoid -> {
@@ -1691,14 +1694,22 @@ public class LanguageServerWrapper implements Disposable {
             // server that never initialized
             return initialized.thenApply(r -> this.languageServer);
         }
-        synchronized (this) {
-            if (this.languageServer == null && serverError != null && isEnabled()) {
-                // In the pause after a failed restart, where start() starts nothing, the request fails as the restart
-                // would have: a feature then keeps no empty result for the file, and asks again after the pause
-                return CompletableFuture.failedFuture(serverError);
-            }
+        var failure = failureWithoutRestart();
+        if (failure != null) {
+            return CompletableFuture.failedFuture(failure);
         }
         return CompletableFuture.completedFuture(this.languageServer);
+    }
+
+    /**
+     * Returns the error of the last start when start() leaves the language server without one and starts nothing, as
+     * in the pause after a failed restart, and null otherwise. A request then fails as the restart would have, so that
+     * a feature keeps no empty result for the file, and asks again after the pause.
+     */
+    private synchronized @Nullable LanguageServerException failureWithoutRestart() {
+        return this.languageServer == null && this.initializeFuture == null && serverError != null && isEnabled()
+                ? serverError
+                : null;
     }
 
     /**

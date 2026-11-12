@@ -116,6 +116,16 @@ public class LanguageServerWrapperRestartTest extends UsefulTestCase {
         } catch (CompletionException e) {
             assertSame(wrapper.getServerError(), e.getCause());
         }
+        // So does the connection of a file, as when the language server stopped and failed to start again between a
+        // feature's request for it and the connection of the file
+        var file = myFixture.addFileToProject("paused.foo", "paused").getVirtualFile();
+        var connected = wrapper.connect(file, new LanguageServerWrapper.LSPFileConnectionInfo(null, null, null, true));
+        try {
+            connected.join();
+            fail("the connection should fail as the last start did");
+        } catch (CompletionException e) {
+            assertSame(wrapper.getServerError(), e.getCause());
+        }
         assertEquals(2, serverDefinition.connectionCount.get());
 
         // A restart by the user, as from the Language Servers view, doesn't wait
