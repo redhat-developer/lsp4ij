@@ -33,6 +33,9 @@ import java.util.List;
  * Each update publishes a new {@link Capabilities} snapshot, which is never changed afterwards: a reader on any
  * thread sees either the capabilities before an event or after it, never a part of it. Events which arrive before
  * the 'initialize' response are kept in their order and applied on top of that response.
+ * <p>
+ * This state (the snapshot, its lock and the pending events) is kept out of {@link DAPClient}, so that it can be
+ * tested on its own, without a debug adapter.
  */
 @ApiStatus.Internal
 public class DAPCapabilities {
