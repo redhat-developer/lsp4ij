@@ -11,7 +11,6 @@
 package com.redhat.devtools.lsp4ij.server.definition.launching;
 
 import com.redhat.devtools.lsp4ij.server.SocketStreamConnectionProvider;
-import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -20,15 +19,12 @@ import java.util.Arrays;
 /**
  * How LSP4IJ talks to a user-defined language server: over the standard input and output of its process, by default,
  * or over a socket, in one of the ways of {@link SocketStreamConnectionProvider}.
- * <p>
- * The socket transports are experimental: this API may change in a future release.
  *
  * @param mode the way LSP4IJ talks to the language server.
  * @param host the host of a language server which runs already, for {@link Mode#ATTACH}.
  * @param port the port of the socket, or 0 to choose a free port, which the command line takes as
  *             {@value #PORT_MACRO}, when LSP4IJ starts the language server.
  */
-@ApiStatus.Experimental
 public record UserDefinedTransport(@NotNull Mode mode, @Nullable String host, int port) {
 
     /**

@@ -46,6 +46,7 @@ import com.redhat.devtools.lsp4ij.templates.ServerMappingSettings;
 import org.eclipse.lsp4j.CodeLensParams;
 import org.eclipse.lsp4j.TextDocumentIdentifier;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.awt.Rectangle;
 import java.lang.reflect.InvocationTargetException;
@@ -53,6 +54,7 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
 
@@ -220,11 +222,18 @@ public class ServerStartFailureTest extends UsefulTestCase {
     }
 
     private @NotNull LanguageServerWrapper startedServer(@NotNull Project project) {
+        // A feature of the open file starts the language server in the background
+        PlatformTestUtil.waitWithEventsDispatching("a feature of the open file starts the language server",
+                () -> findStartedServer(project) != null, 60);
+        return Objects.requireNonNull(findStartedServer(project));
+    }
+
+    private @Nullable LanguageServerWrapper findStartedServer(@NotNull Project project) {
         return LanguageServiceAccessor.getInstance(project).getStartedServers()
                 .stream()
                 .filter(server -> server.getServerDefinition() == serverDefinition)
                 .findFirst()
-                .orElseThrow();
+                .orElse(null);
     }
 
     /**
