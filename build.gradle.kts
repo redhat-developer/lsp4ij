@@ -117,8 +117,9 @@ dependencies {
     testImplementation(libs.junit.jupiter.api)
     testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine")
     testRuntimeOnly(libs.junit.vintage.engine)
-    // Required for IntelliJ Platform 2026.1 to discover and run tests via JUnit Platform
-    testRuntimeOnly("org.junit.platform:junit-platform-launcher:1.11.0")
+    // Required for IntelliJ Platform 2026.1 to discover and run tests via JUnit Platform, and by HangingTestWatchdog,
+    // a listener of the launcher
+    testImplementation("org.junit.platform:junit-platform-launcher:1.11.0")
 }
 
 // Set the JDK version used by the toolchain to build the project (Java 21 is required for platform 2025.3, and Java 25
