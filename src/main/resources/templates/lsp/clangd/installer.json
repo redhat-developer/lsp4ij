@@ -46,7 +46,7 @@
       "onSuccess": {
         "configureServer": {
           "name": "Configure Clangd server command",
-          "command": "${output.dir}/${output.file.name}",
+          "command": "\"${output.dir}/${output.file.name}\"",
           "update": true
         }
       }

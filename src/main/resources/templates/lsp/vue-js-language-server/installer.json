@@ -25,8 +25,8 @@
         "configureServer": {
           "name": "Configure Vue.js Language Server command",
           "command": {
-            "windows": "${workingDir}/node_modules/.bin/vue-language-server.cmd --stdio",
-            "default": "${workingDir}/node_modules/.bin/vue-language-server --stdio"
+            "windows": "\"${workingDir}/node_modules/.bin/vue-language-server.cmd\" --stdio",
+            "default": "\"${workingDir}/node_modules/.bin/vue-language-server\" --stdio"
           },
           "update": true
         }

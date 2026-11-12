@@ -57,7 +57,7 @@
       "onSuccess": {
         "configureServer": {
           "name": "Configure cpp_ls server command",
-          "command": "${output.dir}/${output.file.name}",
+          "command": "\"${output.dir}/${output.file.name}\"",
           "update": true
         }
       }

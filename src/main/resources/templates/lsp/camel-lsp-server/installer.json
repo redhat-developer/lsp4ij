@@ -25,7 +25,7 @@
       "onSuccess": {
         "configureServer": {
           "name": "Configure Camel Language Server command",
-          "command": "java -jar ${output.dir}/${output.file.name}",
+          "command": "java -jar \"${output.dir}/${output.file.name}\"",
           "update": true
         }
       }
