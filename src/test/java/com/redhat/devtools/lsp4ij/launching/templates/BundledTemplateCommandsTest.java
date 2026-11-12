@@ -16,6 +16,7 @@ import org.junit.jupiter.api.Test;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.FileSystem;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
@@ -59,6 +60,27 @@ public class BundledTemplateCommandsTest {
         assertTrue(files.size() > 40, "the templates and installers of the language servers and debug adapters: " + files);
         assertEquals(List.of(), problems,
                 "sh runs only the argument right after -c: start the command without a shell, or give sh -c the whole command in double quotes");
+    }
+
+    @Test
+    void aHomeDirectoryWithASpaceStaysOneArgumentInTheCommandsOfLuauLspAndErlangLs() throws IOException {
+        // As on Windows, where the user name of the home directory can have a space
+        String home = "C:/Users/Jane Doe";
+        for (String template : List.of("luau-lsp", "erlang-ls")) {
+            String resource = "templates/lsp/" + template + "/template.json";
+            try (var in = BundledTemplateCommandsTest.class.getClassLoader().getResourceAsStream(resource)) {
+                assertNotNull(in, resource);
+                var programArgs = JsonParser.parseString(new String(in.readAllBytes(), StandardCharsets.UTF_8))
+                        .getAsJsonObject().getAsJsonObject("programArgs");
+                for (var os : programArgs.entrySet()) {
+                    // LSP4IJ expands $USER_HOME$ before it splits the command at its spaces
+                    List<String> arguments = CommandUtils.createCommands(
+                            os.getValue().getAsString().replace("$USER_HOME$", home));
+                    assertTrue(arguments.stream().anyMatch(argument -> argument.startsWith(home + "/.lsp4ij/lsp/")),
+                            template + " (" + os.getKey() + "): " + arguments);
+                }
+            }
+        }
     }
 
     private static void check(@NotNull Path templates, @NotNull List<String> files, @NotNull List<String> problems)

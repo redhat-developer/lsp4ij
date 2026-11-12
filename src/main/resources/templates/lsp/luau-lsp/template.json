@@ -3,8 +3,8 @@
   "name": "Luau Language Server",
   "url": null,
   "programArgs": {
-    "windows": "$USER_HOME$/.lsp4ij/lsp/luau-lsp/luau-lsp.exe lsp",
-    "default": "$USER_HOME$/.lsp4ij/lsp/luau-lsp/luau-lsp lsp"
+    "windows": "\"$USER_HOME$/.lsp4ij/lsp/luau-lsp/luau-lsp.exe\" lsp",
+    "default": "\"$USER_HOME$/.lsp4ij/lsp/luau-lsp/luau-lsp\" lsp"
   },
   "expandConfiguration": true,
   "fileTypeMappings": [
