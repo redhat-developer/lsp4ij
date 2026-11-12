@@ -3,7 +3,7 @@
   "name": "Stylelint Language Server",
   "programArgs": {
     "windows": "cmd /C stylelint-lsp.cmd --stdio",
-    "default": "sh -c stylelint-lsp --stdio"
+    "default": "stylelint-lsp --stdio"
   },
  "expandConfiguration": false,
   "fileTypeMappings": [

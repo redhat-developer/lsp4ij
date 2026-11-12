@@ -18,10 +18,7 @@ You can use the [Go language server](https://pkg.go.dev/golang.org/x/tools/gopls
 2. **Open the New Language Server Dialog**. This can usually be found under the IDE settings related to Language Server Protocol (LSP). For more information, refer to the [New Language Server Dialog documentation](../UserDefinedLanguageServer.md#new-language-server-dialog).
 
 3. **Select Go Language Server as the template** from the available options.
-   This will populate the command field with a default command:
-
-   * `gopls -mode=stdio` for Windows OS.
-   * `sh -c gopls -mode=stdio` for other OS.
+   This will populate the command field with the default command `gopls -mode=stdio`.
 
    ![Gopls template](../images/user-defined-ls/gopls/select_template.png)
 
