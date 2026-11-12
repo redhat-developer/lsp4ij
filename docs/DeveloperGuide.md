@@ -199,9 +199,6 @@ with the [QuteServer](https://github.com/redhat-developer/intellij-quarkus/blob/
 
 #### SocketStreamConnectionProvider
 
-[SocketStreamConnectionProvider](https://github.com/redhat-developer/lsp4ij/blob/main/src/main/java/com/redhat/devtools/lsp4ij/server/SocketStreamConnectionProvider.java)
-is experimental: its API may change in a future release.
-
 When the language server talks LSP over a TCP socket instead of its standard input and output, use
 [SocketStreamConnectionProvider](https://github.com/redhat-developer/lsp4ij/blob/main/src/main/java/com/redhat/devtools/lsp4ij/server/SocketStreamConnectionProvider.java).
 It covers the three ways a language server takes a socket connection:

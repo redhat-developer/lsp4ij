@@ -15,7 +15,6 @@ import com.intellij.execution.configurations.GeneralCommandLine;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.redhat.devtools.lsp4ij.server.SocketStreamConnectionProvider;
-import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -24,9 +23,8 @@ import java.util.function.IntFunction;
 /**
  * {@link SocketStreamConnectionProvider} of a user-defined language server, which LSP4IJ reaches over a socket. It
  * gives the language server the initialization options and experimental settings of the user, as
- * {@link UserDefinedStreamConnectionProvider} does. This API is experimental: it may change in a future release.
+ * {@link UserDefinedStreamConnectionProvider} does.
  */
-@ApiStatus.Experimental
 public class UserDefinedSocketStreamConnectionProvider extends SocketStreamConnectionProvider {
 
     private final @NotNull UserDefinedLanguageServerDefinition serverDefinition;
