@@ -11,6 +11,7 @@ import com.intellij.notification.Notification;
 import com.intellij.notification.NotificationAction;
 import com.intellij.openapi.actionSystem.AnActionEvent;
 import com.redhat.devtools.lsp4ij.LanguageServerBundle;
+import com.redhat.devtools.lsp4ij.LanguageServerManager;
 import com.redhat.devtools.lsp4ij.LanguageServerWrapper;
 import org.jetbrains.annotations.NotNull;
 
@@ -31,7 +32,17 @@ public class EnableAndStartLanguageServerAction extends NotificationAction {
     public void actionPerformed(@NotNull AnActionEvent e, @NotNull Notification notification) {
         notification.expire();
         // A dispose expires the notification, but a click may come first
-        if (!languageServer.isDisposed()) {
+        if (languageServer.isDisposed()) {
+            return;
+        }
+        var instanceRoot = languageServer.getInstanceRoot();
+        if (instanceRoot != null) {
+            // That instance only, which it enables: the other instances of its definition stay as they are, also when
+            // they are stopped
+            LanguageServerManager.getInstance(languageServer.getProject()).start(
+                    languageServer.getServerDefinition().getId(), instanceRoot,
+                    new LanguageServerManager.StartOptions().setWillEnable(true));
+        } else {
             // It enables the language server, and counts its failed starts from 0 again
             languageServer.restart();
         }
