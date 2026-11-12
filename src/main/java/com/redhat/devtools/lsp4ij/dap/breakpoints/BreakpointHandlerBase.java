@@ -89,13 +89,27 @@ public abstract class BreakpointHandlerBase<B extends XBreakpoint<?>> extends XB
                 .forEach(this::clearIcon);
     }
 
+    /**
+     * Sends the breakpoints to the given DAP server, and to it again on each change of them.
+     * <p>
+     * Called by {@link #initialize(IDebugProtocolServer, Supplier)} with the capabilities of then: a subclass can
+     * override it, and the breakpoints are still sent with the current capabilities. Called directly, the given
+     * capabilities are used each time.
+     *
+     * @param debugProtocolServer the DAP server.
+     * @param capabilities        the capabilities of the DAP server.
+     * @return the future of the sent breakpoints.
+     */
     public CompletableFuture<@Nullable Void> initialize(@NotNull IDebugProtocolServer debugProtocolServer,
                                                         @NotNull Capabilities capabilities) {
-        return initialize(debugProtocolServer, () -> capabilities);
+        this.debugProtocolServers.add(debugProtocolServer);
+        this.capabilities.putIfAbsent(debugProtocolServer, () -> capabilities);
+        return sendBreakpoints(debugProtocolServer, null);
     }
 
     /**
-     * Sends the breakpoints to the given DAP server, and to it again on each change of them.
+     * Sends the breakpoints to the given DAP server, and to it again on each change of them, with its current
+     * capabilities, which its 'capabilities' events can change while the session runs.
      *
      * @param debugProtocolServer the DAP server.
      * @param capabilities        the current capabilities of the DAP server, read each time the breakpoints are sent.
@@ -103,9 +117,8 @@ public abstract class BreakpointHandlerBase<B extends XBreakpoint<?>> extends XB
      */
     public CompletableFuture<@Nullable Void> initialize(@NotNull IDebugProtocolServer debugProtocolServer,
                                                         @NotNull Supplier<Capabilities> capabilities) {
-        this.debugProtocolServers.add(debugProtocolServer);
         this.capabilities.put(debugProtocolServer, capabilities);
-        return sendBreakpoints(debugProtocolServer, null);
+        return initialize(debugProtocolServer, capabilities.get());
     }
 
     /**

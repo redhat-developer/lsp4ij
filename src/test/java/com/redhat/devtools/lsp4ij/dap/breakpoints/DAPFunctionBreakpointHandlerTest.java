@@ -37,6 +37,8 @@ import org.eclipse.lsp4j.debug.FunctionBreakpoint;
 import org.eclipse.lsp4j.debug.SetFunctionBreakpointsArguments;
 import org.eclipse.lsp4j.debug.SetFunctionBreakpointsResponse;
 import org.eclipse.lsp4j.debug.services.IDebugProtocolServer;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.lang.reflect.Proxy;
 import java.util.ArrayList;
@@ -56,6 +58,8 @@ public class DAPFunctionBreakpointHandlerTest extends HeavyPlatformTestCase {
     // What the IJ breakpoints were shown as, in order
     private final List<String> shown = new ArrayList<>();
     private final List<XDebugSessionListener> sessionListeners = new ArrayList<>();
+    // the capabilities which the handler got in initialize(server, Capabilities), as a subclass overriding it sees them
+    private final List<Capabilities> initializedWith = new ArrayList<>();
 
     public void testNothingIsSentToADebugAdapterWithoutFunctionBreakpoints() throws Exception {
         assertFalse(DAPFunctionBreakpointHandler.isSupportsFunctionBreakpoints(new Capabilities()));
@@ -85,6 +89,8 @@ public class DAPFunctionBreakpointHandlerTest extends HeavyPlatformTestCase {
         var handler = handler();
         try {
             handler.initialize(server(arguments -> new Breakpoint[0]), capabilities::get).join();
+            // a subclass which overrides initialize(server, Capabilities) is still called, with the capabilities of then
+            assertEquals(List.of(capabilities.get()), initializedWith);
             handler.registerBreakpoint(breakpoint("twice"));
             assertEmpty(requests);
 
@@ -334,6 +340,13 @@ public class DAPFunctionBreakpointHandlerTest extends HeavyPlatformTestCase {
             return null;
         });
         return new DAPFunctionBreakpointHandler(session, descriptor, getProject()) {
+            @Override
+            public CompletableFuture<@Nullable Void> initialize(@NotNull IDebugProtocolServer debugProtocolServer,
+                                                                @NotNull Capabilities capabilities) {
+                initializedWith.add(capabilities);
+                return super.initialize(debugProtocolServer, capabilities);
+            }
+
             @Override
             protected void setBreakpointVerified(XBreakpoint<DAPFunctionBreakpointProperties> ijBreakpoint) {
                 shown.add("verified " + ijBreakpoint.getProperties().getName());
