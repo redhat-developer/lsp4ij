@@ -10,15 +10,15 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.dap.client.variables;
 
+import com.redhat.devtools.lsp4ij.dap.client.DAPCapabilities;
 import com.redhat.devtools.lsp4ij.dap.client.DAPClient;
 import org.eclipse.lsp4j.debug.Capabilities;
 import org.eclipse.lsp4j.debug.CapabilitiesEventArguments;
 import org.eclipse.lsp4j.debug.Variable;
 import org.eclipse.lsp4j.debug.VariablePresentationHint;
 import org.eclipse.lsp4j.debug.VariablePresentationHintAttributes;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-
-import java.util.concurrent.CompletableFuture;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -29,10 +29,13 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 public class DAPValueSetVariableCapabilityTest {
 
-    /**
-     * The initialize response of the debug adapter, without 'supportsSetVariable'.
-     */
-    private final CompletableFuture<Capabilities> capabilities = CompletableFuture.completedFuture(new Capabilities());
+    private final DAPCapabilities capabilities = new DAPCapabilities();
+
+    @BeforeEach
+    void initialize() {
+        // the initialize response of the debug adapter, without 'supportsSetVariable'
+        capabilities.initialize(new Capabilities());
+    }
 
     @Test
     void cannotSetAVariableBeforeTheCapabilityIsEnabled() {
@@ -69,7 +72,7 @@ public class DAPValueSetVariableCapabilityTest {
 
         var update = new Capabilities();
         update.setSupportsLogPoints(true);
-        DAPClient.updateCapabilities(capabilities, event(update));
+        capabilities.update(event(update));
 
         assertTrue(canSetValue(variable("fromVar")));
     }
@@ -78,13 +81,13 @@ public class DAPValueSetVariableCapabilityTest {
      * As DAPValue.getModifier(): the client reads 'supportsSetVariable' from its current capabilities.
      */
     private boolean canSetValue(Variable variable) {
-        return DAPValue.canSetValue(DAPClient.isSupportsSetVariable(capabilities.join()), variable);
+        return DAPValue.canSetValue(DAPClient.isSupportsSetVariable(capabilities.get()), variable);
     }
 
     private void enableSetVariable(boolean supported) {
         var update = new Capabilities();
         update.setSupportsSetVariable(supported);
-        DAPClient.updateCapabilities(capabilities, event(update));
+        capabilities.update(event(update));
     }
 
     private static CapabilitiesEventArguments event(Capabilities update) {

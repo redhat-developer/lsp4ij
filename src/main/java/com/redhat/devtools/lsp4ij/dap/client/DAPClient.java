@@ -62,7 +62,6 @@ import java.awt.*;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.lang.Thread;
-import java.lang.reflect.Method;
 import java.util.*;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -107,6 +106,10 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
      * reading the capabilities before they are ready.
      */
     private final CompletableFuture<@Nullable Capabilities> capabilitiesFuture = new CompletableFuture<>();
+    /**
+     * The capabilities of the 'initialize' response, updated by the 'capabilities' events.
+     */
+    private final DAPCapabilities adapterCapabilities = new DAPCapabilities();
     /**
      * Once we have received initialized event, this member will be "done" as a flag
      */
@@ -203,7 +206,8 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
                                 + "A default Capabilities will be used instead.", ConsoleViewContentType.LOG_WARNING_OUTPUT);
                         capabilities = new Capabilities();
                     }
-                    capabilitiesFuture.complete(capabilities);
+                    // with the capabilities events which arrived before this response
+                    capabilitiesFuture.complete(adapterCapabilities.initialize(capabilities));
                 }).thenCompose(unused -> {
                     monitor.checkCanceled();
                     monitor.setFraction(20d / 100d);
@@ -315,7 +319,7 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
      */
     @NotNull
     Capabilities getCapabilities() {
-        return capabilitiesFuture.getNow(new Capabilities());
+        return adapterCapabilities.get();
     }
 
     protected Launcher<? extends IDebugProtocolServer> createLauncher(UnaryOperator<MessageConsumer> wrapper,
@@ -331,91 +335,7 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
 
     @Override
     public void capabilities(CapabilitiesEventArguments args) {
-        updateCapabilities(capabilitiesFuture, args);
-    }
-
-    /**
-     * Applies a DAP 'capabilities' event to the capabilities of the debug adapter.
-     * <p>
-     * The event tells that one or more capabilities have changed (ex: once the debug adapter knows the target, after
-     * 'launch' / 'attach', or when it loses it). It sends only the changed capabilities, all others keep their
-     * value: a capability which the event sends replaces the known one, even with <code>false</code> or an empty
-     * array, and a capability which it leaves out is unchanged.
-     * <p>
-     * The capabilities are merged into the very object of the 'initialize' response, which every reader uses
-     * (ex: the breakpoint handlers keep it). An event which arrives before that response is stored is merged right
-     * after it, before the configuration of the debug adapter goes on, so it is never lost nor overwritten.
-     *
-     * @param capabilitiesFuture the capabilities of the 'initialize' response, once it is known.
-     * @param args               the 'capabilities' event.
-     */
-    @ApiStatus.Internal
-    public static void updateCapabilities(@NotNull CompletableFuture<@Nullable Capabilities> capabilitiesFuture,
-                                   @Nullable CapabilitiesEventArguments args) {
-        Capabilities update = args != null ? args.getCapabilities() : null;
-        if (update == null) {
-            // The event has no capabilities: nothing changed
-            return;
-        }
-        capabilitiesFuture.thenAccept(capabilities -> {
-            if (capabilities != null) {
-                mergeCapabilities(capabilities, update);
-            }
-        });
-    }
-
-    /**
-     * Copies each capability which the given update sends (not null) into the given capabilities.
-     * <p>
-     * Every capability of LSP4J's {@link Capabilities} is an optional value with a getter and a setter: the merge
-     * walks them all, so that a capability which LSP4J adds later is merged as well.
-     *
-     * @param capabilities the capabilities to update.
-     * @param update       the changed capabilities.
-     */
-    static void mergeCapabilities(@NotNull Capabilities capabilities,
-                                  @NotNull Capabilities update) {
-        synchronized (capabilities) {
-            for (var accessor : CAPABILITY_ACCESSORS) {
-                try {
-                    Object value = accessor.getter().invoke(update);
-                    if (value != null) {
-                        accessor.setter().invoke(capabilities, value);
-                    }
-                } catch (ReflectiveOperationException e) {
-                    LOGGER.warn("Cannot update the debug adapter capability '" + accessor.getter().getName() + "'", e);
-                }
-            }
-        }
-    }
-
-    /**
-     * A capability of {@link Capabilities}: its getter and its setter.
-     */
-    record CapabilityAccessor(@NotNull Method getter, @NotNull Method setter) {
-    }
-
-    /**
-     * The getter and setter of each capability of {@link Capabilities}.
-     */
-    static final List<CapabilityAccessor> CAPABILITY_ACCESSORS = getCapabilityAccessors();
-
-    private static List<CapabilityAccessor> getCapabilityAccessors() {
-        List<CapabilityAccessor> accessors = new ArrayList<>();
-        for (Method getter : Capabilities.class.getMethods()) {
-            if (getter.getDeclaringClass() != Capabilities.class
-                    || getter.getParameterCount() != 0
-                    || !getter.getName().startsWith("get")) {
-                continue;
-            }
-            try {
-                Method setter = Capabilities.class.getMethod("set" + getter.getName().substring(3), getter.getReturnType());
-                accessors.add(new CapabilityAccessor(getter, setter));
-            } catch (NoSuchMethodException e) {
-                // a getter without setter is not a capability
-            }
-        }
-        return List.copyOf(accessors);
+        adapterCapabilities.update(args);
     }
 
     @Override
