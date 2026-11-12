@@ -18,6 +18,7 @@ import com.intellij.execution.process.ProcessEvent;
 import com.intellij.execution.process.ProcessListener;
 import com.intellij.execution.process.ProcessOutputType;
 import com.intellij.openapi.util.Key;
+import com.intellij.util.concurrency.AppExecutorUtil;
 import com.intellij.util.io.BaseOutputReader;
 import com.intellij.util.net.NetUtils;
 import org.jetbrains.annotations.ApiStatus;
@@ -43,9 +44,13 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.IntFunction;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -127,7 +132,8 @@ public class SocketStreamConnectionProvider implements StreamConnectionProvider,
     private volatile boolean stopped;
     private volatile @Nullable OSProcessHandler processHandler;
     private volatile @Nullable GeneralCommandLine startedCommandLine;
-    private volatile @Nullable ServerSocket serverSocket;
+    // The sockets on which LSP4IJ listens, until the language server connects to one of them
+    private volatile @NotNull List<ServerSocket> serverSockets = List.of();
     private volatile @Nullable Socket connecting;
     private volatile @Nullable Socket socket;
     private volatile @Nullable InputStream inputStream;
@@ -338,8 +344,15 @@ public class SocketStreamConnectionProvider implements StreamConnectionProvider,
             return withPort(host, port);
         }
         return LOOPBACK_ADDRESSES.stream()
-                .map(address -> withPort(address instanceof Inet6Address ? "::1" : address.getHostAddress(), port))
+                .map(address -> withPort(display(address), port))
                 .collect(Collectors.joining(" or "));
+    }
+
+    /**
+     * Returns the IP address of the given address, with ::1 for the IPv6 loopback address, which Java writes in full.
+     */
+    private static @NotNull String display(@NotNull InetAddress address) {
+        return address instanceof Inet6Address && address.isLoopbackAddress() ? "::1" : address.getHostAddress();
     }
 
     private static @NotNull String withPort(@NotNull String host, int port) {
@@ -453,39 +466,90 @@ public class SocketStreamConnectionProvider implements StreamConnectionProvider,
     }
 
     private void accept() throws IOException, ExecutionException, CannotStartProcessException {
-        var server = new ServerSocket(port, 1, InetAddress.getLoopbackAddress());
+        var servers = listen();
         synchronized (this) {
             if (stopped) {
-                server.close();
+                servers.forEach(SocketStreamConnectionProvider::closeQuietly);
                 throw stoppedException();
             }
-            serverSocket = server;
+            serverSockets = servers;
         }
-        boundPort = server.getLocalPort();
+        boundPort = servers.get(0).getLocalPort();
         OSProcessHandler handler = commandLine != null ? startProcess(commandLine.apply(boundPort)) : null;
         Socket accepted;
         try {
-            // stop(), and the end of the language server, close the server socket
-            server.setSoTimeout(timeoutMillis());
-            accepted = server.accept();
-        } catch (SocketTimeoutException e) {
-            throw new CannotStartProcessException("The language server didn't connect to "
-                    + server.getInetAddress().getHostAddress() + ":" + boundPort + " within " + startTimeout.toSeconds()
-                    + " s: " + this + (server.getInetAddress() instanceof Inet4Address
-                    ? " A language server which connects to localhost may try ::1, the IPv6 loopback address, on which"
-                    + " LSP4IJ doesn't listen. Let it connect to " + server.getInetAddress().getHostAddress() + " instead."
-                    : ""));
-        } catch (SocketException e) {
+            // stop(), and the end of the language server, close the server sockets
+            accepted = acceptFirst(servers).orTimeout(timeoutMillis(), TimeUnit.MILLISECONDS).join();
+        } catch (CompletionException e) {
+            if (e.getCause() instanceof TimeoutException) {
+                throw new CannotStartProcessException("The language server didn't connect to "
+                        + servers.stream().map(server -> withPort(display(server.getInetAddress()), boundPort))
+                        .collect(Collectors.joining(" or "))
+                        + " within " + startTimeout.toSeconds() + " s: " + this
+                        + (servers.size() == 1 && servers.get(0).getInetAddress() instanceof Inet4Address
+                        ? " A language server which connects to localhost may try ::1, the IPv6 loopback address, on"
+                        + " which LSP4IJ doesn't listen. Let it connect to "
+                        + servers.get(0).getInetAddress().getHostAddress() + " instead."
+                        : ""));
+            }
             checkNotStopped();
             if (handler != null && handler.isProcessTerminated()) {
                 throw new CannotStartProcessException("The language server ended before it connected: " + this);
             }
-            throw e;
+            throw e.getCause() instanceof IOException io ? io : new IOException(e.getCause());
         } finally {
             // One connection only
-            server.close();
+            servers.forEach(SocketStreamConnectionProvider::closeQuietly);
         }
         install(accepted);
+    }
+
+    /**
+     * Listens on the port on the loopback address of the JVM, and on the same port on the other loopback address, so
+     * that a language server which connects to localhost reaches LSP4IJ, whichever of the two it gets. Without that
+     * port free on the other address, or without IPv6, it listens on the first one only.
+     */
+    private @NotNull List<ServerSocket> listen() throws IOException {
+        for (int attempt = 1; ; attempt++) {
+            var first = new ServerSocket(port, 1, LOOPBACK_ADDRESSES.get(0));
+            if (LOOPBACK_ADDRESSES.size() == 1) {
+                return List.of(first);
+            }
+            try {
+                return List.of(first, new ServerSocket(first.getLocalPort(), 1, LOOPBACK_ADDRESSES.get(1)));
+            } catch (IOException takenOrNoIPv6) {
+                if (port != 0 || attempt == 3) {
+                    return List.of(first);
+                }
+                // Another free port of the first address may be free on the other one too
+                closeQuietly(first);
+            }
+        }
+    }
+
+    /**
+     * Returns the first connection which one of the given server sockets accepts. It fails once they all fail, as when
+     * a stop closes them.
+     */
+    private static @NotNull CompletableFuture<Socket> acceptFirst(@NotNull List<ServerSocket> servers) {
+        var first = new CompletableFuture<Socket>();
+        var failures = new AtomicInteger();
+        for (ServerSocket server : servers) {
+            AppExecutorUtil.getAppExecutorService().execute(() -> {
+                try {
+                    Socket connection = server.accept();
+                    if (!first.complete(connection)) {
+                        // The language server connects once: this is not its connection, or one which came too late
+                        closeQuietly(connection);
+                    }
+                } catch (IOException e) {
+                    if (failures.incrementAndGet() == servers.size()) {
+                        first.completeExceptionally(e);
+                    }
+                }
+            });
+        }
+        return first;
     }
 
     private @NotNull OSProcessHandler startProcess(@NotNull GeneralCommandLine commandLine)
@@ -549,14 +613,12 @@ public class SocketStreamConnectionProvider implements StreamConnectionProvider,
     }
 
     private void languageServerEnded() {
-        ServerSocket server;
+        List<ServerSocket> servers;
         synchronized (this) {
-            server = socket == null ? serverSocket : null;
+            servers = socket == null ? serverSockets : List.of();
         }
-        if (server != null) {
-            // Not connected yet: stop waiting for the connection, and let start() fail
-            closeQuietly(server);
-        }
+        // Not connected yet: stop waiting for the connection, and let start() fail
+        servers.forEach(SocketStreamConnectionProvider::closeQuietly);
         reportUnexpectedStop();
     }
 
@@ -615,7 +677,7 @@ public class SocketStreamConnectionProvider implements StreamConnectionProvider,
             }
             stopped = true;
             handler = processHandler;
-            closeables = Stream.of(socket, connecting, serverSocket)
+            closeables = Stream.concat(Stream.of(socket, connecting), serverSockets.stream())
                     .filter(Objects::nonNull)
                     .map(Closeable.class::cast)
                     .toList();

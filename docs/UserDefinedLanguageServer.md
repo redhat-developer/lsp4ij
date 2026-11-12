@@ -144,17 +144,14 @@ A [template](./UserDefinedLanguageServerTemplate.md#template-descriptor) sets th
 [`socket`](./UserDefinedLanguageServerTemplate.md#socket), and lists the transports which its language server supports
 in [`transports`](./UserDefinedLanguageServerTemplate.md#transports).
 
-LSP4IJ listens on the loopback address only. The output of a language server which LSP4IJ starts is shown in the `Log`
+LSP4IJ listens on the loopback addresses only, `127.0.0.1` and `::1`. The output of a language server which LSP4IJ starts is shown in the `Log`
 tab of the [LSP console](./UserGuide.md#lsp-console), since the socket carries the protocol: its standard output as
 information, and its standard error as errors. As with any TCP transport
 of LSP, which has no handshake to authenticate its peer, any local process can connect to a loopback port: on a machine
 shared with other users, prefer the standard input and output.
 
-A language server which LSP4IJ starts may listen on either loopback address: LSP4IJ connects to `127.0.0.1` and then
-to `::1`. One which connects to LSP4IJ must connect to the loopback address of the JVM, `127.0.0.1` unless Java prefers
-IPv6 addresses (`-Djava.net.preferIPv6Addresses=true`), when it is `::1`: give it that address rather than
-`localhost`, which Node.js may resolve to the other one. When the two don't match, the start fails with an error which
-says so.
+A language server which LSP4IJ starts may listen on, or connect to, either loopback address, `127.0.0.1` or `::1`, as
+one which uses `localhost` may get either: LSP4IJ connects to both, and listens on both.
 
 ### Mappings tab
 
