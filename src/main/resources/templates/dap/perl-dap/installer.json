@@ -57,7 +57,7 @@
       "onSuccess": {
         "configureServer": {
           "name": "Configure Perl DAP server command",
-          "command": "${output.dir}/${output.file.name}",
+          "command": "\"${output.dir}/${output.file.name}\"",
           "update": true
         }
       }

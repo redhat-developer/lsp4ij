@@ -87,12 +87,12 @@ import org.eclipse.lsp4j.debug.Source;
 import org.eclipse.lsp4j.debug.SteppingGranularity;
 import org.eclipse.lsp4j.debug.Thread;
 import org.eclipse.lsp4j.debug.ThreadEventArguments;
+import org.eclipse.lsp4j.debug.services.IDebugProtocolServer;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import javax.swing.*;
 import java.io.IOException;
-import java.net.InetAddress;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.CancellationException;
@@ -178,6 +178,7 @@ public class DAPDebugProcess extends XDebugProcess implements Disposable {
 
     private @Nullable CompletableFuture<Void> connectToServerFuture;
     private volatile Status status;
+    private final Object statusLock = new Object();
     private Supplier<TransportStreams> streamsSupplier;
     private DAPClient parentClient;
     private final @NotNull DAPValueFormat valueFormat = new DAPValueFormat();
@@ -225,7 +226,7 @@ public class DAPDebugProcess extends XDebugProcess implements Disposable {
 
             @Override
             public void run(@NotNull ProgressIndicator indicator) {
-                DAPDebugProcess.this.status = Status.STARTING;
+                advanceStatus(Status.STARTING);
                 print(taskTitle, ConsoleViewContentType.SYSTEM_OUTPUT);
 
                 // The Debug server is launched, create a DAP client and connect to the server when it is ready:
@@ -264,7 +265,7 @@ public class DAPDebugProcess extends XDebugProcess implements Disposable {
 
                         // Wait for DAP client is connecting to the DAP server...
                         ProgressIndicatorUtils.awaitWithCheckCanceled(connectToServerFuture);
-                        DAPDebugProcess.this.status = Status.STARTED;
+                        advanceStatus(Status.STARTED);
 
                         // Refresh Threads panel
                         parentClient
@@ -343,7 +344,8 @@ public class DAPDebugProcess extends XDebugProcess implements Disposable {
                 // The DAP messages go through the socket, so the process output carries none
                 console.setSocketTransport();
             }
-            return new TransportStreams.SocketTransportStreams(address != null ? address : InetAddress.getLoopbackAddress().getHostAddress(), port);
+            // Without an address, both loopback addresses, as a DAP server which listens on localhost can have either
+            return new TransportStreams.SocketTransportStreams(address, port);
         }
         var processHandler = executionResult.getProcessHandler();
         DAPProcessListener processListener = new DAPProcessListener();
@@ -412,26 +414,63 @@ public class DAPDebugProcess extends XDebugProcess implements Disposable {
     @Override
     public void stop() {
         runToCursorBreakpoint.ended();
-        if (status != Status.STOPPED && status != Status.STOPPING) {
-            ApplicationManager.getApplication()
-                    .executeOnPooledThread(() -> {
-                        try {
-                            status = Status.STOPPING;
-                            dispose();
-                            print("Disconnected successfully from the debug server.",
-                                    ConsoleViewContentType.SYSTEM_OUTPUT);
-                        } catch (Exception e) {
-                            print("Disconnected exceptionally from the debug server: " + e.getMessage(),
-                                    ConsoleViewContentType.ERROR_OUTPUT);
-                        } finally {
-                            XDebugSession session = getSession();
-                            if (session != null) {
-                                session.stop();
-                            }
-                            status = Status.STOPPED;
-                        }
-                    });
+        if (!markStopping()) {
+            return;
         }
+        ApplicationManager.getApplication()
+                .executeOnPooledThread(() -> {
+                    try {
+                        dispose();
+                        print("Disconnected successfully from the debug server.",
+                                ConsoleViewContentType.SYSTEM_OUTPUT);
+                    } catch (Exception e) {
+                        print("Disconnected exceptionally from the debug server: " + e.getMessage(),
+                                ConsoleViewContentType.ERROR_OUTPUT);
+                    } finally {
+                        XDebugSession session = getSession();
+                        if (session != null) {
+                            session.stop();
+                        }
+                        status = Status.STOPPED;
+                    }
+                });
+    }
+
+    /**
+     * Marks the debug process as stopping, and returns true unless it was stopping or stopped already. Two sessions of
+     * a tree can end at the same time, and each asks the debug process to stop: only the first one disposes it.
+     */
+    private boolean markStopping() {
+        synchronized (statusLock) {
+            if (status == Status.STOPPING || status == Status.STOPPED) {
+                return false;
+            }
+            status = Status.STOPPING;
+            return true;
+        }
+    }
+
+    /**
+     * Advances a starting debug process to the given status, unless it has been asked to stop meanwhile: a stop which
+     * runs while the debug process starts must not be undone.
+     *
+     * @param next the next status, STARTING or STARTED.
+     */
+    private void advanceStatus(@NotNull Status next) {
+        synchronized (statusLock) {
+            if (status != Status.STOPPING && status != Status.STOPPED) {
+                status = next;
+            }
+        }
+    }
+
+    /**
+     * Returns true once the debug process has been asked to stop: it is stopping, or it has stopped.
+     *
+     * @return true once the debug process has been asked to stop, and false otherwise.
+     */
+    public boolean isStopping() {
+        return status == Status.STOPPING || status == Status.STOPPED;
     }
 
     @Override
@@ -636,11 +675,30 @@ public class DAPDebugProcess extends XDebugProcess implements Disposable {
 
     /**
      * Returns the IntelliJ breakpoint, a line, a function or a data breakpoint, of the given DAP breakpoint id, and
-     * null otherwise.
+     * null otherwise. Each session numbers its breakpoints itself, so the id is that which the given DAP server gave.
+     *
+     * @param debugProtocolServer the DAP server which names the breakpoint.
+     * @param id                  the DAP breakpoint id.
+     * @return the IntelliJ breakpoint of the given DAP breakpoint id, and null otherwise.
+     */
+    public @Nullable XBreakpoint<?> findBreakpointById(@NotNull IDebugProtocolServer debugProtocolServer, @Nullable Integer id) {
+        XBreakpoint<?> breakpoint = breakpointHandler.findBreakpointById(debugProtocolServer, id);
+        if (breakpoint == null) {
+            breakpoint = functionBreakpointHandler.findBreakpointById(debugProtocolServer, id);
+        }
+        return breakpoint != null ? breakpoint : dataBreakpointHandler.findBreakpointById(debugProtocolServer, id);
+    }
+
+    /**
+     * Returns the IntelliJ breakpoint, a line, a function or a data breakpoint, to which one of the DAP servers gave
+     * the given DAP breakpoint id, and null otherwise.
      *
      * @param id the DAP breakpoint id.
      * @return the IntelliJ breakpoint of the given DAP breakpoint id, and null otherwise.
+     * @deprecated each session of a tree numbers its breakpoints itself, so two sessions can give two breakpoints the
+     * same id: use {@link #findBreakpointById(IDebugProtocolServer, Integer)} with the DAP server which names it.
      */
+    @Deprecated
     public @Nullable XBreakpoint<?> findBreakpointById(@Nullable Integer id) {
         XBreakpoint<?> breakpoint = breakpointHandler.findBreakpointById(id);
         if (breakpoint == null) {

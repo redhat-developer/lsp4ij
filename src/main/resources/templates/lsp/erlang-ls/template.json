@@ -2,7 +2,7 @@
   "id": "erlang-ls",
   "name": "Erlang Language Server",
   "programArgs": {
-    "default": "escript $PROJECT_DIR$/erlang_ls"
+    "default": "escript \"$USER_HOME$/.lsp4ij/lsp/erlang/erlang_ls\""
   },
   "fileTypeMappings": [
     {

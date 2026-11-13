@@ -296,8 +296,8 @@ public abstract class DAPBreakpointHandlerBase<B extends XBreakpoint<?>> extends
                             // A native breakpoint shadowed since the request was sent is not sent anymore:
                             // a late response must not give it back the DAP id it had
                             if (ijBreakpoint != null && !shadowedBreakpoints.contains(ijBreakpoint)) {
-                                ijBreakpoint.putUserData(DAP_BREAKPOINT_ID, breakpointResponse.getId());
-                                updateBreakpoint(breakpointResponse, ijBreakpoint);
+                                setBreakpointId(debugProtocolServer, ijBreakpoint, breakpointResponse.getId());
+                                updateBreakpoint(debugProtocolServer, breakpointResponse, ijBreakpoint);
                             }
                         }
                     }
@@ -332,8 +332,8 @@ public abstract class DAPBreakpointHandlerBase<B extends XBreakpoint<?>> extends
         }
         if (shadowed) {
             if (shadowedBreakpoints.add(breakpoint)) {
-                // The breakpoint is not sent anymore: forget the DAP id it had before
-                breakpoint.putUserData(DAP_BREAKPOINT_ID, null);
+                // The breakpoint is not sent anymore: forget what the DAP servers answered for it before
+                forgetAnswers(breakpoint);
                 // Not an error: the inactive dependent icon instead of the invalid one
                 updateBreakpointPresentation(breakpoint,
                         lineBreakpoint.getType().getInactiveDependentIcon(), DAPBundle.message("dap.breakpoints.shadowed"));

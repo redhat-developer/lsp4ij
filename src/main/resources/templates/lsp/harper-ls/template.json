@@ -2,7 +2,7 @@
   "id": "harper-ls",
   "name": "Harper Language Server",
   "programArgs": {
-    "default": "sh -c ${BASE_DIR}/harper-ls --stdio",
+    "default": "${BASE_DIR}/harper-ls --stdio",
     "windows": "${BASE_DIR}/harper-ls.exe --stdio"
   },
   "expandConfiguration": true,

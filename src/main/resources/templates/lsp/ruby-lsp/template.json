@@ -3,7 +3,7 @@
   "name": "Ruby LSP",
   "programArgs": {
     "windows": "cmd /C ruby-lsp",
-    "default": "sh -s ruby-lsp"
+    "default": "ruby-lsp"
   },
   "expandConfiguration": true,
   "fileTypeMappings": [

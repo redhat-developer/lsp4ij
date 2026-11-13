@@ -20,7 +20,7 @@ LSP4IJ is a free and open-source
  * [Debug Adapter Protocol](https://microsoft.github.io/debug-adapter-protocol/) support with [Debug Adapter Protocol Run/Debug configuration](./docs/dap/UserGuide.md).
 
 It allows you to integrate any `language server` that communicates with its client via `stdio`, or over a TCP socket
-(experimental: see [SocketStreamConnectionProvider](./docs/DeveloperGuide.md#socketstreamconnectionprovider) and the
+(see [SocketStreamConnectionProvider](./docs/DeveloperGuide.md#socketstreamconnectionprovider) and the
 [transport of a user-defined language server](./docs/UserDefinedLanguageServer.md#transport)):
 
 * by `developing an IntelliJ plugin` with LSP `extension points`:
@@ -111,6 +111,7 @@ Here are some projects that use LSP4IJ:
  * [ARO Programming Language](https://github.com/arolang/aro)
  * [BBj Language Support for IntelliJ](https://github.com/BBx-Kitchen/bbj-language-server)
  * [Ecstasy Language Support](https://plugins.jetbrains.com/plugin/31202-ecstasy-language-support)
+ * [Zig Pro](https://plugins.jetbrains.com/plugin/35677-zig-pro)
 
 ## Requirements
 

@@ -25,8 +25,8 @@
         "configureServer": {
           "name": "Configure LSP Server for EOLANG command",
           "command": {
-            "windows": "${workingDir}/.bin/eo-lsp-server.cmd --stdio",
-            "default": "${workingDir}/.bin/eo-lsp-server --stdio"
+            "windows": "\"${workingDir}/.bin/eo-lsp-server.cmd\" --stdio",
+            "default": "\"${workingDir}/.bin/eo-lsp-server\" --stdio"
           },
           "update": true
         }

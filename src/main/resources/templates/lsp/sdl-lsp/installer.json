@@ -19,7 +19,7 @@
       "onSuccess": {
         "configureServer": {
           "name": "Configure sdl-lsp server command",
-          "command": "java -jar ${output.dir}/${output.file.name}",
+          "command": "java -jar \"${output.dir}/${output.file.name}\"",
           "update": true
         }
       }

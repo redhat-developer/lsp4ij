@@ -10,7 +10,6 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.server.definition.launching;
 
-import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -21,6 +20,5 @@ import org.jetbrains.annotations.Nullable;
  * @param mode     the mode.
  * @param argument the argument of the command for this mode, or null if the template names none.
  */
-@ApiStatus.Experimental
 public record TransportSupport(@NotNull UserDefinedTransport.Mode mode, @Nullable String argument) {
 }

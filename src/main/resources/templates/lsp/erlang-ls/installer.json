@@ -6,8 +6,8 @@
     "exec": {
       "name": "Check erlang runtime",
       "command": {
-        "windows": "where erlang",
-        "default": "which erlang"
+        "windows": "where escript",
+        "default": "which escript"
       }
     }
   },
@@ -33,7 +33,7 @@
       "onSuccess": {
         "configureServer": {
           "name": "Configure Erlang LS server command",
-          "command": "escript ${output.dir}/${output.file.name}",
+          "command": "escript \"${output.dir}/${output.file.name}\"",
           "update": true
         }
       }

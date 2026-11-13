@@ -63,7 +63,7 @@
       "onSuccess": {
         "configureServer": {
           "name": "Configure SysML v2 Language Server command",
-          "command": "${output.dir}/${output.file.name} --stdio",
+          "command": "\"${output.dir}/${output.file.name}\" --stdio",
           "update": true
         }
       }

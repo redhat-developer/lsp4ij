@@ -40,8 +40,8 @@
         "configureServer": {
           "name": "Configure Scala Language Server command",
           "command": {
-            "windows": "${workingDir}/metals.bat",
-            "default": "${workingDir}/metals"
+            "windows": "\"${workingDir}/metals.bat\"",
+            "default": "\"${workingDir}/metals\""
           },
           "update": true
         }

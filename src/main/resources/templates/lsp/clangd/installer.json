@@ -30,7 +30,7 @@
       "url": {
         "windows": "https://github.com/clangd/clangd/releases/download/snapshot_20250518/clangd-windows-snapshot_20250518.zip",
         "unix": "https://github.com/clangd/clangd/releases/download/snapshot_20250518/clangd-linux-snapshot_20250518.zip",
-        "mac": " https://github.com/clangd/clangd/releases/download/snapshot_20250518/clangd-mac-snapshot_20250518.zip"
+        "mac": "https://github.com/clangd/clangd/releases/download/snapshot_20250518/clangd-mac-snapshot_20250518.zip"
       },
       "output": {
         "dir": "${serverDist}",
@@ -46,7 +46,7 @@
       "onSuccess": {
         "configureServer": {
           "name": "Configure Clangd server command",
-          "command": "${output.dir}/${output.file.name}",
+          "command": "\"${output.dir}/${output.file.name}\"",
           "update": true
         }
       }

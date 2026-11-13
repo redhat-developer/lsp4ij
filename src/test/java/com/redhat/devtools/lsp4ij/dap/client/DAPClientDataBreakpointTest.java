@@ -65,13 +65,16 @@ public class DAPClientDataBreakpointTest extends HeavyPlatformTestCase {
 
             var stop = stop(32);
             assertTrue(DAPClient.isBreakpointStop(stop));
-            assertSame(total, DAPClient.getStopBreakpoint(stop, handler::findBreakpointById, () -> {
+            assertSame(total, DAPClient.getStopBreakpoint(stop, id -> handler.findBreakpointById(server, id), () -> {
                 throw new AssertionError("the debug adapter names the breakpoint");
             }));
-            assertSame(count, DAPClient.getStopBreakpoint(stop(31), handler::findBreakpointById, () -> null));
+            assertSame(count, DAPClient.getStopBreakpoint(stop(31), id -> handler.findBreakpointById(server, id), () -> null));
 
             // an id which is no IntelliJ breakpoint's, such as that of a breakpoint of the debug adapter's own
-            assertNull(DAPClient.getStopBreakpoint(stop(33), handler::findBreakpointById, () -> count));
+            assertNull(DAPClient.getStopBreakpoint(stop(33), id -> handler.findBreakpointById(server, id), () -> count));
+
+            // another session numbers its breakpoints itself: its id 32 is not the id which this session gave 'total'
+            assertNull(DAPClient.getStopBreakpoint(stop, id -> handler.findBreakpointById(server(), id), () -> null));
         } finally {
             handler.dispose();
         }

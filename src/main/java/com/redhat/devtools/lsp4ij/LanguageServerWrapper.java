@@ -74,6 +74,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.net.URI;
+import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -162,7 +163,18 @@ public class LanguageServerWrapper implements Disposable {
     protected StreamConnectionProvider lspStreamProvider;
     private volatile MessageBusConnection messageBusConnection;
     private Future<?> launcherFuture;
+    // The restarts within the last restart window
     private int numberOfRestartAttempts;
+    // When each restart within the last restart window began, as System.nanoTime(). An older restart no longer counts,
+    // so that a language server which fails now and then, as one which crashes once a day, is never disabled, while
+    // one which keeps failing is: its restarts, with their pauses, take about 7.5 minutes
+    private final ArrayDeque<Long> restartNanos = new ArrayDeque<>();
+    private @NotNull Duration restartWindow = Duration.ofMinutes(10);
+    // A start which follows a failed restart too soon waits, so that the features of the open files, each of which
+    // starts the language server, don't use up its restarts in a moment, as while a language server which LSP4IJ
+    // attaches to doesn't run yet. The first restart is at once; from the second on, the pause doubles up to the last.
+    private @NotNull Duration firstRestartPause = Duration.ofSeconds(1);
+    private @NotNull Duration maxRestartPause = Duration.ofSeconds(30);
     private @Nullable CompletableFuture<Void> initializeFuture;
     private volatile LanguageServer languageServer;
     private LanguageClientImpl languageClient;
@@ -428,6 +440,7 @@ public class LanguageServerWrapper implements Disposable {
     }
 
     private synchronized void restart(boolean onItsOwn) {
+        restartNanos.clear();
         numberOfRestartAttempts = 0;
         serverError = null;
         setEnabled(true);
@@ -522,15 +535,29 @@ public class LanguageServerWrapper implements Disposable {
                 // See: https://github.com/redhat-developer/lsp4ij/issues/1673
                 return;
             }
+            long now = System.nanoTime();
+            while (!restartNanos.isEmpty() && now - restartNanos.peekFirst() >= restartWindow.toNanos()) {
+                restartNanos.pollFirst();
+            }
+            numberOfRestartAttempts = restartNanos.size();
+            var pause = restartPause(numberOfRestartAttempts, firstRestartPause, maxRestartPause);
+            // System.nanoTime() is only compared with an earlier one: before a first restart, there is none
+            if (!pause.isZero() && now - restartNanos.getLast() < pause.toNanos()) {
+                // Too soon after the last restart: the language server stays as its failed start left it, without a
+                // language server, and the start counts no restart
+                return;
+            }
             // Here the language server has been not possible
             // we stop it and attempts a new restart if needed
             stop();
             if (numberOfRestartAttempts > MAX_NUMBER_OF_RESTART_ATTEMPTS - 1) {
                 // Disable the language server
                 setEnabled(false);
+                showNotificationDisabled(serverError);
                 return;
             } else {
-                numberOfRestartAttempts++;
+                restartNanos.addLast(now);
+                numberOfRestartAttempts = restartNanos.size();
             }
         }
         final var filesToReconnect = new ArrayList<VirtualFile>();
@@ -777,6 +804,30 @@ public class LanguageServerWrapper implements Disposable {
     }
 
     /**
+     * Returns how long a start waits after the last of the given number of restarts: not at all after none, the first
+     * pause after one, and from then on twice as long after each, up to the last pause.
+     */
+    static @NotNull Duration restartPause(int restarts, @NotNull Duration first, @NotNull Duration max) {
+        if (restarts == 0) {
+            return Duration.ZERO;
+        }
+        // No more doublings than it takes to reach any pause in practice, so that it never overflows
+        Duration pause = first.multipliedBy(1L << Math.min(restarts - 1, 20));
+        return pause.compareTo(max) > 0 ? max : pause;
+    }
+
+    @TestOnly
+    synchronized void setRestartPauses(@NotNull Duration first, @NotNull Duration max) {
+        this.firstRestartPause = first;
+        this.maxRestartPause = max;
+    }
+
+    @TestOnly
+    synchronized void setRestartWindow(@NotNull Duration restartWindow) {
+        this.restartWindow = restartWindow;
+    }
+
+    /**
      * Sets where the connection of a document runs once its start attempt is initialized, so that a test can run it
      * when it chooses, as after a stop.
      *
@@ -837,6 +888,23 @@ public class LanguageServerWrapper implements Disposable {
                 errorNotification = null;
                 notification.expire();
             }
+        }
+    }
+
+    /**
+     * Shows that too many failed starts disabled this language server, in place of the notification of its last
+     * failed start.
+     */
+    private void showNotificationDisabled(@NotNull Exception error) {
+        if (errorNotification != null && !errorNotification.isExpired()) {
+            errorNotification.expire();
+        }
+        var notification = CancellationSupport.showNotificationDisabled(this, error, MAX_NUMBER_OF_RESTART_ATTEMPTS);
+        // A start which succeeds, or a dispose, expires it
+        errorNotification = notification;
+        if (isDisposed()) {
+            errorNotification = null;
+            notification.expire();
         }
     }
 
@@ -1124,15 +1192,18 @@ public class LanguageServerWrapper implements Disposable {
         // start language server if needed, and take the start attempt that the connection is for
         InitializingContext attempt;
         CompletableFuture<Void> initialized;
+        LanguageServerException failure;
         synchronized (this) {
             start();
             attempt = currentInitializingContext;
             initialized = this.initializeFuture;
+            failure = failureWithoutRestart();
         }
 
         if (initialized == null) {
-            // The "initialize" future is not initialized, return null as language server.
-            return CompletableFuture.completedFuture(null);
+            // The "initialize" future is not initialized: no language server, or in the pause after a failed restart,
+            // the error of the last start, as getInitializedServer() gives
+            return failure != null ? CompletableFuture.failedFuture(failure) : CompletableFuture.completedFuture(null);
         }
 
         return initialized.thenComposeAsync(theVoid -> {
@@ -1623,7 +1694,22 @@ public class LanguageServerWrapper implements Disposable {
             // server that never initialized
             return initialized.thenApply(r -> this.languageServer);
         }
+        var failure = failureWithoutRestart();
+        if (failure != null) {
+            return CompletableFuture.failedFuture(failure);
+        }
         return CompletableFuture.completedFuture(this.languageServer);
+    }
+
+    /**
+     * Returns the error of the last start when start() leaves the language server without one and starts nothing, as
+     * in the pause after a failed restart, and null otherwise. A request then fails as the restart would have, so that
+     * a feature keeps no empty result for the file, and asks again after the pause.
+     */
+    private synchronized @Nullable LanguageServerException failureWithoutRestart() {
+        return this.languageServer == null && this.initializeFuture == null && serverError != null && isEnabled()
+                ? serverError
+                : null;
     }
 
     /**

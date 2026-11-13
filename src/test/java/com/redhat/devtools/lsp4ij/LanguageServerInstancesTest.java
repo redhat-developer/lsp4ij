@@ -65,6 +65,7 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.lang.management.ManagementFactory;
 import java.net.URI;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -816,6 +817,10 @@ public class LanguageServerInstancesTest extends LSPCodeInsightFixtureTestCase {
             }
             a = ContainerUtil.find(instances(), instance -> instance.getInstanceRoot() != null
                     && "a".equals(instance.getInstanceRoot().getName()));
+            if (a != null) {
+                // No pause between its restarts, which the test would wait for
+                a.setRestartPauses(Duration.ZERO, Duration.ZERO);
+            }
         }
 
         assertNotNull(a);

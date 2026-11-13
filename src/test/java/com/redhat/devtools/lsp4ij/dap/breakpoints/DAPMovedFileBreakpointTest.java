@@ -117,7 +117,8 @@ public class DAPMovedFileBreakpointTest extends HeavyPlatformTestCase {
     public void testLateResponseOfMovedBreakpointIsIgnored() throws Exception {
         var file = file("a.lua");
         var breakpoint = lineBreakpoint(file);
-        sharedHandler.initialize(server(), new Capabilities()).join();
+        var server = server();
+        sharedHandler.initialize(server, new Capabilities()).join();
 
         // The response for a.lua is held back while the breakpoint moves to b.lua
         var lateResponses = new ArrayList<Runnable>();
@@ -127,12 +128,12 @@ public class DAPMovedFileBreakpointTest extends HeavyPlatformTestCase {
         WriteAction.runAndWait(() -> file.rename(this, "b.lua"));
         forwardedHandler.unregisterBreakpoint(breakpoint, false);
         forwardedHandler.registerBreakpoint(breakpoint);
-        Integer movedId = breakpoint.getUserData(BreakpointHandlerBase.DAP_BREAKPOINT_ID);
+        Integer movedId = sharedHandler.getBreakpointId(server, breakpoint);
         assertNotNull(movedId);
 
         // The late response for a.lua must not override the id given by b.lua
         lateResponses.forEach(Runnable::run);
-        assertEquals(movedId, breakpoint.getUserData(BreakpointHandlerBase.DAP_BREAKPOINT_ID));
+        assertEquals(movedId, sharedHandler.getBreakpointId(server, breakpoint));
     }
 
     @SuppressWarnings({"unchecked", "rawtypes"})
