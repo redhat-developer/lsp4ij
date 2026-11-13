@@ -435,11 +435,20 @@ public abstract class BreakpointHandlerBase<B extends XBreakpoint<?>> extends XB
     }
 
     /**
-     * Forgets the ids which the DAP servers gave the given breakpoint, as when it is not sent anymore.
+     * Forgets what the DAP servers answered for the given breakpoint, as when it is not sent anymore: which of them
+     * reported it bound, and the ids they gave it. It stays registered, and the end of a session which had bound it
+     * doesn't show it as invalid.
      *
      * @param ijBreakpoint the IJ breakpoint.
      */
-    protected void forgetBreakpointIds(@NotNull B ijBreakpoint) {
+    protected void forgetAnswers(@NotNull B ijBreakpoint) {
+        Set<Object> sessions = verifiedBy.get(ijBreakpoint);
+        if (sessions != null) {
+            // Under the lock which the answers and the end of a session take, so that none of them interleaves
+            synchronized (sessions) {
+                sessions.clear();
+            }
+        }
         breakpointIds.remove(ijBreakpoint);
         updateDeprecatedBreakpointId(ijBreakpoint, null);
     }

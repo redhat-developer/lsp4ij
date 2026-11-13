@@ -332,8 +332,8 @@ public abstract class DAPBreakpointHandlerBase<B extends XBreakpoint<?>> extends
         }
         if (shadowed) {
             if (shadowedBreakpoints.add(breakpoint)) {
-                // The breakpoint is not sent anymore: forget the DAP id it had before
-                forgetBreakpointIds(breakpoint);
+                // The breakpoint is not sent anymore: forget what the DAP servers answered for it before
+                forgetAnswers(breakpoint);
                 // Not an error: the inactive dependent icon instead of the invalid one
                 updateBreakpointPresentation(breakpoint,
                         lineBreakpoint.getType().getInactiveDependentIcon(), DAPBundle.message("dap.breakpoints.shadowed"));
