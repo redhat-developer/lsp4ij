@@ -49,7 +49,7 @@
       "onSuccess": {
         "configureServer": {
           "name": "Configure Docker Language Server command",
-          "command": "${output.dir}/${output.file.name} start --stdio",
+          "command": "\"${output.dir}/${output.file.name}\" start --stdio",
           "update": true
         }
       }

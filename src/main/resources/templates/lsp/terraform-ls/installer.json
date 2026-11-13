@@ -47,7 +47,7 @@
       "onSuccess": {
         "configureServer": {
           "name": "Configure Terraform Language server command",
-          "command": "${output.dir}/${output.file.name} serve",
+          "command": "\"${output.dir}/${output.file.name}\" serve",
           "update": true
         }
       }

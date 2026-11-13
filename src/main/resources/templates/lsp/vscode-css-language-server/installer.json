@@ -24,7 +24,7 @@
       "onSuccess": {
         "configureServer": {
           "name": "Configure CSS Language Server command",
-          "command": "node ${workingDir}/vscode-langservers-extracted/lib/css-language-server/node/cssServerMain.js --stdio",
+          "command": "node \"${workingDir}/vscode-langservers-extracted/lib/css-language-server/node/cssServerMain.js\" --stdio",
           "update": true
         }
       }

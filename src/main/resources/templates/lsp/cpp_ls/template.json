@@ -1,0 +1,70 @@
+{
+  "id": "cpp_ls",
+  "name": "Cpp Language Server",
+  "programArgs": {
+    "default": "cpp_ls",
+    "windows": "cpp_ls.exe"
+  },
+  "transports": [
+    {
+      "mode": "stdio",
+      "argument": ""
+    },
+    {
+      "mode": "startAndConnect",
+      "argument": "--communication tcp --port ${port}"
+    }
+  ],
+  "expandConfiguration": true,
+  "fileTypeMappings": [
+    {
+      "fileType": {
+        "patterns": [
+          "*.c",
+          "*.i"
+        ]
+      },
+      "languageId": "c"
+    },
+    {
+      "fileType": {
+        "patterns": [
+          "*.cpp",
+          "*.cppm",
+          "*.cc",
+          "*.ccm",
+          "*.cxx",
+          "*.cxxm",
+          "*.c++",
+          "*.c++m",
+          "*.hpp",
+          "*.hh",
+          "*.hxx",
+          "*.h++",
+          "*.h",
+          "*.ii",
+          "*.ino",
+          "*.inl",
+          "*.ipp",
+          "*.ixx",
+          "*.mpp",
+          "*.mxx",
+          "*.tpp",
+          "*.txx",
+          "*.hpp.in",
+          "*.h.in"
+        ]
+      },
+      "languageId": "cpp"
+    },
+    {
+      "fileType": {
+        "patterns": [
+          "*.cu",
+          "*.cuh"
+        ]
+      },
+      "languageId": "cuda-cpp"
+    }
+  ]
+}

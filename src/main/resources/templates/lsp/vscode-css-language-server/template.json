@@ -2,7 +2,7 @@
   "id": "vscode-css-language-server",
   "name": "CSS Language Server",
   "programArgs": {
-    "default": "node $USER_HOME$/.lsp4ij/lsp/vscode-css-language-server/node_modules/vscode-langservers-extracted/lib/css-language-server/node/cssServerMain.js --stdio"
+    "default": "node \"$USER_HOME$/.lsp4ij/lsp/vscode-css-language-server/node_modules/vscode-langservers-extracted/lib/css-language-server/node/cssServerMain.js\" --stdio"
   },
   "transports": [
     {

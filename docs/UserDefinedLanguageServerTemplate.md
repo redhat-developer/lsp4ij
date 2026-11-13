@@ -61,7 +61,7 @@ The template descriptor (`template.json`) is a JSON file used to define:
   "id": "typescript-language-server",
   "name": "TypeScript Language Server",
   "programArgs": {
-    "default": "sh -c typescript-language-server --stdio",
+    "default": "typescript-language-server --stdio",
     "windows": "cmd /C typescript-language-server.cmd --stdio"
   },
   "transports": [

@@ -36,6 +36,7 @@ import org.eclipse.lsp4j.jsonrpc.RemoteEndpoint;
 import org.jetbrains.annotations.NotNull;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
@@ -53,7 +54,7 @@ import java.util.concurrent.TimeUnit;
 /**
  * The sessions of a tree, which a debug adapter starts with 'startDebugging' as vscode-js-debug does for the iframes
  * and the workers of a page, keep the debug session running while one of them is alive, and the last one to terminate
- * stops it.
+ * stops it. A session whose connection closes without a 'terminated' event ends as if it had sent one.
  */
 public class DAPSessionTreeTest extends HeavyPlatformTestCase {
 
@@ -88,7 +89,7 @@ public class DAPSessionTreeTest extends HeavyPlatformTestCase {
         assertTheDebugSessionKeepsRunning(child);
 
         root.terminated();
-        assertTheDebugSessionStops(root);
+        waitForTheDebugSessionToStop();
     }
 
     public void testTheDebugSessionKeepsRunningWhileAChildSessionIsAlive() throws Exception {
@@ -99,7 +100,7 @@ public class DAPSessionTreeTest extends HeavyPlatformTestCase {
         assertTheDebugSessionKeepsRunning(root);
 
         child.terminated();
-        assertTheDebugSessionStops(child);
+        waitForTheDebugSessionToStop();
     }
 
     public void testALiveSessionBelowATerminatedChildKeepsTheDebugSessionRunning() throws Exception {
@@ -112,7 +113,39 @@ public class DAPSessionTreeTest extends HeavyPlatformTestCase {
         assertTheDebugSessionKeepsRunning(child, root);
 
         grandchild.terminated();
-        assertTheDebugSessionStops(grandchild);
+        waitForTheDebugSessionToStop();
+    }
+
+    public void testTheDebugSessionStopsWhenItsConnectionClosesWithoutTerminated() throws Exception {
+        var root = debug();
+
+        root.dropConnection();
+
+        waitForTheDebugSessionToStop();
+    }
+
+    public void testAChildSessionWhoseConnectionClosedNoLongerKeepsTheDebugSessionRunning() throws Exception {
+        var root = debug();
+        var child = startChildSession(root);
+
+        root.terminated();
+        assertTheDebugSessionKeepsRunning(root);
+
+        // As a debug adapter which crashed while debugging a worker
+        child.dropConnection();
+        waitForTheDebugSessionToStop();
+    }
+
+    public void testTheClientEndsItsChildSessionsWhenItsConnectionClosesBeforeDisconnectIsAnswered() throws Exception {
+        var root = debug();
+        var child = startChildSession(root);
+        // As a debug adapter which crashes, or exits, before it answers
+        root.dropConnectionOnDisconnect();
+
+        session.stop();
+
+        PlatformTestUtil.waitWithEventsDispatching("the client closes the connection of the child session",
+                child.listening::isDone, BOUND_SECONDS);
     }
 
     /**
@@ -170,14 +203,6 @@ public class DAPSessionTreeTest extends HeavyPlatformTestCase {
         assertFalse("the debug session keeps running", getDebugProcess().isStopping());
     }
 
-    /**
-     * Waits until the client has handled the messages which the given sessions sent, and asserts that they have asked
-     * the debug process to stop.
-     */
-    private void assertTheDebugSessionStops(@NotNull Session... senders) {
-        waitUntilHandled(senders);
-        assertTrue("the debug session stops", getDebugProcess().isStopping());
-    }
 
     /**
      * Waits until the client has handled the messages which each of the given sessions has sent: it handles the
@@ -188,6 +213,15 @@ public class DAPSessionTreeTest extends HeavyPlatformTestCase {
         var answers = Arrays.stream(senders).map(Session::ping).toList();
         PlatformTestUtil.waitWithEventsDispatching("the client handles the messages of the sessions",
                 () -> answers.stream().allMatch(CompletableFuture::isDone), BOUND_SECONDS);
+    }
+
+    /**
+     * Waits until something asks the debug process to stop, as the 'terminated' event of the last live session or the
+     * end of a connection does. A ping, as {@link #waitUntilHandled} sends, would not do: stopping the debug process
+     * closes the connections of the sessions, and may close the one of the ping before the client answers it.
+     */
+    private void waitForTheDebugSessionToStop() {
+        PlatformTestUtil.waitWithEventsDispatching("the debug session stops", getDebugProcess()::isStopping, BOUND_SECONDS);
     }
 
     private @NotNull DAPDebugProcess getDebugProcess() {
@@ -260,6 +294,7 @@ public class DAPSessionTreeTest extends HeavyPlatformTestCase {
         // Done once the client has closed the connection
         private final Future<Void> listening;
         private final CompletableFuture<Void> configured = new CompletableFuture<>();
+        private volatile boolean dropConnectionOnDisconnect;
 
         Session(@NotNull Socket socket, @NotNull ExecutorService executor) throws IOException {
             this.socket = socket;
@@ -292,6 +327,20 @@ public class DAPSessionTreeTest extends HeavyPlatformTestCase {
             return remoteEndpoint.request("lsp4ij/test/ping", null);
         }
 
+        /**
+         * Closes the connection without a 'terminated' event, as a debug adapter which crashed does.
+         */
+        void dropConnection() throws IOException {
+            socket.close();
+        }
+
+        /**
+         * Closes the connection when the client sends 'disconnect', without answering it.
+         */
+        void dropConnectionOnDisconnect() {
+            dropConnectionOnDisconnect = true;
+        }
+
         @Override
         public CompletableFuture<Capabilities> initialize(InitializeRequestArguments args) {
             var capabilities = new Capabilities();
@@ -318,6 +367,14 @@ public class DAPSessionTreeTest extends HeavyPlatformTestCase {
 
         @Override
         public CompletableFuture<Void> disconnect(DisconnectArguments args) {
+            if (dropConnectionOnDisconnect) {
+                try {
+                    dropConnection();
+                } catch (IOException e) {
+                    throw new UncheckedIOException(e);
+                }
+                return new CompletableFuture<>();
+            }
             return CompletableFuture.completedFuture(null);
         }
     }

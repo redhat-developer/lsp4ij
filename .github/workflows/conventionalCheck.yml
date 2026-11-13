@@ -7,6 +7,11 @@ on:
       - edited
       - synchronize
 
+# A new push to a pull request, or an edit of its title, cancels the check of the older one
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
 jobs:
   main:
     runs-on: ubuntu-latest

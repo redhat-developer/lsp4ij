@@ -115,6 +115,48 @@ public class LanguageServerSocketTemplateTest extends LightPlatformTestCase {
         assertSame(UserDefinedTransport.STDIO, template.getTransport());
     }
 
+    public void testATransportWithoutAModeIsReportedAsSuch() {
+        var template = GSON.fromJson("""
+                {
+                  "id": "server",
+                  "name": "Server",
+                  "programArgs": { "default": "server" },
+                  "transports": [ { "mode": "stdio", "argument": "--stdio" }, { "argument": "--socket=${port}" } ]
+                }""", LanguageServerTemplate.class);
+
+        assertEquals(List.of(new TransportSupport(UserDefinedTransport.Mode.STDIO, "--stdio")),
+                template.getSupportedTransports());
+        assertEquals(List.of(LanguageServerBundle.message("language.server.template.transports.mode.missing")),
+                template.getProblems());
+    }
+
+    public void testASocketModeWhichTheTransportsDontListIsReported() {
+        var template = GSON.fromJson("""
+                {
+                  "id": "server",
+                  "name": "Server",
+                  "programArgs": { "default": "server --port ${port}" },
+                  "socket": { "mode": "startAndConnect" },
+                  "transports": [ { "mode": "stdio" }, { "mode": "startAndAccept", "argument": "--socket=${port}" } ]
+                }""", LanguageServerTemplate.class);
+
+        assertEquals(List.of(LanguageServerBundle.message("language.server.template.socket.mode.not.listed",
+                "startAndConnect")), template.getProblems());
+    }
+
+    public void testASocketModeWhichTheTransportsListIsNoProblem() {
+        var template = GSON.fromJson("""
+                {
+                  "id": "server",
+                  "name": "Server",
+                  "programArgs": { "default": "server --socket=${port}" },
+                  "socket": { "mode": "startAndAccept" },
+                  "transports": [ { "mode": "stdio" }, { "mode": "startAndAccept", "argument": "--socket=${port}" } ]
+                }""", LanguageServerTemplate.class);
+
+        assertEmpty(template.getProblems());
+    }
+
     public void testWhatATemplateGivesWrongIsReportedInsteadOfDroppedSilently() {
         var template = GSON.fromJson("""
                 {

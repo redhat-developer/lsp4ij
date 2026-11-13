@@ -235,6 +235,13 @@ public class LanguageServerView implements Disposable {
                 this.setCommandLine(userSettings.getCommandLine());
                 this.setWorkingDir(userSettings.getWorkingDir());
                 this.setTransport(userSettings.getTransport());
+                String templateId = userDef.getTemplateId();
+                if (templateId != null) {
+                    var template = LanguageServerTemplateManager.getInstance().findTemplateById(templateId);
+                    if (template != null) {
+                        languageServerPanel.setSupportedTransports(template.getSupportedTransports());
+                    }
+                }
                 this.setEnvData(EnvironmentVariablesData.create(
                         userSettings.getUserEnvironmentVariables(),
                         userSettings.isIncludeSystemEnvironmentVariables()));

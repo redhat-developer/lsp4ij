@@ -10,10 +10,13 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij;
 
+import com.intellij.notification.Notification;
+import com.intellij.notification.Notifications;
 import com.intellij.openapi.application.Application;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.Disposer;
+import com.intellij.testFramework.TestActionEvent;
 import com.intellij.testFramework.UsefulTestCase;
 import com.intellij.testFramework.fixtures.IdeaProjectTestFixture;
 import com.intellij.testFramework.fixtures.IdeaTestFixtureFactory;
@@ -26,6 +29,7 @@ import com.redhat.devtools.lsp4ij.mock.MockLanguageServer;
 import com.redhat.devtools.lsp4ij.mock.MockLanguageServerDefinition;
 import com.redhat.devtools.lsp4ij.server.CannotStartProcessException;
 import com.redhat.devtools.lsp4ij.server.StreamConnectionProvider;
+import com.redhat.devtools.lsp4ij.settings.actions.EnableAndStartLanguageServerAction;
 import com.redhat.devtools.lsp4ij.templates.ServerMappingSettings;
 import org.eclipse.lsp4j.InitializeParams;
 import org.eclipse.lsp4j.InitializeResult;
@@ -41,11 +45,14 @@ import org.jetbrains.annotations.NotNull;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.Proxy;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -62,6 +69,132 @@ public class LanguageServerWrapperRestartTest extends UsefulTestCase {
 
     private LSPCodeInsightTestFixture myFixture;
     private FailingOnceServerDefinition serverDefinition;
+
+    public void testTheFirstRestartIsAtOnceAndThePauseDoublesFromTheSecondUpToTheLast() {
+        var first = Duration.ofSeconds(1);
+        var max = Duration.ofSeconds(30);
+        List<Duration> pauses = new ArrayList<>();
+        for (int restarts = 0; restarts <= 7; restarts++) {
+            pauses.add(LanguageServerWrapper.restartPause(restarts, first, max));
+        }
+        assertEquals(List.of(Duration.ZERO, Duration.ofSeconds(1), Duration.ofSeconds(2), Duration.ofSeconds(4),
+                Duration.ofSeconds(8), Duration.ofSeconds(16), max, max), pauses);
+        // as many restarts as a language server which fails for long has, without an overflow
+        assertEquals(max, LanguageServerWrapper.restartPause(1000, first, max));
+    }
+
+    public void testAStartTooSoonAfterAFailedRestartStartsNothingUntilTheUserRestarts() {
+        serverDefinition.failingConnections = Integer.MAX_VALUE;
+        var wrapper = new LanguageServerWrapper(myFixture.getProject(), serverDefinition);
+        Disposer.register(getTestRootDisposable(), wrapper);
+        // A pause which a test never waits for
+        wrapper.setRestartPauses(Duration.ofHours(1), Duration.ofHours(1));
+
+        wrapper.start();
+        waitUntil(() -> serverDefinition.connectionCount.get() == 1 && wrapper.getServerError() != null
+                && wrapper.getServerStatus() == ServerStatus.stopped, "the start should fail");
+        // The first restart is at once
+        wrapper.start();
+        assertEquals(1, wrapper.getNumberOfRestartAttempts());
+        waitUntil(() -> serverDefinition.connectionCount.get() == 2 && wrapper.getServerStatus() == ServerStatus.stopped,
+                "the first restart should fail");
+
+        // As each feature of the open files starts the language server: before the pause is over, nothing restarts
+        for (int i = 0; i < 5; i++) {
+            wrapper.start();
+        }
+        assertEquals(1, wrapper.getNumberOfRestartAttempts());
+        assertEquals(2, serverDefinition.connectionCount.get());
+        assertTrue(wrapper.isEnabled());
+        // A feature which asks for the language server gets the failure of the last start, as after a restart which
+        // fails: a feature doesn't keep a failed result, so it asks again after the pause, unlike an empty one
+        var initialized = wrapper.getInitializedServer();
+        assertTrue(initialized.isCompletedExceptionally());
+        try {
+            initialized.join();
+            fail("the request should fail as the last start did");
+        } catch (CompletionException e) {
+            assertSame(wrapper.getServerError(), e.getCause());
+        }
+        // So does the connection of a file, as when the language server stopped and failed to start again between a
+        // feature's request for it and the connection of the file
+        var file = myFixture.addFileToProject("paused.foo", "paused").getVirtualFile();
+        var connected = wrapper.connect(file, new LanguageServerWrapper.LSPFileConnectionInfo(null, null, null, true));
+        try {
+            connected.join();
+            fail("the connection should fail as the last start did");
+        } catch (CompletionException e) {
+            assertSame(wrapper.getServerError(), e.getCause());
+        }
+        assertEquals(2, serverDefinition.connectionCount.get());
+
+        // A restart by the user, as from the Language Servers view, doesn't wait
+        wrapper.restart();
+        waitUntil(() -> serverDefinition.connectionCount.get() == 3, "the restart by the user should start at once");
+        assertEquals(0, wrapper.getNumberOfRestartAttempts());
+    }
+
+    public void testTooManyFailedStartsDisableTheLanguageServerWithANotificationWhichStartsItAgain() {
+        serverDefinition.failingConnections = Integer.MAX_VALUE;
+        Project project = myFixture.getProject();
+        List<Notification> notifications = new CopyOnWriteArrayList<>();
+        project.getMessageBus().connect(getTestRootDisposable()).subscribe(Notifications.TOPIC, new Notifications() {
+            @Override
+            public void notify(@NotNull Notification notification) {
+                notifications.add(notification);
+            }
+        });
+        var wrapper = new LanguageServerWrapper(project, serverDefinition);
+        Disposer.register(getTestRootDisposable(), wrapper);
+        // No pause between the restarts, which the test would wait for
+        wrapper.setRestartPauses(Duration.ZERO, Duration.ZERO);
+
+        // As the features of the open files do, each of which starts the language server: each start counts the failure
+        // of the one before, and once they are too many, disables it
+        waitUntil(() -> {
+            if (wrapper.isEnabled()) {
+                wrapper.start();
+            }
+            return !wrapper.isEnabled();
+        }, "the failed starts should disable the language server");
+
+        var disabled = notifications.stream()
+                .filter(notification -> LanguageServerBundle.message("language.server.disabled.after.failed.starts",
+                        wrapper.getMaxNumberOfRestartAttempts()).equals(notification.getSubtitle()))
+                .toList();
+        assertSize(1, disabled);
+        assertEquals("Simulated start failure", disabled.get(0).getContent());
+        var enableAndStart = disabled.get(0).getActions().stream()
+                .filter(EnableAndStartLanguageServerAction.class::isInstance)
+                .map(EnableAndStartLanguageServerAction.class::cast)
+                .findFirst()
+                .orElseThrow();
+
+        enableAndStart.actionPerformed(TestActionEvent.createTestEvent(), disabled.get(0));
+
+        assertTrue(disabled.get(0).isExpired());
+        assertTrue(wrapper.isEnabled());
+        assertEquals(0, wrapper.getNumberOfRestartAttempts());
+    }
+
+    public void testOnlyTheRestartsWithinTheWindowCountSoALanguageServerWhichFailsNowAndThenStaysEnabled() {
+        serverDefinition.failingConnections = Integer.MAX_VALUE;
+        var wrapper = new LanguageServerWrapper(myFixture.getProject(), serverDefinition);
+        Disposer.register(getTestRootDisposable(), wrapper);
+        wrapper.setRestartPauses(Duration.ZERO, Duration.ZERO);
+        // A window which each restart has left by the next start, as for a language server which crashes once a day
+        wrapper.setRestartWindow(Duration.ZERO);
+
+        // More failed starts than it takes to disable a language server whose restarts all count
+        int starts = wrapper.getMaxNumberOfRestartAttempts() + 5;
+        waitUntil(() -> {
+            wrapper.start();
+            return serverDefinition.connectionCount.get() >= starts || !wrapper.isEnabled();
+        }, "the language server should start " + starts + " times");
+
+        assertTrue(wrapper.isEnabled());
+        assertTrue(String.valueOf(wrapper.getNumberOfRestartAttempts()), wrapper.getNumberOfRestartAttempts() <= 1);
+    }
 
     public void testStartDoesNotAbortRestartInFlight() {
         var wrapper = new LanguageServerWrapper(myFixture.getProject(), serverDefinition);
@@ -106,8 +239,14 @@ public class LanguageServerWrapperRestartTest extends UsefulTestCase {
         var initialized = runPooledThreadTasksHere(wrapper::getInitializedServer);
         waitUntil(() -> wrapper.getServerError() != null && wrapper.getServerStatus() == ServerStatus.stopped,
                 "the failed start should stop the server");
-        // The caller gets no server, not a NullPointerException from the failure handler
-        assertNull(initialized.get(10, TimeUnit.SECONDS));
+        // The caller gets the error of the start, as from a start which fails later, not a NullPointerException from
+        // the failure handler
+        try {
+            initialized.get(10, TimeUnit.SECONDS);
+            fail("the request should fail as the start did");
+        } catch (ExecutionException e) {
+            assertSame(wrapper.getServerError(), e.getCause());
+        }
 
         // The next start starts the server
         wrapper.start();
@@ -246,11 +385,12 @@ public class LanguageServerWrapperRestartTest extends UsefulTestCase {
     }
 
     /**
-     * Server definition whose first connection fails to start.
+     * Server definition whose first connection fails to start, or as many as a test sets.
      */
     private static class FailingOnceServerDefinition extends MockLanguageServerDefinition {
 
         private final AtomicInteger connectionCount = new AtomicInteger();
+        private volatile int failingConnections = 1;
 
         FailingOnceServerDefinition() {
             super("test-server-restart", false);
@@ -258,7 +398,7 @@ public class LanguageServerWrapperRestartTest extends UsefulTestCase {
 
         @Override
         public @NotNull StreamConnectionProvider createConnectionProvider(@NotNull Project project) {
-            if (connectionCount.incrementAndGet() == 1) {
+            if (connectionCount.incrementAndGet() <= failingConnections) {
                 return new MockConnectionProvider(getServer()) {
                     @Override
                     public void start() throws CannotStartProcessException {

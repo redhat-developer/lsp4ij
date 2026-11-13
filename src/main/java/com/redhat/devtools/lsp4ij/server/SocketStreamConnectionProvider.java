@@ -18,9 +18,10 @@ import com.intellij.execution.process.ProcessEvent;
 import com.intellij.execution.process.ProcessListener;
 import com.intellij.execution.process.ProcessOutputType;
 import com.intellij.openapi.util.Key;
+import com.intellij.util.concurrency.AppExecutorUtil;
 import com.intellij.util.io.BaseOutputReader;
 import com.intellij.util.net.NetUtils;
-import org.jetbrains.annotations.ApiStatus;
+import com.redhat.devtools.lsp4ij.internal.LoopbackAddresses;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -31,20 +32,27 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.ConnectException;
 import java.net.Inet4Address;
+import java.net.Inet6Address;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketException;
 import java.net.SocketTimeoutException;
+import java.net.UnknownHostException;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.IntFunction;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
@@ -71,10 +79,7 @@ import java.util.stream.Stream;
  * a loopback port: on a machine shared with other users, one of their processes could connect to the port LSP4IJ
  * listens on before the language server does, or listen on the port LSP4IJ connects to. Prefer the standard input and
  * output of the language server's process there.
- * <p>
- * This API is experimental: it may change in a future release.
  */
-@ApiStatus.Experimental
 public class SocketStreamConnectionProvider implements StreamConnectionProvider, ProcessDataProvider {
 
     /**
@@ -95,6 +100,10 @@ public class SocketStreamConnectionProvider implements StreamConnectionProvider,
     private static final long FIRST_RETRY_PAUSE_MILLIS = 10;
     private static final long MAX_RETRY_PAUSE_MILLIS = 500;
 
+    // Without a host, LSP4IJ connects to both loopback addresses, that of the JVM first: a language server which listens
+    // on localhost may get either, as Node.js does, in the order in which the system resolves localhost
+    private static final List<InetAddress> LOOPBACK_ADDRESSES = LoopbackAddresses.get();
+
     /**
      * How long a start waits for the connection by default.
      */
@@ -107,7 +116,8 @@ public class SocketStreamConnectionProvider implements StreamConnectionProvider,
     public static final @NotNull Duration ATTACH_TIMEOUT = Duration.ofSeconds(10);
 
     private final @NotNull Direction direction;
-    private final @NotNull String host;
+    // The host LSP4IJ connects to, or null for the loopback addresses
+    private final @Nullable String host;
     private final int port;
     private final @Nullable IntFunction<GeneralCommandLine> commandLine;
     private final List<LanguageServerLogErrorHandler> logErrorHandlers = new CopyOnWriteArrayList<>();
@@ -119,7 +129,8 @@ public class SocketStreamConnectionProvider implements StreamConnectionProvider,
     private volatile boolean stopped;
     private volatile @Nullable OSProcessHandler processHandler;
     private volatile @Nullable GeneralCommandLine startedCommandLine;
-    private volatile @Nullable ServerSocket serverSocket;
+    // The sockets on which LSP4IJ listens, until the language server connects to one of them
+    private volatile @NotNull List<ServerSocket> serverSockets = List.of();
     private volatile @Nullable Socket connecting;
     private volatile @Nullable Socket socket;
     private volatile @Nullable InputStream inputStream;
@@ -142,7 +153,7 @@ public class SocketStreamConnectionProvider implements StreamConnectionProvider,
 
     /**
      * Returns a provider which starts the language server, which listens on the given port, and connects to it once
-     * it accepts connections.
+     * it accepts connections, on the IPv4 or the IPv6 loopback address.
      *
      * @param port        the port the language server listens on, or 0 to choose a free port.
      * @param commandLine the command line which starts the language server, for the port it listens on.
@@ -150,8 +161,7 @@ public class SocketStreamConnectionProvider implements StreamConnectionProvider,
      */
     public static @NotNull SocketStreamConnectionProvider startAndConnect(int port,
                                                                           @NotNull IntFunction<GeneralCommandLine> commandLine) {
-        return new SocketStreamConnectionProvider(Direction.CONNECT, InetAddress.getLoopbackAddress().getHostAddress(),
-                port, commandLine);
+        return new SocketStreamConnectionProvider(Direction.CONNECT, null, port, commandLine);
     }
 
     /**
@@ -163,21 +173,22 @@ public class SocketStreamConnectionProvider implements StreamConnectionProvider,
      */
     public static @NotNull SocketStreamConnectionProvider startAndAccept(int port,
                                                                          @NotNull IntFunction<GeneralCommandLine> commandLine) {
-        return new SocketStreamConnectionProvider(Direction.ACCEPT, InetAddress.getLoopbackAddress().getHostAddress(),
-                port, commandLine);
+        return new SocketStreamConnectionProvider(Direction.ACCEPT, null, port, commandLine);
     }
 
     /**
      * Creates a provider.
      *
      * @param direction   which side of the connection listens.
-     * @param host        the host LSP4IJ connects to; LSP4IJ listens on the loopback address.
+     * @param host        the host LSP4IJ connects to, each of its addresses in turn, or null for the loopback addresses,
+     *                    that of the JVM and then the other one, {@code 127.0.0.1} and {@code ::1}. LSP4IJ listens on the
+     *                    loopback address of the JVM.
      * @param port        the port, or 0 to choose a free port when the provider starts a language server or listens.
      * @param commandLine the command line which starts the language server, for the port, or null if it is not
      *                    started by LSP4IJ.
      */
     protected SocketStreamConnectionProvider(@NotNull Direction direction,
-                                             @NotNull String host,
+                                             @Nullable String host,
                                              int port,
                                              @Nullable IntFunction<GeneralCommandLine> commandLine) {
         if (port < 0 || port > 0xFFFF) {
@@ -302,14 +313,13 @@ public class SocketStreamConnectionProvider implements StreamConnectionProvider,
         long pause = FIRST_RETRY_PAUSE_MILLIS;
         while (true) {
             try {
-                install(connectOnce(port, connectTimeout()));
+                // Each attempt gets only the time which is left of the start
+                install(connectOnce(port, Duration.ofNanos(deadline - System.nanoTime())));
                 return;
             } catch (ConnectException notListeningYet) {
                 long remaining = TimeUnit.NANOSECONDS.toMillis(deadline - System.nanoTime());
                 if (remaining <= 0) {
-                    throw new CannotStartProcessException("The language server didn't accept a connection on "
-                            + address(port) + " within " + startTimeout.toSeconds() + " s: " + this
-                            + ipv6Hint(" Let it listen on " + host + " instead."));
+                    throw notAccepted(port);
                 }
                 boolean ended = handler.waitFor(Math.min(pause, remaining));
                 checkNotStopped();
@@ -317,14 +327,38 @@ public class SocketStreamConnectionProvider implements StreamConnectionProvider,
                     throw new CannotStartProcessException("The language server ended before it accepted a connection: " + this);
                 }
                 pause = Math.min(pause * 2, MAX_RETRY_PAUSE_MILLIS);
+            } catch (SocketTimeoutException startTimedOut) {
+                throw notAccepted(port);
             }
         }
     }
 
+    private @NotNull CannotStartProcessException notAccepted(int port) {
+        return new CannotStartProcessException("The language server didn't accept a connection on " + address(port)
+                + " within " + startTimeout.toSeconds() + " s: " + this + ipv6Hint(" Let it listen on " + host + " instead."));
+    }
+
     /**
-     * Returns the host and the given port, as {@code host:port}, or {@code [host]:port} for an IPv6 address.
+     * Returns the host and the given port, as {@code host:port}, or {@code [host]:port} for an IPv6 address; without a
+     * host, both loopback addresses with the port.
      */
     private @NotNull String address(int port) {
+        if (host != null) {
+            return withPort(host, port);
+        }
+        return LOOPBACK_ADDRESSES.stream()
+                .map(address -> withPort(display(address), port))
+                .collect(Collectors.joining(" or "));
+    }
+
+    /**
+     * Returns the IP address of the given address, with ::1 for the IPv6 loopback address, which Java writes in full.
+     */
+    private static @NotNull String display(@NotNull InetAddress address) {
+        return address instanceof Inet6Address && address.isLoopbackAddress() ? "::1" : address.getHostAddress();
+    }
+
+    private static @NotNull String withPort(@NotNull String host, int port) {
         return (host.indexOf(':') >= 0 ? "[" + host + "]" : host) + ":" + port;
     }
 
@@ -334,32 +368,96 @@ public class SocketStreamConnectionProvider implements StreamConnectionProvider,
      * string otherwise.
      */
     private @NotNull String ipv6Hint(@NotNull String advice) {
-        boolean ipv4Loopback = host.equalsIgnoreCase("localhost") || host.startsWith("127.");
-        return ipv4Loopback
+        boolean ipv4Loopback = host != null && (host.equalsIgnoreCase("localhost") || host.startsWith("127."));
+        return ipv4Loopback && !connectsToTheIPv6Loopback()
                 ? " A language server which listens on localhost may listen on ::1 only, the IPv6 loopback address, to"
                 + " which LSP4IJ doesn't connect." + advice
                 : "";
     }
 
-    private void checkNothingListens(int port) throws CannotStartProcessException {
-        try (var probe = new Socket()) {
-            probe.connect(new InetSocketAddress(host, port));
+    /**
+     * Returns true if LSP4IJ connects to {@code ::1} too, as without a host, or with {@code localhost} where the system
+     * resolves it to both loopback addresses.
+     */
+    private boolean connectsToTheIPv6Loopback() {
+        try {
+            return addresses().stream().anyMatch(address -> address instanceof Inet6Address && address.isLoopbackAddress());
+        } catch (UnknownHostException e) {
+            return false;
+        }
+    }
+
+    private void checkNothingListens(int port) throws IOException, CannotStartProcessException {
+        Socket listener;
+        try {
+            // Bounded, and closed by stop(), so that a host which drops packets doesn't hold the start up
+            listener = connectOnce(port, ATTACH_TIMEOUT.compareTo(startTimeout) < 0 ? ATTACH_TIMEOUT : startTimeout);
         } catch (IOException nothingListens) {
             return;
         }
+        closeQuietly(listener);
         throw new CannotStartProcessException("A process listens on port " + port + " already: " + this);
     }
 
     /**
-     * Returns how long one connection attempt waits: for a language server which runs already, the shorter of
-     * {@link #ATTACH_TIMEOUT} and the start timeout; for one which this provider starts, the start timeout.
+     * Returns the addresses to connect to, in turn: those of the host, in the order in which the system resolves it, or
+     * without a host, both loopback addresses.
+     */
+    private @NotNull List<InetAddress> addresses() throws UnknownHostException {
+        return LoopbackAddresses.of(host);
+    }
+
+    /**
+     * Returns how long LSP4IJ waits for the connection: for a language server which runs already, the shorter of
+     * {@link #ATTACH_TIMEOUT} and the start timeout; for one which this provider starts, the start timeout, which its
+     * attempts share.
      */
     @NotNull
     Duration connectTimeout() {
         return commandLine == null && ATTACH_TIMEOUT.compareTo(startTimeout) < 0 ? ATTACH_TIMEOUT : startTimeout;
     }
 
+    /**
+     * Connects once to each address in turn, until one takes the connection, within the given timeout for all of
+     * them. When none takes it, it fails with a {@link SocketTimeoutException} if the time ran out, as an address which
+     * drops packets makes it, and as the first address did otherwise, as with "Connection refused". The failures of
+     * the others are suppressed in it.
+     */
     private @NotNull Socket connectOnce(int port, @NotNull Duration timeout) throws IOException, CannotStartProcessException {
+        long deadline = System.nanoTime() + timeout.toNanos();
+        IOException failure = null;
+        for (InetAddress address : addresses()) {
+            long remaining = TimeUnit.NANOSECONDS.toMillis(deadline - System.nanoTime());
+            if (remaining <= 0) {
+                // An address which drops packets took the time of all
+                if (!(failure instanceof SocketTimeoutException)) {
+                    failure = withSuppressed(new SocketTimeoutException("Connect timed out"), failure);
+                }
+                break;
+            }
+            try {
+                return connectOnce(new InetSocketAddress(address, port), Duration.ofMillis(remaining));
+            } catch (IOException e) {
+                // A stop closes the attempt: the start ends, without trying the next address
+                checkNotStopped();
+                // A timeout is what failed, rather than a refusal of an address before it: something may listen there
+                failure = failure == null ? e
+                        : e instanceof SocketTimeoutException ? withSuppressed(e, failure)
+                        : withSuppressed(failure, e);
+            }
+        }
+        throw Objects.requireNonNull(failure, "no address to connect to");
+    }
+
+    private static @NotNull IOException withSuppressed(@NotNull IOException failure, @Nullable IOException other) {
+        if (other != null) {
+            failure.addSuppressed(other);
+        }
+        return failure;
+    }
+
+    private @NotNull Socket connectOnce(@NotNull InetSocketAddress address, @NotNull Duration timeout)
+            throws IOException, CannotStartProcessException {
         var attempt = new Socket();
         synchronized (this) {
             checkNotStopped();
@@ -367,7 +465,7 @@ public class SocketStreamConnectionProvider implements StreamConnectionProvider,
         }
         try {
             // stop() closes the attempt
-            attempt.connect(new InetSocketAddress(host, port), Math.toIntExact(timeout.toMillis()));
+            attempt.connect(address, Math.toIntExact(timeout.toMillis()));
             return attempt;
         } catch (IOException e) {
             closeQuietly(attempt);
@@ -380,39 +478,90 @@ public class SocketStreamConnectionProvider implements StreamConnectionProvider,
     }
 
     private void accept() throws IOException, ExecutionException, CannotStartProcessException {
-        var server = new ServerSocket(port, 1, InetAddress.getLoopbackAddress());
+        var servers = listen();
         synchronized (this) {
             if (stopped) {
-                server.close();
+                servers.forEach(SocketStreamConnectionProvider::closeQuietly);
                 throw stoppedException();
             }
-            serverSocket = server;
+            serverSockets = servers;
         }
-        boundPort = server.getLocalPort();
+        boundPort = servers.get(0).getLocalPort();
         OSProcessHandler handler = commandLine != null ? startProcess(commandLine.apply(boundPort)) : null;
         Socket accepted;
         try {
-            // stop(), and the end of the language server, close the server socket
-            server.setSoTimeout(timeoutMillis());
-            accepted = server.accept();
-        } catch (SocketTimeoutException e) {
-            throw new CannotStartProcessException("The language server didn't connect to "
-                    + server.getInetAddress().getHostAddress() + ":" + boundPort + " within " + startTimeout.toSeconds()
-                    + " s: " + this + (server.getInetAddress() instanceof Inet4Address
-                    ? " A language server which connects to localhost may try ::1, the IPv6 loopback address, on which"
-                    + " LSP4IJ doesn't listen. Let it connect to " + server.getInetAddress().getHostAddress() + " instead."
-                    : ""));
-        } catch (SocketException e) {
+            // stop(), and the end of the language server, close the server sockets
+            accepted = acceptFirst(servers).orTimeout(timeoutMillis(), TimeUnit.MILLISECONDS).join();
+        } catch (CompletionException e) {
+            if (e.getCause() instanceof TimeoutException) {
+                throw new CannotStartProcessException("The language server didn't connect to "
+                        + servers.stream().map(server -> withPort(display(server.getInetAddress()), boundPort))
+                        .collect(Collectors.joining(" or "))
+                        + " within " + startTimeout.toSeconds() + " s: " + this
+                        + (servers.size() == 1 && servers.get(0).getInetAddress() instanceof Inet4Address
+                        ? " A language server which connects to localhost may try ::1, the IPv6 loopback address, on"
+                        + " which LSP4IJ doesn't listen. Let it connect to "
+                        + servers.get(0).getInetAddress().getHostAddress() + " instead."
+                        : ""));
+            }
             checkNotStopped();
             if (handler != null && handler.isProcessTerminated()) {
                 throw new CannotStartProcessException("The language server ended before it connected: " + this);
             }
-            throw e;
+            throw e.getCause() instanceof IOException io ? io : new IOException(e.getCause());
         } finally {
             // One connection only
-            server.close();
+            servers.forEach(SocketStreamConnectionProvider::closeQuietly);
         }
         install(accepted);
+    }
+
+    /**
+     * Listens on the port on the loopback address of the JVM, and on the same port on the other loopback address, so
+     * that a language server which connects to localhost reaches LSP4IJ, whichever of the two it gets. Without that
+     * port free on the other address, or without IPv6, it listens on the first one only.
+     */
+    private @NotNull List<ServerSocket> listen() throws IOException {
+        for (int attempt = 1; ; attempt++) {
+            var first = new ServerSocket(port, 1, LOOPBACK_ADDRESSES.get(0));
+            if (LOOPBACK_ADDRESSES.size() == 1) {
+                return List.of(first);
+            }
+            try {
+                return List.of(first, new ServerSocket(first.getLocalPort(), 1, LOOPBACK_ADDRESSES.get(1)));
+            } catch (IOException takenOrNoIPv6) {
+                if (port != 0 || attempt == 3) {
+                    return List.of(first);
+                }
+                // Another free port of the first address may be free on the other one too
+                closeQuietly(first);
+            }
+        }
+    }
+
+    /**
+     * Returns the first connection which one of the given server sockets accepts. It fails once they all fail, as when
+     * a stop closes them.
+     */
+    private static @NotNull CompletableFuture<Socket> acceptFirst(@NotNull List<ServerSocket> servers) {
+        var first = new CompletableFuture<Socket>();
+        var failures = new AtomicInteger();
+        for (ServerSocket server : servers) {
+            AppExecutorUtil.getAppExecutorService().execute(() -> {
+                try {
+                    Socket connection = server.accept();
+                    if (!first.complete(connection)) {
+                        // The language server connects once: this is not its connection, or one which came too late
+                        closeQuietly(connection);
+                    }
+                } catch (IOException e) {
+                    if (failures.incrementAndGet() == servers.size()) {
+                        first.completeExceptionally(e);
+                    }
+                }
+            });
+        }
+        return first;
     }
 
     private @NotNull OSProcessHandler startProcess(@NotNull GeneralCommandLine commandLine)
@@ -476,14 +625,12 @@ public class SocketStreamConnectionProvider implements StreamConnectionProvider,
     }
 
     private void languageServerEnded() {
-        ServerSocket server;
+        List<ServerSocket> servers;
         synchronized (this) {
-            server = socket == null ? serverSocket : null;
+            servers = socket == null ? serverSockets : List.of();
         }
-        if (server != null) {
-            // Not connected yet: stop waiting for the connection, and let start() fail
-            closeQuietly(server);
-        }
+        // Not connected yet: stop waiting for the connection, and let start() fail
+        servers.forEach(SocketStreamConnectionProvider::closeQuietly);
         reportUnexpectedStop();
     }
 
@@ -542,7 +689,7 @@ public class SocketStreamConnectionProvider implements StreamConnectionProvider,
             }
             stopped = true;
             handler = processHandler;
-            closeables = Stream.of(socket, connecting, serverSocket)
+            closeables = Stream.concat(Stream.of(socket, connecting), serverSockets.stream())
                     .filter(Objects::nonNull)
                     .map(Closeable.class::cast)
                     .toList();
@@ -574,7 +721,7 @@ public class SocketStreamConnectionProvider implements StreamConnectionProvider,
 
     @Override
     public String toString() {
-        String connection = direction == Direction.CONNECT ? "connect to " + host + ":" + boundPort
+        String connection = direction == Direction.CONNECT ? "connect to " + address(boundPort)
                 : "accept on port " + boundPort;
         var commandLine = startedCommandLine;
         return "SocketStreamConnectionProvider [" + connection

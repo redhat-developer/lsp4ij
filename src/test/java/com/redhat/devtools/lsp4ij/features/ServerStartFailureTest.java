@@ -17,10 +17,12 @@ import com.intellij.openapi.editor.event.VisibleAreaListener;
 import com.intellij.openapi.editor.ex.EditorEx;
 import com.intellij.openapi.project.Project;
 import com.intellij.psi.PsiFile;
+import com.intellij.testFramework.PlatformTestUtil;
 import com.intellij.testFramework.UsefulTestCase;
 import com.intellij.testFramework.fixtures.IdeaProjectTestFixture;
 import com.intellij.testFramework.fixtures.IdeaTestFixtureFactory;
 import com.intellij.testFramework.fixtures.TestFixtureBuilder;
+import com.redhat.devtools.lsp4ij.LanguageServerWrapper;
 import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
 import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
 import com.redhat.devtools.lsp4ij.features.codeLens.CodeLensDataResult;
@@ -39,6 +41,7 @@ import com.redhat.devtools.lsp4ij.templates.ServerMappingSettings;
 import org.eclipse.lsp4j.CodeLensParams;
 import org.eclipse.lsp4j.TextDocumentIdentifier;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.awt.Rectangle;
 import java.lang.reflect.InvocationTargetException;
@@ -46,7 +49,10 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * A feature which waits for a language server which cannot start, as when its command is wrong, gets nothing. It
@@ -82,6 +88,35 @@ public class ServerStartFailureTest extends UsefulTestCase {
 
         assertEmpty(LSPFoldingRangeBuilder.getFoldingRanges(file));
         assertServerCannotStart(file.getProject());
+    }
+
+    public void testAFeatureAsksAgainAfterAFailedResultForAnUnchangedFileButKeepsAnEmptyOne() {
+        // A request for the language server fails with the error of the last start, rather than giving no language
+        // server, in the pause after a failed restart too: the feature then asks again once the pause is over
+        PsiFile file = myFixture.configureByText("main.foo", "a\n");
+        var failing = new AtomicBoolean(true);
+        var loads = new AtomicInteger();
+        var support = new LSPCodeLensSupport(file) {
+            @Override
+            protected CompletableFuture<CodeLensDataResult> doLoad(@NotNull CodeLensParams params,
+                                                                   @NotNull CancellationSupport cancellationSupport) {
+                loads.incrementAndGet();
+                return failing.get()
+                        ? CompletableFuture.failedFuture(new CannotStartProcessException("Simulated start failure"))
+                        // As a request without a language server: no code lenses
+                        : CompletableFuture.completedFuture(null);
+            }
+        };
+        var params = new CodeLensParams(new TextDocumentIdentifier());
+
+        assertTrue(support.getCodeLenses(params).isCompletedExceptionally());
+        failing.set(false);
+        var codeLenses = support.getCodeLenses(params);
+
+        assertEquals("the failed result must not be kept", 2, loads.get());
+        assertFalse(codeLenses.isCompletedExceptionally());
+        assertSame("the empty result is kept until the file changes", codeLenses, support.getCodeLenses(params));
+        assertEquals(2, loads.get());
     }
 
     public void testAScrollOfAnEditorWhoseCodeLensesFailedDoesNotThrow() {
@@ -141,9 +176,8 @@ public class ServerStartFailureTest extends UsefulTestCase {
     /**
      * Asks for the code lenses of the file for the editor, as LSPCodeLensProvider does for each editor of the file when
      * code vision asks for them, with a request that fails as when the language server cannot start. The request of a
-     * language server that cannot start doesn't always fail: when the start fails before {@code start()} returns, or
-     * as another feature's start replaces it, the request finds no language server and has no code lenses, which these
-     * tests are not about. So this request fails every time.
+     * language server that cannot start doesn't always fail: as another feature's start replaces it, the request finds
+     * no language server and has no code lenses, which these tests are not about. So this request fails every time.
      */
     private static void failCodeLenses(PsiFile file, EditorEx editor) {
         var support = new LSPCodeLensSupport(file) {
@@ -168,12 +202,22 @@ public class ServerStartFailureTest extends UsefulTestCase {
     }
 
     private void assertServerCannotStart(@NotNull Project project) {
-        var wrapper = LanguageServiceAccessor.getInstance(project).getStartedServers()
+        assertInstanceOf(startedServer(project).getServerError(), CannotStartProcessException.class);
+    }
+
+    private @NotNull LanguageServerWrapper startedServer(@NotNull Project project) {
+        // A feature of the open file starts the language server in the background
+        PlatformTestUtil.waitWithEventsDispatching("a feature of the open file starts the language server",
+                () -> findStartedServer(project) != null, 60);
+        return Objects.requireNonNull(findStartedServer(project));
+    }
+
+    private @Nullable LanguageServerWrapper findStartedServer(@NotNull Project project) {
+        return LanguageServiceAccessor.getInstance(project).getStartedServers()
                 .stream()
                 .filter(server -> server.getServerDefinition() == serverDefinition)
                 .findFirst()
-                .orElseThrow();
-        assertInstanceOf(wrapper.getServerError(), CannotStartProcessException.class);
+                .orElse(null);
     }
 
     /**

@@ -47,7 +47,7 @@
       "onSuccess": {
         "configureServer": {
           "name": "Configure clojure-lsp server command",
-          "command": "${output.dir}/${output.file.name}",
+          "command": "\"${output.dir}/${output.file.name}\"",
           "update": true
         }
       }

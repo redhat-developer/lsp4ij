@@ -60,7 +60,7 @@
       "onSuccess": {
         "configureServer": {
           "name": "Configure Ada Language Server command",
-          "command": "${output.dir}/${output.file.name}",
+          "command": "\"${output.dir}/${output.file.name}\"",
           "update": true
         }
       }

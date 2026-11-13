@@ -117,8 +117,9 @@ dependencies {
     testImplementation(libs.junit.jupiter.api)
     testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine")
     testRuntimeOnly(libs.junit.vintage.engine)
-    // Required for IntelliJ Platform 2026.1 to discover and run tests via JUnit Platform
-    testRuntimeOnly("org.junit.platform:junit-platform-launcher:1.11.0")
+    // Required for IntelliJ Platform 2026.1 to discover and run tests via JUnit Platform, and by HangingTestWatchdog,
+    // a listener of the launcher
+    testImplementation("org.junit.platform:junit-platform-launcher:1.11.0")
 }
 
 // Set the JDK version used by the toolchain to build the project (Java 21 is required for platform 2025.3, and Java 25
@@ -191,12 +192,21 @@ intellijPlatform {
         failureLevel = listOf(INVALID_PLUGIN, COMPATIBILITY_PROBLEMS)
         verificationReportsFormats = listOf(MARKDOWN, PLAIN)
         ides {
-            select {
-                types = listOf(IntelliJPlatformType.IntellijIdea)
-                // The latest release of each version, and the current EAP, so that an API that the coming
-                // version removes fails the verification before that version is released.
-                channels = listOf(ProductRelease.Channel.RELEASE, ProductRelease.Channel.EAP)
-                sinceBuild = "242" // From your minimum supported version
+            // A pull request is verified against the IDEs that IJ.yml names, the oldest and the newest release, where
+            // an API goes missing or is removed; main, against every release since the oldest, and the current EAP
+            val verifiedIdes = providers.gradleProperty("verifiedIdes").orNull
+            if (verifiedIdes != null) {
+                verifiedIdes.split(',').map(String::trim).filter(String::isNotEmpty).forEach { version ->
+                    create(IntelliJPlatformType.IntellijIdea, version)
+                }
+            } else {
+                select {
+                    types = listOf(IntelliJPlatformType.IntellijIdea)
+                    // The latest release of each version, and the current EAP, so that an API that the coming
+                    // version removes fails the verification before that version is released.
+                    channels = listOf(ProductRelease.Channel.RELEASE, ProductRelease.Channel.EAP)
+                    sinceBuild = "242" // From your minimum supported version
+                }
             }
         }
     }

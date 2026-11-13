@@ -55,6 +55,17 @@ public final class SocketTestServers {
     }
 
     /**
+     * A language server which connects to its port on the IPv6 loopback address, as one which connects to localhost may
+     * do where the system resolves localhost to ::1 first.
+     */
+    public static class IPv6ConnectingServer {
+        public static void main(String[] args) throws IOException {
+            int port = Integer.parseInt(args[0]);
+            echo(new Socket(InetAddress.getByName("::1"), port));
+        }
+    }
+
+    /**
      * A language server which ends at once.
      */
     public static class EndingServer {

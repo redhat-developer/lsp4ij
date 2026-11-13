@@ -30,11 +30,15 @@ import com.intellij.xdebugger.impl.breakpoints.XBreakpointBase;
 import com.redhat.devtools.lsp4ij.dap.configurations.DAPRunConfigurationOptions;
 import com.redhat.devtools.lsp4ij.dap.descriptors.DebugAdapterDescriptor;
 import org.eclipse.lsp4j.debug.Breakpoint;
+import com.redhat.devtools.lsp4ij.dap.client.DAPCapabilities;
 import org.eclipse.lsp4j.debug.Capabilities;
+import org.eclipse.lsp4j.debug.CapabilitiesEventArguments;
 import org.eclipse.lsp4j.debug.FunctionBreakpoint;
 import org.eclipse.lsp4j.debug.SetFunctionBreakpointsArguments;
 import org.eclipse.lsp4j.debug.SetFunctionBreakpointsResponse;
 import org.eclipse.lsp4j.debug.services.IDebugProtocolServer;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.lang.reflect.Proxy;
 import java.util.ArrayList;
@@ -54,6 +58,8 @@ public class DAPFunctionBreakpointHandlerTest extends HeavyPlatformTestCase {
     // What the IJ breakpoints were shown as, in order
     private final List<String> shown = new ArrayList<>();
     private final List<XDebugSessionListener> sessionListeners = new ArrayList<>();
+    // the capabilities which the handler got in initialize(server, Capabilities), as a subclass overriding it sees them
+    private final List<Capabilities> initializedWith = new ArrayList<>();
 
     public void testNothingIsSentToADebugAdapterWithoutFunctionBreakpoints() throws Exception {
         assertFalse(DAPFunctionBreakpointHandler.isSupportsFunctionBreakpoints(new Capabilities()));
@@ -71,6 +77,30 @@ public class DAPFunctionBreakpointHandlerTest extends HeavyPlatformTestCase {
             handler.unregisterBreakpoint(twice, false);
 
             assertEmpty(requests);
+        } finally {
+            handler.dispose();
+        }
+    }
+
+    public void testABreakpointAddedAfterACapabilitiesEventUsesTheCurrentCapabilities() throws Exception {
+        // the debug adapter enables function breakpoints with a 'capabilities' event, after its 'initialize' response
+        var capabilities = new DAPCapabilities();
+        capabilities.initialize(new Capabilities());
+        var handler = handler();
+        try {
+            handler.initialize(server(arguments -> new Breakpoint[0]), capabilities::get).join();
+            // a subclass which overrides initialize(server, Capabilities) is still called, with the capabilities of then
+            assertEquals(List.of(capabilities.get()), initializedWith);
+            handler.registerBreakpoint(breakpoint("twice"));
+            assertEmpty(requests);
+
+            var event = new CapabilitiesEventArguments();
+            event.setCapabilities(supported());
+            capabilities.update(event);
+
+            // the next change sends the breakpoints with the current capabilities
+            handler.registerBreakpoint(breakpoint("Point.move"));
+            assertEquals(List.of(List.of("twice", "Point.move")), names());
         } finally {
             handler.dispose();
         }
@@ -167,6 +197,32 @@ public class DAPFunctionBreakpointHandlerTest extends HeavyPlatformTestCase {
         }
     }
 
+    /**
+     * In a tree of sessions, the failed request of one session doesn't show as invalid a breakpoint which another
+     * session has bound.
+     */
+    public void testAFailedRequestKeepsTheBreakpointsWhichAnotherSessionBoundVerified() throws Exception {
+        var twice = breakpoint("twice");
+        var nope = breakpoint("nope");
+        var handler = handler();
+        try {
+            handler.registerBreakpoint(twice);
+            handler.registerBreakpoint(nope);
+            handler.initialize(server(arguments -> new Breakpoint[]{
+                    answer(11, true, null),
+                    answer(12, false, "No method named 'nope'")}), supported()).join();
+            shown.clear();
+
+            handler.initialize(server(arguments -> {
+                throw new IllegalStateException("cannot set function breakpoints");
+            }), supported()).join();
+
+            assertEquals(List.of("verified twice", "invalid nope: cannot set function breakpoints"), shown);
+        } finally {
+            handler.dispose();
+        }
+    }
+
     public void testTheAnswerToAnOlderRequestChangesNothing() throws Exception {
         var twice = breakpoint("twice");
         var move = breakpoint("Point.move");
@@ -186,6 +242,36 @@ public class DAPFunctionBreakpointHandlerTest extends HeavyPlatformTestCase {
             assertEquals(List.of("verified Point.move"), shown);
             assertSame(move, handler.findBreakpointById(22));
             assertNull(handler.findBreakpointById(12));
+        } finally {
+            handler.dispose();
+        }
+    }
+
+    /**
+     * A breakpoint which is unregistered and registered again, as when it is disabled and enabled, is no longer shown
+     * verified because of a DAP server which bound it before.
+     */
+    public void testAnUnregisteredBreakpointForgetsWhichServersBoundIt() throws Exception {
+        var twice = breakpoint("twice");
+        var handler = handler();
+        var binds = new boolean[]{true};
+        try {
+            handler.registerBreakpoint(twice);
+            handler.initialize(server(arguments -> {
+                if (!binds[0]) {
+                    throw new IllegalStateException("the DAP server is busy");
+                }
+                return new Breakpoint[]{answer(11, true, null)};
+            }), supported()).join();
+            handler.unregisterBreakpoint(twice, false);
+            binds[0] = false;
+            handler.registerBreakpoint(twice);
+            shown.clear();
+
+            // another DAP server answers that it cannot bind it
+            handler.updateBreakpoint(server(arguments -> new Breakpoint[0]), answer(21, false, "Unbound breakpoint"), twice);
+
+            assertEquals(List.of("invalid twice: Unbound breakpoint"), shown);
         } finally {
             handler.dispose();
         }
@@ -310,6 +396,13 @@ public class DAPFunctionBreakpointHandlerTest extends HeavyPlatformTestCase {
             return null;
         });
         return new DAPFunctionBreakpointHandler(session, descriptor, getProject()) {
+            @Override
+            public CompletableFuture<@Nullable Void> initialize(@NotNull IDebugProtocolServer debugProtocolServer,
+                                                                @NotNull Capabilities capabilities) {
+                initializedWith.add(capabilities);
+                return super.initialize(debugProtocolServer, capabilities);
+            }
+
             @Override
             protected void setBreakpointVerified(XBreakpoint<DAPFunctionBreakpointProperties> ijBreakpoint) {
                 shown.add("verified " + ijBreakpoint.getProperties().getName());

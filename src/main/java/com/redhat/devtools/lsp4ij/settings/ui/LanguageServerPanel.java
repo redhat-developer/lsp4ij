@@ -65,6 +65,8 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import static com.redhat.devtools.lsp4ij.LanguageServerBundle.BUNDLE;
 import static com.redhat.devtools.lsp4ij.server.definition.launching.CommandUtils.resolveCommandLine;
@@ -99,6 +101,10 @@ public class LanguageServerPanel implements Disposable {
     private CommandLineWidget commandLine;
     private TextFieldWithBrowseButton workingDir;
     private @Nullable TransportFields transportFields;
+    private @NotNull List<TransportSupport> supportedTransports = List.of();
+    // Set while the panel shows a transport, or the transports of a template, itself: only a change of the transport
+    // that the user makes swaps its argument in the command
+    private boolean showingTransport;
     private ServerMappingsPanel mappingsPanel;
     private @Nullable SchemaBackedJsonTextField configurationWidget;
     private String configurationSchemaContent;
@@ -502,6 +508,56 @@ public class LanguageServerPanel implements Disposable {
             form.revalidate();
             form.repaint();
         }
+        swapTransportArgument();
+    }
+
+    /**
+     * Swaps the argument of a transport in the command for that of the transport which the user has just chosen, as
+     * the template lists them, such as {@code --stdio} for {@code --socket=${port}}. The arguments are matched as
+     * whole words, and the one which comes last in the command is replaced. A command which has none of the template's
+     * arguments stays as it is, and so does the command when the panel shows a transport itself, as when it loads a
+     * template or saved settings.
+     */
+    private void swapTransportArgument() {
+        if (showingTransport || commandLine == null || supportedTransports.isEmpty()) {
+            return;
+        }
+        String argument = getTransportArgument(getTransport().mode());
+        if (argument == null) {
+            // As for a language server which runs already, whose command isn't used
+            return;
+        }
+        String command = commandLine.getText();
+        // The occurrence which ends last, and of those which end there, the longest: an argument is never taken for a
+        // shorter one which it contains
+        String present = null;
+        int start = -1;
+        int end = -1;
+        for (TransportSupport support : supportedTransports) {
+            String candidate = support.argument();
+            if (candidate == null || candidate.isBlank()) {
+                continue;
+            }
+            Matcher matcher = Pattern.compile("(?<=^|\\s)" + Pattern.quote(candidate) + "(?=\\s|$)").matcher(command);
+            while (matcher.find()) {
+                if (matcher.end() > end || matcher.end() == end && matcher.start() < start) {
+                    present = candidate;
+                    start = matcher.start();
+                    end = matcher.end();
+                }
+            }
+        }
+        if (present != null && !present.equals(argument)) {
+            commandLine.setText(command.substring(0, start) + argument + command.substring(end));
+        }
+    }
+
+    private @Nullable String getTransportArgument(@NotNull UserDefinedTransport.Mode mode) {
+        return supportedTransports.stream()
+                .filter(t -> t.mode() == mode)
+                .findFirst()
+                .map(TransportSupport::argument)
+                .orElse(null);
     }
 
     private void createConfigurationField(@NotNull FormBuilder builder) {
@@ -596,8 +652,14 @@ public class LanguageServerPanel implements Disposable {
      * @param supportedTransports the transports which the template lists, empty if it lists none.
      */
     public void setSupportedTransports(@NotNull List<TransportSupport> supportedTransports) {
+        this.supportedTransports = List.copyOf(supportedTransports);
         if (transportFields != null) {
-            transportFields.setSupportedTransports(supportedTransports);
+            showingTransport = true;
+            try {
+                transportFields.setSupportedTransports(supportedTransports);
+            } finally {
+                showingTransport = false;
+            }
         }
     }
 
@@ -617,7 +679,12 @@ public class LanguageServerPanel implements Disposable {
      */
     public void setTransport(@NotNull UserDefinedTransport transport) {
         if (transportFields != null) {
-            transportFields.setTransport(transport);
+            showingTransport = true;
+            try {
+                transportFields.setTransport(transport);
+            } finally {
+                showingTransport = false;
+            }
         }
     }
 

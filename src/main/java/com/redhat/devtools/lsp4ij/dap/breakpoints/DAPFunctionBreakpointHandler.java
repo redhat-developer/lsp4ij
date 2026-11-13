@@ -64,7 +64,7 @@ public class DAPFunctionBreakpointHandler extends BreakpointHandlerBase<XBreakpo
     public void unregisterBreakpoint(@NotNull XBreakpoint<DAPFunctionBreakpointProperties> breakpoint,
                                      boolean temporary) {
         // A function breakpoint has no source position, which the base class needs to remove a line breakpoint
-        if (breakpoints.remove(breakpoint)) {
+        if (removeBreakpoint(breakpoint)) {
             sendFunctionBreakpoints();
         }
     }
@@ -117,7 +117,7 @@ public class DAPFunctionBreakpointHandler extends BreakpointHandlerBase<XBreakpo
                     if (error != null) {
                         Throwable cause = error instanceof CompletionException && error.getCause() != null ? error.getCause() : error;
                         String message = cause.getMessage();
-                        ijBreakpoints.forEach(ijBreakpoint -> setBreakpointInvalid(ijBreakpoint, message));
+                        updateBreakpointsOfFailedRequest(debugProtocolServer, ijBreakpoints, message);
                         return null;
                     }
                     var breakpoints = response != null ? response.getBreakpoints() : null;
@@ -127,8 +127,8 @@ public class DAPFunctionBreakpointHandler extends BreakpointHandlerBase<XBreakpo
                     // The response has a breakpoint per function breakpoint of the request, in the same order
                     for (int i = 0; i < Math.min(breakpoints.length, ijBreakpoints.size()); i++) {
                         var ijBreakpoint = ijBreakpoints.get(i);
-                        ijBreakpoint.putUserData(DAP_BREAKPOINT_ID, breakpoints[i].getId());
-                        updateBreakpoint(breakpoints[i], ijBreakpoint);
+                        setBreakpointId(debugProtocolServer, ijBreakpoint, breakpoints[i].getId());
+                        updateBreakpoint(debugProtocolServer, breakpoints[i], ijBreakpoint);
                     }
                     return null;
                 });

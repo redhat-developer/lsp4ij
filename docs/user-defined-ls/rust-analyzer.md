@@ -16,7 +16,7 @@ You can use [Rust Analyzer](https://rust-analyzer.github.io/) to benefit from `R
    This will populate the command field with a default command:
 
     * `${BASE_DIR}/rust-analyzer.exe` for Windows OS.
-    * `sh -c ${BASE_DIR}/rust-analyzer` for other OS.
+    * `${BASE_DIR}/rust-analyzer` for other OS.
 
    ![Rust Analyzer template](../images/user-defined-ls/rust-analyzer/select_template.png)
 

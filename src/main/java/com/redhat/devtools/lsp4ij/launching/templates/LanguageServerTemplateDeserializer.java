@@ -56,8 +56,16 @@ public class LanguageServerTemplateDeserializer extends ServerTemplateJsonDeseri
         languageServerTemplate.setEnvData(deserializeEnvData(jsonObject));
         // What can't be used is reported, instead of a silent fallback
         var problems = new ArrayList<String>();
-        languageServerTemplate.setTransport(deserializeTransport(jsonObject, problems));
-        languageServerTemplate.setSupportedTransports(deserializeSupportedTransports(jsonObject, problems));
+        var transport = deserializeTransport(jsonObject, problems);
+        var supportedTransports = deserializeSupportedTransports(jsonObject, problems);
+        if (transport.mode() != UserDefinedTransport.Mode.STDIO && !supportedTransports.isEmpty()
+                && supportedTransports.stream().noneMatch(supported -> supported.mode() == transport.mode())) {
+            // The socket is then preselected, but the transports of the template may not let the user choose it again
+            problems.add(LanguageServerBundle.message("language.server.template.socket.mode.not.listed",
+                    transport.mode().getId()));
+        }
+        languageServerTemplate.setTransport(transport);
+        languageServerTemplate.setSupportedTransports(supportedTransports);
         languageServerTemplate.setProblems(problems);
 
         boolean expandConfiguration = JSONUtils.getBoolean(jsonObject, EXPAND_CONFIGURATION_JSON_PROPERTY);
@@ -125,6 +133,10 @@ public class LanguageServerTemplateDeserializer extends ServerTemplateJsonDeseri
                 .map(JsonElement::getAsJsonObject)
                 .flatMap(transport -> {
                     String id = JSONUtils.getString(transport, TRANSPORT_MODE_JSON_PROPERTY);
+                    if (id == null) {
+                        problems.add(LanguageServerBundle.message("language.server.template.transports.mode.missing"));
+                        return Stream.empty();
+                    }
                     var mode = UserDefinedTransport.Mode.fromId(id);
                     // fromId reads an unknown mode as stdio
                     if (!mode.getId().equals(id)) {

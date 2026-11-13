@@ -16,6 +16,7 @@ import com.intellij.codeInsight.hint.HintUtil;
 import com.intellij.execution.ui.ConsoleViewContentType;
 import com.intellij.openapi.Disposable;
 import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.application.ModalityState;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.editor.VisualPosition;
 import com.intellij.openapi.progress.EmptyProgressIndicator;
@@ -30,6 +31,7 @@ import com.intellij.xdebugger.breakpoints.XBreakpoint;
 import com.intellij.xdebugger.frame.XSuspendContext;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.console.explorer.TracingMessageConsumer;
+import com.redhat.devtools.lsp4ij.dap.DAPBundle;
 import com.redhat.devtools.lsp4ij.dap.DAPDebugProcess;
 import com.redhat.devtools.lsp4ij.dap.DebugMode;
 import com.redhat.devtools.lsp4ij.dap.TransportStreams;
@@ -63,10 +65,12 @@ import java.io.OutputStream;
 import java.lang.Thread;
 import java.util.*;
 import java.util.List;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
@@ -106,6 +110,29 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
      */
     private final CompletableFuture<@Nullable Capabilities> capabilitiesFuture = new CompletableFuture<>();
     /**
+     * The capabilities of the 'initialize' response, updated by the 'capabilities' events.
+     */
+    private final DAPCapabilities adapterCapabilities = new DAPCapabilities();
+    /**
+     * Guards what the breakpoints and the exception breakpoint filters were sent with: a step of the configuration
+     * reads the current capabilities and sends with them, and a 'capabilities' event changes them and sends again what
+     * it changed, one after the other.
+     */
+    private final Object capabilitiesLock = new Object();
+    // The capabilities which the function breakpoints, the data breakpoints and the exception breakpoint filters were
+    // last sent to the DAP server with, null until the configuration sends them. An event which arrives during the
+    // configuration changes what its next steps send, and what its steps before sent is sent again once it is done.
+    // Guarded by capabilitiesLock.
+    private @Nullable Capabilities functionBreakpointsSentWith;
+    private @Nullable Capabilities dataBreakpointsSentWith;
+    private @Nullable Capabilities exceptionFiltersSentWith;
+    // Whether the disassembly breakpoint handler sends the instruction breakpoints to the DAP server: it is initialized
+    // for it once, when the DAP server supports disassembling. Guarded by capabilitiesLock.
+    private boolean instructionBreakpointsInitialized;
+    // Whether the configuration is done: from then on, a 'capabilities' event sends again what it changes. Guarded by
+    // capabilitiesLock.
+    private boolean configured;
+    /**
      * Once we have received initialized event, this member will be "done" as a flag
      */
     private final CompletableFuture<@Nullable Void> initialized = new CompletableFuture<>();
@@ -124,6 +151,10 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
     // Child sessions which sent 'terminated': out of childrenClient so they get no more requests, kept to be disposed
     private final List<DAPClient> terminatedChildren = new CopyOnWriteArrayList<>();
     private volatile boolean terminatedReceived;
+    // Set once the client ends the session, with terminate() or dispose(): the end of its connection is expected then
+    private volatile boolean ending;
+    // dispose() runs once: the end of the connection, which it causes, may dispose the client too
+    private final AtomicBoolean disposed = new AtomicBoolean();
     private boolean sentTerminateRequest;
     // Whether the loaded sources and modules were asked for. They are asked for at the first stop, and then follow the
     // 'loadedSource' and 'module' events: asking at each stop would get all of them again at each step.
@@ -179,6 +210,7 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
                 threadPool);
 
         debugProtocolFuture = debugProtocolLauncher.startListening();
+        endWhenTheConnectionCloses(debugProtocolFuture);
         debugProtocolServer = debugProtocolLauncher.getRemoteProxy();
 
         return initialize(dapParameters, indicator);
@@ -201,7 +233,8 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
                                 + "A default Capabilities will be used instead.", ConsoleViewContentType.LOG_WARNING_OUTPUT);
                         capabilities = new Capabilities();
                     }
-                    capabilitiesFuture.complete(capabilities);
+                    // with the capabilities events which arrived before this response
+                    capabilitiesFuture.complete(adapterCapabilities.initialize(capabilities));
                 }).thenCompose(unused -> {
                     monitor.checkCanceled();
                     monitor.setFraction(20d / 100d);
@@ -230,7 +263,7 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
                         monitor.setText2("Sending breakpoints");
                         return debugProcess
                                 .getBreakpointHandler()
-                                .initialize(getDebugProtocolServer(), getCapabilities());
+                                .initialize(getDebugProtocolServer(), this::getCapabilities);
                     })
                     .thenCompose(v -> {
                         // client sends a setFunctionBreakpoints request
@@ -238,9 +271,12 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
                         monitor.checkCanceled();
                         monitor.setFraction(55d / 100d);
                         monitor.setText2("Sending function breakpoints");
-                        return debugProcess
-                                .getFunctionBreakpointHandler()
-                                .initialize(getDebugProtocolServer(), getCapabilities());
+                        synchronized (capabilitiesLock) {
+                            functionBreakpointsSentWith = getCapabilities();
+                            return debugProcess
+                                    .getFunctionBreakpointHandler()
+                                    .initialize(getDebugProtocolServer(), this::getCapabilities);
+                        }
                     })
                     .thenCompose(v -> {
                         // client sends a setDataBreakpoints request
@@ -248,9 +284,12 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
                         monitor.checkCanceled();
                         monitor.setFraction(57d / 100d);
                         monitor.setText2("Sending data breakpoints");
-                        return debugProcess
-                                .getDataBreakpointHandler()
-                                .initialize(getDebugProtocolServer(), getCapabilities());
+                        synchronized (capabilitiesLock) {
+                            dataBreakpointsSentWith = getCapabilities();
+                            return debugProcess
+                                    .getDataBreakpointHandler()
+                                    .initialize(getDebugProtocolServer(), this::getCapabilities);
+                        }
                     })
                     .thenCompose(v -> {
                         // client sends a setExceptionBreakpoints request
@@ -260,13 +299,16 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
                         monitor.setFraction(60d / 100d);
                         monitor.setText2("Sending exception breakpoints filters");
 
-                        var filters = getCapabilities().getExceptionBreakpointFilters();
-                        if (filters != null) {
-                            return debugProcess
-                                    .getBreakpointHandler()
-                                    .sendExceptionBreakpointFilters(filters, getDebugProtocolServer());
+                        synchronized (capabilitiesLock) {
+                            exceptionFiltersSentWith = getCapabilities();
+                            var filters = exceptionFiltersSentWith.getExceptionBreakpointFilters();
+                            if (filters != null) {
+                                return debugProcess
+                                        .getBreakpointHandler()
+                                        .sendExceptionBreakpointFilters(filters, getDebugProtocolServer());
+                            }
+                            return CompletableFuture.completedFuture(null);
                         }
-                        return CompletableFuture.completedFuture(null);
                     })
                     .thenCompose(v -> {
                         monitor.checkCanceled();
@@ -277,9 +319,9 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
                             return CompletableFuture.completedFuture(null);
                         }
                         monitor.setText2("Sending instruction breakpoints");
-                        return debugProcess
-                                .getDisassemblyBreakpointHandler()
-                                .initialize(getDebugProtocolServer(), getCapabilities());
+                        synchronized (capabilitiesLock) {
+                            return initializeInstructionBreakpoints();
+                        }
                     });
         }
         configurationDoneFuture = configurationDoneFuture
@@ -293,8 +335,126 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
                                 .configurationDone(new ConfigurationDoneArguments());
                     }
                     return CompletableFuture.completedFuture(null);
-                });
+                })
+                .thenRun(this::endConfiguration);
         return CompletableFuture.allOf(launchAttachFuture, configurationDoneFuture);
+    }
+
+    /**
+     * Ends the configuration: what a 'capabilities' event changed after a step of the configuration read the
+     * capabilities is sent again now, and what the next events change is sent again as they arrive.
+     */
+    private void endConfiguration() {
+        synchronized (capabilitiesLock) {
+            configured = true;
+            sendWhatTheCapabilitiesChanged();
+        }
+    }
+
+    /**
+     * Sends again to the DAP server what was sent to it with capabilities which changed since: the function
+     * breakpoints, or the data breakpoints, when their support was turned on or off, and the exception breakpoint
+     * filters when the filters or their options changed. The instruction breakpoints are sent once the DAP server
+     * supports disassembling. Line breakpoints are sent with their conditions and log messages whatever the
+     * capabilities, so they are not sent again.
+     * <p>
+     * Called under {@link #capabilitiesLock}, once the configuration is done.
+     */
+    private void sendWhatTheCapabilitiesChanged() {
+        if (!isDebug) {
+            // The configuration sent no breakpoints: the program runs without debugging
+            return;
+        }
+        var server = getDebugProtocolServer();
+        Capabilities current = getCapabilities();
+        if (isTurnedOnOrOff(functionBreakpointsSentWith, current, Capabilities::getSupportsFunctionBreakpoints)) {
+            debugProcess.getFunctionBreakpointHandler().sendBreakpoints(server);
+        }
+        if (isTurnedOnOrOff(dataBreakpointsSentWith, current, Capabilities::getSupportsDataBreakpoints)) {
+            debugProcess.getDataBreakpointHandler().sendBreakpoints(server);
+        }
+        var filters = current.getExceptionBreakpointFilters();
+        if (filters != null && isExceptionFiltersChanged(exceptionFiltersSentWith, current)) {
+            sendExceptionBreakpointFilters(filters, server);
+        }
+        initializeInstructionBreakpoints();
+        functionBreakpointsSentWith = current;
+        dataBreakpointsSentWith = current;
+        exceptionFiltersSentWith = current;
+    }
+
+    /**
+     * Returns true if the given capability was turned on or off since it was sent with the given capabilities, and
+     * false otherwise, or if it was not sent.
+     */
+    private static boolean isTurnedOnOrOff(@Nullable Capabilities sentWith,
+                                           @NotNull Capabilities current,
+                                           @NotNull Function<Capabilities, @Nullable Boolean> capability) {
+        return sentWith != null
+                && Boolean.TRUE.equals(capability.apply(sentWith)) != Boolean.TRUE.equals(capability.apply(current));
+    }
+
+    /**
+     * Returns true if the exception breakpoint filters which the DAP server offers, or its support of their options,
+     * changed since they were sent with the given capabilities, and false otherwise, or if they were not sent.
+     * <p>
+     * Whether a filter is enabled by default is left out: the user's choice for a filter which was already offered
+     * replaces it, and the "Exception Breakpoints" panel keeps that choice in the filter itself.
+     *
+     * @param sentWith the capabilities which the exception breakpoint filters were sent with, or null.
+     * @param current  the current capabilities.
+     * @return true if the exception breakpoint filters or their options changed, and false otherwise.
+     */
+    private static boolean isExceptionFiltersChanged(@Nullable Capabilities sentWith, @NotNull Capabilities current) {
+        return sentWith != null
+                && (Boolean.TRUE.equals(sentWith.getSupportsExceptionFilterOptions()) != Boolean.TRUE.equals(current.getSupportsExceptionFilterOptions())
+                || !describeExceptionFilters(sentWith).equals(describeExceptionFilters(current)));
+    }
+
+    private static @NotNull List<List<Object>> describeExceptionFilters(@NotNull Capabilities capabilities) {
+        var filters = capabilities.getExceptionBreakpointFilters();
+        if (filters == null) {
+            // Offers no filter, as an empty array does
+            return List.of();
+        }
+        return Arrays.stream(filters)
+                .map(filter -> Arrays.<Object>asList(filter.getFilter(), filter.getLabel(), filter.getDescription(),
+                        filter.getSupportsCondition(), filter.getConditionDescription()))
+                .toList();
+    }
+
+    /**
+     * Shows the given exception breakpoint filters in the "Exception Breakpoints" panel, with the user's choices for
+     * those which it showed already, and sends those which are enabled to the given DAP server. The panel is changed
+     * on the EDT, also while a modal dialog is open, so that the filters take effect at once.
+     *
+     * @param filters the exception breakpoint filters which the DAP server offers.
+     * @param server  the DAP server.
+     */
+    private void sendExceptionBreakpointFilters(ExceptionBreakpointsFilter @NotNull [] filters,
+                                                @NotNull IDebugProtocolServer server) {
+        ApplicationManager.getApplication().invokeLater(
+                () -> debugProcess.getBreakpointHandler().sendExceptionBreakpointFilters(filters, server),
+                ModalityState.any(),
+                ignored -> disposed.get());
+    }
+
+    /**
+     * Initializes the disassembly breakpoint handler for the DAP server, so that it sends the instruction breakpoints
+     * to it, once the DAP server supports disassembling. It is initialized once for a DAP server.
+     * <p>
+     * Called under {@link #capabilitiesLock}.
+     *
+     * @return the future of the sent instruction breakpoints.
+     */
+    private CompletableFuture<@Nullable Void> initializeInstructionBreakpoints() {
+        if (instructionBreakpointsInitialized || !canDisassemble()) {
+            return CompletableFuture.completedFuture(null);
+        }
+        instructionBreakpointsInitialized = true;
+        return debugProcess
+                .getDisassemblyBreakpointHandler()
+                .initialize(getDebugProtocolServer(), this::getCapabilities);
     }
 
     public IDebugProtocolServer getDebugProtocolServer() {
@@ -313,7 +473,7 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
      */
     @NotNull
     Capabilities getCapabilities() {
-        return capabilitiesFuture.getNow(new Capabilities());
+        return adapterCapabilities.get();
     }
 
     protected Launcher<? extends IDebugProtocolServer> createLauncher(UnaryOperator<MessageConsumer> wrapper,
@@ -325,6 +485,18 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
     @Override
     public void initialized() {
         initialized.complete(null);
+    }
+
+    @Override
+    public void capabilities(CapabilitiesEventArguments args) {
+        synchronized (capabilitiesLock) {
+            adapterCapabilities.update(args);
+            if (configured) {
+                // During the configuration, its next steps read the new capabilities, and it applies them to what its
+                // steps before sent once it is done
+                sendWhatTheCapabilitiesChanged();
+            }
+        }
     }
 
     @Override
@@ -383,11 +555,11 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
                 // breakpoint with a given id changed (ex: verified changed)
                 // update the Intellij Breakpoint, a line, a function or a data breakpoint, with those information.
                 debugProcess.getBreakpointHandler()
-                        .updateBreakpoint(breakpoint, null);
+                        .updateBreakpoint(getDebugProtocolServer(), breakpoint, null);
                 debugProcess.getFunctionBreakpointHandler()
-                        .updateBreakpoint(breakpoint, null);
+                        .updateBreakpoint(getDebugProtocolServer(), breakpoint, null);
                 debugProcess.getDataBreakpointHandler()
-                        .updateBreakpoint(breakpoint, null);
+                        .updateBreakpoint(getDebugProtocolServer(), breakpoint, null);
             }
         }
     }
@@ -450,7 +622,7 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
         StackFrame topFrame = frames[0];
         DAPSuspendContext context = getSuspendContext(threads, stoppedThread, frames);
         var breakpointHandler = debugProcess.getBreakpointHandler();
-        XBreakpoint<?> breakpoint = getStopBreakpoint(args, debugProcess::findBreakpointById, () -> breakpointHandler.findBreakpoint(topFrame));
+        XBreakpoint<?> breakpoint = getStopBreakpoint(args, id -> debugProcess.findBreakpointById(server, id), () -> breakpointHandler.findBreakpoint(topFrame));
         if (breakpoint != null) {
             breakpointReached(getSession(), server, breakpoint, context, topFrame.getId(), stoppedThread.getId(),
                     singleThreadResumed ? Boolean.TRUE : null)
@@ -805,6 +977,21 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
 
     @Override
     public void terminated(TerminatedEventArguments args) {
+        // TODO : manage args.getRestart()
+        endSession();
+    }
+
+    /**
+     * Ends this session, as its 'terminated' event or the end of its connection says: stops the debug process unless
+     * another session of the tree is still alive.
+     */
+    private void endSession() {
+        var server = getDebugProtocolServer();
+        if (server != null) {
+            debugProcess.getBreakpointHandler().forgetSession(server);
+            debugProcess.getFunctionBreakpointHandler().forgetSession(server);
+            debugProcess.getDataBreakpointHandler().forgetSession(server);
+        }
         // A debug adapter may run a session per target, as vscode-js-debug does with 'startDebugging': when an iframe or
         // a worker goes away only its session terminates, and the debug process must go on for the others
         terminatedReceived = true;
@@ -817,7 +1004,6 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
             parentClient.terminatedChildren.add(this);
             parentClient.childrenClient.remove(this);
         }
-        // TODO : manage args.getRestart()
         if (root.hasLiveSession()) {
             return;
         }
@@ -845,8 +1031,63 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
         return false;
     }
 
+    /**
+     * Ends this session when its connection closes without a 'terminated' event, as when the debug adapter crashed or
+     * was killed, or when the socket of a child session dropped: otherwise the session would count as alive for good,
+     * and keep the debug process running and the breakpoints it bound shown as verified. When the client is ending the
+     * session itself, it disposes the client instead, since the answer which terminate() waits for won't come.
+     *
+     * @param listening the future of the message loop, which ends when the connection closes.
+     */
+    private void endWhenTheConnectionCloses(@NotNull Future<Void> listening) {
+        threadPool.execute(() -> {
+            try {
+                listening.get();
+            } catch (InterruptedException e) {
+                java.lang.Thread.currentThread().interrupt();
+                return;
+            } catch (CancellationException | ExecutionException e) {
+                // Cancelled by dispose(), or the connection failed: it is gone either way
+            }
+            if (isEnding()) {
+                // terminate() disposes the client once the DAP server answers 'terminate' or 'disconnect', which it
+                // can't do now: the debug adapter exited or crashed meanwhile
+                dispose();
+                return;
+            }
+            if (terminatedReceived) {
+                return;
+            }
+            debugProcess.print(DAPBundle.message("dap.session.connection.closed"), ConsoleViewContentType.SYSTEM_OUTPUT);
+            endSession();
+        });
+    }
+
+    /**
+     * Returns true once the connection to the DAP server has closed, or dispose() has cancelled it.
+     */
+    private boolean isConnectionClosed() {
+        return debugProtocolFuture != null && debugProtocolFuture.isDone();
+    }
+
+    /**
+     * Returns true when the client ends this session, or a session above it, with terminate() or dispose().
+     */
+    private boolean isEnding() {
+        for (DAPClient client = this; client != null; client = client.parentClient) {
+            if (client.ending) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     @Override
     public void dispose() {
+        ending = true;
+        if (!disposed.compareAndSet(false, true)) {
+            return;
+        }
         if (debugProtocolFuture != null) {
             CancellationSupport.cancel(debugProtocolFuture);
 
@@ -894,8 +1135,10 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
      * from the debuggee but will allow it to continue."
      */
     public void terminate() {
+        ending = true;
         IDebugProtocolServer server = getDebugProtocolServer();
-        if (server == null) {
+        if (server == null || isConnectionClosed()) {
+            // A request over a closed connection would never be answered, and the client never disposed
             dispose();
             return;
         }

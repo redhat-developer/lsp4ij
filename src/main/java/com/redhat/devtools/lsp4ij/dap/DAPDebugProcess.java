@@ -87,12 +87,12 @@ import org.eclipse.lsp4j.debug.Source;
 import org.eclipse.lsp4j.debug.SteppingGranularity;
 import org.eclipse.lsp4j.debug.Thread;
 import org.eclipse.lsp4j.debug.ThreadEventArguments;
+import org.eclipse.lsp4j.debug.services.IDebugProtocolServer;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import javax.swing.*;
 import java.io.IOException;
-import java.net.InetAddress;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.CancellationException;
@@ -344,7 +344,8 @@ public class DAPDebugProcess extends XDebugProcess implements Disposable {
                 // The DAP messages go through the socket, so the process output carries none
                 console.setSocketTransport();
             }
-            return new TransportStreams.SocketTransportStreams(address != null ? address : InetAddress.getLoopbackAddress().getHostAddress(), port);
+            // Without an address, both loopback addresses, as a DAP server which listens on localhost can have either
+            return new TransportStreams.SocketTransportStreams(address, port);
         }
         var processHandler = executionResult.getProcessHandler();
         DAPProcessListener processListener = new DAPProcessListener();
@@ -674,11 +675,30 @@ public class DAPDebugProcess extends XDebugProcess implements Disposable {
 
     /**
      * Returns the IntelliJ breakpoint, a line, a function or a data breakpoint, of the given DAP breakpoint id, and
-     * null otherwise.
+     * null otherwise. Each session numbers its breakpoints itself, so the id is that which the given DAP server gave.
+     *
+     * @param debugProtocolServer the DAP server which names the breakpoint.
+     * @param id                  the DAP breakpoint id.
+     * @return the IntelliJ breakpoint of the given DAP breakpoint id, and null otherwise.
+     */
+    public @Nullable XBreakpoint<?> findBreakpointById(@NotNull IDebugProtocolServer debugProtocolServer, @Nullable Integer id) {
+        XBreakpoint<?> breakpoint = breakpointHandler.findBreakpointById(debugProtocolServer, id);
+        if (breakpoint == null) {
+            breakpoint = functionBreakpointHandler.findBreakpointById(debugProtocolServer, id);
+        }
+        return breakpoint != null ? breakpoint : dataBreakpointHandler.findBreakpointById(debugProtocolServer, id);
+    }
+
+    /**
+     * Returns the IntelliJ breakpoint, a line, a function or a data breakpoint, to which one of the DAP servers gave
+     * the given DAP breakpoint id, and null otherwise.
      *
      * @param id the DAP breakpoint id.
      * @return the IntelliJ breakpoint of the given DAP breakpoint id, and null otherwise.
+     * @deprecated each session of a tree numbers its breakpoints itself, so two sessions can give two breakpoints the
+     * same id: use {@link #findBreakpointById(IDebugProtocolServer, Integer)} with the DAP server which names it.
      */
+    @Deprecated
     public @Nullable XBreakpoint<?> findBreakpointById(@Nullable Integer id) {
         XBreakpoint<?> breakpoint = breakpointHandler.findBreakpointById(id);
         if (breakpoint == null) {
