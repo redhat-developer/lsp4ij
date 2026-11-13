@@ -134,6 +134,10 @@ final class TransportFields {
      */
     void setSupportedTransports(@NotNull List<TransportSupport> supportedTransports) {
         this.supportedTransports = List.copyOf(supportedTransports);
+        supportedTransports.stream()
+                .filter(t -> t.mode() != UserDefinedTransport.Mode.STDIO)
+                .findFirst()
+                .ifPresent(t -> modeButton(t.mode()).setSelected(true));
         update();
     }
 

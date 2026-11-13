@@ -99,6 +99,8 @@ public class LanguageServerPanel implements Disposable {
     private CommandLineWidget commandLine;
     private TextFieldWithBrowseButton workingDir;
     private @Nullable TransportFields transportFields;
+    private @NotNull List<TransportSupport> supportedTransports = List.of();
+    private @Nullable UserDefinedTransport.Mode previousTransportMode;
     private ServerMappingsPanel mappingsPanel;
     private @Nullable SchemaBackedJsonTextField configurationWidget;
     private String configurationSchemaContent;
@@ -502,6 +504,42 @@ public class LanguageServerPanel implements Disposable {
             form.revalidate();
             form.repaint();
         }
+        updateCommandLineForTransport();
+    }
+
+    /**
+     * Updates the command line when the transport mode changes: replaces the previous transport's argument with the
+     * new one, or appends the current transport's argument if not already present (on initial template load).
+     */
+    private void updateCommandLineForTransport() {
+        if (commandLine == null || supportedTransports.isEmpty()) {
+            return;
+        }
+        UserDefinedTransport.Mode currentMode = getTransport().mode();
+        String currentArgument = getTransportArgument(currentMode);
+        if (previousTransportMode != null && previousTransportMode != currentMode) {
+            String oldArgument = getTransportArgument(previousTransportMode);
+            if (oldArgument != null && currentArgument != null) {
+                String currentCommand = commandLine.getText();
+                if (currentCommand.contains(oldArgument)) {
+                    commandLine.setText(currentCommand.replace(oldArgument, currentArgument));
+                }
+            }
+        } else if (currentArgument != null) {
+            String currentCommand = commandLine.getText();
+            if (!currentCommand.contains(currentArgument)) {
+                commandLine.setText(currentCommand.isEmpty() ? currentArgument : currentCommand + " " + currentArgument);
+            }
+        }
+        previousTransportMode = currentMode;
+    }
+
+    private @Nullable String getTransportArgument(@NotNull UserDefinedTransport.Mode mode) {
+        return supportedTransports.stream()
+                .filter(t -> t.mode() == mode)
+                .findFirst()
+                .map(TransportSupport::argument)
+                .orElse(null);
     }
 
     private void createConfigurationField(@NotNull FormBuilder builder) {
@@ -596,6 +634,7 @@ public class LanguageServerPanel implements Disposable {
      * @param supportedTransports the transports which the template lists, empty if it lists none.
      */
     public void setSupportedTransports(@NotNull List<TransportSupport> supportedTransports) {
+        this.supportedTransports = List.copyOf(supportedTransports);
         if (transportFields != null) {
             transportFields.setSupportedTransports(supportedTransports);
         }

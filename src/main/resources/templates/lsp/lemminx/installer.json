@@ -1,0 +1,30 @@
+{
+  "id": "lemminx",
+  "name": "XML Language Server",
+  "executeOnStartServer": false,
+  "properties": {
+    "serverDist": "$USER_HOME$/.lsp4ij/lsp/lemminx"
+  },
+  "check": {
+    "fileExists": {
+      "name": "Check if LemMinX is installed",
+      "file": "${serverDist}/org.eclipse.lemminx-uber.jar"
+    }
+  },
+  "run": {
+    "download": {
+      "name": "Download LemMinX",
+      "url": "https://download.eclipse.org/lemminx/releases/0.31.2/org.eclipse.lemminx-uber.jar",
+      "output": {
+        "dir": "${serverDist}"
+      },
+      "onSuccess": {
+        "configureServer": {
+          "name": "Configure LemMinX server command",
+          "command": "java -classpath \"${output.dir}/${output.file.name}\" org.eclipse.lemminx.XMLServerLauncher",
+          "update": true
+        }
+      }
+    }
+  }
+}
