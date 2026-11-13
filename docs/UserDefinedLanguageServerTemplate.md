@@ -178,13 +178,18 @@ for instance, is started over its standard input and output, and also talks over
 }
 ```
 
+When the user changes the transport, in the New Language Server dialog or in the settings of a language server created
+from the template, the argument of the chosen transport replaces that of another listed transport in the command. A
+command with none of the listed arguments stays as it is.
+
 #### Socket and transports
 
 `socket` and `transports` answer two questions. `socket` is the transport which the New Language Server dialog
 preselects, and which an [exported](./UserDefinedLanguageServer.md#exporting-templates) language server keeps.
-`transports` lists what the language server supports, and only changes what the dialog offers and hints. LSP4IJ
-doesn't check one against the other: a `socket` whose `mode` isn't in `transports` is still preselected, without a
-warning. Keep them in line, for instance with the `socket` mode as the socket mode of `transports`.
+`transports` lists what the language server supports: it changes what the dialog offers and hints, and the argument
+that a change of the transport swaps in the command. LSP4IJ doesn't check one against the other: a `socket` whose
+`mode` isn't in `transports` is still preselected, without a warning. Keep them in line, for instance with the
+`socket` mode as the socket mode of `transports`.
 
 ## Installer descriptor
 
