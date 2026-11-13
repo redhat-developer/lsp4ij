@@ -12,6 +12,7 @@ package com.redhat.devtools.lsp4ij.dap.breakpoints;
 
 import com.intellij.openapi.Disposable;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.util.Key;
 import com.intellij.util.containers.ContainerUtil;
 import com.intellij.xdebugger.XDebugSession;
 import com.intellij.xdebugger.XDebugSessionListener;
@@ -50,6 +51,16 @@ public abstract class BreakpointHandlerBase<B extends XBreakpoint<?>> extends XB
     private static final Logger LOGGER = LoggerFactory.getLogger(BreakpointHandlerBase.class);
 
     protected static final CompletableFuture<?>[] EMPTY_COMPLETABLE_FUTURES = new CompletableFuture<?>[0];
+
+    /**
+     * The id which the last session that answered gave a breakpoint, or null when no session has an id for it.
+     *
+     * @deprecated each session of a session tree numbers its breakpoints itself, so a breakpoint has an id per session,
+     * and two breakpoints can have the same id in two sessions: use
+     * {@link #findBreakpointById(IDebugProtocolServer, Integer)}. The key is still set, as for a single session.
+     */
+    @Deprecated(since = "0.30.0", forRemoval = true)
+    protected static final @NotNull Key<Integer> DAP_BREAKPOINT_ID = Key.create("dap.breakpoint.id");
 
     protected final @NotNull XDebugSession debugSession;
     protected final @NotNull DebugAdapterDescriptor debugAdapterDescriptor;
@@ -221,6 +232,7 @@ public abstract class BreakpointHandlerBase<B extends XBreakpoint<?>> extends XB
         }
         verifiedBy.remove(breakpoint);
         breakpointIds.remove(breakpoint);
+        updateDeprecatedBreakpointId(breakpoint, null);
         return true;
     }
 
@@ -229,6 +241,7 @@ public abstract class BreakpointHandlerBase<B extends XBreakpoint<?>> extends XB
         debugProtocolServers.clear();
         capabilities.clear();
         verifiedBy.clear();
+        breakpointIds.keySet().forEach(breakpoint -> breakpoint.putUserData(DAP_BREAKPOINT_ID, null));
         breakpointIds.clear();
         endedSessions.clear();
     }
@@ -381,7 +394,11 @@ public abstract class BreakpointHandlerBase<B extends XBreakpoint<?>> extends XB
                 }
             }
         }
-        breakpointIds.values().forEach(ids -> ids.remove(debugProtocolServer));
+        breakpointIds.forEach((breakpoint, ids) -> {
+            if (ids.remove(debugProtocolServer) != null) {
+                updateDeprecatedBreakpointId(breakpoint, null);
+            }
+        });
     }
 
     /**
@@ -400,6 +417,7 @@ public abstract class BreakpointHandlerBase<B extends XBreakpoint<?>> extends XB
             if (ids != null) {
                 ids.remove(session);
             }
+            updateDeprecatedBreakpointId(ijBreakpoint, null);
             return;
         }
         breakpointIds.computeIfAbsent(ijBreakpoint, key -> new ConcurrentHashMap<>()).put(session, id);
@@ -410,7 +428,10 @@ public abstract class BreakpointHandlerBase<B extends XBreakpoint<?>> extends XB
             if (ids != null) {
                 ids.remove(session, id);
             }
+            updateDeprecatedBreakpointId(ijBreakpoint, null);
+            return;
         }
+        updateDeprecatedBreakpointId(ijBreakpoint, id);
     }
 
     /**
@@ -420,6 +441,29 @@ public abstract class BreakpointHandlerBase<B extends XBreakpoint<?>> extends XB
      */
     protected void forgetBreakpointIds(@NotNull B ijBreakpoint) {
         breakpointIds.remove(ijBreakpoint);
+        updateDeprecatedBreakpointId(ijBreakpoint, null);
+    }
+
+    /**
+     * Sets the deprecated {@link #DAP_BREAKPOINT_ID} of the given breakpoint: to the id which a session just gave it,
+     * or, when a session's id is forgotten, to the id it holds if a session still has it, else to an id which another
+     * session gave it, else to null.
+     *
+     * @param ijBreakpoint the IJ breakpoint.
+     * @param given        the id which a session just gave it, or null when one was forgotten.
+     */
+    private void updateDeprecatedBreakpointId(@NotNull B ijBreakpoint, @Nullable Integer given) {
+        Integer id = given;
+        if (id == null) {
+            var ids = breakpointIds.get(ijBreakpoint);
+            Integer current = ijBreakpoint.getUserData(DAP_BREAKPOINT_ID);
+            if (ids != null) {
+                // The map takes no null, and another thread can empty it meanwhile
+                id = current != null && ids.containsValue(current) ? current
+                        : ids.values().stream().findFirst().orElse(null);
+            }
+        }
+        ijBreakpoint.putUserData(DAP_BREAKPOINT_ID, id);
     }
 
     /**

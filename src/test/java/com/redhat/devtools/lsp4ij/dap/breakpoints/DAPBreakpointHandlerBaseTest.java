@@ -251,6 +251,36 @@ public class DAPBreakpointHandlerBaseTest extends HeavyPlatformTestCase {
         }
     }
 
+    /**
+     * The deprecated DAP_BREAKPOINT_ID still holds the id which the last session that answered gave a breakpoint, as for
+     * the single session of 0.21.0, and is cleared once no session has an id for it.
+     */
+    @SuppressWarnings("removal")
+    public void testTheDeprecatedKeyHoldsTheIdOfTheLastSessionThatAnswered() throws Exception {
+        var handler = handler(recordingSession(new ArrayList<>()));
+        var dir = Files.createTempDirectory("dap-breakpoints-");
+        var a = breakpoint(dir.resolve("a.lua"), 0);
+        try {
+            handler.registerBreakpoint(a);
+            var first = server(true, Map.of("a.lua", 4));
+            handler.initialize(first, new Capabilities()).join();
+            assertEquals(Integer.valueOf(4), a.getUserData(BreakpointHandlerBase.DAP_BREAKPOINT_ID));
+            var second = server(true, Map.of("a.lua", 9));
+            handler.initialize(second, new Capabilities()).join();
+            assertEquals(Integer.valueOf(9), a.getUserData(BreakpointHandlerBase.DAP_BREAKPOINT_ID));
+
+            // The session whose id it holds ends: the id which the other one gave
+            handler.forgetSession(second);
+            assertEquals(Integer.valueOf(4), a.getUserData(BreakpointHandlerBase.DAP_BREAKPOINT_ID));
+
+            handler.unregisterBreakpoint(a, false);
+            assertNull(a.getUserData(BreakpointHandlerBase.DAP_BREAKPOINT_ID));
+        } finally {
+            handler.dispose();
+            com.intellij.openapi.util.io.FileUtil.delete(dir.toFile());
+        }
+    }
+
     /** Returns a debug session which records, in the given list, each state the breakpoints are shown in. */
     private static XDebugSession recordingSession(List<String> states) {
         return (XDebugSession)Proxy.newProxyInstance(XDebugSession.class.getClassLoader(),new Class<?>[]{XDebugSession.class}, (p, m, a) -> {
