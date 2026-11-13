@@ -134,10 +134,14 @@ final class TransportFields {
      */
     void setSupportedTransports(@NotNull List<TransportSupport> supportedTransports) {
         this.supportedTransports = List.copyOf(supportedTransports);
-        supportedTransports.stream()
-                .filter(t -> t.mode() != UserDefinedTransport.Mode.STDIO)
-                .findFirst()
-                .ifPresent(t -> modeButton(t.mode()).setSelected(true));
+        if (!socket.isSelected()) {
+            // A socket chosen later starts in the mode which the template lists, and a socket mode chosen already, as
+            // in saved settings, stays
+            supportedTransports.stream()
+                    .filter(t -> t.mode() != UserDefinedTransport.Mode.STDIO)
+                    .findFirst()
+                    .ifPresent(t -> modeButton(t.mode()).setSelected(true));
+        }
         update();
     }
 

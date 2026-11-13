@@ -4,7 +4,7 @@
   "dev": true,
   "url": "https://github.com/eclipse/lemminx",
   "programArgs": {
-    "default": "java -classpath \"$USER_HOME$/.lsp4ij/lsp/lemminx/org.eclipse.lemminx-uber.jar\""
+    "default": "java -classpath \"$USER_HOME$/.lsp4ij/lsp/lemminx/org.eclipse.lemminx-uber.jar\" org.eclipse.lemminx.XMLServerLauncher"
   },
   "transports": [
     {

@@ -193,6 +193,18 @@ public class TransportFieldsTest extends LightPlatformTestCase {
         }
     }
 
+    public void testATemplateLeavesASocketModeChosenAlready() {
+        var running = new UserDefinedTransport(UserDefinedTransport.Mode.ATTACH, "127.0.0.1", 6005);
+        fields.setTransport(running);
+
+        // as when the settings of a language server open: the saved transport first, then its template's transports
+        fields.setSupportedTransports(List.of(
+                new TransportSupport(UserDefinedTransport.Mode.STDIO, "--stdio"),
+                new TransportSupport(UserDefinedTransport.Mode.START_AND_ACCEPT, "--socket=${port}")));
+
+        assertEquals(running, fields.getTransport());
+    }
+
     public void testATransportIsShownAsItIs() {
         for (var transport : new UserDefinedTransport[]{
                 UserDefinedTransport.STDIO,
