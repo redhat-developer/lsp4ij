@@ -15,6 +15,7 @@ import com.intellij.openapi.util.TextRange;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import org.eclipse.lsp4j.FormattingOptions;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
 
@@ -31,4 +32,28 @@ public record LSPFormattingParams(@NotNull List<TextRange> textRanges,
                                   @NotNull LanguageServerItem formattingServer,
                                   @NotNull FormattingOptions formattingOptions) {
 
+    /**
+     * LSP formatting parameters of one text range.
+     *
+     * @param textRange the text range to format, or null to format the whole document.
+     * @deprecated use the constructor which takes a list of text ranges, as IntelliJ can format several ranges of a
+     * file at once.
+     */
+    @Deprecated(since = "0.30.0", forRemoval = true)
+    public LSPFormattingParams(@Nullable TextRange textRange,
+                               @NotNull Document document,
+                               @NotNull LanguageServerItem formattingServer,
+                               @NotNull FormattingOptions formattingOptions) {
+        this(textRange != null ? List.of(textRange) : List.of(), document, formattingServer, formattingOptions);
+    }
+
+    /**
+     * Returns the first text range to format, or null to format the whole document.
+     *
+     * @deprecated use {@link #textRanges()}, as IntelliJ can format several ranges of a file at once.
+     */
+    @Deprecated(since = "0.30.0", forRemoval = true)
+    public @Nullable TextRange textRange() {
+        return textRanges.isEmpty() ? null : textRanges.get(0);
+    }
 }

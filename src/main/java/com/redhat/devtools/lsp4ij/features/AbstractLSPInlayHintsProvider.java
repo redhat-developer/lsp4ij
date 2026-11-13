@@ -87,6 +87,16 @@ public abstract class AbstractLSPInlayHintsProvider implements InlayHintsProvide
         return key;
     }
 
+    /**
+     * Returns "LSP". A provider returns its own name, which Settings | Editor | Inlay Hints shows; this one is kept for
+     * the providers built against 0.21.0, which didn't need to.
+     */
+    @NotNull
+    @Override
+    public String getName() {
+        return "LSP";
+    }
+
     @Nullable
     @Override
     public String getPreviewText() {

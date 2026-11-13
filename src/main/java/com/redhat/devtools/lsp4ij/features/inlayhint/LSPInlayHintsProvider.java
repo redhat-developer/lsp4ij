@@ -50,6 +50,12 @@ public class LSPInlayHintsProvider extends AbstractLSPDeclarativeInlayHintsProvi
 
     public static final String PROVIDER_ID_PREFIX = "LSPInlayHintsProvider";
 
+    /**
+     * @deprecated each language has its own provider id: use {@link #getProviderId(String)}.
+     */
+    @Deprecated(since = "0.30.0", forRemoval = true)
+    public static final String PROVIDER_ID = PROVIDER_ID_PREFIX;
+
     public static @NotNull String getProviderId(@NotNull String languageId) {
         return PROVIDER_ID_PREFIX + "." + languageId;
     }
