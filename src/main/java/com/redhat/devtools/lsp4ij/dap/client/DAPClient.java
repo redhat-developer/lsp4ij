@@ -555,11 +555,11 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
                 // breakpoint with a given id changed (ex: verified changed)
                 // update the Intellij Breakpoint, a line, a function or a data breakpoint, with those information.
                 debugProcess.getBreakpointHandler()
-                        .updateBreakpoint(breakpoint, null);
+                        .updateBreakpoint(getDebugProtocolServer(), breakpoint, null);
                 debugProcess.getFunctionBreakpointHandler()
-                        .updateBreakpoint(breakpoint, null);
+                        .updateBreakpoint(getDebugProtocolServer(), breakpoint, null);
                 debugProcess.getDataBreakpointHandler()
-                        .updateBreakpoint(breakpoint, null);
+                        .updateBreakpoint(getDebugProtocolServer(), breakpoint, null);
             }
         }
     }
@@ -622,7 +622,7 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
         StackFrame topFrame = frames[0];
         DAPSuspendContext context = getSuspendContext(threads, stoppedThread, frames);
         var breakpointHandler = debugProcess.getBreakpointHandler();
-        XBreakpoint<?> breakpoint = getStopBreakpoint(args, debugProcess::findBreakpointById, () -> breakpointHandler.findBreakpoint(topFrame));
+        XBreakpoint<?> breakpoint = getStopBreakpoint(args, id -> debugProcess.findBreakpointById(server, id), () -> breakpointHandler.findBreakpoint(topFrame));
         if (breakpoint != null) {
             breakpointReached(getSession(), server, breakpoint, context, topFrame.getId(), stoppedThread.getId(),
                     singleThreadResumed ? Boolean.TRUE : null)
@@ -986,6 +986,12 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
      * another session of the tree is still alive.
      */
     private void endSession() {
+        var server = getDebugProtocolServer();
+        if (server != null) {
+            debugProcess.getBreakpointHandler().forgetSession(server);
+            debugProcess.getFunctionBreakpointHandler().forgetSession(server);
+            debugProcess.getDataBreakpointHandler().forgetSession(server);
+        }
         // A debug adapter may run a session per target, as vscode-js-debug does with 'startDebugging': when an iframe or
         // a worker goes away only its session terminates, and the debug process must go on for the others
         terminatedReceived = true;

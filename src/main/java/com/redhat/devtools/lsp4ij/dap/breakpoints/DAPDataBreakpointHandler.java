@@ -135,7 +135,7 @@ public class DAPDataBreakpointHandler extends BreakpointHandlerBase<XBreakpoint<
     public void unregisterBreakpoint(@NotNull XBreakpoint<DAPDataBreakpointProperties> breakpoint,
                                      boolean temporary) {
         // A data breakpoint has no source position, which the base class needs to remove a line breakpoint
-        if (breakpoints.remove(breakpoint)) {
+        if (removeBreakpoint(breakpoint)) {
             sendDataBreakpoints();
         }
     }
@@ -196,7 +196,7 @@ public class DAPDataBreakpointHandler extends BreakpointHandlerBase<XBreakpoint<
                         return null;
                     }
                     if (error != null) {
-                        ijBreakpoints.forEach(ijBreakpoint -> setBreakpointInvalid(ijBreakpoint, getCause(error).getMessage()));
+                        updateBreakpointsOfFailedRequest(debugProtocolServer, ijBreakpoints, getCause(error).getMessage());
                         return null;
                     }
                     var breakpoints = response != null ? response.getBreakpoints() : null;
@@ -206,8 +206,8 @@ public class DAPDataBreakpointHandler extends BreakpointHandlerBase<XBreakpoint<
                     // The response has a breakpoint per data breakpoint of the request, in the same order
                     for (int i = 0; i < Math.min(breakpoints.length, ijBreakpoints.size()); i++) {
                         var ijBreakpoint = ijBreakpoints.get(i);
-                        ijBreakpoint.putUserData(DAP_BREAKPOINT_ID, breakpoints[i].getId());
-                        updateBreakpoint(breakpoints[i], ijBreakpoint);
+                        setBreakpointId(debugProtocolServer, ijBreakpoint, breakpoints[i].getId());
+                        updateBreakpoint(debugProtocolServer, breakpoints[i], ijBreakpoint);
                     }
                     return null;
                 });

@@ -59,16 +59,20 @@ public class DAPClientFunctionBreakpointTest extends HeavyPlatformTestCase {
             var capabilities = new Capabilities();
             capabilities.setSupportsFunctionBreakpoints(true);
             // the debug adapter gives the function breakpoints the ids 21 and 22
-            handler.initialize(server(), capabilities).join();
+            var server = server();
+            handler.initialize(server, capabilities).join();
 
             var stop = stop(22);
             assertTrue(DAPClient.isBreakpointStop(stop));
-            assertSame(move, DAPClient.getStopBreakpoint(stop, handler::findBreakpointById, () -> {
+            assertSame(move, DAPClient.getStopBreakpoint(stop, id -> handler.findBreakpointById(server, id), () -> {
                 throw new AssertionError("the debug adapter names the breakpoint");
             }));
 
             // an id which is no IntelliJ breakpoint's, such as that of a breakpoint of the debug adapter's own
-            assertNull(DAPClient.getStopBreakpoint(stop(23), handler::findBreakpointById, () -> twice));
+            assertNull(DAPClient.getStopBreakpoint(stop(23), id -> handler.findBreakpointById(server, id), () -> twice));
+
+            // another session numbers its breakpoints itself: its id 22 is not the id which this session gave 'move'
+            assertNull(DAPClient.getStopBreakpoint(stop, id -> handler.findBreakpointById(server(), id), () -> null));
         } finally {
             handler.dispose();
         }

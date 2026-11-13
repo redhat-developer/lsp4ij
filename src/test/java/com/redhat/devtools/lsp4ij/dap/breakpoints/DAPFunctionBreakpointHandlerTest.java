@@ -197,6 +197,32 @@ public class DAPFunctionBreakpointHandlerTest extends HeavyPlatformTestCase {
         }
     }
 
+    /**
+     * In a tree of sessions, the failed request of one session doesn't show as invalid a breakpoint which another
+     * session has bound.
+     */
+    public void testAFailedRequestKeepsTheBreakpointsWhichAnotherSessionBoundVerified() throws Exception {
+        var twice = breakpoint("twice");
+        var nope = breakpoint("nope");
+        var handler = handler();
+        try {
+            handler.registerBreakpoint(twice);
+            handler.registerBreakpoint(nope);
+            handler.initialize(server(arguments -> new Breakpoint[]{
+                    answer(11, true, null),
+                    answer(12, false, "No method named 'nope'")}), supported()).join();
+            shown.clear();
+
+            handler.initialize(server(arguments -> {
+                throw new IllegalStateException("cannot set function breakpoints");
+            }), supported()).join();
+
+            assertEquals(List.of("verified twice", "invalid nope: cannot set function breakpoints"), shown);
+        } finally {
+            handler.dispose();
+        }
+    }
+
     public void testTheAnswerToAnOlderRequestChangesNothing() throws Exception {
         var twice = breakpoint("twice");
         var move = breakpoint("Point.move");
@@ -216,6 +242,36 @@ public class DAPFunctionBreakpointHandlerTest extends HeavyPlatformTestCase {
             assertEquals(List.of("verified Point.move"), shown);
             assertSame(move, handler.findBreakpointById(22));
             assertNull(handler.findBreakpointById(12));
+        } finally {
+            handler.dispose();
+        }
+    }
+
+    /**
+     * A breakpoint which is unregistered and registered again, as when it is disabled and enabled, is no longer shown
+     * verified because of a DAP server which bound it before.
+     */
+    public void testAnUnregisteredBreakpointForgetsWhichServersBoundIt() throws Exception {
+        var twice = breakpoint("twice");
+        var handler = handler();
+        var binds = new boolean[]{true};
+        try {
+            handler.registerBreakpoint(twice);
+            handler.initialize(server(arguments -> {
+                if (!binds[0]) {
+                    throw new IllegalStateException("the DAP server is busy");
+                }
+                return new Breakpoint[]{answer(11, true, null)};
+            }), supported()).join();
+            handler.unregisterBreakpoint(twice, false);
+            binds[0] = false;
+            handler.registerBreakpoint(twice);
+            shown.clear();
+
+            // another DAP server answers that it cannot bind it
+            handler.updateBreakpoint(server(arguments -> new Breakpoint[0]), answer(21, false, "Unbound breakpoint"), twice);
+
+            assertEquals(List.of("invalid twice: Unbound breakpoint"), shown);
         } finally {
             handler.dispose();
         }
