@@ -50,6 +50,22 @@ public class LSPFormattingSupport extends AbstractLSPDocumentFeatureSupport<LSPF
         super(file);
     }
 
+    /**
+     * Formats one text range of the given document.
+     *
+     * @param textRange the text range to format, or null to format the whole document.
+     * @deprecated use {@link #format(Document, PsiFile, Editor, List, AsyncFormattingRequest)}, as IntelliJ can format
+     * several ranges of a file at once.
+     */
+    @Deprecated(since = "0.30.0", forRemoval = true)
+    public void format(@NotNull Document document,
+                       @NotNull PsiFile file,
+                       @Nullable Editor editor,
+                       @Nullable TextRange textRange,
+                       @NotNull AsyncFormattingRequest formattingRequest) {
+        format(document, file, editor, textRange != null ? List.of(textRange) : List.of(), formattingRequest);
+    }
+
     public void format(@NotNull Document document,
                        @NotNull PsiFile file,
                        @Nullable Editor editor,

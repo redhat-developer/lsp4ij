@@ -17,14 +17,18 @@ import com.intellij.json.json5.Json5Language;
 import com.intellij.openapi.fileTypes.MockLanguageFileType;
 import com.intellij.openapi.fileTypes.PlainTextFileType;
 import com.intellij.openapi.fileTypes.PlainTextLanguage;
+import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiDocumentManager;
+import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
 import com.intellij.psi.PsiFileFactory;
 import com.intellij.testFramework.LightPlatformTestCase;
 import com.intellij.testFramework.LightVirtualFile;
 import com.intellij.xdebugger.XDebuggerUtil;
 import com.intellij.xdebugger.evaluation.EvaluationMode;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 public class DAPDebuggerEditorsProviderTest extends LightPlatformTestCase {
 
@@ -79,5 +83,27 @@ public class DAPDebuggerEditorsProviderTest extends LightPlatformTestCase {
         assertEquals(JsonFileType.INSTANCE, codeFragment.getFileType());
         // It should have degraded to the base language
         assertEquals(JsonLanguage.INSTANCE, codeFragment.getLanguage());
+    }
+
+    @SuppressWarnings("removal")
+    public void testAProviderBuiltAgainst021GetsANonPhysicalFragmentOfItsOwnFileType() {
+        // As the Qute debugger of Quarkus Tools 2.6.1 does: it asks for a plain text fragment with the method of 0.21.0
+        PsiFile textFile = createFile("test.txt", "Hello, world.");
+        var provider = new DAPDebuggerEditorsProvider(PlainTextFileType.INSTANCE, null) {
+            @Override
+            protected PsiFile createExpressionCodeFragment(@NotNull Project project,
+                                                           @NotNull String text,
+                                                           @Nullable PsiElement context,
+                                                           boolean isPhysical) {
+                return super.createExpressionCodeFragment(project, text, PlainTextFileType.INSTANCE,
+                        PlainTextLanguage.INSTANCE);
+            }
+        };
+
+        PsiFile codeFragment = provider.createExpressionCodeFragment(getProject(), "n", textFile, true);
+
+        assertEquals(PlainTextFileType.INSTANCE, codeFragment.getFileType());
+        assertEquals(PlainTextLanguage.INSTANCE, codeFragment.getLanguage());
+        assertFalse(codeFragment.isPhysical());
     }
 }

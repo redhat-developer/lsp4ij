@@ -34,6 +34,7 @@ import org.eclipse.lsp4j.DocumentRangeFormattingParams;
 import org.eclipse.lsp4j.Position;
 import org.eclipse.lsp4j.Range;
 import org.eclipse.lsp4j.TextEdit;
+import org.jetbrains.annotations.Nullable;
 
 import java.io.File;
 import java.util.List;
@@ -256,6 +257,47 @@ public class ClosedDocumentFormattingTest extends LSPCodeInsightFixtureTestCase 
         var request = new FormattingResult("text", new CompletableFuture<>());
         new LSPFormattingSupport(file).format(myFixture.getEditor().getDocument(), file, null, List.of(), request);
         assertNull(request.result().get(5, TimeUnit.SECONDS));
+    }
+
+    public void testTheFormatOf021WithOneRangeFormatsThatRange() throws Exception {
+        assertFormatOf021(new TextRange(0, 5), List.of(new TextRange(0, 5)));
+    }
+
+    public void testTheFormatOf021WithoutARangeFormatsTheWholeDocument() throws Exception {
+        assertFormatOf021(null, List.of());
+    }
+
+    @SuppressWarnings("removal")
+    private void assertFormatOf021(@Nullable TextRange range, List<TextRange> expectedRanges) throws Exception {
+        MockLanguageServer.reset(() -> {
+            var capabilities = MockLanguageServer.defaultServerCapabilities();
+            capabilities.setDocumentRangeFormattingProvider(true);
+            return capabilities;
+        });
+        String original = "const value=1;";
+        var file = myFixture.configureByText("range.ts", original);
+        LanguageServiceAccessor.getInstance(myFixture.getProject())
+                .getLanguageServers(file, null, null).get(5, TimeUnit.SECONDS);
+        var params = new AtomicReference<LSPFormattingParams>();
+        var support = new LSPFormattingSupport(file) {
+            @Override
+            protected CompletableFuture<List<? extends TextEdit>> getFormatting(
+                    LSPFormattingParams formattingParams, CancellationSupport cancellationSupport) {
+                params.set(formattingParams);
+                return CompletableFuture.completedFuture(List.of());
+            }
+        };
+        var request = new FormattingResult(original, new CompletableFuture<>());
+
+        support.format(myFixture.getEditor().getDocument(), file, null, range, request);
+
+        request.result().get(5, TimeUnit.SECONDS);
+        var sent = params.get();
+        assertNotNull("The formatting must reach the language server", sent);
+        assertEquals(expectedRanges, sent.textRanges());
+        assertEquals(range, sent.textRange());
+        assertEquals(sent, new LSPFormattingParams(range, sent.document(), sent.formattingServer(),
+                sent.formattingOptions()));
     }
 
     /** A formatter whose edits require textDocument/didOpen, as real LSP servers commonly do. */

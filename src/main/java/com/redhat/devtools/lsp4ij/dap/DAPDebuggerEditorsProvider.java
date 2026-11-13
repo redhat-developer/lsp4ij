@@ -92,6 +92,20 @@ public class DAPDebuggerEditorsProvider extends XDebuggerEditorsProviderBase {
         return new DAPExpressionCodeFragment(text, fileType, language, getDebugProcess(), project, isPhysical);
     }
 
+    /**
+     * Creates the code fragment of an expression in the given file type and language, which isn't physical.
+     *
+     * @deprecated use {@link #createExpressionCodeFragment(Project, String, FileType, Language, boolean)}, which
+     * makes the fragment physical when IntelliJ asks for it.
+     */
+    @Deprecated(since = "0.30.0", forRemoval = true)
+    protected @NotNull PsiFile createExpressionCodeFragment(@NotNull Project project,
+                                                            @NotNull String text,
+                                                            @NotNull FileType fileType,
+                                                            @NotNull Language language) {
+        return createExpressionCodeFragment(project, text, fileType, language, false);
+    }
+
     protected @Nullable DAPDebugProcess getDebugProcess() {
         return debugProcess;
     }
