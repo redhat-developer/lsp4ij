@@ -24,7 +24,7 @@
         "asset": {
           "windows": "luau-lsp-win64.zip",
           "unix": {
-            "amd64": "luau-lsp-linux.zip",
+            "amd64": "luau-lsp-linux-x86_64.zip",
             "arm64": "luau-lsp-linux-arm64.zip"
           },
           "mac": "luau-lsp-macos.zip"
