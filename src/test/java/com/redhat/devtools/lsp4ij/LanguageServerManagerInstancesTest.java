@@ -550,6 +550,19 @@ public class LanguageServerManagerInstancesTest extends LSPCodeInsightFixtureTes
                 waitForTheInstanceConnectedToWithoutAnotherCheck(file.getVirtualFile()));
     }
 
+    public void testARequestWhoseFilterAsksTheClientFeaturesKeepsTheInstanceWhichWaitsForItsInstaller() throws Exception {
+        definition.checkedRoots.add("b");
+        var file = file("b/one.instances");
+        var accessor = LanguageServiceAccessor.getInstance(myFixture.getProject());
+
+        // A filter which asks the client features whether they take the file, which starts the check of their installer
+        assertEmpty(waitFor(accessor.getLanguageServers(file, features -> features.isEnabled(file.getVirtualFile()), null)));
+
+        assertNotNull("The instance of b must wait for its installer", instanceOfRoot("b"));
+        assertEmpty(waitFor(accessor.getLanguageServers(file, null, null)));
+        assertEquals("The installer must check the installation once", 1, definition.checks.size());
+    }
+
     public void testAFileMovedToARootWithoutInstanceIsConnectedOnceTheInstallerOfItsNewInstanceHasCheckedTheInstallation() throws Exception {
         definition.checkedRoots.add("b");
         var file = file("a/moved.instances").getVirtualFile();
@@ -578,6 +591,8 @@ public class LanguageServerManagerInstancesTest extends LSPCodeInsightFixtureTes
         var checkOfC = checkOf("c");
         var c = instanceOfRoot("c");
         assertNotNull("The instance of c must wait for its installer", c);
+        // The language server of the id is the oldest instance that doesn't wait for its installer: none yet
+        assertNull(waitFor(manager.getLanguageServer(ID)));
 
         // The installer of b starts the definition once its check ends, as LanguageServerInstallerBase does
         endCheck(checkOf("b"));

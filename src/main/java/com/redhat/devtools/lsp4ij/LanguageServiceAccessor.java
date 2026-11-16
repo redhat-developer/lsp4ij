@@ -977,16 +977,14 @@ public class LanguageServiceAccessor implements Disposable {
         boolean accepted = false;
         boolean waiting = false;
         try {
-            var clientFeatures = instance.getClientFeatures();
-            if (beforeStartingServerFilter == null || beforeStartingServerFilter.test(clientFeatures)) {
-                // The client features of a new instance can decide by its root, so only they can tell whether it takes
-                // the file: an instance that leaves out the file which it is created for would stay without a document
-                accepted = !created || clientFeatures.isEnabled(file);
-                // Unless they can't tell yet, as their installer checks the installation, and starts the definition
-                // once the check ends: the instance waits for that, as the language server of a definition without
-                // instances does. A new instance would have a new installer, which would start a new check
-                waiting = !accepted && clientFeatures.isWaitingForServerInstallation();
-            }
+            // The client features of a new instance can decide by its root, so only they can tell whether it takes the
+            // file: an instance that leaves out the file which it is created for would stay without a document
+            accepted = (beforeStartingServerFilter == null || beforeStartingServerFilter.test(instance.getClientFeatures()))
+                    && (!created || instance.getClientFeatures().isEnabled(file));
+            // Unless they can't tell yet, also when the filter asked them, as their installer checks the installation,
+            // and starts the definition once the check ends: the instance waits for that, as the language server of a
+            // definition without instances does. A new instance would have a new installer, which would check again
+            waiting = created && !accepted && instance.getClientFeatures().isWaitingForServerInstallation();
         } finally {
             // As for a language server without instances: also when the filter throws, as a cancellation does
             if (created && !accepted && !waiting) {
