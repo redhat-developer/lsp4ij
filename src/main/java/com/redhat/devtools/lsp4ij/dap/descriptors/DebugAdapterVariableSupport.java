@@ -11,6 +11,7 @@
 package com.redhat.devtools.lsp4ij.dap.descriptors;
 
 import com.intellij.icons.AllIcons;
+import com.intellij.openapi.editor.DefaultLanguageHighlighterColors;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.TextRange;
@@ -67,7 +68,8 @@ public class DebugAdapterVariableSupport {
     }
 
     /**
-     * Returns the value representation for the given variable.
+     * Returns the value representation for the given variable. A string is shown in the string color, as the DAP
+     * server sends it: with the quotes and escapes of its language, which only the DAP server knows.
      *
      * @param variable the variable.
      * @return value representation for the given variable.
@@ -76,9 +78,14 @@ public class DebugAdapterVariableSupport {
         final String type = variable.getType() != null ? variable.getType() : "";
         final String formattedValue = formatValue(variable);
 
-        // String type
+        // String type: XStringValuePresentation would put the value in double quotes of its own
         if (isStringType(type)) {
-            return new XStringValuePresentation(formattedValue);
+            return new XValuePresentation() {
+                @Override
+                public void renderValue(@NotNull XValueTextRenderer renderer) {
+                    renderer.renderValue(formattedValue, DefaultLanguageHighlighterColors.STRING);
+                }
+            };
         }
 
         // Numeric type
@@ -95,17 +102,15 @@ public class DebugAdapterVariableSupport {
         return new XRegularValuePresentation(formattedValue, type);
     }
 
+    /**
+     * Returns the text which shows the value of the given variable: by default, the value as the DAP server sends it.
+     *
+     * @param variable the variable.
+     * @return the text which shows the value of the given variable.
+     */
     @NotNull
     protected String formatValue(@NotNull Variable variable) {
-        final String value = variable.getValue() != null ? variable.getValue() : "";
-        final String type = variable.getType() != null ? variable.getType() : "";
-        if (isStringType(type)) {
-            // String type (ex:value='foo' or "foo")
-            // Remove start/end simple and double quote
-            // to display only foo
-            return removeQuotes(value);
-        }
-        return value;
+        return variable.getValue() != null ? variable.getValue() : "";
     }
 
     protected boolean isStringType(@NotNull String type) {
@@ -161,13 +166,6 @@ public class DebugAdapterVariableSupport {
      */
     public @NotNull Collection<DebugVariablePositionProvider> getDebugVariablePositionProvider() {
         return List.of(new LSPDebugVariablePositionProvider(), new HighlighterDebugVariablePositionProvider());
-    }
-
-    @NotNull
-    private static String removeQuotes(@NotNull String value) {
-        return value
-                .replaceAll("^\"+|\"+$", "")
-                .replaceAll("^\'+|\'+$", "");
     }
 
     public @Nullable ExpressionInfo getExpressionInfo(@NotNull Project project,
