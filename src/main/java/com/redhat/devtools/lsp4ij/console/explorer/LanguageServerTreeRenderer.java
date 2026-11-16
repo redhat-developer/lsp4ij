@@ -19,8 +19,10 @@ import com.intellij.ui.RelativeFont;
 import com.intellij.ui.SimpleTextAttributes;
 import com.intellij.util.ui.UIUtil;
 import com.redhat.devtools.lsp4ij.ServerStatus;
+import org.eclipse.lsp4j.ServerInfo;
 import org.jetbrains.annotations.NonNls;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import javax.swing.*;
 import java.awt.*;
@@ -47,6 +49,7 @@ public class LanguageServerTreeRenderer extends ColoredTreeCellRenderer {
                                       final boolean leaf,
                                       final int row,
                                       final boolean hasFocus) {
+        setToolTipText(null);
         myDurationText = null;
         myDurationColor = null;
         myDurationWidth = 0;
@@ -56,6 +59,7 @@ public class LanguageServerTreeRenderer extends ColoredTreeCellRenderer {
             // Render of language server
             setIcon(languageServerTreeNode.getIcon());
             append(languageServerTreeNode.getDisplayName());
+            setToolTipText(formatServerInfo(languageServerTreeNode.getServerInfo()));
             return;
         }
 
@@ -118,6 +122,34 @@ public class LanguageServerTreeRenderer extends ColoredTreeCellRenderer {
         super.paintComponent(g);
         // restore clip area if needed
         if (clip != null) g.setClip(clip);
+    }
+
+    /**
+     * Formats the server info for tooltip display.
+     *
+     * @param serverInfo the server info returned by the language server, or {@code null}
+     * @return formatted server info, or {@code null} if no info is available
+     */
+    @Nullable
+    static String formatServerInfo(@Nullable ServerInfo serverInfo) {
+        if (serverInfo == null) {
+            return null;
+        }
+        String name = serverInfo.getName();
+        String version = serverInfo.getVersion();
+        boolean hasName = name != null && !name.isBlank();
+        boolean hasVersion = version != null && !version.isBlank();
+
+        if (hasName && hasVersion) {
+            return name.trim() + " " + version.trim();
+        }
+        if (hasName) {
+            return name.trim();
+        }
+        if (hasVersion) {
+            return version.trim();
+        }
+        return null;
     }
 }
 

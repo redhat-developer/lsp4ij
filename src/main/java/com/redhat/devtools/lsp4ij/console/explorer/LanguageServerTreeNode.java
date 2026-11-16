@@ -16,6 +16,7 @@ package com.redhat.devtools.lsp4ij.console.explorer;
 import com.redhat.devtools.lsp4ij.LanguageServerWrapper;
 import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
+import org.eclipse.lsp4j.ServerInfo;
 import org.eclipse.lsp4j.WorkspaceFolder;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -118,5 +119,16 @@ public class LanguageServerTreeNode extends DefaultMutableTreeNode {
 
     public String getDisplayName() {
         return serverDefinition.getDisplayName();
+    }
+
+    /**
+     * Returns the server information returned by the language server upon initialization,
+     * or {@code null} if no server instance has initialized or provided server info.
+     *
+     * @return the server information, or {@code null}
+     */
+    public @Nullable ServerInfo getServerInfo() {
+        var activeNode = getActiveProcessTreeNode();
+        return activeNode != null ? activeNode.getLanguageServer().getServerInfo() : null;
     }
 }
