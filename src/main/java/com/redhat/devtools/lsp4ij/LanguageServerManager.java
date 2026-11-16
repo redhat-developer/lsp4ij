@@ -160,8 +160,11 @@ public class LanguageServerManager {
         boolean started = false;
         for (var ls : LanguageServiceAccessor.getInstance(project).getStartedServers()) {
             if (serverDefinition.equals(ls.getServerDefinition())) {
+                // An instance that waits for the check of its own installer starts once its installer starts the
+                // definition, not when the installer of another instance does
                 if ((ls.isEnabled() || options.isWillEnable())
-                        && (options.isForceRestart() || ls.getServerStatus() != ServerStatus.started)) {
+                        && (options.isForceRestart() || ls.getServerStatus() != ServerStatus.started)
+                        && !ls.isWaitingForItsInstallation()) {
                     ls.restart();
                 }
                 started = true;

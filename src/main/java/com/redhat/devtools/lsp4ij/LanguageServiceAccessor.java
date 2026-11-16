@@ -774,9 +774,11 @@ public class LanguageServiceAccessor implements Disposable {
      * Returns the language server instance of the given choice for a file: the one that has the file connected or
      * provides it, or the one of its root, created if there is none and the given filter accepts its client features.
      * The client features of an instance can decide by its root, so only those of the instance itself can tell. An
-     * instance that the filter doesn't accept is disposed, as for a request. Returns null if no instance serves the
-     * file, if the filter doesn't accept the instance that it would create, or if the instances of the definition were
-     * replaced since the choice, which connects the open files again.
+     * instance that the filter doesn't accept is disposed, as for a request, unless its client features wait for the
+     * check of the installation, see {@link LSPClientFeatures#isWaitingForServerInstallation()}: it stays without the
+     * file then, and the start of the definition at the end of the check connects the file. Returns null if no instance
+     * serves the file, if the filter doesn't accept the instance that it would create, or if the instances of the
+     * definition were replaced since the choice, which connects the open files again.
      */
     @Nullable
     LanguageServerWrapper getOrCreateInstanceOf(@NotNull VirtualFile file,
@@ -801,19 +803,25 @@ public class LanguageServiceAccessor implements Disposable {
             if (instance == null) {
                 instance = LanguageServerWrapper.forInstanceRoot(project, serverDefinition, choice.root());
                 boolean accepted = false;
+                boolean waiting = false;
                 try {
                     accepted = beforeCreatingInstanceFilter == null
                             || beforeCreatingInstanceFilter.test(instance.getClientFeatures());
+                    // As for a request: unless its client features can't tell yet, as their installer checks the
+                    // installation. The start of the definition at the end of the check connects the file
+                    waiting = !accepted && instance.getClientFeatures().isWaitingForServerInstallation();
                 } finally {
                     // As for a request: also when the filter throws, as a cancellation does
-                    if (!accepted) {
+                    if (!accepted && !waiting) {
                         Disposer.dispose(instance);
                     }
+                }
+                if (accepted || waiting) {
+                    startedServers.add(instance);
                 }
                 if (!accepted) {
                     return null;
                 }
-                startedServers.add(instance);
             }
             return instance;
         }
@@ -967,21 +975,28 @@ public class LanguageServiceAccessor implements Disposable {
             instance = LanguageServerWrapper.forInstanceRoot(project, serverDefinition, choice.root());
         }
         boolean accepted = false;
+        boolean waiting = false;
         try {
-            // The client features of a new instance can decide by its root, so only they can tell whether it takes the
-            // file: an instance that leaves out the file which it is created for would stay without a document
-            accepted = (beforeStartingServerFilter == null || beforeStartingServerFilter.test(instance.getClientFeatures()))
-                    && (!created || instance.getClientFeatures().isEnabled(file));
+            var clientFeatures = instance.getClientFeatures();
+            if (beforeStartingServerFilter == null || beforeStartingServerFilter.test(clientFeatures)) {
+                // The client features of a new instance can decide by its root, so only they can tell whether it takes
+                // the file: an instance that leaves out the file which it is created for would stay without a document
+                accepted = !created || clientFeatures.isEnabled(file);
+                // Unless they can't tell yet, as their installer checks the installation, and starts the definition
+                // once the check ends: the instance waits for that, as the language server of a definition without
+                // instances does. A new instance would have a new installer, which would start a new check
+                waiting = !accepted && clientFeatures.isWaitingForServerInstallation();
+            }
         } finally {
             // As for a language server without instances: also when the filter throws, as a cancellation does
-            if (created && !accepted) {
+            if (created && !accepted && !waiting) {
                 Disposer.dispose(instance);
             }
         }
+        if (created && (accepted || waiting)) {
+            startedServers.add(instance);
+        }
         if (accepted) {
-            if (created) {
-                startedServers.add(instance);
-            }
             matchedServers.add(instance);
         }
     }
@@ -1039,13 +1054,15 @@ public class LanguageServiceAccessor implements Disposable {
 
     /**
      * Adds all started language server instances of a definition with several instances. Without a file, nothing tells
-     * which instance to start.
+     * which instance to start. An instance that waits for the check of its own installer starts once its installer
+     * starts the definition, so it isn't added.
      */
     private void collectStartedInstances(@NotNull LanguageServerDefinition serverDefinition,
                                          @NotNull Set<LanguageServerWrapper> matchedServers,
                                          @Nullable Predicate<LSPClientFeatures> beforeStartingServerFilter) {
         for (var startedServer : startedServers) {
             if (startedServer.getServerDefinition().equals(serverDefinition)
+                    && !startedServer.isWaitingForItsInstallation()
                     && (beforeStartingServerFilter == null || beforeStartingServerFilter.test(startedServer.getClientFeatures()))) {
                 matchedServers.add(startedServer);
             }

@@ -48,6 +48,9 @@ public class LSPClientFeatures implements Disposable, FileUriSupport {
 
     private ServerInstaller serverInstaller;
 
+    // The check of the installation that checkServerInstallation() last found running
+    private volatile @Nullable CompletableFuture<ServerInstallationStatus> installationCheck;
+
     private FileUriSupport fileUriSupport;
 
     private final AtomicReference<DocumentContentProvider> documentContentProvider = new AtomicReference<>();
@@ -127,6 +130,14 @@ public class LSPClientFeatures implements Disposable, FileUriSupport {
 
     /**
      * Returns true if the language server is enabled for the given file and false otherwise. Default to true
+     * <p>
+     * With a server installer, the default returns false until the installer has checked the installation. A new
+     * instance of a definition with several instances, see
+     * {@link com.redhat.devtools.lsp4ij.features.workspaceFolder.WorkspaceFolderStrategy#hasServerInstances()}, whose
+     * client features leave out the file which it is created for, stays only while that check runs: the installer
+     * starts the definition once the check ends. So client features that leave out the files of some roots by the root
+     * of their instance should decide that before they call {@code super.isEnabled(file)}, which starts no check then.
+     * </p>
      *
      * @param file the file for test
      * @return true if the language server is enabled for the input and false otherwise. Default to true
@@ -145,17 +156,36 @@ public class LSPClientFeatures implements Disposable, FileUriSupport {
     protected final boolean checkServerInstallation() {
         var serverInstaller = getServerInstaller();
         if (serverInstaller != null) {
-            var status = serverInstaller
-                    .checkInstallation()
-                    .getNow(null);
+            var check = serverInstaller.checkInstallation();
+            var status = check.getNow(null);
             if (status == ServerInstallationStatus.INSTALLED) {
                 // The language server is correctly installed, enable it
                 return true;
             }
-            // Disable the language server startup while installation
+            // Disable the language server startup while installation. A new instance of a definition with several
+            // instances waits for this check, see isWaitingForServerInstallation()
+            installationCheck = check;
             return false;
         }
         return true;
+    }
+
+    /**
+     * Returns true if {@link #checkServerInstallation()} found the check of the installation running, and the server
+     * installer hasn't reported the language server installed since: until then, these client features can't tell
+     * whether they take a file. As {@link com.redhat.devtools.lsp4ij.installation.ServerInstallerBase} does, an
+     * installer reports it before it starts the definition, and ends the check after that start.
+     *
+     * @return true if these client features wait for the check of the installation and false otherwise.
+     */
+    @ApiStatus.Internal
+    public final boolean isWaitingForServerInstallation() {
+        var check = installationCheck;
+        if (check == null || check.isDone()) {
+            return false;
+        }
+        var serverInstaller = getServerInstaller();
+        return serverInstaller != null && serverInstaller.getStatus() != ServerInstallationStatus.INSTALLED;
     }
 
     /**
