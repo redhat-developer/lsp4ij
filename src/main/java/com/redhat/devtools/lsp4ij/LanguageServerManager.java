@@ -160,8 +160,11 @@ public class LanguageServerManager {
         boolean started = false;
         for (var ls : LanguageServiceAccessor.getInstance(project).getStartedServers()) {
             if (serverDefinition.equals(ls.getServerDefinition())) {
+                // An instance that waits for the check of its own installer starts once its installer starts the
+                // definition, not when the installer of another instance does
                 if ((ls.isEnabled() || options.isWillEnable())
-                        && (options.isForceRestart() || ls.getServerStatus() != ServerStatus.started)) {
+                        && (options.isForceRestart() || ls.getServerStatus() != ServerStatus.started)
+                        && !ls.isWaitingForItsInstallation()) {
                     ls.restart();
                 }
                 started = true;
@@ -408,8 +411,9 @@ public class LanguageServerManager {
     /**
      * Returns the initialized language server item from the given language server id and null otherwise. For a
      * definition with several language server instances, this is the one created first, which is started if it
-     * stopped; a plugin that knows the file uses {@link #getLanguageServer(String, VirtualFile)}, which gives the
-     * instance that serves it, and {@link #getLanguageServers(String)} gives all of them.
+     * stopped, of those that don't wait for the check of their installer; a plugin that knows the file uses
+     * {@link #getLanguageServer(String, VirtualFile)}, which gives the instance that serves it, and
+     * {@link #getLanguageServers(String)} gives all of them.
      *
      * @param languageServerId the language server id.
      * @return the initialized language server item from the given language server id and null otherwise.
@@ -420,9 +424,13 @@ public class LanguageServerManager {
             return CompletableFuture.completedFuture(null);
         }
         if (serverDefinition.hasServerInstances()) {
-            // Without a file, nothing tells which instance is meant: take the one created first, and create none
-            var instances = instancesOf(serverDefinition);
-            return instances.isEmpty() ? CompletableFuture.completedFuture(null) : getInitializedServer(instances.get(0));
+            // Without a file, nothing tells which instance is meant: take the one created first, and create none. An
+            // instance that waits for the check of its own installer starts once its installer starts the definition
+            return instancesOf(serverDefinition).stream()
+                    .filter(instance -> !instance.isWaitingForItsInstallation())
+                    .findFirst()
+                    .map(LanguageServerManager::getInitializedServer)
+                    .orElseGet(() -> CompletableFuture.completedFuture(null));
         }
         return LanguageServiceAccessor.getInstance(project)
                 .getLanguageServers(Set.of(serverDefinition), null, null)

@@ -2007,6 +2007,16 @@ public class LanguageServerWrapper implements Disposable {
     }
 
     /**
+     * Returns true if this is an instance of a definition with several instances whose client features wait for the
+     * check of the installation, see {@link LSPClientFeatures#isWaitingForServerInstallation()}, and false otherwise.
+     * Client features that weren't created yet wait for nothing.
+     */
+    boolean isWaitingForItsInstallation() {
+        var features = clientFeatures;
+        return instanceRoot != null && features != null && features.isWaitingForServerInstallation();
+    }
+
+    /**
      * Returns the name of this language server instance for the user: the path of its root relative to the project's
      * directory, the name of its root if that is the project's directory, or its full path outside the project.
      *

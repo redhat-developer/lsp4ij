@@ -19,12 +19,14 @@ import com.intellij.openapi.command.WriteCommandAction;
 import com.intellij.openapi.editor.EditorFactory;
 import com.intellij.openapi.fileEditor.FileDocumentManager;
 import com.intellij.openapi.progress.ProcessCanceledException;
+import com.intellij.openapi.progress.ProgressIndicator;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiFile;
 import com.intellij.testFramework.EdtTestUtil;
 import com.intellij.testFramework.PlatformTestUtil;
 import com.intellij.testFramework.TestActionEvent;
+import com.intellij.util.concurrency.AppExecutorUtil;
 import com.redhat.devtools.lsp4ij.client.features.FileUriSupport;
 import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
 import com.redhat.devtools.lsp4ij.client.features.LSPWorkspaceFolderFeature;
@@ -32,9 +34,11 @@ import com.redhat.devtools.lsp4ij.features.diagnostics.LSPDiagnosticsPassFactory
 import com.redhat.devtools.lsp4ij.features.workspaceFolder.WorkspaceFolderStrategy;
 import com.redhat.devtools.lsp4ij.fixtures.LSPCodeInsightFixtureTestCase;
 import com.redhat.devtools.lsp4ij.installation.ConsoleProvider;
+import com.redhat.devtools.lsp4ij.installation.LanguageServerInstallerBase;
 import com.redhat.devtools.lsp4ij.installation.ServerInstallationContext;
 import com.redhat.devtools.lsp4ij.installation.ServerInstallationStatus;
 import com.redhat.devtools.lsp4ij.installation.ServerInstaller;
+import com.redhat.devtools.lsp4ij.installation.ServerInstallerBase;
 import com.redhat.devtools.lsp4ij.lifecycle.LanguageServerLifecycleListener;
 import com.redhat.devtools.lsp4ij.lifecycle.LanguageServerLifecycleManager;
 import com.redhat.devtools.lsp4ij.mock.MockConnectionProvider;
@@ -58,7 +62,9 @@ import java.io.UncheckedIOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -530,6 +536,86 @@ public class LanguageServerManagerInstancesTest extends LSPCodeInsightFixtureTes
         assertTrue("The client features of the instance of b must be disposed", definition.disposedRoots.contains("b"));
     }
 
+    public void testAnOpenFileIsConnectedOnceTheInstallerOfTheInstanceOfItsRootHasCheckedTheInstallation() throws Exception {
+        definition.checkedRoots.add("b");
+        var file = file("b/one.instances");
+        myFixture.openFileInEditor(file.getVirtualFile());
+
+        // As an editor asks: the installer of the new instance of b hasn't ended its check, so it can't take the file
+        assertEmpty(waitFor(LanguageServiceAccessor.getInstance(myFixture.getProject()).getLanguageServers(file, null, null)));
+        var b = instanceOfRoot("b");
+        endCheck(checkOf("b"));
+
+        assertSame("The instance which waited for its installer must take the file", b,
+                waitForTheInstanceConnectedToWithoutAnotherCheck(file.getVirtualFile()));
+    }
+
+    public void testARequestWhoseFilterAsksTheClientFeaturesKeepsTheInstanceWhichWaitsForItsInstaller() throws Exception {
+        definition.checkedRoots.add("b");
+        var file = file("b/one.instances");
+        var accessor = LanguageServiceAccessor.getInstance(myFixture.getProject());
+
+        // A filter which asks the client features whether they take the file, which starts the check of their installer
+        assertEmpty(waitFor(accessor.getLanguageServers(file, features -> features.isEnabled(file.getVirtualFile()), null)));
+
+        assertNotNull("The instance of b must wait for its installer", instanceOfRoot("b"));
+        assertEmpty(waitFor(accessor.getLanguageServers(file, null, null)));
+        assertEquals("The installer must check the installation once", 1, definition.checks.size());
+    }
+
+    public void testAFileMovedToARootWithoutInstanceIsConnectedOnceTheInstallerOfItsNewInstanceHasCheckedTheInstallation() throws Exception {
+        definition.checkedRoots.add("b");
+        var file = file("a/moved.instances").getVirtualFile();
+        var a = openAndConnect(file);
+
+        move(file, myFixture.getTempDirFixture().findOrCreateDir("b"));
+
+        var check = checkOf("b");
+        var b = instanceOfRoot("b");
+        endCheck(check);
+
+        assertSame("The instance which waited for its installer must take the file", b,
+                waitForTheInstanceConnectedToWithoutAnotherCheck(file));
+        assertFalse(a.isConnectedTo(a.toUri(file)));
+    }
+
+    public void testTheEndOfTheCheckOfAnotherInstanceStartsNoInstanceWhoseInstallerStillChecks() throws Exception {
+        definition.checkedRoots.addAll(List.of("b", "c"));
+        var inB = file("b/one.instances");
+        var inC = file("c/one.instances");
+        var accessor = LanguageServiceAccessor.getInstance(myFixture.getProject());
+        myFixture.openFileInEditor(inB.getVirtualFile());
+        assertEmpty(waitFor(accessor.getLanguageServers(inB, null, null)));
+        myFixture.openFileInEditor(inC.getVirtualFile());
+        assertEmpty(waitFor(accessor.getLanguageServers(inC, null, null)));
+        var checkOfC = checkOf("c");
+        var c = instanceOfRoot("c");
+        assertNotNull("The instance of c must wait for its installer", c);
+        // The language server of the id is the oldest instance that doesn't wait for its installer: none yet
+        assertNull(waitFor(manager.getLanguageServer(ID)));
+
+        // The installer of b starts the definition once its check ends, as LanguageServerInstallerBase does
+        endCheck(checkOf("b"));
+
+        assertEquals("b", waitForTheInstanceConnectedTo(inB.getVirtualFile()).getInstanceRoot().getName());
+        dispatchAll();
+        assertFalse("The instance of c must not start before its installer has checked the installation",
+                c.getServerStatus() == ServerStatus.starting || c.getServerStatus() == ServerStatus.started);
+        assertNull(instanceConnectedTo(inC.getVirtualFile()));
+        // Nor does a request without a file, as for workspace symbols, which goes to all instances
+        assertEquals(List.of("b"), waitFor(accessor.getLanguageServers(Set.of(definition), null, null))
+                .stream()
+                .map(server -> server.getServerWrapper().getInstanceRoot().getName())
+                .toList());
+        assertFalse("A request without a file must not start the instance of c before its installer has checked the installation",
+                c.getServerStatus() == ServerStatus.starting || c.getServerStatus() == ServerStatus.started);
+
+        endCheck(checkOfC);
+
+        assertSame(c, waitForTheInstanceConnectedTo(inC.getVirtualFile()));
+        assertEquals("Each installer must check the installation once", 2, definition.checks.size());
+    }
+
     public void testTheClientFeaturesOfTheInstanceOfItsNewRootDecideForAMovedFile() throws Exception {
         var file = file("a/moved.instances").getVirtualFile();
         var a = openAndConnect(file);
@@ -773,6 +859,38 @@ public class LanguageServerManagerInstancesTest extends LSPCodeInsightFixtureTes
         return instance;
     }
 
+    /**
+     * Waits for the installer of the instance of the given root to start its check, and returns it.
+     */
+    private @NotNull CheckingInstaller checkOf(@NotNull String root) {
+        PlatformTestUtil.waitWithEventsDispatching("The installer of the instance of " + root + " must check the installation",
+                () -> definition.checks.stream().anyMatch(check -> root.equals(check.rootName())), TIMEOUT);
+        return definition.checks.stream()
+                .filter(check -> root.equals(check.rootName()))
+                .findFirst()
+                .orElseThrow();
+    }
+
+    /**
+     * Ends the given check off the UI thread, as the task of {@link ServerInstallerBase} does.
+     */
+    private static void endCheck(@NotNull CheckingInstaller check) throws Exception {
+        waitFor(CompletableFuture.runAsync(check::end, AppExecutorUtil.getAppExecutorService()));
+    }
+
+    /**
+     * Waits for the given file to be connected to an instance, or for an installer to start another check, which a new
+     * instance of the root of the file would.
+     */
+    private @NotNull LanguageServerWrapper waitForTheInstanceConnectedToWithoutAnotherCheck(@NotNull VirtualFile file) {
+        PlatformTestUtil.waitWithEventsDispatching("The file must be connected to an instance, or another check start",
+                () -> instanceConnectedTo(file) != null || definition.checks.size() > 1, TIMEOUT);
+        assertEquals("The installer must check the installation once", 1, definition.checks.size());
+        var instance = instanceConnectedTo(file);
+        assertNotNull(instance);
+        return instance;
+    }
+
     private static void stop(@NotNull LanguageServerWrapper instance) {
         instance.stop();
         waitForStatus(instance, ServerStatus.stopped);
@@ -911,10 +1029,80 @@ public class LanguageServerManagerInstancesTest extends LSPCodeInsightFixtureTes
         }
     }
 
+    /**
+     * An installer set in the client features of each instance, as with
+     * {@link LSPClientFeatures#setServerInstaller(ServerInstaller)}, whose check of the installation of the instance of
+     * a root that the definition names runs until the test ends it, as the task of {@link ServerInstallerBase} would.
+     * It finds the language server of the other instances installed at once.
+     */
+    private static final class CheckingInstaller extends LanguageServerInstallerBase {
+
+        private final @NotNull InstancesDefinition definition;
+        private final CompletableFuture<ServerInstallationStatus> check = new CompletableFuture<>();
+        private @Nullable ServerInstallationContext context;
+
+        CheckingInstaller(@NotNull InstancesDefinition definition) {
+            this.definition = definition;
+        }
+
+        @Override
+        public synchronized @NotNull CompletableFuture<ServerInstallationStatus> checkInstallation(@NotNull ServerInstallationContext context) {
+            if (getStatus() == ServerInstallationStatus.INSTALLED || !definition.checkedRoots.contains(rootName())) {
+                return INSTALLED_FUTURE;
+            }
+            if (this.context == null) {
+                this.context = context;
+                definition.checks.add(this);
+            }
+            return check;
+        }
+
+        /**
+         * Ends the check as the task of {@link ServerInstallerBase} does when it finds the language server installed:
+         * after the status, the code to run after it, which starts the definition.
+         */
+        void end() {
+            ServerInstallationContext context;
+            synchronized (this) {
+                context = this.context;
+            }
+            assertNotNull("The check must have started", context);
+            updateStatus(ServerInstallationStatus.INSTALLED);
+            var afterCode = getAfterCode(context);
+            if (afterCode != null) {
+                afterCode.run();
+            }
+            check.complete(ServerInstallationStatus.INSTALLED);
+        }
+
+        @Nullable
+        String rootName() {
+            var clientFeatures = getClientFeatures();
+            var languageServer = clientFeatures != null ? clientFeatures.getServerWrapper() : null;
+            var root = languageServer != null ? languageServer.getInstanceRoot() : null;
+            return root != null ? root.getName() : null;
+        }
+
+        @Override
+        protected boolean checkServerInstalled(@NotNull ProgressIndicator indicator) {
+            throw new UnsupportedOperationException("The test ends the check");
+        }
+
+        @Override
+        protected void install(@NotNull ProgressIndicator indicator) {
+            throw new UnsupportedOperationException("The test ends the check");
+        }
+    }
+
     private static final class InstancesDefinition extends MockLanguageServerDefinition {
 
         final List<MockLanguageServer> servers = new CopyOnWriteArrayList<>();
         final AtomicInteger installations = new AtomicInteger();
+        // The names of the roots whose instances wait for the check of their installer, which the test ends. With
+        // none, each instance has an installer that finds the language server installed at once
+        final Set<String> checkedRoots = ConcurrentHashMap.newKeySet();
+        // The installers that started a check, in the order in which they started it
+        final List<CheckingInstaller> checks = new CopyOnWriteArrayList<>();
         volatile boolean failingInstallation;
         volatile @Nullable CompletableFuture<Void> installationGate;
         // Is given each file whose instance root the strategy is asked for
@@ -980,7 +1168,9 @@ public class LanguageServerManagerInstancesTest extends LSPCodeInsightFixtureTes
                     return new InstancesStrategy(InstancesDefinition.this);
                 }
             });
-            features.setServerInstaller(new CountingInstaller(installations, () -> failingInstallation, () -> installationGate));
+            features.setServerInstaller(checkedRoots.isEmpty()
+                    ? new CountingInstaller(installations, () -> failingInstallation, () -> installationGate)
+                    : new CheckingInstaller(this));
             return features;
         }
     }
