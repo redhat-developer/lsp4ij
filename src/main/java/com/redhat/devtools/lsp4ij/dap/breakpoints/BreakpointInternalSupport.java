@@ -17,12 +17,15 @@ import com.intellij.openapi.util.Comparing;
 import com.intellij.xdebugger.XDebugSession;
 import com.intellij.xdebugger.XDebuggerManager;
 import com.intellij.xdebugger.breakpoints.XBreakpoint;
+import com.intellij.xdebugger.frame.XSuspendContext;
+import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.swing.*;
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 
 /**
@@ -33,7 +36,8 @@ import java.lang.reflect.Method;
  * Each {@link Method} is resolved once at class-load time and cached. A {@code null} field means the
  * internal API was not found, and the operation becomes a no-op.
  */
-final class BreakpointInternalSupport {
+@ApiStatus.Internal
+public final class BreakpointInternalSupport {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(BreakpointInternalSupport.class);
 
@@ -58,6 +62,8 @@ final class BreakpointInternalSupport {
     // XDebugSessionImpl methods
     private static final @Nullable Method GET_BREAKPOINT_PRESENTATION =
             findMethod(X_DEBUG_SESSION_IMPL_CLASS, "getBreakpointPresentation", XBreakpoint.class);
+    private static final @Nullable Method POSITION_REACHED =
+            findMethod(X_DEBUG_SESSION_IMPL_CLASS, "positionReached", XSuspendContext.class, boolean.class);
 
     // CustomizedBreakpointPresentation methods
     private static final @Nullable Method GET_ICON =
@@ -165,6 +171,37 @@ final class BreakpointInternalSupport {
                 },
                 ModalityState.any(),
                 project.getDisposed());
+    }
+
+    /**
+     * Calls {@code XDebugSessionImpl.positionReached(context, attract)} via reflection. With {@code attract} true,
+     * the session attracts the user as at a breakpoint: it brings the Debug tool window to the front (when "Show
+     * debug window on breakpoint" is on) and selects the tab of the {@code breakpoint} condition.
+     *
+     * @param debugSession the debug session.
+     * @param context      the suspend context of the stop.
+     * @param attract      true to attract the user.
+     * @return {@code true} if the session was told, {@code false} if the internal API is not available, so the
+     * caller must tell the session itself.
+     */
+    public static boolean positionReached(@NotNull XDebugSession debugSession,
+                                          @NotNull XSuspendContext context,
+                                          boolean attract) {
+        if (POSITION_REACHED == null || X_DEBUG_SESSION_IMPL_CLASS == null
+                || !X_DEBUG_SESSION_IMPL_CLASS.isInstance(debugSession)) {
+            return false;
+        }
+        try {
+            POSITION_REACHED.invoke(debugSession, context, attract);
+            return true;
+        } catch (IllegalAccessException e) {
+            LOGGER.warn("Cannot call positionReached of the debug session", e);
+            return false;
+        } catch (InvocationTargetException e) {
+            // The session failed while it handled the stop: don't tell it twice
+            LOGGER.warn("The debug session failed to handle the stop", e.getCause());
+            return true;
+        }
     }
 
     // -- Reflection helpers -----------------------------------------------------------------------
