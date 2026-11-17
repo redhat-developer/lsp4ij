@@ -47,6 +47,10 @@ public abstract class DAPBreakpointHandlerBase<B extends XBreakpoint<?>> extends
     // The sources which have breakpoints in the debug adapter, with a token of their latest 'setBreakpoints' request.
     // A cleared source stays until its clear succeeded, so that a failed clear is sent again.
     private final Map<Source, Object> sentSources = new ConcurrentHashMap<>();
+    // The token of the latest 'setBreakpoints' request of each DAP server for each source. Each server answers its own
+    // requests: a request to one server must not make the pending answer of another one stale, as when a session of a
+    // tree starts while the request of another session is not answered yet.
+    private final Map<ServerSource, Object> latestRequests = new ConcurrentHashMap<>();
 
     public DAPBreakpointHandlerBase(@NotNull Class<? extends XBreakpointType<B, ?>> breakpointTypeClass,
                                     @NotNull XDebugSession debugSession,
@@ -223,19 +227,22 @@ public abstract class DAPBreakpointHandlerBase<B extends XBreakpoint<?>> extends
             // Call 'setBreakpoints' DAP request for each Source keys.
             final var arguments = createSetBreakpointsArguments(source, sourceBreakpoints);
             List<@Nullable B> ijBreakpoints = targetIJBreakpoints.getOrDefault(source, List.of());
-            // A later request for this source replaces the token, so that the response of an earlier request
-            // is not applied anymore, and the response of an earlier clear cannot stop tracking it
+            // A later request for this source replaces the token: of each DAP server it is sent to, so that the
+            // response of an earlier request of that server is not applied anymore, and of the source, so that the
+            // response of an earlier clear cannot stop tracking it
             final var token = new Object();
             sentSources.put(source, token);
             final var sourceFutures = new ArrayList<CompletableFuture<Void>>();
             if (debugProtocolServer != null) {
                 // Call 'setBreakpoints' DAP request for each Source keys
                 // and the given debug protocol server
+                latestRequests.put(new ServerSource(debugProtocolServer, source), token);
                 sourceFutures.add(setBreakpoints(debugProtocolServer, arguments, ijBreakpoints, token));
             } else {
                 // Call 'setBreakpoints' DAP request for each Source keys
                 // for each registered debug protocol server
                 for (var server : debugProtocolServers) {
+                    latestRequests.put(new ServerSource(server, source), token);
                     sourceFutures.add(setBreakpoints(server, arguments, ijBreakpoints, token));
                 }
             }
@@ -259,7 +266,7 @@ public abstract class DAPBreakpointHandlerBase<B extends XBreakpoint<?>> extends
      * @param arguments           the 'setBreakpoints' arguments.
      * @param ijBreakpoints       the IJ breakpoint of each source breakpoint of the arguments, in the same order, and
      *                            null for the temporary breakpoint.
-     * @param token               the token of the request in {@link #sentSources}.
+     * @param token               the token of the request in {@link #latestRequests}.
      * @return the future.
      */
     private CompletableFuture<Void> setBreakpoints(@NotNull IDebugProtocolServer debugProtocolServer,
@@ -277,9 +284,10 @@ public abstract class DAPBreakpointHandlerBase<B extends XBreakpoint<?>> extends
                     // it and applying the response under the same lock keeps an older response from writing after
                     // a newer one
                     synchronized (this) {
-                        // A later request for this source replaced this one: its breakpoints may have changed or moved
-                        // to another source since, so this response must not override the state of the later one
-                        if (sentSources.get(arguments.getSource()) != token) {
+                        // A later request of this DAP server for this source replaced this one: its breakpoints may
+                        // have changed or moved to another source since, so this response must not override the state
+                        // of the later one
+                        if (latestRequests.get(new ServerSource(debugProtocolServer, arguments.getSource())) != token) {
                             return;
                         }
                         for (int i = 0; i < breakpoints.length; i++) {
@@ -399,6 +407,18 @@ public abstract class DAPBreakpointHandlerBase<B extends XBreakpoint<?>> extends
     private record LineLocation(@NotNull VirtualFile file, int line) {
     }
 
+    /**
+     * A source in the requests of a DAP server.
+     */
+    private record ServerSource(@NotNull IDebugProtocolServer server, @NotNull Source source) {
+    }
+
+    @Override
+    public void forgetSession(@NotNull IDebugProtocolServer debugProtocolServer) {
+        super.forgetSession(debugProtocolServer);
+        latestRequests.keySet().removeIf(request -> request.server() == debugProtocolServer);
+    }
+
     @Override
     protected boolean hasSentBreakpoints() {
         return !sentSources.isEmpty();
@@ -409,6 +429,7 @@ public abstract class DAPBreakpointHandlerBase<B extends XBreakpoint<?>> extends
         super.dispose();
         shadowedBreakpoints.clear();
         sentSources.clear();
+        latestRequests.clear();
     }
 
     private @Nullable B findBreakpoint(@NotNull Breakpoint breakpointResponse,

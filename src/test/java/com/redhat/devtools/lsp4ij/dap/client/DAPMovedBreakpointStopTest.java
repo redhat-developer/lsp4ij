@@ -150,6 +150,31 @@ public class DAPMovedBreakpointStopTest extends HeavyPlatformTestCase {
         }
     }
 
+    /**
+     * A session which starts while the 'setBreakpoints' request of another one is not answered yet doesn't make
+     * that answer stale: each session answers its own requests, so the moved line of the other one is kept.
+     */
+    public void testAnswerOfASessionIsKeptWhenAnotherSessionStartsMeanwhile() throws Exception {
+        var blankLine = breakpoint(3);
+        var handler = handler();
+        try {
+            handler.registerBreakpoint(blankLine);
+            var pending = new CompletableFuture<SetBreakpointsResponse>();
+            var moves = serverAnswering(arguments -> pending);
+            var keeps = server(lines -> lines);
+            // The first session sends its breakpoints, and answers only after the second session sent its own
+            var movesSent = handler.initialize(moves, new Capabilities());
+            handler.initialize(keeps, new Capabilities()).join();
+            pending.complete(response(2));
+            movesSent.join();
+
+            assertSame(blankLine, stopBreakpoint(handler, moves, frame(2)));
+            assertSame(blankLine, stopBreakpoint(handler, keeps, frame(3)));
+        } finally {
+            handler.dispose();
+        }
+    }
+
     /** A later answer which reports no line forgets the line of an earlier one: the IntelliJ line counts again. */
     public void testLaterAnswerWithoutLineForgetsTheMovedLine() throws Exception {
         var blankLine = breakpoint(3);
@@ -232,18 +257,35 @@ public class DAPMovedBreakpointStopTest extends HeavyPlatformTestCase {
      * request and the line which the given function gives for that line.
      */
     private static IDebugProtocolServer server(Function<Integer, Integer> answeredLine) {
+        return serverAnswering(arguments -> {
+            var response = new SetBreakpointsResponse();
+            response.setBreakpoints(Arrays.stream(arguments.getBreakpoints()).map(sourceBreakpoint -> {
+                var breakpoint = new Breakpoint();
+                breakpoint.setId(sourceBreakpoint.getLine());
+                breakpoint.setVerified(true);
+                breakpoint.setLine(answeredLine.apply(sourceBreakpoint.getLine()));
+                return breakpoint;
+            }).toArray(Breakpoint[]::new));
+            return CompletableFuture.completedFuture(response);
+        });
+    }
+
+    /** Returns a verified breakpoint answer for one source breakpoint, with id 3 and the given line. */
+    private static SetBreakpointsResponse response(int line) {
+        var breakpoint = new Breakpoint();
+        breakpoint.setId(3);
+        breakpoint.setVerified(true);
+        breakpoint.setLine(line);
+        var response = new SetBreakpointsResponse();
+        response.setBreakpoints(new Breakpoint[]{breakpoint});
+        return response;
+    }
+
+    /** Returns a debug adapter which answers each 'setBreakpoints' request with the given function. */
+    private static IDebugProtocolServer serverAnswering(Function<SetBreakpointsArguments, CompletableFuture<SetBreakpointsResponse>> setBreakpoints) {
         return (IDebugProtocolServer) Proxy.newProxyInstance(IDebugProtocolServer.class.getClassLoader(), new Class<?>[]{IDebugProtocolServer.class}, (p, m, a) -> {
             if (m.getName().equals("setBreakpoints")) {
-                var arguments = (SetBreakpointsArguments) a[0];
-                var response = new SetBreakpointsResponse();
-                response.setBreakpoints(Arrays.stream(arguments.getBreakpoints()).map(sourceBreakpoint -> {
-                    var breakpoint = new Breakpoint();
-                    breakpoint.setId(sourceBreakpoint.getLine());
-                    breakpoint.setVerified(true);
-                    breakpoint.setLine(answeredLine.apply(sourceBreakpoint.getLine()));
-                    return breakpoint;
-                }).toArray(Breakpoint[]::new));
-                return CompletableFuture.completedFuture(response);
+                return setBreakpoints.apply((SetBreakpointsArguments) a[0]);
             }
             if (m.getName().equals("equals")) return p == a[0];
             if (m.getName().equals("hashCode")) return System.identityHashCode(p);
