@@ -882,9 +882,12 @@ public class LanguageServerPanel implements Disposable {
     /**
      * Returns an error when the transport can't be used: a language server which runs already needs its port, a fixed
      * port isn't 0, and the command of a language server on a port which LSP4IJ chooses takes it as
-     * {@value UserDefinedTransport#PORT_MACRO}, or the language server never learns it.
+     * {@value UserDefinedTransport#PORT_MACRO}, or the language server never learns it. Else it returns a warning when
+     * the command takes {@value UserDefinedTransport#PORT_MACRO} with stdio, which gives no port: the language server
+     * gets the text as it is. It is a warning, which doesn't block OK or Apply, as the command may give the text to a
+     * shell of its own, as in {@code sh -c '…'}.
      *
-     * @return the error of the transport, or null if it can be used.
+     * @return the error of the transport, else its warning, or null if there is neither.
      */
     public @Nullable ValidationInfo validateTransport() {
         if (transportFields == null) {
@@ -902,7 +905,16 @@ public class LanguageServerPanel implements Disposable {
             return new ValidationInfo(LanguageServerBundle.message("language.server.validation.socket.port.macro",
                     UserDefinedTransport.PORT_MACRO), commandLine);
         }
-        return hasServerInstances() ? transportFields.validateForServerInstances() : null;
+        var instancesError = hasServerInstances() ? transportFields.validateForServerInstances() : null;
+        if (instancesError != null) {
+            return instancesError;
+        }
+        if (transport.mode() == UserDefinedTransport.Mode.STDIO
+                && commandLine != null && commandLine.getText().contains(UserDefinedTransport.PORT_MACRO)) {
+            return new ValidationInfo(LanguageServerBundle.message("language.server.validation.stdio.port.macro",
+                    UserDefinedTransport.PORT_MACRO), commandLine).asWarning().withOKEnabled();
+        }
+        return null;
     }
 
     /**

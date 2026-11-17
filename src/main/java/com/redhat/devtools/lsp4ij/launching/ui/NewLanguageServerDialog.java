@@ -266,7 +266,9 @@ public class NewLanguageServerDialog extends DialogWrapper {
         var listed = new ArrayList<>(problems);
         problems.stream()
                 .filter(problem -> problem.component != null)
-                .map(problem -> new ValidationInfo(problem.message))
+                .map(problem -> problem.warning
+                        ? new ValidationInfo(problem.message).asWarning().withOKEnabled()
+                        : new ValidationInfo(problem.message))
                 .forEach(listed::add);
         // What LSP4IJ couldn't use in the template is told below the fields too, without blocking OK
         templateProblems.forEach(problem -> listed.add(new ValidationInfo(problem).asWarning().withOKEnabled()));
