@@ -179,6 +179,7 @@ public class LanguageServerWrapper implements Disposable {
     private volatile LanguageServer languageServer;
     private LanguageClientImpl languageClient;
     private ServerCapabilities serverCapabilities;
+    private volatile @Nullable ServerInfo serverInfo;
     private volatile @Nullable Alarm stopAlarm = null;
     private ServerStatus serverStatus;
     private volatile boolean disposed;
@@ -739,6 +740,7 @@ public class LanguageServerWrapper implements Disposable {
                                 errorNotification = null;
                             }
                             serverCapabilities = initializingContext.initializeResult.getCapabilities();
+                            serverInfo = initializingContext.initializeResult.getServerInfo();
                             syncOptions = createSyncOptions();
                             getClientFeatures().setServerCapabilities(serverCapabilities);
                             this.initiallySupportsWorkspaceFolders = supportsWorkspaceFolders(serverCapabilities);
@@ -1757,6 +1759,17 @@ public class LanguageServerWrapper implements Disposable {
     @Nullable
     public ServerCapabilities getServerCapabilitiesSync() {
         return serverCapabilities;
+    }
+
+    /**
+     * Returns the server information returned by the language server upon initialization,
+     * or {@code null} if the server has not initialized yet or did not provide server info.
+     *
+     * @return the server information, or {@code null}
+     */
+    @Nullable
+    public ServerInfo getServerInfo() {
+        return serverInfo;
     }
 
     /**
@@ -2834,6 +2847,7 @@ public class LanguageServerWrapper implements Disposable {
                     clientFeatures.dispose();
                     clientFeatures = null;
                 }
+                serverInfo = null;
             }
         } finally {
             // Also when the stop or the cleanup fails: a language server that is disposed is never disposed again

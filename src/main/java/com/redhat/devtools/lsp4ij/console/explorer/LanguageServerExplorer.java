@@ -37,6 +37,7 @@ import com.redhat.devtools.lsp4ij.server.definition.launching.UserDefinedLanguag
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import javax.swing.ToolTipManager;
 import javax.swing.event.TreeSelectionListener;
 import javax.swing.tree.DefaultMutableTreeNode;
 import javax.swing.tree.DefaultTreeModel;
@@ -179,6 +180,8 @@ public class LanguageServerExplorer extends SimpleToolWindowPanel implements Dis
 
         Tree tree = new Tree(treeRoot);
         tree.setRootVisible(false);
+
+        ToolTipManager.sharedInstance().registerComponent(tree);
 
         // Language server definitions will be loaded asynchronously in loadAsync()
 
