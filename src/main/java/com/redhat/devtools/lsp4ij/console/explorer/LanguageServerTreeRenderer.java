@@ -14,6 +14,7 @@
 package com.redhat.devtools.lsp4ij.console.explorer;
 
 import com.intellij.ide.ui.UISettings;
+import com.intellij.openapi.project.Project;
 import com.intellij.ui.ColoredTreeCellRenderer;
 import com.intellij.ui.RelativeFont;
 import com.intellij.ui.SimpleTextAttributes;
@@ -21,6 +22,7 @@ import com.intellij.util.ui.UIUtil;
 import com.redhat.devtools.lsp4ij.ServerStatus;
 import org.jetbrains.annotations.NonNls;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import javax.swing.*;
 import java.awt.*;
@@ -34,10 +36,19 @@ public class LanguageServerTreeRenderer extends ColoredTreeCellRenderer {
 
     @NonNls
     private static final String SPACE_STRING = " ";
+    private final @Nullable Project project;
     private String myDurationText;
     private Color myDurationColor;
     private int myDurationWidth;
     private int myDurationOffset;
+
+    public LanguageServerTreeRenderer(@Nullable Project project) {
+        this.project = project;
+    }
+
+    public LanguageServerTreeRenderer() {
+        this(null);
+    }
 
     @Override
     public void customizeCellRenderer(@NotNull final JTree tree,
@@ -47,6 +58,7 @@ public class LanguageServerTreeRenderer extends ColoredTreeCellRenderer {
                                       final boolean leaf,
                                       final int row,
                                       final boolean hasFocus) {
+        setToolTipText(null);
         myDurationText = null;
         myDurationColor = null;
         myDurationWidth = 0;
@@ -56,6 +68,12 @@ public class LanguageServerTreeRenderer extends ColoredTreeCellRenderer {
             // Render of language server
             setIcon(languageServerTreeNode.getIcon());
             append(languageServerTreeNode.getDisplayName());
+            Project p = project != null ? project : languageServerTreeNode.getProject();
+            String badge = languageServerTreeNode.getStatusBadge(p);
+            if (badge != null) {
+                append(" " + badge, SimpleTextAttributes.GRAYED_ATTRIBUTES);
+            }
+            setToolTipText(languageServerTreeNode.getToolTipText(p));
             return;
         }
 
@@ -63,6 +81,11 @@ public class LanguageServerTreeRenderer extends ColoredTreeCellRenderer {
             // Render of language server process
             setIcon(languageProcessTreeNode.getIcon());
             append(languageProcessTreeNode.getDisplayName());
+            String secondaryText = languageProcessTreeNode.getSecondaryText();
+            if (secondaryText != null) {
+                append(" [" + secondaryText + "]", SimpleTextAttributes.GRAYED_ATTRIBUTES);
+            }
+            setToolTipText(languageProcessTreeNode.getToolTipText());
 
             if (languageProcessTreeNode.getServerStatus() == ServerStatus.starting
                     || languageProcessTreeNode.getServerStatus() == ServerStatus.stopping

@@ -57,6 +57,7 @@ public class SocketStreamConnectionProviderTest extends LightPlatformTestCase {
                     assertTrue(provider.isAlive());
                     assertNull("LSP4IJ started no process", provider.getPid());
                     assertEquals(List.of(), provider.getCommands());
+                    assertEquals("connect to " + HOST + ":" + server.getLocalPort(), provider.getConnectionDescription());
 
                     writeLine(provider.getOutputStream(), "ping");
                     assertEquals("ping", readLine(accepted.getInputStream()));
@@ -512,5 +513,29 @@ public class SocketStreamConnectionProviderTest extends LightPlatformTestCase {
             ProcessHandle.of(pid).ifPresent(ProcessHandle::destroyForcibly);
         }
         awaitExit(provider);
+    }
+
+    public void testConnectionDescriptionForAttach() throws Exception {
+        try (var server = new ServerSocket(0, 1, InetAddress.getLoopbackAddress())) {
+            var provider = SocketStreamConnectionProvider.attachTo(HOST, server.getLocalPort());
+            assertEquals("connect to " + HOST + ":" + server.getLocalPort(), provider.getConnectionDescription());
+        }
+    }
+
+    public void testConnectionDescriptionForAccept() {
+        var provider = SocketStreamConnectionProvider.startAndAccept(6005, port -> new GeneralCommandLine("cmd"));
+        assertEquals("accept on port 6005", provider.getConnectionDescription());
+    }
+
+    public void testDynamicPortZeroReportsActualBoundPort() throws Exception {
+        var provider = SocketStreamConnectionProvider.startAndAccept(0, port -> java(ConnectingServer.class, port));
+        try {
+            provider.start();
+            int boundPort = provider.getPort();
+            assertTrue(boundPort > 0);
+            assertEquals("accept on port " + boundPort, provider.getConnectionDescription());
+        } finally {
+            reap(provider);
+        }
     }
 }

@@ -102,7 +102,13 @@ public class LanguageServerExplorerLifecycleListener implements LanguageServerLi
             return;
         }
 
-        invokeLaterIfNeeded(() -> showError(processTreeNode, exception));
+        invokeLaterIfNeeded(() -> {
+            if (explorer.isDisposed()) {
+                return;
+            }
+            showError(processTreeNode, exception);
+            processTreeNode.refresh();
+        });
     }
 
     @Override

@@ -748,6 +748,142 @@ public class LanguageServerProcessNodesTest extends LSPCodeInsightFixtureTestCas
         return node;
     }
 
+    public void testParentNodeStatusSingleInstance() {
+        first.updateStatus(ServerStatus.started);
+        PlatformTestUtil.dispatchAllEventsInIdeEventQueue();
+        assertEquals("[started]", serverNode().getStatusBadge(project));
+
+        first.updateStatus(ServerStatus.stopped);
+        PlatformTestUtil.dispatchAllEventsInIdeEventQueue();
+        assertEquals("[stopped]", serverNode().getStatusBadge(project));
+    }
+
+    public void testParentNodeStatusMixedInstances() {
+        first.updateStatus(ServerStatus.started);
+        second.updateStatus(ServerStatus.started);
+        PlatformTestUtil.dispatchAllEventsInIdeEventQueue();
+        assertEquals("[started]", serverNode().getStatusBadge(project));
+
+        second.updateStatus(ServerStatus.stopped);
+        PlatformTestUtil.dispatchAllEventsInIdeEventQueue();
+        assertEquals("[1/2 started]", serverNode().getStatusBadge(project));
+    }
+
+    public void testParentNodeEmptyInstances() {
+        var emptyDefinition = new InstancesDefinition();
+        var emptyNode = new LanguageServerTreeNode(emptyDefinition, project);
+        assertNull(emptyNode.getStatusBadge(project));
+        assertNull(emptyNode.getStatusBadge());
+
+        emptyDefinition.setEnabled(false, project);
+        assertEquals("[disabled]", emptyNode.getStatusBadge(project));
+        assertEquals("[disabled]", emptyNode.getStatusBadge());
+    }
+
+    public void testParentNodeDisabledWhenDefinitionDisabled() {
+        startBoth();
+        definition.setEnabled(false, project);
+        assertEquals("[disabled]", serverNode().getStatusBadge(project));
+    }
+
+    public void testProcessNodeSecondaryText() {
+        first.start();
+        PlatformTestUtil.waitWithEventsDispatching("first must start", () -> first.getServerStatus() == ServerStatus.started, TIMEOUT);
+        try {
+            var node = processNode(first);
+            // Mock connection provider is classified as CUSTOM
+            assertEquals("custom", node.getSecondaryText());
+        } finally {
+            first.stop();
+            PlatformTestUtil.waitWithEventsDispatching("first must stop", () -> first.getServerStatus() == ServerStatus.stopped, TIMEOUT);
+        }
+    }
+
+    public void testParentAndProcessTooltips() {
+        startBoth();
+        String parentTooltip = serverNode().getToolTipText(project);
+        assertNotNull(parentTooltip);
+        assertTrue(parentTooltip.contains("Language Server:"));
+        assertTrue(parentTooltip.contains("Status:"));
+        assertTrue(parentTooltip.contains("Instances:"));
+
+        String processTooltip = processNode(first).getToolTipText();
+        assertNotNull(processTooltip);
+        assertTrue(processTooltip.contains("Status:"));
+        assertTrue(processTooltip.contains("Instance:"));
+    }
+
+    public void testParentNodeStatusMixedStartedAndCrashedInstances() {
+        first.updateStatus(ServerStatus.started);
+        second.updateStatus(ServerStatus.started);
+        PlatformTestUtil.dispatchAllEventsInIdeEventQueue();
+        assertEquals("[started]", serverNode().getStatusBadge(project));
+
+        // Crash the second instance
+        second.setServerError(new CannotStartProcessException("Simulated crash"));
+        second.updateStatus(ServerStatus.stopped);
+        PlatformTestUtil.dispatchAllEventsInIdeEventQueue();
+        assertEquals("[1/2 started]", serverNode().getStatusBadge(project));
+
+        // Crash the first instance too
+        first.setServerError(new CannotStartProcessException("Simulated crash 1"));
+        first.updateStatus(ServerStatus.stopped);
+        PlatformTestUtil.dispatchAllEventsInIdeEventQueue();
+        assertEquals("[2/2 crashed]", serverNode().getStatusBadge(project));
+    }
+
+    public void testParentNodeDisabledWithZeroInstances() {
+        var emptyDefinition = new InstancesDefinition();
+        var emptyNode = new LanguageServerTreeNode(emptyDefinition, project);
+        emptyDefinition.setEnabled(false, project);
+        assertEquals("[disabled]", emptyNode.getStatusBadge(project));
+        assertEquals("[disabled]", emptyNode.getStatusBadge());
+    }
+
+    public void testTooltipHtmlEscaping() {
+        startBoth();
+        second.setServerError(new CannotStartProcessException("<script>alert('xss')</script> & \"foo\""));
+        PlatformTestUtil.dispatchAllEventsInIdeEventQueue();
+
+        String parentTooltip = serverNode().getToolTipText(project);
+        assertNotNull(parentTooltip);
+        assertFalse(parentTooltip.contains("<script>"));
+        assertTrue(parentTooltip.contains("&lt;script&gt;"));
+        assertTrue(parentTooltip.contains("&amp;"));
+
+        String processTooltip = processNode(second).getToolTipText();
+        assertNotNull(processTooltip);
+        assertFalse(processTooltip.contains("<script>"));
+        assertTrue(processTooltip.contains("&lt;script&gt;"));
+        assertTrue(processTooltip.contains("&amp;"));
+    }
+
+    public void testRefreshPreservesStartTimeAndRecalculatesDisplay() throws Exception {
+        first.updateStatus(ServerStatus.starting);
+        PlatformTestUtil.dispatchAllEventsInIdeEventQueue();
+        var node = processNode(first);
+        var startTimeField = LanguageServerProcessTreeNode.class.getDeclaredField("startTime");
+        startTimeField.setAccessible(true);
+        long initialStartTime = (long) startTimeField.get(node);
+        assertTrue(initialStartTime > 0);
+
+        Thread.sleep(10);
+
+        // An error occurs during starting and refresh() is called
+        first.setServerError(new CannotStartProcessException("Starting failed"));
+        var refreshMethod = LanguageServerProcessTreeNode.class.getDeclaredMethod("refresh");
+        refreshMethod.setAccessible(true);
+        refreshMethod.invoke(node);
+        PlatformTestUtil.dispatchAllEventsInIdeEventQueue();
+
+        // startTime must NOT be reset or modified
+        assertEquals(initialStartTime, (long) startTimeField.get(node));
+        // lifecycle status must NOT be changed
+        assertEquals(ServerStatus.starting, node.getServerStatus());
+        // display name must be recalculated to include restart attempt info
+        assertTrue(node.getDisplayName().contains("[0/"));
+    }
+
     /**
      * The folder of a file named a, b or c is the root of its instance.
      */
