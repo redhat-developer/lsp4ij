@@ -2783,6 +2783,9 @@ public class LanguageServerWrapper implements Disposable {
                 } catch (Exception ex) {
                     getLanguageServerLifecycleManager().onError(this, ex);
                 }
+                // The message writer sends the exit notification on its own thread: let it do so before the
+                // connection closes, which would fail the write and leave the language server without it
+                waitForTheMessageWriter();
             }
         }
 
@@ -2792,6 +2795,25 @@ public class LanguageServerWrapper implements Disposable {
             provider.stop();
         }
 
+    }
+
+    /**
+     * Waits until the message writer has sent the messages queued so far, for a second at most. A disposed language
+     * server sends no messages, and isn't waited for.
+     */
+    private void waitForTheMessageWriter() {
+        if (isDisposed()) {
+            return;
+        }
+        try {
+            // The writer has one thread, so it runs this once the messages before it are sent
+            CompletableFuture.runAsync(() -> {
+            }, messageWriter).get(1, TimeUnit.SECONDS);
+        } catch (InterruptedException ex) {
+            Thread.currentThread().interrupt();
+        } catch (ExecutionException | TimeoutException | RejectedExecutionException ex) {
+            // A writer which is stopped or blocked: the connection closes anyway
+        }
     }
 
     private void shutdownLanguageServerInstance(LanguageServer languageServerInstance) throws Exception {
