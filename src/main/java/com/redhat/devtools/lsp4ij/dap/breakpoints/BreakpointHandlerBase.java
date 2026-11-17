@@ -32,6 +32,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.swing.*;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.IdentityHashMap;
 import java.util.List;
@@ -75,6 +76,9 @@ public abstract class BreakpointHandlerBase<B extends XBreakpoint<?>> extends XB
     // vscode-js-debug does, so a breakpoint has an id per session, and two breakpoints can have the same id in two
     // sessions
     private final Map<B, Map<Object, Integer>> breakpointIds = new ConcurrentHashMap<>();
+    // The line (1-based) where each session installed each breakpoint, when it reported one: a debug adapter can move
+    // a breakpoint to another line, as debugpy moves a breakpoint on a blank line or a comment to the line before
+    private final Map<B, Map<Object, Integer>> breakpointLines = new ConcurrentHashMap<>();
     // The sessions which have terminated: a late answer of one of them must not count
     private final Set<Object> endedSessions = ConcurrentHashMap.newKeySet();
     private static final Object UNKNOWN_SESSION = new Object();
@@ -232,6 +236,7 @@ public abstract class BreakpointHandlerBase<B extends XBreakpoint<?>> extends XB
         }
         verifiedBy.remove(breakpoint);
         breakpointIds.remove(breakpoint);
+        breakpointLines.remove(breakpoint);
         updateDeprecatedBreakpointId(breakpoint, null);
         return true;
     }
@@ -243,6 +248,7 @@ public abstract class BreakpointHandlerBase<B extends XBreakpoint<?>> extends XB
         verifiedBy.clear();
         breakpointIds.keySet().forEach(breakpoint -> breakpoint.putUserData(DAP_BREAKPOINT_ID, null));
         breakpointIds.clear();
+        breakpointLines.clear();
         endedSessions.clear();
     }
 
@@ -302,6 +308,10 @@ public abstract class BreakpointHandlerBase<B extends XBreakpoint<?>> extends XB
         if (ijBreakpoint == null || !breakpoints.contains(ijBreakpoint)) {
             // A late answer for an unregistered breakpoint must not keep its verdicts
             return;
+        }
+        if (breakpoint.getLine() != null) {
+            // A 'changed' breakpoint event can move the breakpoint to another line
+            setBreakpointLine(debugProtocolServer, ijBreakpoint, breakpoint.getLine());
         }
         Object session = session(debugProtocolServer);
         Set<Object> sessions = verifiedBy.computeIfAbsent(ijBreakpoint, key -> ConcurrentHashMap.newKeySet());
@@ -399,6 +409,7 @@ public abstract class BreakpointHandlerBase<B extends XBreakpoint<?>> extends XB
                 updateDeprecatedBreakpointId(breakpoint, null);
             }
         });
+        breakpointLines.values().forEach(lines -> lines.remove(debugProtocolServer));
     }
 
     /**
@@ -450,7 +461,59 @@ public abstract class BreakpointHandlerBase<B extends XBreakpoint<?>> extends XB
             }
         }
         breakpointIds.remove(ijBreakpoint);
+        breakpointLines.remove(ijBreakpoint);
         updateDeprecatedBreakpointId(ijBreakpoint, null);
+    }
+
+    /**
+     * Keeps the line where the given DAP server installed the given breakpoint, or forgets it when the line is null.
+     *
+     * @param debugProtocolServer the DAP server which answered, or null when it is not known.
+     * @param ijBreakpoint        the IJ breakpoint.
+     * @param line                the line (1-based) of the DAP breakpoint, or null.
+     */
+    protected void setBreakpointLine(@Nullable IDebugProtocolServer debugProtocolServer,
+                                     @NotNull B ijBreakpoint,
+                                     @Nullable Integer line) {
+        Object session = session(debugProtocolServer);
+        if (line == null) {
+            var lines = breakpointLines.get(ijBreakpoint);
+            if (lines != null) {
+                lines.remove(session);
+            }
+            return;
+        }
+        breakpointLines.computeIfAbsent(ijBreakpoint, key -> new ConcurrentHashMap<>()).put(session, line);
+        // A late answer for a breakpoint which was unregistered since, or of a session which has terminated since,
+        // must not keep its line. Checked after the put, so that an answer which races with the removal is dropped too.
+        if (!breakpoints.contains(ijBreakpoint) || endedSessions.contains(session)) {
+            var lines = breakpointLines.get(ijBreakpoint);
+            if (lines != null) {
+                lines.remove(session, line);
+            }
+        }
+    }
+
+    /**
+     * Returns the lines where the DAP servers installed the given breakpoint: the line which the given DAP server
+     * reported, or the lines which any DAP server reported when the given one is null. Empty when none reported one.
+     *
+     * @param debugProtocolServer the DAP server, or null for any DAP server.
+     * @param ijBreakpoint        the IJ breakpoint.
+     * @return the lines (1-based) where the DAP servers installed the given breakpoint.
+     */
+    @NotNull
+    Collection<Integer> getBreakpointLines(@Nullable IDebugProtocolServer debugProtocolServer,
+                                           @NotNull XBreakpoint<?> ijBreakpoint) {
+        var lines = breakpointLines.get(ijBreakpoint);
+        if (lines == null) {
+            return List.of();
+        }
+        if (debugProtocolServer == null) {
+            return List.copyOf(lines.values());
+        }
+        Integer line = lines.get(debugProtocolServer);
+        return line != null ? List.of(line) : List.of();
     }
 
     /**
