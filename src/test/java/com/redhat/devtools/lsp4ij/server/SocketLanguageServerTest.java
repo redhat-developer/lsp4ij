@@ -28,14 +28,20 @@ import org.eclipse.lsp4j.Position;
 import org.eclipse.lsp4j.TextDocumentIdentifier;
 import org.eclipse.lsp4j.jsonrpc.MessageConsumer;
 import org.eclipse.lsp4j.jsonrpc.messages.Message;
+import org.eclipse.lsp4j.jsonrpc.messages.NotificationMessage;
+import org.eclipse.lsp4j.services.LanguageClient;
 import org.eclipse.lsp4j.launch.LSPLauncher;
 import org.jetbrains.annotations.NotNull;
 
+import java.io.FilterOutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.TimeUnit;
@@ -147,6 +153,124 @@ public class SocketLanguageServerTest extends LSPCodeInsightFixtureTestCase {
                 server.waitBeforeTearDown();
                 LanguageServersRegistry.getInstance().removeServerDefinition(project, definition);
             }
+        }
+    }
+
+    /**
+     * A stop lets the message writer send the exit notification before it closes the connection, also when the write
+     * takes a moment, so the language server gets it.
+     */
+    public void testAStopSendsTheExitNotificationBeforeItClosesTheConnection() throws Exception {
+        var project = myFixture.getProject();
+        try (var listening = new ServerSocket(0, 1, InetAddress.getLoopbackAddress())) {
+            var definition = new MockLanguageServerDefinition("socket-server", false) {
+                @Override
+                public @NotNull StreamConnectionProvider createConnectionProvider(@NotNull Project project) {
+                    return new SlowExitProvider(listening.getLocalPort());
+                }
+            };
+            var server = definition.getServer();
+            var exitReceived = new CompletableFuture<Void>();
+            var connection = CompletableFuture.supplyAsync(() -> {
+                try {
+                    Socket accepted = listening.accept();
+                    var launcher = new LSPLauncher.Builder<LanguageClient>()
+                            .setLocalService(server)
+                            .setRemoteInterface(LanguageClient.class)
+                            .setInput(accepted.getInputStream())
+                            .setOutput(accepted.getOutputStream())
+                            .wrapMessages(consumer -> message -> {
+                                if (message instanceof NotificationMessage notification
+                                        && "exit".equals(notification.getMethod())) {
+                                    exitReceived.complete(null);
+                                }
+                                consumer.consume(message);
+                            })
+                            .create();
+                    server.addRemoteProxy(launcher.getRemoteProxy());
+                    launcher.startListening();
+                    return accepted;
+                } catch (IOException e) {
+                    throw new CompletionException(e);
+                }
+            });
+            LanguageServersRegistry.getInstance().addServerDefinition(project, definition,
+                    List.of(ServerMappingSettings.createFileNamePatternsMappingSettings(List.of("*.sock"), null)));
+            var errors = new CopyOnWriteArrayList<Throwable>();
+            var lifecycle = LanguageServerLifecycleManager.getInstance(project);
+            var listener = new LanguageServerLifecycleListener() {
+                @Override
+                public void handleStatusChanged(@NotNull LanguageServerWrapper languageServer) {
+                }
+
+                @Override
+                public void handleLSPMessage(@NotNull Message message, @NotNull MessageConsumer consumer,
+                                             @NotNull LanguageServerWrapper languageServer) {
+                }
+
+                @Override
+                public void handleError(@NotNull LanguageServerWrapper languageServer, @NotNull Throwable exception) {
+                    errors.add(exception);
+                }
+
+                @Override
+                public void dispose() {
+                }
+            };
+            lifecycle.addLanguageServerLifecycleListener(listener);
+            try {
+                var psiFile = myFixture.configureByText("main.sock", "main");
+                LanguageServerItem item = LanguageServiceAccessor.getInstance(project).getLanguageServers(psiFile, null, null)
+                        .get(BOUND_SECONDS, TimeUnit.SECONDS).stream()
+                        .filter(languageServer -> languageServer.getServerDefinition() == definition)
+                        .findFirst()
+                        .orElseThrow();
+                var wrapper = item.getServerWrapper();
+                assertEquals(ServerStatus.started, wrapper.getServerStatus());
+                connection.get(BOUND_SECONDS, TimeUnit.SECONDS);
+                // Nothing listens anymore, so that a start again fails at once instead of waiting on a connection
+                // which nothing serves
+                listening.close();
+
+                wrapper.stop().get(BOUND_SECONDS, TimeUnit.SECONDS);
+
+                // the language server reads the notification on its own thread
+                exitReceived.get(BOUND_SECONDS, TimeUnit.SECONDS);
+                assertEquals("errors of the stop", List.of(), errors);
+            } finally {
+                lifecycle.removeLanguageServerLifecycleListener(listener);
+                server.waitBeforeTearDown();
+                LanguageServersRegistry.getInstance().removeServerDefinition(project, definition);
+            }
+        }
+    }
+
+    /**
+     * Connects to a language server which runs already, and takes a moment to write the exit notification, as a writer
+     * which has other messages to send first does.
+     */
+    private static final class SlowExitProvider extends SocketStreamConnectionProvider {
+
+        SlowExitProvider(int port) {
+            super(Direction.CONNECT, InetAddress.getLoopbackAddress().getHostAddress(), port, null);
+        }
+
+        @Override
+        public OutputStream getOutputStream() {
+            OutputStream connection = super.getOutputStream();
+            return connection == null ? null : new FilterOutputStream(connection) {
+                @Override
+                public void write(byte @NotNull [] bytes, int offset, int length) throws IOException {
+                    if (new String(bytes, offset, length, StandardCharsets.UTF_8).contains("\"method\":\"exit\"")) {
+                        try {
+                            Thread.sleep(100);
+                        } catch (InterruptedException e) {
+                            Thread.currentThread().interrupt();
+                        }
+                    }
+                    out.write(bytes, offset, length);
+                }
+            };
         }
     }
 }
