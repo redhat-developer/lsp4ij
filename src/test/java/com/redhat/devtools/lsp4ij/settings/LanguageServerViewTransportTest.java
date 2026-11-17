@@ -77,6 +77,7 @@ public class LanguageServerViewTransportTest extends BasePlatformTestCase {
 
     public void testTheStandardInputAndOutputIsSaved() throws ConfigurationException {
         view.setTransport(UserDefinedTransport.STDIO);
+        // The command still takes ${port}, which stdio doesn't give: a warning, which doesn't keep Apply from saving
         view.apply();
 
         assertSame(UserDefinedTransport.STDIO, savedTransport());

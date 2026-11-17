@@ -325,11 +325,13 @@ public class LanguageServerView implements Disposable {
      * Update the proper language server settings and language server definition from the UI fields.
      *
      * @throws ConfigurationException if a JSON field is not valid JSON, or the transport can't be used, in which case
-     *                                nothing is saved.
+     *                                nothing is saved. A warning, such as a stdio command which takes the port, doesn't
+     *                                keep the settings from being saved.
      */
     public void apply() throws ConfigurationException {
-        // The same checks as the New Language Server dialog, every problem listed
-        var problems = languageServerPanel.validateFields();
+        // The same checks as the New Language Server dialog, every error listed. Warnings don't block Apply, as they
+        // don't block OK in the dialog
+        var problems = languageServerPanel.validateFields().stream().filter(problem -> !problem.warning).toList();
         if (problems.size() == 1) {
             throw new ConfigurationException(problems.get(0).message);
         }

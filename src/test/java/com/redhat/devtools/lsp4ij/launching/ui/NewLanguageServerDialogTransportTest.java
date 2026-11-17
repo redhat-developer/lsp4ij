@@ -56,6 +56,8 @@ public class NewLanguageServerDialogTransportTest extends BasePlatformTestCase {
             assertEquals("node css.js --socket=${port}", command(dialog));
             click(dialog, "language.server.transport.stdio");
             assertEquals("node css.js --stdio", command(dialog));
+            // the swapped command takes no port, so stdio has nothing to warn of
+            assertEmpty(dialog.doValidateAll());
         } finally {
             dialog.close(DialogWrapper.CANCEL_EXIT_CODE);
         }
@@ -205,6 +207,22 @@ public class NewLanguageServerDialogTransportTest extends BasePlatformTestCase {
                             && LanguageServerBundle.message("language.server.transport.socket").equals(button.getText()))
                     .findFirst().orElseThrow();
             assertFalse(socket.isEnabled());
+        } finally {
+            dialog.close(DialogWrapper.CANCEL_EXIT_CODE);
+        }
+    }
+
+    public void testAStdioCommandWhichTakesThePortIsAWarningWhichDoesNotBlockOk() {
+        var dialog = dialog(template("node server.js --socket=${port}", UserDefinedTransport.STDIO));
+        try {
+            String message = LanguageServerBundle.message("language.server.validation.stdio.port.macro",
+                    UserDefinedTransport.PORT_MACRO);
+            List<ValidationInfo> problems = dialog.doValidateAll();
+
+            // On the command, and listed below the fields
+            assertEquals(List.of(message, message), problems.stream().map(problem -> problem.message).toList());
+            assertTrue(problems.get(0).component instanceof CommandLineWidget);
+            assertTrue("warnings, which don't block OK", problems.stream().allMatch(problem -> problem.warning && problem.okEnabled));
         } finally {
             dialog.close(DialogWrapper.CANCEL_EXIT_CODE);
         }
