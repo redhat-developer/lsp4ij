@@ -13,6 +13,8 @@
  *******************************************************************************/
 package com.redhat.devtools.lsp4ij.internal;
 
+import com.intellij.openapi.application.ex.ApplicationEx;
+import com.intellij.openapi.application.ex.ApplicationManagerEx;
 import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.progress.ProgressIndicator;
 import com.intellij.openapi.progress.ProgressManager;
@@ -39,6 +41,11 @@ import java.util.function.Function;
  * @author Angelo ZERR
  */
 public class CompletableFutures {
+
+    /**
+     * How often {@link #awaitUnlessWriteActionPending(Future)} checks whether a write action waits for the lock.
+     */
+    private static final long WRITE_ACTION_CHECK_INTERVAL_MS = 10;
 
     private static final Logger LOGGER = LoggerFactory.getLogger(CompletableFutures.class);
 
@@ -165,6 +172,45 @@ public class CompletableFutures {
             }
             logFailure(failure);
         }
+    }
+
+    /**
+     * Waits for the done of the given future as {@link #awaitWithCheckCanceled(Future)} does, but stops waiting, and
+     * returns false, when a write action waits for the read lock that the caller holds.
+     * <p>
+     * IntelliJ cancels most read actions when a write action needs the lock, and {@link #awaitWithCheckCanceled(Future)}
+     * then stops. A caller whose read action a write action doesn't cancel, such as a {@code GotoDeclarationHandler},
+     * which IntelliJ calls in a plain read action under a modal progress, uses this wait instead: waiting there for the
+     * language server would keep the write action, and the UI with it, waiting for as long as the server takes.
+     *
+     * @param future the future to wait.
+     * @return true if the future is done, and false if a write action waits for the lock before it is.
+     * @throws CancellationException as {@link #awaitWithCheckCanceled(Future)} does.
+     */
+    public static boolean awaitUnlessWriteActionPending(@Nullable Future<?> future) {
+        if (future == null) {
+            return true;
+        }
+        ApplicationEx application = ApplicationManagerEx.getApplicationEx();
+        while (!future.isDone()) {
+            ProgressManager.checkCanceled();
+            if (application.isReadAccessAllowed() && application.isWriteActionPending()) {
+                return false;
+            }
+            try {
+                future.get(WRITE_ACTION_CHECK_INTERVAL_MS, TimeUnit.MILLISECONDS);
+            } catch (TimeoutException e) {
+                // Not done yet: check again
+            } catch (ExecutionException | CancellationException e) {
+                // Done: awaitWithCheckCanceled reports it below
+                break;
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new ProcessCanceledException(e);
+            }
+        }
+        awaitWithCheckCanceled(future);
+        return true;
     }
 
     /**

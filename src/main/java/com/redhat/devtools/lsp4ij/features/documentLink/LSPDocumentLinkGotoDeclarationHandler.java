@@ -44,7 +44,7 @@ import java.util.concurrent.CompletableFuture;
 
 import static com.redhat.devtools.lsp4ij.features.documentLink.LSPDocumentLinkPsiElement.isHttpUrl;
 import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.isDoneNormally;
-import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.awaitWithCheckCanceled;
+import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.awaitUnlessWriteActionPending;
 
 /**
  * {@link GotoDeclarationHandler} implementation used to open LSP document link with CTrl+Click.
@@ -72,7 +72,11 @@ public class LSPDocumentLinkGotoDeclarationHandler implements GotoDeclarationHan
         var params = new DocumentLinkParams(new TextDocumentIdentifier());
         CompletableFuture<List<DocumentLinkData>> documentLinkFuture = documentLinkSupport.getDocumentLinks(params);
         try {
-            awaitWithCheckCanceled(documentLinkFuture);
+            if (!awaitUnlessWriteActionPending(documentLinkFuture)) {
+                // As LSPGotoDeclarationHandler does: give up rather than keep a write action waiting for the language
+                // server. The request goes on, and the next Go to Declaration uses its reply.
+                return null;
+            }
         } catch (ProcessCanceledException e) {
             throw e;
         } catch (CancellationException ignore) {
@@ -136,7 +140,11 @@ public class LSPDocumentLinkGotoDeclarationHandler implements GotoDeclarationHan
                 .getTextDocumentService()
                 .documentLinkResolve(documentLink), languageServer, LSPRequestConstants.DOCUMENT_LINK_RESOLVE);
         try {
-            awaitWithCheckCanceled(resolveFuture);
+            if (!awaitUnlessWriteActionPending(resolveFuture)) {
+                // Give up rather than keep a write action waiting for the language server
+                cancellationSupport.cancel();
+                return null;
+            }
         } catch (ProcessCanceledException e) {
             cancellationSupport.cancel();
             throw e;
