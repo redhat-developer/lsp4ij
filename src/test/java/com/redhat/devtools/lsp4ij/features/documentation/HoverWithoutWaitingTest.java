@@ -9,10 +9,13 @@ package com.redhat.devtools.lsp4ij.features.documentation;
 
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.ReadAction;
+import com.intellij.openapi.command.WriteCommandAction;
 import com.intellij.platform.backend.documentation.DocumentationData;
+import com.intellij.platform.backend.documentation.DocumentationResult;
 import com.intellij.platform.backend.documentation.DocumentationTarget;
 import com.intellij.psi.PsiFile;
 import com.intellij.util.concurrency.AppExecutorUtil;
+import com.intellij.util.containers.ContainerUtil;
 import com.redhat.devtools.lsp4ij.LSPIJEditorUtils;
 import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
 import com.redhat.devtools.lsp4ij.fixtures.LSPCodeInsightFixtureTestCase;
@@ -29,6 +32,8 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+
+import static com.intellij.platform.backend.documentation.impl.ImplKt.computeDocumentationBlocking;
 
 /**
  * Tests that the documentation targets of a hover don't keep their caller waiting for the language server: IntelliJ
@@ -70,13 +75,28 @@ public class HoverWithoutWaitingTest extends LSPCodeInsightFixtureTestCase {
 
         assertSize(1, targets);
         var target = assertInstanceOf(targets.get(0), LSPPendingHoverDocumentationTarget.class);
-        assertFalse("the documentation is computed in the background",
-                ReadAction.compute(target::computeDocumentation) instanceof DocumentationData);
+        DocumentationResult result = ReadAction.compute(target::computeDocumentation);
+        assertNotNull("a documentation result", result);
+        assertFalse("the documentation is computed in the background", result instanceof DocumentationData);
         reply.complete(hover());
-        String html = target.getHtml();
-        assertNotNull(html);
-        assertTrue(html, html.contains(DOCUMENTATION));
+        // As IntelliJ computes it, once the reply is there
+        DocumentationData documentation = computeDocumentationBlocking(target.createPointer());
+        assertNotNull("the documentation of the reply", documentation);
+        assertTrue(documentation.getHtml(), documentation.getHtml().contains(DOCUMENTATION));
         assertEquals(1, hoverRequests.get());
+    }
+
+    public void testAReplyIsNotShownOnceTheDocumentHasChanged() throws Exception {
+        PsiFile file = open("edited.foo", "a word");
+
+        List<? extends DocumentationTarget> targets = targetsWhileTheReplyIsHeld(file);
+
+        var target = assertInstanceOf(ContainerUtil.getOnlyItem(targets), LSPPendingHoverDocumentationTarget.class);
+        reply.complete(hover());
+        // The document changes after the reply, and before IntelliJ computes the documentation
+        WriteCommandAction.runWriteCommandAction(myFixture.getProject(),
+                () -> myFixture.getEditor().getDocument().insertString(0, "an edit, "));
+        assertNull("no documentation of a reply to the earlier text", computeDocumentationBlocking(target.createPointer()));
     }
 
     public void testAFileWithDocumentationOfItsOwnWaitsBrieflyAndUsesTheReplyNextTime() throws Exception {

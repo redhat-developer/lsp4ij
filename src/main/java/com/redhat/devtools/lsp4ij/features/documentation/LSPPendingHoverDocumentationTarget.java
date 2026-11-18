@@ -32,6 +32,8 @@ public class LSPPendingHoverDocumentationTarget implements DocumentationTarget {
 
     private final CompletableFuture<List<HoverData>> hoverFuture;
     private final Document document;
+    // The modification stamp of the document that the hover was asked for
+    private final long modificationStamp;
     private final PsiFile file;
 
     LSPPendingHoverDocumentationTarget(@NotNull CompletableFuture<List<HoverData>> hoverFuture,
@@ -39,6 +41,7 @@ public class LSPPendingHoverDocumentationTarget implements DocumentationTarget {
                                        @NotNull PsiFile file) {
         this.hoverFuture = hoverFuture;
         this.document = document;
+        this.modificationStamp = document.getModificationStamp();
         this.file = file;
     }
 
@@ -61,13 +64,14 @@ public class LSPPendingHoverDocumentationTarget implements DocumentationTarget {
 
     /**
      * Waits for the reply, and returns its documentation targets, one per language server which has documentation
-     * here.
+     * here. A reply is left out once the document has changed since the hover was asked for: its range, whose text
+     * the target presents, is that of the earlier text.
      *
      * @return the documentation targets of the reply.
      */
     public @NotNull List<LSPDocumentationTarget> getTargets() {
         LSPDocumentationTargetProvider.await(hoverFuture);
-        return ReadAction.compute(() -> file.isValid()
+        return ReadAction.compute(() -> file.isValid() && document.getModificationStamp() == modificationStamp
                 ? LSPDocumentationTargetProvider.toDocumentationTargets(hoverFuture, document, file)
                 : List.of());
     }
