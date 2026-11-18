@@ -12,17 +12,17 @@ package com.redhat.devtools.lsp4ij.fixtures;
 
 import com.intellij.lang.documentation.ide.IdeDocumentationTargetProvider;
 import com.intellij.platform.backend.documentation.DocumentationData;
-import com.intellij.platform.backend.documentation.DocumentationResult;
 import com.intellij.platform.backend.documentation.DocumentationTarget;
 import com.intellij.util.containers.ContainerUtil;
 import com.redhat.devtools.lsp4ij.JSONUtils;
 import com.redhat.devtools.lsp4ij.features.documentation.LSPDocumentationTarget;
+import com.redhat.devtools.lsp4ij.features.documentation.LSPPendingHoverDocumentationTarget;
 import com.redhat.devtools.lsp4ij.mock.MockLanguageServer;
 import org.eclipse.lsp4j.Hover;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.LinkedList;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -72,23 +72,33 @@ public abstract class LSPHoverFixtureTestCase extends LSPCodeInsightFixtureTestC
         var editor = myFixture.getEditor();
         var file = myFixture.getFile();
         int offset = editor.getCaretModel().getOffset();
-        List<DocumentationTarget> targets = new LinkedList<>();
-        ContainerUtil.addAllNotNull(targets, IdeDocumentationTargetProvider.getInstance(myFixture.getProject()).documentationTargets(editor, file, offset));
-        // LSPTargetElementEvaluator will always return a non-null target when the caret is on a word, but we only want
-        // to process those that are translated into LSPDocumentationTargets
-        targets.removeIf(documentationTarget -> !(documentationTarget instanceof LSPDocumentationTarget));
+        List<String> html = getLSPHoverHtml(IdeDocumentationTargetProvider.getInstance(myFixture.getProject())
+                .documentationTargets(editor, file, offset));
         if (expectedHoverContent == null) {
-            assertTrue("", targets.isEmpty());
+            assertEmpty(html);
             return;
         }
-        assertSize(1, targets);
+        assertSize(1, html);
+        assertEquals("", expectedHoverContent, html.get(0));
+    }
 
-        DocumentationTarget target = targets.get(0);
-        DocumentationResult documentationResult = target.computeDocumentation();
-        DocumentationData documentationData = (DocumentationData) documentationResult;
-
-        String actual = documentationData.getHtml();
-
-        assertEquals("", expectedHoverContent, actual);
+    /**
+     * Returns the documentation of the LSP hover targets among the given ones, as HTML, waiting for the reply of a
+     * pending target. LSPTargetElementEvaluator will always return a non-null target when the caret is on a word, but
+     * only those that are translated into LSP targets are processed, and those without documentation are left out.
+     *
+     * @param targets the documentation targets.
+     * @return the HTML of the LSP targets which have documentation.
+     */
+    public static @NotNull List<String> getLSPHoverHtml(@NotNull List<? extends DocumentationTarget> targets) {
+        List<String> html = new ArrayList<>();
+        for (DocumentationTarget target : targets) {
+            if (target instanceof LSPDocumentationTarget lspTarget) {
+                html.add(((DocumentationData) lspTarget.computeDocumentation()).getHtml());
+            } else if (target instanceof LSPPendingHoverDocumentationTarget pendingTarget) {
+                ContainerUtil.addIfNotNull(html, pendingTarget.getHtml());
+            }
+        }
+        return html;
     }
 }
