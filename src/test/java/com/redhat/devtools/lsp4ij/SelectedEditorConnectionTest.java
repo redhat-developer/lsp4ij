@@ -120,6 +120,7 @@ public class SelectedEditorConnectionTest extends LSPCodeInsightFixtureTestCase 
         var initialize = MockLanguageServer.INSTANCE.holdInitialize();
         var waiting = myFixture.addFileToProject("waiting.ts", "const waiting=1;").getVirtualFile();
         var editors = FileEditorManager.getInstance(myFixture.getProject());
+        var opened = expectDidOpen("waiting.ts");
         try {
             editors.openFile(waiting, true);
             PlatformTestUtil.waitWithEventsDispatching("the selection must start the server",
@@ -132,9 +133,11 @@ public class SelectedEditorConnectionTest extends LSPCodeInsightFixtureTestCase 
         PlatformTestUtil.waitWithEventsDispatching("the server must be initialized",
                 () -> MockLanguageServer.INSTANCE.getNotifications().contains("initialized"), 10);
 
-        // the connection is made now, and its release, on the EDT, disconnects the file
-        dispatchEventsFor(2);
-        assertFalse("the closed file must end disconnected", isConnected("waiting.ts"));
+        // The connection is made now, and its release, on the EDT, disconnects the file. Both are waited for, rather
+        // than a time, which a busy machine can exceed between the didOpen and the didClose that the server reads.
+        PlatformTestUtil.waitWithEventsDispatching("the selection's connection must be made", opened::isDone, 10);
+        PlatformTestUtil.waitWithEventsDispatching("the closed file must end disconnected",
+                () -> !isConnected("waiting.ts"), 10);
     }
 
     public void testAFeatureThatAsksWhileItsEditorIsOpenDoesNotConnectTheFileAfterTheEditorCloses() throws Exception {

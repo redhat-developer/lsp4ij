@@ -44,7 +44,7 @@ import java.util.concurrent.CompletableFuture;
 
 import static com.redhat.devtools.lsp4ij.features.LSPPsiElementFactory.toPsiElement;
 import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.isDoneNormally;
-import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.awaitWithCheckCanceled;
+import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.awaitUnlessWriteActionPending;
 
 public class LSPGotoDeclarationHandler implements GotoDeclarationHandler {
 
@@ -144,7 +144,12 @@ public class LSPGotoDeclarationHandler implements GotoDeclarationHandler {
         var params = new LSPDefinitionParams(new TextDocumentIdentifier(), LSPIJUtils.toPosition(offset, document), offset);
         CompletableFuture<List<LocationData>> definitionsFuture = definitionSupport.getDefinitions(params);
         try {
-            awaitWithCheckCanceled(definitionsFuture);
+            if (!awaitUnlessWriteActionPending(definitionsFuture)) {
+                // IntelliJ asks for the targets in a read action that a write action doesn't cancel: rather than keep
+                // the write action, and the UI with it, waiting for the language server, give up. The request goes on,
+                // and Go to Declaration at the same offset uses its reply.
+                return PsiElement.EMPTY_ARRAY;
+            }
         } catch (ProcessCanceledException e) {
             throw e;
         } catch (CancellationException ignore) {
