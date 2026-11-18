@@ -20,6 +20,14 @@ jobs:
   test:
     name: Test (${{ matrix.os }}${{ matrix.platformVersion && format(', {0}', matrix.platformVersion) || '' }})
     runs-on: ${{ matrix.os }}
+
+    # Codecov authenticates uploads with a short-lived OIDC token instead of a
+    # long-lived CODECOV_TOKEN. Fork PRs cannot request an id-token, so they keep
+    # using Codecov's tokenless path (owner:branch) as before.
+    permissions:
+      contents: read
+      id-token: write
+
     strategy:
       fail-fast: false
       matrix:
@@ -69,6 +77,8 @@ jobs:
         uses: codecov/codecov-action@v7.1.1
         if: runner.os == 'Linux' && matrix.platformVersion == ''
         with:
-          token: ${{ secrets.CODECOV_TOKEN }}
+          use_oidc: true
           slug: redhat-developer/lsp4ij
           files: ${{ github.workspace }}/build/reports/kover/report.xml
+          # A rejected upload must not leave the job green.
+          fail_ci_if_error: true
