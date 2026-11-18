@@ -44,7 +44,7 @@ import java.util.concurrent.CompletableFuture;
 
 import static com.redhat.devtools.lsp4ij.features.documentLink.LSPDocumentLinkPsiElement.isHttpUrl;
 import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.isDoneNormally;
-import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.awaitWithCheckCanceled;
+import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.awaitUnlessWriteActionPending;
 
 /**
  * {@link GotoDeclarationHandler} implementation used to open LSP document link with CTrl+Click.
@@ -72,7 +72,11 @@ public class LSPDocumentLinkGotoDeclarationHandler implements GotoDeclarationHan
         var params = new DocumentLinkParams(new TextDocumentIdentifier());
         CompletableFuture<List<DocumentLinkData>> documentLinkFuture = documentLinkSupport.getDocumentLinks(params);
         try {
-            awaitWithCheckCanceled(documentLinkFuture);
+            if (!awaitUnlessWriteActionPending(documentLinkFuture)) {
+                // As LSPGotoDeclarationHandler does: give up rather than keep a write action waiting for the language
+                // server. The request goes on, and the next Go to Declaration uses its reply.
+                return null;
+            }
         } catch (ProcessCanceledException e) {
             throw e;
         } catch (CancellationException ignore) {
@@ -88,7 +92,12 @@ public class LSPDocumentLinkGotoDeclarationHandler implements GotoDeclarationHan
                     TextRange range = LSPIJUtils.toTextRange(documentLink.getRange(), document);
                     if (range != null && range.contains(offset)) {
                         // The Ctrl+Click has been done in a LSP document link,try to open the document.
-                        DocumentLink resolvedLink = resolveTarget(documentLinkData, psiFile);
+                        Resolution resolution = resolveTarget(documentLinkData, psiFile);
+                        if (resolution.gaveWay()) {
+                            // As above: no targets, rather than those of another link here, while a write action waits
+                            return null;
+                        }
+                        DocumentLink resolvedLink = resolution.link();
                         final String target = resolvedLink != null ? resolvedLink.getTarget() : null;
                         if (target != null && !target.isEmpty()) {
                             String tooltip = resolvedLink.getTooltip();
@@ -120,30 +129,46 @@ public class LSPDocumentLinkGotoDeclarationHandler implements GotoDeclarationHan
      * @param documentLinkData the document link and its language server.
      * @param psiFile          the Psi file of the document link.
      * @return the document link with its target, the document link as it is if it has a target or cannot be
-     * resolved, or null if the resolve failed or was cancelled.
+     * resolved, or no link if the resolve failed or was cancelled; or that the resolve gave way to a write action.
      */
-    private static @Nullable DocumentLink resolveTarget(@NotNull DocumentLinkData documentLinkData,
+    private static @NotNull Resolution resolveTarget(@NotNull DocumentLinkData documentLinkData,
                                                         @NotNull PsiFile psiFile) {
         DocumentLink documentLink = documentLinkData.documentLink();
         String target = documentLink.getTarget();
         LanguageServerItem languageServer = documentLinkData.languageServer();
         if ((target != null && !target.isEmpty())
                 || !languageServer.getClientFeatures().getDocumentLinkFeature().isResolveDocumentLinkSupported(psiFile)) {
-            return documentLink;
+            return new Resolution(documentLink, false);
         }
         var cancellationSupport = new CancellationSupport();
         CompletableFuture<DocumentLink> resolveFuture = cancellationSupport.execute(languageServer
                 .getTextDocumentService()
                 .documentLinkResolve(documentLink), languageServer, LSPRequestConstants.DOCUMENT_LINK_RESOLVE);
         try {
-            awaitWithCheckCanceled(resolveFuture);
+            if (!awaitUnlessWriteActionPending(resolveFuture)) {
+                // Give up rather than keep a write action waiting for the language server
+                cancellationSupport.cancel();
+                return Resolution.GAVE_WAY;
+            }
         } catch (ProcessCanceledException e) {
             cancellationSupport.cancel();
             throw e;
         } catch (CancellationException ignore) {
-            return null;
+            return new Resolution(null, false);
         }
-        return isDoneNormally(resolveFuture) ? resolveFuture.getNow(null) : null;
+        return new Resolution(isDoneNormally(resolveFuture) ? resolveFuture.getNow(null) : null, false);
+    }
+
+    /**
+     * The result of {@link #resolveTarget(DocumentLinkData, PsiFile)}: the document link with its target, or no link;
+     * or that the resolve gave way to a write action, as {@link #GAVE_WAY}.
+     *
+     * @param link    the document link, or null.
+     * @param gaveWay true if the resolve gave way to a write action.
+     */
+    private record Resolution(@Nullable DocumentLink link, boolean gaveWay) {
+
+        private static final Resolution GAVE_WAY = new Resolution(null, true);
     }
 
 }
