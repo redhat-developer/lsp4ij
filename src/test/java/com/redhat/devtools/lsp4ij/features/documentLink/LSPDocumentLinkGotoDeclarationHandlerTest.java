@@ -8,7 +8,11 @@
 package com.redhat.devtools.lsp4ij.features.documentLink;
 
 import com.google.gson.JsonPrimitive;
+import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.application.ReadAction;
+import com.intellij.openapi.application.WriteAction;
 import com.intellij.psi.PsiElement;
+import com.intellij.util.concurrency.AppExecutorUtil;
 import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
 import com.redhat.devtools.lsp4ij.fixtures.LSPCodeInsightFixtureTestCase;
 import com.redhat.devtools.lsp4ij.mock.MockLanguageServer;
@@ -22,6 +26,8 @@ import org.eclipse.lsp4j.jsonrpc.messages.ResponseErrorCode;
 
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -32,6 +38,7 @@ public class LSPDocumentLinkGotoDeclarationHandlerTest extends LSPCodeInsightFix
 
     private static final String TEXT = "see https://example.com/ here";
     private static final String URL = "https://example.com/";
+    private static final String OTHER_URL = "https://example.org/";
     // "https://example.com/" in TEXT
     private static final Range URL_RANGE = new Range(new Position(0, 4), new Position(0, 24));
     // in the URL
@@ -93,6 +100,37 @@ public class LSPDocumentLinkGotoDeclarationHandlerTest extends LSPCodeInsightFix
 
         assertEquals(0, targetsAtClick().length);
         assertEquals(1, MockLanguageServer.INSTANCE.getTextDocumentService().getDocumentLinkResolveRequests().size());
+    }
+
+    public void testALinkWhoseResolveGivesWayToAWriteActionOpensNoOtherLink() throws Exception {
+        serverResolvesLinks(true);
+        // Two links at the click: the first one is resolved, the second one has a target
+        MockLanguageServer.INSTANCE.setDocumentLinks(List.of(linkWithoutTarget(), new DocumentLink(URL_RANGE, OTHER_URL)));
+        var resolveRequested = new CountDownLatch(1);
+        var resolved = new CompletableFuture<DocumentLink>();
+        MockLanguageServer.INSTANCE.getTextDocumentService().setDocumentLinkResolveProcessor(link -> {
+            resolveRequested.countDown();
+            return resolved;
+        });
+        open();
+        // Without the fix, the write action below waits for the resolve: release it in time for the test to fail
+        var release = AppExecutorUtil.getAppScheduledExecutorService().schedule(
+                () -> resolved.complete(new DocumentLink(URL_RANGE, URL)), 20, TimeUnit.SECONDS);
+        try {
+            Future<PsiElement[]> targets = ApplicationManager.getApplication().executeOnPooledThread(
+                    () -> ReadAction.compute(this::targetsAtClick));
+            assertTrue("the link is resolved", resolveRequested.await(30, TimeUnit.SECONDS));
+
+            long start = System.nanoTime();
+            WriteAction.run(() -> {
+            });
+            long waitedMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start);
+
+            assertTrue("the write action waited " + waitedMs + " ms for the resolve", waitedMs < 5_000);
+            assertEquals("no target, not the other link's", 0, targets.get(30, TimeUnit.SECONDS).length);
+        } finally {
+            release.cancel(false);
+        }
     }
 
     private static DocumentLink linkWithoutTarget() {
