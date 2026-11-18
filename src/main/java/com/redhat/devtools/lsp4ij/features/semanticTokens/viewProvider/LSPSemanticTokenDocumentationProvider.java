@@ -14,7 +14,6 @@ package com.redhat.devtools.lsp4ij.features.semanticTokens.viewProvider;
 import com.intellij.lang.documentation.AbstractDocumentationProvider;
 import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.util.text.StringUtil;
-import com.intellij.platform.backend.documentation.DocumentationTarget;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
 import com.intellij.psi.PsiNamedElement;
@@ -31,7 +30,6 @@ import org.jetbrains.annotations.Nullable;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Function;
-import java.util.function.Predicate;
 
 /**
  * Documentation provider for {@link LSPSemanticTokensFileViewProvider} files that provides quick navigation info
@@ -79,11 +77,7 @@ public class LSPSemanticTokenDocumentationProvider extends AbstractDocumentation
                 try {
                     PsiFile file = sourceElement.getContainingFile();
                     List<LSPDocumentationTarget> lspDocumentationTargets = LSP_DOCUMENTATION_TARGET_PROVIDER
-                            .documentationTargets(file, offset)
-                            .stream()
-                            .filter((Predicate<DocumentationTarget>) dt -> dt instanceof LSPDocumentationTarget)
-                            .map((Function<DocumentationTarget, LSPDocumentationTarget>) dt -> (LSPDocumentationTarget) dt)
-                            .toList();
+                            .getHoverTargets(file, offset);
                     if (!ContainerUtil.isEmpty(lspDocumentationTargets)) {
                         String documentation = StringUtil.join(lspDocumentationTargets, toHtml::apply, separator).trim();
                         if (StringUtil.isNotEmpty(documentation)) {

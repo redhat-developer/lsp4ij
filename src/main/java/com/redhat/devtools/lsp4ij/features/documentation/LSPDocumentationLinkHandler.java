@@ -20,6 +20,8 @@ import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.List;
+
 /**
  * LSP {@link DocumentationLinkHandler} to open file in an
  * IJ Editor (and with a given position if declared) declared as link in HTML.
@@ -30,7 +32,8 @@ public class LSPDocumentationLinkHandler implements DocumentationLinkHandler {
     @Override
     public @Nullable LinkResolveResult resolveLink(@NotNull DocumentationTarget target,
                                                    @NotNull String url) {
-        if (target instanceof LSPDocumentationTarget lspTarget && url.startsWith("file://")) {
+        LSPDocumentationTarget lspTarget = toLSPDocumentationTarget(target);
+        if (lspTarget != null && url.startsWith("file://")) {
             ApplicationManager.getApplication()
                     .executeOnPooledThread(() -> {
                         var file = lspTarget.getFile();
@@ -38,6 +41,18 @@ public class LSPDocumentationLinkHandler implements DocumentationLinkHandler {
                         LSPIJUtils.openInEditor(url, null, true, true, fileUriSupport, file.getProject());
                     });
             return LinkResolveResult.resolvedTarget(target);
+        }
+        return null;
+    }
+
+    private static @Nullable LSPDocumentationTarget toLSPDocumentationTarget(@NotNull DocumentationTarget target) {
+        if (target instanceof LSPDocumentationTarget lspTarget) {
+            return lspTarget;
+        }
+        if (target instanceof LSPPendingHoverDocumentationTarget pendingTarget) {
+            // A link is followed in a documentation which is shown, so the reply is there
+            List<LSPDocumentationTarget> targets = pendingTarget.getTargets();
+            return targets.isEmpty() ? null : targets.get(0);
         }
         return null;
     }
