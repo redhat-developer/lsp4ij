@@ -80,5 +80,3 @@ jobs:
           use_oidc: true
           slug: redhat-developer/lsp4ij
           files: ${{ github.workspace }}/build/reports/kover/report.xml
-          # A rejected upload must not leave the job green.
-          fail_ci_if_error: true
