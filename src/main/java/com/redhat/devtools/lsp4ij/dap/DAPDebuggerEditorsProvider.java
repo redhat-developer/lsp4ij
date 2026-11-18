@@ -89,7 +89,7 @@ public class DAPDebuggerEditorsProvider extends XDebuggerEditorsProviderBase {
                                                             @NotNull FileType fileType,
                                                             @NotNull Language language,
                                                             boolean isPhysical) {
-        return new DAPExpressionCodeFragment(text, fileType, language, getDebugProcess(), project, isPhysical);
+        return DAPExpressionCodeFragment.create(text, fileType, language, getDebugProcess(), project, isPhysical);
     }
 
     /**

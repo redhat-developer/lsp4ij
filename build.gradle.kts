@@ -251,6 +251,29 @@ changelog {
     repositoryUrl = properties("pluginRepositoryUrl")
 }
 
+// Tests that need IntelliJ's JavaScript plugin. The sandbox of the other tests disables it (see prepareTestSandbox), so
+// they run in testJavaScript, whose sandbox keeps it. The IntelliJ Platform Gradle Plugin makes check run testJavaScript.
+// Of the IDEs the tests run on, only IntelliJ IDEA Ultimate (-PplatformType=IU, as on CI's 2026.3 leg) bundles the plugin;
+// elsewhere the task is skipped.
+val javaScriptPluginTests = "**/*JavaScriptPluginTest.class"
+val bundlesJavaScriptPlugin = properties("platformType").get() == "IU"
+
+intellijPlatformTesting {
+    testIde {
+        register("testJavaScript") {
+            testFramework(TestFrameworkType.Platform)
+            task {
+                description = "Runs the tests that need the JavaScript plugin (*JavaScriptPluginTest), with -PplatformType=IU."
+                group = LifecycleBasePlugin.VERIFICATION_GROUP
+                include(javaScriptPluginTests)
+                // A local copy: the configuration cache can't store a reference to the build script
+                val bundlesPlugin = bundlesJavaScriptPlugin
+                onlyIf("the IDE bundles the JavaScript plugin (-PplatformType=IU)") { bundlesPlugin }
+            }
+        }
+    }
+}
+
 tasks.withType<Test>().configureEach {
     useJUnitPlatform()
     environment("GRADLE_RELEASE_REPOSITORY","https://services.gradle.org/distributions")
@@ -282,6 +305,11 @@ tasks {
         // the tests that IntelliJ IDEA Community leaves to LSP4IJ. Community has neither plugin, so there, this changes
         // nothing.
         disabledPlugins.addAll("JavaScript", "com.intellij.css")
+    }
+
+    test {
+        // They run in testJavaScript, with the JavaScript plugin
+        exclude(javaScriptPluginTests)
     }
 
     // TODO: Once LSP4IJ no longer supports 2023.*, the hotswap JVM args can be added unconditionally

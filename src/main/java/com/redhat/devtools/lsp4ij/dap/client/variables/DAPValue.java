@@ -10,7 +10,9 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.dap.client.variables;
 
+import com.intellij.openapi.application.ReadAction;
 import com.intellij.util.ThreeState;
+import com.intellij.xdebugger.XSourcePosition;
 import com.intellij.xdebugger.frame.*;
 import com.intellij.xdebugger.frame.presentation.XValuePresentation;
 import com.redhat.devtools.lsp4ij.dap.client.DAPClient;
@@ -22,6 +24,7 @@ import org.jetbrains.annotations.Nullable;
 
 import javax.swing.*;
 import java.util.Arrays;
+import java.util.concurrent.CompletableFuture;
 
 /**
  * Debug Adapter Protocol (DAP) value.
@@ -134,13 +137,23 @@ public class DAPValue extends XNamedValue {
 
     @Override
     public void computeSourcePosition(@NotNull XNavigatable navigatable) {
-        stackFrame
-                .getSourcePositionFor(variable)
-                .thenAccept(sourcePosition -> {
-                    if (sourcePosition != null) {
-                        navigatable.setSourcePosition(sourcePosition);
-                    }
-                });
+        setSourcePosition(stackFrame.getSourcePositionFor(variable), navigatable);
+    }
+
+    /**
+     * Gives the source position to the navigatable once it is known, in a read action: the future may complete on a
+     * pooled thread, and the navigatable of the inline values reads the document of the position.
+     *
+     * @param sourcePosition the future of the source position.
+     * @param navigatable    the navigatable which takes the source position.
+     */
+    static void setSourcePosition(@NotNull CompletableFuture<@Nullable XSourcePosition> sourcePosition,
+                                  @NotNull XNavigatable navigatable) {
+        sourcePosition.thenAccept(position -> {
+            if (position != null) {
+                ReadAction.run(() -> navigatable.setSourcePosition(position));
+            }
+        });
     }
 
     @NotNull

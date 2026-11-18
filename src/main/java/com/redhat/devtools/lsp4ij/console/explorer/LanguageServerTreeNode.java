@@ -19,6 +19,7 @@ import com.redhat.devtools.lsp4ij.LanguageServerWrapper;
 import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
 import com.redhat.devtools.lsp4ij.ServerStatus;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
+import org.eclipse.lsp4j.ServerInfo;
 import org.eclipse.lsp4j.WorkspaceFolder;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -31,15 +32,15 @@ import javax.swing.tree.DefaultMutableTreeNode;
  */
 public class LanguageServerTreeNode extends DefaultMutableTreeNode {
 
-    private final LanguageServerDefinition serverDefinition;
+    private final @Nullable LanguageServerDefinition serverDefinition;
     private @Nullable Project project;
 
-    public LanguageServerTreeNode(@NotNull LanguageServerDefinition serverDefinition, @Nullable Project project) {
+    public LanguageServerTreeNode(@Nullable LanguageServerDefinition serverDefinition, @Nullable Project project) {
         this.serverDefinition = serverDefinition;
         this.project = project;
     }
 
-    public LanguageServerTreeNode(@NotNull LanguageServerDefinition serverDefinition) {
+    public LanguageServerTreeNode(@Nullable LanguageServerDefinition serverDefinition) {
         this(serverDefinition, null);
     }
 
@@ -122,11 +123,22 @@ public class LanguageServerTreeNode extends DefaultMutableTreeNode {
     }
 
     public Icon getIcon() {
-        return serverDefinition.getIcon();
+        return serverDefinition != null ? serverDefinition.getIcon() : null;
     }
 
     public String getDisplayName() {
-        return serverDefinition.getDisplayName();
+        return serverDefinition != null ? serverDefinition.getDisplayName() : null;
+    }
+
+    /**
+     * Returns the server information returned by the language server upon initialization,
+     * or {@code null} if no server instance has initialized or provided server info.
+     *
+     * @return the server information, or {@code null}
+     */
+    public @Nullable ServerInfo getServerInfo() {
+        var activeNode = getActiveProcessTreeNode();
+        return activeNode != null ? activeNode.getLanguageServer().getServerInfo() : null;
     }
 
     public void setProject(@Nullable Project project) {
@@ -147,7 +159,7 @@ public class LanguageServerTreeNode extends DefaultMutableTreeNode {
 
     public boolean isEnabled(@Nullable Project project) {
         Project p = project != null ? project : getProject();
-        return p != null && serverDefinition.isEnabled(p);
+        return p != null && serverDefinition != null && serverDefinition.isEnabled(p);
     }
 
     public boolean isEnabled() {
@@ -209,8 +221,11 @@ public class LanguageServerTreeNode extends DefaultMutableTreeNode {
 
     public @Nullable String getToolTipText(@Nullable Project project) {
         StringBuilder sb = new StringBuilder("<html>");
-        sb.append("<b>Language Server:</b> ").append(escapeHtml(getDisplayName()))
-                .append(" (").append(escapeHtml(serverDefinition.getId())).append(")<br/>");
+        sb.append("<b>Language Server:</b> ").append(escapeHtml(getDisplayName()));
+        if (serverDefinition != null) {
+            sb.append(" (").append(escapeHtml(serverDefinition.getId())).append(")");
+        }
+        sb.append("<br/>");
         boolean enabled = isEnabled(project);
         sb.append("<b>Status:</b> ").append(enabled ? "Enabled" : "Disabled");
         int total = getChildCount();

@@ -77,7 +77,7 @@ jobs:
           git push origin main
 
       - name: Simple conventional changelog
-        uses: redhat-developer/simple-conventional-changelog@0a6db1ac3910c2cf66f2e1a530951dba1ece8540 #0.0.12
+        uses: redhat-developer/simple-conventional-changelog@d1060338b82efbffd09263457a470151597aa8a0 #0.0.13
         id: changelog
         with:
           token: ${{ secrets.GITHUB_TOKEN }}

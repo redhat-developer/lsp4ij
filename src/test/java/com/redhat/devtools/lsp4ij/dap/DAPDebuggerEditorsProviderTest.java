@@ -14,6 +14,7 @@ package com.redhat.devtools.lsp4ij.dap;
 import com.intellij.json.JsonFileType;
 import com.intellij.json.JsonLanguage;
 import com.intellij.json.json5.Json5Language;
+import com.intellij.json.psi.JsonFile;
 import com.intellij.openapi.fileTypes.MockLanguageFileType;
 import com.intellij.openapi.fileTypes.PlainTextFileType;
 import com.intellij.openapi.fileTypes.PlainTextLanguage;
@@ -23,6 +24,7 @@ import com.intellij.psi.PsiDocumentManager;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
 import com.intellij.psi.PsiFileFactory;
+import com.intellij.psi.xml.XmlFile;
 import com.intellij.testFramework.LightPlatformTestCase;
 import com.intellij.testFramework.LightVirtualFile;
 import com.intellij.xdebugger.XDebuggerUtil;
@@ -83,6 +85,22 @@ public class DAPDebuggerEditorsProviderTest extends LightPlatformTestCase {
         assertEquals(JsonFileType.INSTANCE, codeFragment.getFileType());
         // It should have degraded to the base language
         assertEquals(JsonLanguage.INSTANCE, codeFragment.getLanguage());
+        // and be the file the language's parser definition creates, which the PSI of the language expects above it
+        assertInstanceOf(codeFragment, JsonFile.class);
+    }
+
+    public void testWithALanguageWhoseFileIsCreatedByAnotherLanguage() {
+        // XHTML's parser definition creates an XML file: a PsiFileBase in XHTML failed with "Language: XML != Language: XHTML"
+        PsiFile xhtmlFile = createFile("test.xhtml", "<html/>");
+        assertEquals("XHTML", xhtmlFile.getLanguage().getID());
+        var provider = new DAPDebuggerEditorsProvider(xhtmlFile.getFileType(), null);
+
+        PsiFile codeFragment = provider.createExpressionCodeFragment(getProject(), "<a/>", xhtmlFile, true);
+
+        assertEquals(xhtmlFile.getFileType(), codeFragment.getFileType());
+        assertEquals(xhtmlFile.getLanguage(), codeFragment.getLanguage());
+        assertInstanceOf(codeFragment, XmlFile.class);
+        assertTrue(codeFragment.isPhysical());
     }
 
     @SuppressWarnings("removal")

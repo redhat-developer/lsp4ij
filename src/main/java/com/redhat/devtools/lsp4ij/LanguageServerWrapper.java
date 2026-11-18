@@ -179,6 +179,7 @@ public class LanguageServerWrapper implements Disposable {
     private volatile LanguageServer languageServer;
     private LanguageClientImpl languageClient;
     private ServerCapabilities serverCapabilities;
+    private volatile @Nullable ServerInfo serverInfo;
     private volatile @Nullable Alarm stopAlarm = null;
     private ServerStatus serverStatus;
     private volatile boolean disposed;
@@ -757,6 +758,7 @@ public class LanguageServerWrapper implements Disposable {
                                 errorNotification = null;
                             }
                             serverCapabilities = initializingContext.initializeResult.getCapabilities();
+                            serverInfo = initializingContext.initializeResult.getServerInfo();
                             syncOptions = createSyncOptions();
                             getClientFeatures().setServerCapabilities(serverCapabilities);
                             this.initiallySupportsWorkspaceFolders = supportsWorkspaceFolders(serverCapabilities);
@@ -1783,6 +1785,17 @@ public class LanguageServerWrapper implements Disposable {
     }
 
     /**
+     * Returns the server information returned by the language server upon initialization,
+     * or {@code null} if the server has not initialized yet or did not provide server info.
+     *
+     * @return the server information, or {@code null}
+     */
+    @Nullable
+    public ServerInfo getServerInfo() {
+        return serverInfo;
+    }
+
+    /**
      * Updates workspace diagnostic providers from this server's capabilities.
      * Does nothing until a language client is attached.
      */
@@ -2027,6 +2040,16 @@ public class LanguageServerWrapper implements Disposable {
      */
     public @Nullable WorkspaceFolder getInstanceRoot() {
         return instanceRoot;
+    }
+
+    /**
+     * Returns true if this is an instance of a definition with several instances whose client features wait for the
+     * check of the installation, see {@link LSPClientFeatures#isWaitingForServerInstallation()}, and false otherwise.
+     * Client features that weren't created yet wait for nothing.
+     */
+    boolean isWaitingForItsInstallation() {
+        var features = clientFeatures;
+        return instanceRoot != null && features != null && features.isWaitingForServerInstallation();
     }
 
     /**
@@ -2791,6 +2814,9 @@ public class LanguageServerWrapper implements Disposable {
                 } catch (Exception ex) {
                     getLanguageServerLifecycleManager().onError(this, ex);
                 }
+                // The message writer sends the exit notification on its own thread: let it do so before the
+                // connection closes, which would fail the write and leave the language server without it
+                waitForTheMessageWriter();
             }
         }
 
@@ -2800,6 +2826,25 @@ public class LanguageServerWrapper implements Disposable {
             provider.stop();
         }
 
+    }
+
+    /**
+     * Waits until the message writer has sent the messages queued so far, for a second at most. A disposed language
+     * server sends no messages, and isn't waited for.
+     */
+    private void waitForTheMessageWriter() {
+        if (isDisposed()) {
+            return;
+        }
+        try {
+            // The writer has one thread, so it runs this once the messages before it are sent
+            CompletableFuture.runAsync(() -> {
+            }, messageWriter).get(1, TimeUnit.SECONDS);
+        } catch (InterruptedException ex) {
+            Thread.currentThread().interrupt();
+        } catch (ExecutionException | TimeoutException | RejectedExecutionException ex) {
+            // A writer which is stopped or blocked: the connection closes anyway
+        }
     }
 
     private void shutdownLanguageServerInstance(LanguageServer languageServerInstance) throws Exception {
@@ -2855,6 +2900,7 @@ public class LanguageServerWrapper implements Disposable {
                     clientFeatures.dispose();
                     clientFeatures = null;
                 }
+                serverInfo = null;
             }
         } finally {
             // Also when the stop or the cleanup fails: a language server that is disposed is never disposed again

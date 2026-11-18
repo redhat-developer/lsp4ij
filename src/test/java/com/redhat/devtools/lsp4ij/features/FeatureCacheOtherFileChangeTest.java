@@ -9,15 +9,14 @@ package com.redhat.devtools.lsp4ij.features;
 
 import com.intellij.lang.documentation.ide.IdeDocumentationTargetProvider;
 import com.intellij.openapi.command.WriteCommandAction;
-import com.intellij.platform.backend.documentation.DocumentationData;
 import com.intellij.psi.PsiDocumentManager;
 import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.LSPFileSupport;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
-import com.redhat.devtools.lsp4ij.features.documentation.LSPDocumentationTarget;
 import com.redhat.devtools.lsp4ij.features.navigation.LSPDefinitionParams;
 import com.redhat.devtools.lsp4ij.features.navigation.LSPDefinitionSupport;
 import com.redhat.devtools.lsp4ij.fixtures.LSPCodeInsightFixtureTestCase;
+import com.redhat.devtools.lsp4ij.fixtures.LSPHoverFixtureTestCase;
 import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
 import com.redhat.devtools.lsp4ij.mock.MockLanguageServer;
 import org.eclipse.lsp4j.FoldingRangeRequestParams;
@@ -107,13 +106,10 @@ public class FeatureCacheOtherFileChangeTest extends LSPCodeInsightFixtureTestCa
 
     private String hover() {
         var editor = myFixture.getEditor();
-        var targets = IdeDocumentationTargetProvider.getInstance(myFixture.getProject())
-                .documentationTargets(editor, myFixture.getFile(), editor.getCaretModel().getOffset())
-                .stream()
-                .filter(LSPDocumentationTarget.class::isInstance)
-                .toList();
-        assertSize(1, targets);
-        return ((DocumentationData) targets.get(0).computeDocumentation()).getHtml();
+        var html = LSPHoverFixtureTestCase.getLSPHoverHtml(IdeDocumentationTargetProvider.getInstance(myFixture.getProject())
+                .documentationTargets(editor, myFixture.getFile(), editor.getCaretModel().getOffset()));
+        assertSize(1, html);
+        return html.get(0);
     }
 
     private int definitionLine(LSPDefinitionSupport definitions) throws Exception {
