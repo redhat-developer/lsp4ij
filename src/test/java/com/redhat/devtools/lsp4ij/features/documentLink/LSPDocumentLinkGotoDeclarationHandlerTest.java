@@ -102,6 +102,28 @@ public class LSPDocumentLinkGotoDeclarationHandlerTest extends LSPCodeInsightFix
         assertEquals(1, MockLanguageServer.INSTANCE.getTextDocumentService().getDocumentLinkResolveRequests().size());
     }
 
+    public void testAClickWaitsForAResolveWhenNoWriteActionWaits() throws Exception {
+        serverResolvesLinks(true);
+        MockLanguageServer.INSTANCE.setDocumentLinks(List.of(linkWithoutTarget()));
+        var resolveRequested = new CountDownLatch(1);
+        var resolved = new CompletableFuture<DocumentLink>();
+        MockLanguageServer.INSTANCE.getTextDocumentService().setDocumentLinkResolveProcessor(link -> {
+            resolveRequested.countDown();
+            return resolved;
+        });
+        open();
+
+        Future<PsiElement[]> targets = ApplicationManager.getApplication().executeOnPooledThread(
+                () -> ReadAction.compute(this::targetsAtClick));
+        assertTrue("the link is resolved", resolveRequested.await(30, TimeUnit.SECONDS));
+        // No write action waits for the lock: the click waits for the resolve, which completes now
+        resolved.complete(new DocumentLink(URL_RANGE, URL));
+
+        PsiElement[] clicked = targets.get(30, TimeUnit.SECONDS);
+        assertEquals(1, clicked.length);
+        assertEquals(URL, ((LSPDocumentLinkPsiElement) clicked[0]).getLocationString());
+    }
+
     public void testALinkWhoseResolveGivesWayToAWriteActionOpensNoOtherLink() throws Exception {
         serverResolvesLinks(true);
         // Two links at the click: the first one is resolved, the second one has a target
