@@ -28,6 +28,7 @@ import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiFile;
 import com.intellij.testFramework.LightVirtualFile;
 import com.redhat.devtools.lsp4ij.features.color.LSPColorProvider;
+import com.redhat.devtools.lsp4ij.features.documentContent.DocumentContentFile;
 import com.redhat.devtools.lsp4ij.features.inlayhint.LSPInlayHintsProvider;
 import com.redhat.devtools.lsp4ij.features.semanticTokens.SemanticTokensColorsProvider;
 import com.redhat.devtools.lsp4ij.internal.SimpleLanguageUtils;
@@ -1147,6 +1148,11 @@ public class LanguageServersRegistry implements Disposable {
                 .anyMatch(mapping -> mapping.match(language, fileType, filename))) {
             @Nullable VirtualFile f = file != null ? file : psiFile.getVirtualFile();
             if (f != null && !f.isInLocalFileSystem()) {
+                if (f instanceof DocumentContentFile) {
+                    // A document that a language server provides with workspace/textDocumentContent: it is open on
+                    // that server under its own URI, so the features of the server work in it as in a file.
+                    return true;
+                }
                 if (f instanceof LightVirtualFile) {
                     return false;
                 }
@@ -1179,7 +1185,8 @@ public class LanguageServersRegistry implements Disposable {
         if (fileAssociations
                 .stream()
                 .anyMatch(mapping -> mapping.match(language, fileType, fileName))) {
-            return virtualFile.isInLocalFileSystem() || !(virtualFile instanceof LightVirtualFile);
+            return virtualFile.isInLocalFileSystem() || !(virtualFile instanceof LightVirtualFile)
+                    || virtualFile instanceof DocumentContentFile;
         }
 
         return false;
