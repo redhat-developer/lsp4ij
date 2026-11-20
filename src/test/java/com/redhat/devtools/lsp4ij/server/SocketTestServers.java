@@ -66,6 +66,17 @@ public final class SocketTestServers {
     }
 
     /**
+     * A language server which connects to its port on the IPv4 loopback address. {@link ConnectingServer} connects to
+     * {@link InetAddress#getLoopbackAddress()}, which is ::1 when the JVM prefers IPv6 addresses.
+     */
+    public static class IPv4ConnectingServer {
+        public static void main(String[] args) throws IOException {
+            int port = Integer.parseInt(args[0]);
+            echo(new Socket(InetAddress.getByName("127.0.0.1"), port));
+        }
+    }
+
+    /**
      * A language server which ends at once.
      */
     public static class EndingServer {
