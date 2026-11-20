@@ -113,6 +113,9 @@ public final class LSPDiagnosticsApplier implements Disposable {
         try {
             ReadAction
                     .nonBlocking(() -> collectDiagnostics(file, psiFile, document, modificationStamp))
+                    // The diagnostics are placed at offsets of the document but annotate the Psi file, which has the
+                    // document's text only once it is committed: right after a completion, the document can be longer
+                    .withDocumentsCommitted(project)
                     .coalesceBy(this, file != null ? file : psiFile)
                     .finishOnUiThread(ModalityState.defaultModalityState(), highlights -> {
                         try {

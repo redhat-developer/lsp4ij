@@ -13,10 +13,13 @@ import com.intellij.codeInsight.daemon.impl.DaemonCodeAnalyzerImpl;
 import com.intellij.codeInsight.daemon.impl.HighlightInfo;
 import com.intellij.codeInsight.daemon.impl.UpdateHighlightersUtil;
 import com.intellij.openapi.application.impl.NonBlockingReadActionImpl;
+import com.intellij.openapi.command.WriteCommandAction;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.vfs.VirtualFile;
+import com.intellij.psi.PsiDocumentManager;
 import com.intellij.psi.PsiFile;
 import com.intellij.testFramework.PlatformTestUtil;
+import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
 import com.redhat.devtools.lsp4ij.fixtures.LSPCodeInsightFixtureTestCase;
 import com.redhat.devtools.lsp4ij.mock.MockLanguageServer;
@@ -25,6 +28,7 @@ import org.eclipse.lsp4j.Position;
 import org.eclipse.lsp4j.Range;
 
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -112,6 +116,32 @@ public class LSPDiagnosticsApplierTest extends LSPCodeInsightFixtureTestCase {
 
         awaitShownWhilePending(applier, virtualFile);
         assertFalse("no refresh may be pending once the diagnostics are shown", applier.isRefreshPending(virtualFile));
+    }
+
+    public void testARefreshWaitsUntilTheDocumentIsCommitted() throws Exception {
+        registeredGroupId();
+        var file = openWithItsDiagnosticsShown();
+        var project = myFixture.getProject();
+        var applier = LSPDiagnosticsApplier.getInstance(project);
+        VirtualFile virtualFile = file.getVirtualFile();
+        Document document = myFixture.getEditor().getDocument();
+        // The document has text that its Psi file doesn't have yet, as right after a completion inserts it
+        WriteCommandAction.runWriteCommandAction(project, () -> document.insertString(document.getTextLength(), " after"));
+        assertFalse(PsiDocumentManager.getInstance(project).isCommitted(document));
+
+        // A diagnostic of the inserted text, which this test holds the UI thread to keep uncommitted
+        var server = LanguageServiceAccessor.getInstance(project).getStartedServers().iterator().next();
+        server.getOpenedDocument(LSPIJUtils.toUri(virtualFile)).updateDiagnostics("inserted",
+                List.of(new Diagnostic(new Range(new Position(0, 7), new Position(0, 12)), "inserted")), null);
+        // A refresh that collected now would annotate the Psi file at offsets of the longer document
+        long deadline = System.currentTimeMillis() + 1000;
+        while (applier.isRefreshPending(virtualFile) && System.currentTimeMillis() < deadline) {
+            Thread.sleep(10);
+        }
+        assertTrue("the refresh must wait until the document is committed", applier.isRefreshPending(virtualFile));
+
+        PlatformTestUtil.waitWithEventsDispatching("the diagnostic of the inserted text must be shown",
+                () -> Set.copyOf(shownDiagnostics()).equals(Set.of("published", "inserted")), 30);
     }
 
     /**
