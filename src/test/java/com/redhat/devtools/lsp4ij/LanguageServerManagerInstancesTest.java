@@ -249,6 +249,27 @@ public class LanguageServerManagerInstancesTest extends LSPCodeInsightFixtureTes
         assertEquals(ServerStatus.stopped, b.getServerStatus());
     }
 
+    /**
+     * A feature that still holds an instance once it is switched off, as the quick fixes of the diagnostics that the
+     * instance showed do, gets no language server from it, while it stops and once it is stopped: the instance stays
+     * stopped and switched off, rather than start again.
+     */
+    public void testAFeatureThatStillHoldsAnInstanceSwitchedOffDoesNotStartIt() throws Exception {
+        var a = openAndConnect(file("a/one.instances").getVirtualFile());
+
+        a.stopAndDisable();
+        // As the quick fixes of a diagnostic of a, which ask a for its code actions
+        var whileItStops = a.getInitializedServer();
+        waitForStatus(a, ServerStatus.stopped);
+        var onceItIsStopped = a.getInitializedServer();
+
+        assertNull(waitFor(whileItStops));
+        assertNull(waitFor(onceItIsStopped));
+        dispatchAll();
+        assertEquals(ServerStatus.stopped, a.getServerStatus());
+        assertFalse(a.isEnabled());
+    }
+
     public void testStopWithARootStopsOnlyThatInstance() throws Exception {
         var a = serverOf(file("a/one.instances"));
         var b = serverOf(file("b/one.instances"));
