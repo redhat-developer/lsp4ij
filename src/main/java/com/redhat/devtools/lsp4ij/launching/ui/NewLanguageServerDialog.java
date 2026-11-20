@@ -37,6 +37,7 @@ import com.redhat.devtools.lsp4ij.server.definition.launching.UserDefinedLanguag
 import com.redhat.devtools.lsp4ij.settings.ui.LanguageServerPanel;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.jetbrains.annotations.TestOnly;
 
 import javax.swing.*;
 import javax.swing.event.DocumentEvent;
@@ -60,6 +61,18 @@ public class NewLanguageServerDialog extends DialogWrapper {
     private LanguageServerTemplate currentTemplate = null;
     // what LSP4IJ couldn't use in the loaded template
     private List<String> templateProblems = List.of();
+    // Opens the instructions of the template, its README.md: one instance, which DialogWrapper finds again
+    private final Action helpAction = new AbstractAction() {
+        @Override
+        public void actionPerformed(ActionEvent e) {
+            if (hasInstructions()) {
+                ShowInstructionDialog dialog = new ShowInstructionDialog(currentTemplate, project);
+                dialog.show();
+            }
+        }
+    };
+    // The help button, which DialogWrapper creates for the help action on the left of the dialog
+    private @Nullable JButton helpButton;
 
     public NewLanguageServerDialog(@NotNull Project project) {
         super(project);
@@ -67,6 +80,7 @@ public class NewLanguageServerDialog extends DialogWrapper {
         super.setTitle(LanguageServerBundle.message("new.language.server.dialog.title"));
         init();
         initValidation();
+        updateHelpButton();
     }
 
     private static String getCommandLine(LanguageServerTemplate entry) {
@@ -198,15 +212,47 @@ public class NewLanguageServerDialog extends DialogWrapper {
 
     @Override
     protected @NotNull Action getHelpAction() {
-        return new AbstractAction() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                if (currentTemplate != null && StringUtils.isNotBlank(currentTemplate.getDescription())) {
-                    ShowInstructionDialog dialog = new ShowInstructionDialog(currentTemplate, project);
-                    dialog.show();
-                }
-            }
-        };
+        return helpAction;
+    }
+
+    /**
+     * Returns true if the current template has instructions, the content of its README.md.
+     */
+    private boolean hasInstructions() {
+        return currentTemplate != null && StringUtils.isNotBlank(currentTemplate.getDescription());
+    }
+
+    @Override
+    protected @NotNull JButton createHelpButton(@NotNull Insets insets) {
+        helpButton = super.createHelpButton(insets);
+        return helpButton;
+    }
+
+    /**
+     * Returns the help button: the one that DialogWrapper creates on the left of the dialog, or else the button of the
+     * help action among the others.
+     */
+    private @Nullable JButton getHelpButton() {
+        return helpButton != null ? helpButton : getButton(helpAction);
+    }
+
+    /**
+     * Shows the help button, which opens the instructions of the template, only for a template which has some.
+     */
+    private void updateHelpButton() {
+        JButton button = getHelpButton();
+        if (button != null) {
+            button.setVisible(hasInstructions());
+        }
+    }
+
+    /**
+     * Returns true if the help button, which opens the instructions of the template, shows.
+     */
+    @TestOnly
+    boolean isHelpButtonVisible() {
+        JButton button = getHelpButton();
+        return button != null && button.isVisible();
     }
 
     public void loadFromTemplate(@NotNull LanguageServerTemplate template) {
@@ -251,6 +297,8 @@ public class NewLanguageServerDialog extends DialogWrapper {
 
         // Update workspace folder configuration
         this.languageServerPanel.setWorkspaceFolderStrategyConfiguration(template.getWorkspaceFolderConfiguration());
+
+        updateHelpButton();
     }
 
     @Override
@@ -277,7 +325,7 @@ public class NewLanguageServerDialog extends DialogWrapper {
 
     @Override
     protected Action @NotNull [] createActions() {
-        return new Action[]{getOKAction(), getCancelAction()};
+        return new Action[]{getOKAction(), getCancelAction(), getHelpAction()};
     }
 
 
