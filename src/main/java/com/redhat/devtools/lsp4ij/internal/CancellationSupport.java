@@ -203,9 +203,9 @@ public class CancellationSupport implements CancelChecker {
             case as_notification -> // Show LSP error (ResponseErrorException) in an IJ notification
                     showNotificationError(languageServer.getServerWrapper(), featureName, error);
             case in_log -> {
-                // Show LSP error in the log
+                // Show LSP error in the log, as a warning: IntelliJ shows an error in the log as an IDE error
                 String languageServerName = languageServer.getServerDefinition().getDisplayName();
-                LOGGER.error("Error while consuming '" + featureName + "' with language server '" + languageServerName + "'", error);
+                LOGGER.warn("Error while consuming '" + featureName + "' with language server '" + languageServerName + "'", error);
             }
             default -> {
                 // Do nothing
