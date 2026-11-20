@@ -425,7 +425,7 @@ and will return the `asset.browser_download_url`.
 
 ```json
 {
-  "asset": "js-debug-dap-*.tar.gz"
+  "asset": "perllsp-*-x86_64-unknown-linux-gnu.tar.gz"
 }
 ```
 
