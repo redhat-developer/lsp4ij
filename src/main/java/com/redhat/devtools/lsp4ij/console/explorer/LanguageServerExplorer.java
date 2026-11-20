@@ -68,7 +68,7 @@ public class LanguageServerExplorer extends SimpleToolWindowPanel implements Dis
             DefaultTreeModel treeModel = (DefaultTreeModel) tree.getModel();
             DefaultMutableTreeNode root = (DefaultMutableTreeNode) treeModel.getRoot();
             for (var serverDefinition : event.serverDefinitions) {
-                root.add(new LanguageServerTreeNode(serverDefinition));
+                root.add(new LanguageServerTreeNode(serverDefinition, getProject()));
             }
             treeModel.reload(root);
             // Select the new language server node
@@ -185,7 +185,7 @@ public class LanguageServerExplorer extends SimpleToolWindowPanel implements Dis
 
         // Language server definitions will be loaded asynchronously in loadAsync()
 
-        tree.setCellRenderer(new LanguageServerTreeRenderer());
+        tree.setCellRenderer(new LanguageServerTreeRenderer(getProject()));
 
         tree.addTreeSelectionListener(treeSelectionListener);
 
@@ -369,7 +369,7 @@ public class LanguageServerExplorer extends SimpleToolWindowPanel implements Dis
                     .getServerDefinitions()
                     .stream()
                     .sorted(java.util.Comparator.comparing(LanguageServerDefinition::getDisplayName))
-                    .map(LanguageServerTreeNode::new)
+                    .map(serverDefinition -> new LanguageServerTreeNode(serverDefinition, getProject()))
                     .toList();
         })
         .expireWith(this)

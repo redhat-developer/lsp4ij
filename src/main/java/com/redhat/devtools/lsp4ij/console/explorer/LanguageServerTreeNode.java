@@ -13,8 +13,11 @@
  *******************************************************************************/
 package com.redhat.devtools.lsp4ij.console.explorer;
 
+import com.intellij.openapi.project.Project;
+import com.intellij.openapi.util.text.StringUtil;
 import com.redhat.devtools.lsp4ij.LanguageServerWrapper;
 import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
+import com.redhat.devtools.lsp4ij.ServerStatus;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
 import org.eclipse.lsp4j.ServerInfo;
 import org.eclipse.lsp4j.WorkspaceFolder;
@@ -29,13 +32,19 @@ import javax.swing.tree.DefaultMutableTreeNode;
  */
 public class LanguageServerTreeNode extends DefaultMutableTreeNode {
 
-    private final LanguageServerDefinition serverDefinition;
+    private final @NotNull LanguageServerDefinition serverDefinition;
+    private final @Nullable Project project;
 
-    public LanguageServerTreeNode(LanguageServerDefinition serverDefinition) {
+    public LanguageServerTreeNode(@NotNull LanguageServerDefinition serverDefinition, @Nullable Project project) {
         this.serverDefinition = serverDefinition;
+        this.project = project;
     }
 
-    public LanguageServerDefinition getServerDefinition() {
+    public LanguageServerTreeNode(@NotNull LanguageServerDefinition serverDefinition) {
+        this(serverDefinition, null);
+    }
+
+    public @NotNull LanguageServerDefinition getServerDefinition() {
         return serverDefinition;
     }
 
@@ -130,5 +139,133 @@ public class LanguageServerTreeNode extends DefaultMutableTreeNode {
     public @Nullable ServerInfo getServerInfo() {
         var activeNode = getActiveProcessTreeNode();
         return activeNode != null ? activeNode.getLanguageServer().getServerInfo() : null;
+    }
+
+    public @Nullable Project getProject() {
+        if (project != null) {
+            return project;
+        }
+        if (super.getChildCount() > 0 && super.getChildAt(0) instanceof LanguageServerProcessTreeNode first) {
+            return first.getLanguageServer().getProject();
+        }
+        return null;
+    }
+
+    public boolean isEnabled(@Nullable Project project) {
+        Project p = project != null ? project : getProject();
+        return p != null && serverDefinition.isEnabled(p);
+    }
+
+    public boolean isEnabled() {
+        return isEnabled(null);
+    }
+
+    public @Nullable String getStatusBadge(@Nullable Project project) {
+        if (!isEnabled(project)) {
+            return "[disabled]";
+        }
+        int total = getChildCount();
+        if (total == 0) {
+            return null;
+        }
+        int startedCount = 0;
+        int crashedCount = 0;
+        int transitionalCount = 0;
+        int instanceDisabledCount = 0;
+
+        for (int i = 0; i < total; i++) {
+            if (getChildAt(i) instanceof LanguageServerProcessTreeNode child) {
+                ServerStatus status = child.getServerStatus();
+                boolean enabled = child.getLanguageServer().isEnabled();
+                boolean hasError = child.getLanguageServer().getServerError() != null;
+
+                if (!enabled) {
+                    instanceDisabledCount++;
+                } else if (status == ServerStatus.started) {
+                    startedCount++;
+                } else if (status == ServerStatus.stopped && hasError) {
+                    crashedCount++;
+                } else if (isTransitional(status)) {
+                    transitionalCount++;
+                }
+            }
+        }
+
+        if (instanceDisabledCount == total) {
+            return "[disabled]";
+        }
+        if (startedCount == total) {
+            return "[started]";
+        }
+        if (startedCount > 0) {
+            return "[" + startedCount + "/" + total + " started]";
+        }
+        if (transitionalCount > 0) {
+            return "[starting]";
+        }
+        if (crashedCount > 0) {
+            return total > 1 ? "[" + crashedCount + "/" + total + " crashed]" : "[crashed]";
+        }
+        return "[stopped]";
+    }
+
+    public @Nullable String getStatusBadge() {
+        return getStatusBadge(null);
+    }
+
+    public @Nullable String getToolTipText(@Nullable Project project) {
+        StringBuilder sb = new StringBuilder("<html>");
+        sb.append("<b>Language Server:</b> ").append(escapeHtml(getDisplayName()));
+        sb.append(" (").append(escapeHtml(serverDefinition.getId())).append(")");
+        String serverInfo = LanguageServerTreeRenderer.formatServerInfo(getServerInfo());
+        if (serverInfo != null) {
+            sb.append("<br/><b>Server:</b> ").append(escapeHtml(serverInfo));
+        }
+        sb.append("<br/>");
+        boolean enabled = isEnabled(project);
+        sb.append("<b>Status:</b> ").append(enabled ? "Enabled" : "Disabled");
+        int total = getChildCount();
+        if (total > 0) {
+            sb.append("<br/><b>Instances:</b> ").append(total);
+            String badge = getStatusBadge(project);
+            if (badge != null) {
+                sb.append(" ").append(escapeHtml(badge));
+            }
+        }
+        Throwable error = findFirstError();
+        if (error != null && error.getMessage() != null) {
+            sb.append("<br/><b>Error:</b> ").append(escapeHtml(error.getMessage()));
+        } else if (!enabled) {
+            sb.append("<br/><b>Reason:</b> Server is disabled");
+        }
+        sb.append("</html>");
+        return sb.toString();
+    }
+
+    public @Nullable String getToolTipText() {
+        return getToolTipText(null);
+    }
+
+    private @Nullable Throwable findFirstError() {
+        for (int i = 0; i < getChildCount(); i++) {
+            if (getChildAt(i) instanceof LanguageServerProcessTreeNode child) {
+                Throwable err = child.getLanguageServer().getServerError();
+                if (err != null) {
+                    return err;
+                }
+            }
+        }
+        return null;
+    }
+
+    private static @NotNull String escapeHtml(@Nullable String text) {
+        return text != null ? StringUtil.escapeXmlEntities(text) : "";
+    }
+
+    private static boolean isTransitional(ServerStatus status) {
+        return status == ServerStatus.starting
+                || status == ServerStatus.stopping
+                || status == ServerStatus.checking_installed
+                || status == ServerStatus.installing;
     }
 }

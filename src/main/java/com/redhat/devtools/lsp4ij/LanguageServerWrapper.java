@@ -183,9 +183,11 @@ public class LanguageServerWrapper implements Disposable {
     private volatile @Nullable Alarm stopAlarm = null;
     private ServerStatus serverStatus;
     private volatile boolean disposed;
+
     private LanguageServerException serverError;
     private Long currentProcessId;
     private List<String> currentProcessCommandLines;
+    private String connectionDescription;
     private boolean initiallySupportsWorkspaceFolders = false;
     private FileOperationsManager fileOperationsManager;
     private WorkspaceFolderNotificationManager workspaceFolderNotificationManager;
@@ -635,6 +637,7 @@ public class LanguageServerWrapper implements Disposable {
                             this.currentProcessId = data.getPid();
                             this.currentProcessCommandLines = data.getCommands();
                         }
+                        this.connectionDescription = provider.getConnectionDescription();
 
                         synchronized (this) {
                             if (isDisposed() || currentInitializingContext != initializingContext) {
@@ -827,6 +830,11 @@ public class LanguageServerWrapper implements Disposable {
     @TestOnly
     synchronized void setRestartWindow(@NotNull Duration restartWindow) {
         this.restartWindow = restartWindow;
+    }
+
+    @TestOnly
+    public void setServerError(@Nullable LanguageServerException serverError) {
+        this.serverError = serverError;
     }
 
     /**
@@ -2122,6 +2130,10 @@ public class LanguageServerWrapper implements Disposable {
      */
     public Long getCurrentProcessId() {
         return currentProcessId;
+    }
+
+    public @Nullable String getConnectionDescription() {
+        return connectionDescription;
     }
 
     public List<String> getCurrentProcessCommandLine() {

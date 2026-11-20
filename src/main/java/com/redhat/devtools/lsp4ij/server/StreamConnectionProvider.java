@@ -13,6 +13,7 @@ package com.redhat.devtools.lsp4ij.server;
 import com.intellij.openapi.vfs.VirtualFile;
 import org.eclipse.lsp4j.jsonrpc.messages.Message;
 import org.eclipse.lsp4j.services.LanguageServer;
+import org.jetbrains.annotations.Nullable;
 
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -104,6 +105,17 @@ public interface StreamConnectionProvider {
         if (!isAlive()) {
             throw new CannotStartProcessException("Unable to start language server: " + this.toString()); //$NON-NLS-1$
         }
+    }
+
+    /**
+     * Returns a human-readable description of the connection when available (for example,
+     * {@code "stdio"}, {@code "connect to localhost:8080"} or {@code "accept on port 8080"}),
+     * and {@code null} when unknown.
+     *
+     * @return a description of the connection, or null when unknown.
+     */
+    default @Nullable String getConnectionDescription() {
+        return null;
     }
 
 }

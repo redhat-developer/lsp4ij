@@ -15,6 +15,7 @@ package com.redhat.devtools.lsp4ij.console.explorer;
 
 import com.intellij.icons.AllIcons;
 import com.intellij.openapi.util.text.Formats;
+import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.ui.AnimatedIcon;
 import com.redhat.devtools.lsp4ij.LanguageServerWrapper;
 import com.redhat.devtools.lsp4ij.ServerStatus;
@@ -25,6 +26,7 @@ import org.jetbrains.annotations.Nullable;
 import javax.swing.*;
 import javax.swing.tree.DefaultMutableTreeNode;
 import javax.swing.tree.DefaultTreeModel;
+import javax.swing.tree.TreeNode;
 import java.util.Comparator;
 import java.util.Objects;
 
@@ -88,15 +90,20 @@ public class LanguageServerProcessTreeNode extends DefaultMutableTreeNode {
 
     /**
      * Shows the current status again, for a change that has no status of its own, such as that of the enabled flag
-     * of the definition.
+     * of the definition or an updated error.
      */
     void refresh() {
-        setServerStatus(serverStatus);
+        displayName = getDisplayName(serverStatus);
+        this.setUserObject(displayName);
+        treeModel.nodeChanged(this);
+        TreeNode parent = getParent();
+        if (parent != null) {
+            treeModel.nodeChanged(parent);
+        }
     }
 
     public void setServerStatus(ServerStatus serverStatus) {
         this.serverStatus = serverStatus;
-        displayName = getDisplayName(serverStatus);
         if (isEnabled()) {
             switch (serverStatus) {
                 case starting:
@@ -114,8 +121,7 @@ public class LanguageServerProcessTreeNode extends DefaultMutableTreeNode {
         } else {
             startTime = -1;
         }
-        this.setUserObject(displayName);
-        treeModel.nodeChanged(this);
+        refresh();
     }
 
     private String getDisplayName(@NotNull ServerStatus serverStatus) {
@@ -212,5 +218,51 @@ public class LanguageServerProcessTreeNode extends DefaultMutableTreeNode {
         long endTime = System.currentTimeMillis();
         long duration = endTime - startTime;
         return Formats.formatDuration(duration, "\u2009");
+    }
+
+    public @Nullable String getSecondaryText() {
+        return languageServer.getConnectionDescription();
+    }
+
+    long getStartTime() {
+        return startTime;
+    }
+
+    public @Nullable String getToolTipText() {
+        StringBuilder sb = new StringBuilder("<html>");
+        String label = languageServer.getInstanceLabel();
+        if (label != null) {
+            sb.append("<b>Instance:</b> ").append(escapeHtml(label)).append("<br/>");
+        }
+        sb.append("<b>Status:</b> ").append(escapeHtml(getStatusName(serverStatus)));
+        String connectionDesc = languageServer.getConnectionDescription();
+        if (connectionDesc != null) {
+            sb.append("<br/><b>Connection:</b> ").append(escapeHtml(connectionDesc));
+        }
+        Long pid = languageServer.getCurrentProcessId();
+        if (pid != null) {
+            sb.append("<br/><b>PID:</b> ").append(pid);
+        }
+        var commandLine = languageServer.getCurrentProcessCommandLine();
+        if (commandLine != null && !commandLine.isEmpty()) {
+            sb.append("<br/><b>Command:</b> <code>");
+            for (int i = 0; i < commandLine.size(); i++) {
+                if (i > 0) {
+                    sb.append(" ");
+                }
+                sb.append(escapeHtml(commandLine.get(i)));
+            }
+            sb.append("</code>");
+        }
+        Throwable error = languageServer.getServerError();
+        if (error != null && error.getMessage() != null) {
+            sb.append("<br/><b>Error:</b> ").append(escapeHtml(error.getMessage()));
+        }
+        sb.append("</html>");
+        return sb.toString();
+    }
+
+    private static @NotNull String escapeHtml(@Nullable String text) {
+        return text != null ? StringUtil.escapeXmlEntities(text) : "";
     }
 }

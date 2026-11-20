@@ -720,9 +720,14 @@ public class SocketStreamConnectionProvider implements StreamConnectionProvider,
     }
 
     @Override
-    public String toString() {
-        String connection = direction == Direction.CONNECT ? "connect to " + address(boundPort)
+    public String getConnectionDescription() {
+        return direction == Direction.CONNECT ? "connect to " + address(boundPort)
                 : "accept on port " + boundPort;
+    }
+
+    @Override
+    public String toString() {
+        String connection = getConnectionDescription();
         var commandLine = startedCommandLine;
         return "SocketStreamConnectionProvider [" + connection
                 + (commandLine != null ? ", commandLine=" + commandLine.getCommandLineString() : "") + "]";

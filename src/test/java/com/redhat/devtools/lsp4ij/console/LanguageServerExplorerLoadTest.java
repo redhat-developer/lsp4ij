@@ -99,7 +99,11 @@ public class LanguageServerExplorerLoadTest extends LSPCodeInsightFixtureTestCas
             // Test renderer tooltip on server node
             var renderer = (LanguageServerTreeRenderer) explorer.getTree().getCellRenderer();
             renderer.customizeCellRenderer(explorer.getTree(), serverNode, false, false, false, 0, false);
-            assertEquals("mock-ls 1.2.3", renderer.getToolTipText());
+            String tooltip = renderer.getToolTipText();
+            assertNotNull(tooltip);
+            assertTrue(tooltip.contains("mock-ls 1.2.3"));
+            assertTrue(tooltip.contains("<b>Server:</b> mock-ls 1.2.3"));
+            assertTrue(tooltip.contains("<b>Language Server:</b>"));
 
             // Stop server and verify metadata retention
             languageServer.stop().get(10, TimeUnit.SECONDS);
