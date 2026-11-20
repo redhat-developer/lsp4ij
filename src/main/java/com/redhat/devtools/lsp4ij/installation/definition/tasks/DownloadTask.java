@@ -34,15 +34,15 @@ import java.util.function.Function;
 /**
  * <pre>
  *     "download": {
- *       "name": "Download sdl-lsp",
- *       "url": "https://oss.sonatype.org/content/repositories/snapshots/io/smartdatalake/sdl-lsp/1.0-SNAPSHOT/sdl-lsp-1.0-20250503.111518-23-jar-with-dependencies.jar",
+ *       "name": "Download Camel Language Server",
+ *       "url": "https://repo1.maven.org/maven2/com/github/camel-tooling/camel-lsp-server/1.31.0/camel-lsp-server-1.31.0.jar",
  *       "output": {
- *         "dir": "$USER_HOME$/.lsp4ij/lsp/sdl-lsp"
+ *         "dir": "$USER_HOME$/.lsp4ij/lsp/camel-lsp-server"
  *       },
  *       "onSuccess": {
  *         "configureServer": {
- *           "name": "Configure sdl-lsp server command",
- *           "command": "java -jar ${output.dir}/${output.file.name}",
+ *           "name": "Configure Camel Language Server command",
+ *           "command": "java -jar \"${output.dir}/${output.file.name}\"",
  *           "update": true
  *         }
  *       }
