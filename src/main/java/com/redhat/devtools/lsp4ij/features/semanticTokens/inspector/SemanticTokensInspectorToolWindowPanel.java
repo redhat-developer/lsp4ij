@@ -25,6 +25,7 @@ import com.intellij.util.ui.JBFont;
 import com.intellij.util.ui.JBUI;
 
 import javax.swing.*;
+import javax.swing.text.DefaultCaret;
 import java.awt.*;
 
 /**
@@ -154,12 +155,17 @@ public class SemanticTokensInspectorToolWindowPanel extends SimpleToolWindowPane
         return editorData;
     }
 
-    private JBTextArea createEditor() {
+    static JBTextArea createEditor() {
         JBTextArea semanticTokenEditor = new JBTextArea(5, 0);
         semanticTokenEditor.setLineWrap(true);
         semanticTokenEditor.setWrapStyleWord(true);
         semanticTokenEditor.setFont(JBFont.regular());
         semanticTokenEditor.setEditable(false);
+        // A refresh of the text keeps the caret, and so the view, where the user left them, instead of moving the
+        // caret to the end of the new text, which scrolls the view to the bottom (#400)
+        if (semanticTokenEditor.getCaret() instanceof DefaultCaret caret) {
+            caret.setUpdatePolicy(DefaultCaret.NEVER_UPDATE);
+        }
         return semanticTokenEditor;
     }
 

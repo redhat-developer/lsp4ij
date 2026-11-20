@@ -19,11 +19,27 @@ import java.util.List;
 /**
  * Semantic tokens inspector data.
  *
- * @param document
- * @param file
- * @param highlightInfos
+ * @param document       the document of the semantic tokens.
+ * @param file           the file of the semantic tokens.
+ * @param highlightInfos the semantic tokens, with their offsets in the text.
+ * @param text           the text of the document when the semantic tokens were computed, which their offsets are
+ *                       in: the inspector shows them later, when the document can have changed.
  */
 public record SemanticTokensInspectorData(@NotNull Document document,
                                           @NotNull PsiFile file,
-                                          @NotNull List<SemanticTokensHighlightInfo> highlightInfos) {
+                                          @NotNull List<SemanticTokensHighlightInfo> highlightInfos,
+                                          @NotNull String text) {
+
+    /**
+     * Creates the data of the given semantic tokens, whose offsets are in the current text of the document.
+     *
+     * @param document       the document of the semantic tokens.
+     * @param file           the file of the semantic tokens.
+     * @param highlightInfos the semantic tokens, with their offsets in the current text of the document.
+     */
+    public SemanticTokensInspectorData(@NotNull Document document,
+                                       @NotNull PsiFile file,
+                                       @NotNull List<SemanticTokensHighlightInfo> highlightInfos) {
+        this(document, file, highlightInfos, document.getText());
+    }
 }

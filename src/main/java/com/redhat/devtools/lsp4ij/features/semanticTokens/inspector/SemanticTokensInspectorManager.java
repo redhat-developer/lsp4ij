@@ -64,27 +64,32 @@ public class SemanticTokensInspectorManager {
                                 boolean showTokenType,
                                 boolean showTokenModifiers,
                                 Project project) {
-        var document = data.document();
+        // The text which the offsets of the tokens are in: the document can have changed since (#399)
+        var text = data.text();
         var infos = data.highlightInfos();
         if (infos.isEmpty()) {
-            return document.getText();
+            return text;
         }
         infos.sort(HIGHLIGHT_INFO_SORTER());
         if (ApplicationManager.getApplication().isWriteAccessAllowed()) {
-            return doFormat(infos, document, showTextAttributes, showTokenType, showTokenModifiers);
+            return doFormat(infos, text, showTextAttributes, showTokenType, showTokenModifiers);
         }
         return WriteCommandAction.runWriteCommandAction(project, (Computable<String>) () -> {
-            return doFormat(infos, document, showTextAttributes, showTokenType, showTokenModifiers);
+            return doFormat(infos, text, showTextAttributes, showTokenType, showTokenModifiers);
         });
     }
 
     private static @NotNull String doFormat(List<SemanticTokensHighlightInfo> infos,
-                                            Document document,
+                                            String text,
                                             boolean showTextAttributes,
                                             boolean showTokenType,
                                             boolean showTokenModifiers) {
-        Document newDocument = new DocumentImpl(document.getText());
+        Document newDocument = new DocumentImpl(text);
         for (var info : infos) {
+            if (info.start() < 0 || info.start() > info.end() || info.end() > text.length()) {
+                // A token outside the text, as one with a large value from a server: nothing to show it at
+                continue;
+            }
             String infoToShow = format(info, showTextAttributes, showTokenType, showTokenModifiers);
 
             int end = info.end();
