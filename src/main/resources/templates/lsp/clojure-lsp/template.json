@@ -2,8 +2,8 @@
   "id": "clojure-lsp",
   "name": "Clojure LSP",
   "programArgs": {
-    "windows": "\"${BASE_DIR}/clojure-lsp.exe\"",
-    "default": "\"${BASE_DIR}/clojure-lsp.sh\""
+    "windows": "\"$USER_HOME$/.lsp4ij/lsp/clojure-lsp/clojure-lsp.exe\"",
+    "default": "\"$USER_HOME$/.lsp4ij/lsp/clojure-lsp/clojure-lsp\""
   },
   "expandConfiguration": true,
   "disablePromotionFor": ["com.github.clojure-lsp"],

@@ -101,6 +101,75 @@ public class BundledTemplateCommandsTest {
         assertEquals(List.of(), problems, "put the paths of the commands in double quotes");
     }
 
+    /**
+     * A template whose installer checks for the language server where its download puts it starts the language server
+     * there, as the command that the installer gives it once it has downloaded it: when the check finds the language
+     * server installed, the download doesn't run, and the language server keeps the command of its template (#2011).
+     * Not the templates that start a language server on the PATH, as cpp_ls, nor those whose installer puts it in a
+     * folder named after its version, as clangd.
+     */
+    @Test
+    void aTemplateStartsItsLanguageServerWhereItsInstallerPutsIt() throws IOException, URISyntaxException {
+        var files = bundledFiles();
+        List<String> problems = new ArrayList<>();
+        for (String server : List.of("clojure-lsp", "harper-ls", "jdtls", "lemminx", "luau-lsp", "perl-lsp")) {
+            var template = files.get("lsp/" + server + "/template.json");
+            var installer = files.get("lsp/" + server + "/installer.json");
+            assertNotNull(template, server);
+            assertNotNull(installer, server);
+            for (String os : List.of("windows", "default")) {
+                String command = byOs(template.get("programArgs"), os);
+                String installed = installedCommand(installer, os);
+                if (!command.equals(installed)) {
+                    problems.add(server + " (" + os + "): " + command + ", installed: " + installed);
+                }
+            }
+        }
+        assertEquals(List.of(), problems, "start the language server where its installer puts it");
+    }
+
+    /**
+     * Returns the command that the download of the given installer gives the language server on the given OS,
+     * {@code windows} or {@code default}, with the directory and the file of the download.
+     */
+    private static @NotNull String installedCommand(@NotNull JsonObject installer, @NotNull String os) {
+        Map<String, String> properties = new HashMap<>();
+        var declared = installer.getAsJsonObject("properties");
+        if (declared != null) {
+            declared.entrySet().forEach(property -> properties.put(property.getKey(), property.getValue().getAsString()));
+        }
+        var download = installer.getAsJsonObject("run").getAsJsonObject("download");
+        var output = download.getAsJsonObject("output");
+        properties.put("output.dir", resolve(output.get("dir").getAsString(), properties));
+        var file = output.getAsJsonObject("file");
+        if (file != null) {
+            properties.put("output.file.name", byOs(file.get("name"), os));
+        } else {
+            // Without a file name, the download keeps the name of the file of its URL
+            String url = byOs(download.get("url"), os);
+            properties.put("output.file.name", url.substring(url.lastIndexOf('/') + 1));
+        }
+        var command = download.getAsJsonObject("onSuccess").getAsJsonObject("configureServer").get("command");
+        return resolve(byOs(command, os), properties);
+    }
+
+    /**
+     * Returns the value for the given OS, {@code windows} or {@code default}, of a value that can differ by OS: a
+     * string, or an object by OS, whose {@code default}, or else {@code unix}, is for the OS other than Windows.
+     */
+    private static @NotNull String byOs(@NotNull JsonElement value, @NotNull String os) {
+        if (value.isJsonPrimitive()) {
+            return value.getAsString();
+        }
+        var byOs = value.getAsJsonObject();
+        for (String key : os.equals("windows") ? List.of("windows", "default") : List.of("default", "unix")) {
+            if (byOs.has(key)) {
+                return byOs.get(key).getAsString();
+            }
+        }
+        throw new AssertionError("No value for " + os + " in " + value);
+    }
+
     private static @NotNull String resolve(@NotNull String text, @NotNull Map<String, String> properties) {
         String resolved = text;
         for (int i = 0; i < 5; i++) {
