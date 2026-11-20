@@ -35,6 +35,7 @@ import com.redhat.devtools.lsp4ij.dap.DAPBundle;
 import com.redhat.devtools.lsp4ij.dap.DAPDebugProcess;
 import com.redhat.devtools.lsp4ij.dap.DebugMode;
 import com.redhat.devtools.lsp4ij.dap.TransportStreams;
+import com.redhat.devtools.lsp4ij.dap.breakpoints.BreakpointInternalSupport;
 import com.redhat.devtools.lsp4ij.dap.breakpoints.DAPDataBreakpointHandler;
 import com.redhat.devtools.lsp4ij.dap.client.variables.DAPValueFormat;
 import com.redhat.devtools.lsp4ij.dap.descriptors.DebugAdapterDescriptor;
@@ -603,7 +604,8 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
     /**
      * Suspends the session where the given thread stopped. When a breakpoint stopped it, the session is told which
      * one; otherwise, the session is suspended at the top frame, and an exception which stopped the thread is shown
-     * there. What a data breakpoint saw change, as the stopped event describes it, is shown where the program stopped.
+     * there. A stop which the debug adapter reports as caused by a breakpoint of any kind, such as an exception
+     * breakpoint, brings the debugger to the front as an IntelliJ breakpoint does. What a data breakpoint saw change, as the stopped event describes it, is shown where the program stopped.
      *
      * @param server        the debug adapter.
      * @param args          the stopped event.
@@ -632,12 +634,64 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
             }
             return;
         }
-        getSession().positionReached(context);
+        positionReached(getSession(), context, args.getReason());
         if (StoppedEventArgumentsReason.EXCEPTION.equals(args.getReason())) {
             showExceptionHint(getProject(), context, server, getCapabilities(), args, DAPClient::showErrorHint);
         } else {
             showDataBreakpointHint(getProject(), context, args, DAPClient::showInformationHint);
         }
+    }
+
+    /**
+     * Tells the session that the program stopped where the given context says. When the stopped event's reason says
+     * that a breakpoint of any kind stopped the program, the session attracts the user as at an IntelliJ breakpoint:
+     * it brings the Debug tool window to the front (when "Show debug window on breakpoint" is on) and selects the
+     * Debugger tab (Variables in the classic UI). Without the internal API for that, the session selects the tab
+     * only. Steps, pauses and other stops leave the tool window and its tabs as they are.
+     *
+     * @param session the debug session.
+     * @param context the suspend context of the stop.
+     * @param reason  the reason of the stopped event.
+     */
+    static void positionReached(@NotNull XDebugSession session,
+                                @NotNull XSuspendContext context,
+                                @Nullable String reason) {
+        if (!isBreakpointReason(reason)) {
+            session.positionReached(context);
+            return;
+        }
+        if (BreakpointInternalSupport.positionReached(session, context, true)) {
+            return;
+        }
+        session.positionReached(context);
+        ApplicationManager.getApplication().invokeLater(() -> {
+            var ui = session.getUI();
+            if (ui != null && !session.isStopped()) {
+                ui.attractBy(BREAKPOINT_CONDITION);
+            }
+        }, ModalityState.any(), session.getProject().getDisposed());
+    }
+
+    /**
+     * The condition which selects the Debugger tab when a breakpoint stops the program
+     * ({@code XDebuggerUIConstants.LAYOUT_VIEW_BREAKPOINT_CONDITION}, which is internal).
+     */
+    static final String BREAKPOINT_CONDITION = "breakpoint";
+
+    /**
+     * Returns whether the reason of a stopped event says that a breakpoint of any kind stopped the program: a line,
+     * exception, function, data or instruction breakpoint. A step, a pause, a stop on entry and a reason which DAP
+     * doesn't define don't.
+     *
+     * @param reason the reason of the stopped event.
+     * @return true if a breakpoint stopped the program and false otherwise.
+     */
+    static boolean isBreakpointReason(@Nullable String reason) {
+        return StoppedEventArgumentsReason.BREAKPOINT.equals(reason)
+                || StoppedEventArgumentsReason.EXCEPTION.equals(reason)
+                || StoppedEventArgumentsReason.FUNCTION_BREAKPOINT.equals(reason)
+                || StoppedEventArgumentsReason.DATA_BREAKPOINT.equals(reason)
+                || StoppedEventArgumentsReason.INSTRUCTION_BREAKPOINT.equals(reason);
     }
 
     /**
