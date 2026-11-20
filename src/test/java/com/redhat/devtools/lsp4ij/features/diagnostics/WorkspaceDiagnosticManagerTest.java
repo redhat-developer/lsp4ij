@@ -566,6 +566,33 @@ public class WorkspaceDiagnosticManagerTest {
     }
 
     @Test
+    public void retriesAPullTheServerCancelledItself() throws Exception {
+        var h = harness();
+        h.manager.updateProviders(Set.of("lua"));
+        var first = h.next();
+        h.partial(first, full("file:///a.lua", "one"));
+        assertNotNull(h.applied.poll(5, TimeUnit.SECONDS));
+        // LSP4J answers RequestCancelled for any request whose future the server cancels, also one that the client
+        // didn't cancel
+        first.future.completeExceptionally(new ResponseErrorException(new ResponseError(ResponseErrorCode.RequestCancelled,
+                "The request (id: 1, method: 'workspace/diagnostic') has been cancelled", null)));
+        var second = h.next();
+        assertEquals(List.of(new PreviousResultId("file:///a.lua", "one")),
+                second.params.getPreviousResultIds());
+    }
+
+    @Test
+    public void stopsAfterAFailedPull() throws Exception {
+        var h = harness();
+        h.manager.updateProviders(Set.of("lua"));
+        h.next().future.completeExceptionally(new ResponseErrorException(new ResponseError(
+                ResponseErrorCode.InternalError, "failed", null)));
+        assertNull(h.requests.poll(1200, TimeUnit.MILLISECONDS));
+        h.manager.refresh();
+        assertNotNull(h.next());
+    }
+
+    @Test
     public void retriesContentModifiedAndRetainsPreviousResults() throws Exception {
         var h = harness();
         h.manager.updateProviders(Set.of("lua"));

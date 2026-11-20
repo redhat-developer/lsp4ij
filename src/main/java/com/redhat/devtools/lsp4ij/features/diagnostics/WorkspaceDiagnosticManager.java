@@ -363,6 +363,13 @@ public final class WorkspaceDiagnosticManager implements Disposable {
             return true;
         }
         if (error instanceof ResponseErrorException response
+                && response.getResponseError().getCode() == ResponseErrorCode.RequestCancelled.getValue()) {
+            // The server cancelled the pull itself: a pull that this client cancels completes with a
+            // CancellationException, without waiting for the server's answer. LSP4J answers RequestCancelled for any
+            // request whose future a server cancels, so this is the ServerCancelled of such a server.
+            return true;
+        }
+        if (error instanceof ResponseErrorException response
                 && response.getResponseError().getCode() == ResponseErrorCode.ServerCancelled.getValue()) {
             var data = response.getResponseError().getData();
             if (data == null) {
