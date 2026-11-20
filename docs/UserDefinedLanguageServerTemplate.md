@@ -319,20 +319,20 @@ Example: downloading a JAR and configuring the start command
 
 ```json
 {
-  "id": "sdl-lsp",
-  "name": "sdl-lsp",
+  "id": "camel-lsp-server",
+  "name": "Camel Language Server",
   "check": {},
   "run": {
     "download": {
-      "name": "Download sdl-lsp",
-      "url": "https://oss.sonatype.org/.../sdl-lsp-1.0-20250503.111518-23-jar-with-dependencies.jar",
+      "name": "Download Camel Language Server",
+      "url": "https://repo1.maven.org/maven2/com/github/camel-tooling/camel-lsp-server/1.31.0/camel-lsp-server-1.31.0.jar",
       "output": {
-        "dir": "$USER_HOME$/.lsp4ij/lsp/sdl-lsp"
+        "dir": "$USER_HOME$/.lsp4ij/lsp/camel-lsp-server"
       },
       "onSuccess": {
         "configureServer": {
-          "name": "Configure sdl-lsp server command",
-          "command": "java -jar ${output.dir}/${output.file.name}",
+          "name": "Configure Camel Language Server command",
+          "command": "java -jar \"${output.dir}/${output.file.name}\"",
           "update": true
         }
       }
@@ -425,8 +425,7 @@ and will return the `asset.browser_download_url`.
 
 ```json
 {
-      "asset": "sdl-lsp-*-jar-with-dependencies.jar"
- 
+  "asset": "js-debug-dap-*.tar.gz"
 }
 ```
 
@@ -527,8 +526,8 @@ Used to set the server launch command:
 ```json5
 {
   "configureServer": {
-    "name": "Configure sdl-lsp server command",
-    "command": "java -jar ${output.dir}/${output.file.name}",
+    "name": "Configure Camel Language Server command",
+    "command": "java -jar \"${output.dir}/${output.file.name}\"",
     "update": true
   }
 }
