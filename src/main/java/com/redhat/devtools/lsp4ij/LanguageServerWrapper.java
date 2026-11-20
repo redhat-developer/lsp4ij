@@ -181,6 +181,8 @@ public class LanguageServerWrapper implements Disposable {
     private ServerCapabilities serverCapabilities;
     private volatile @Nullable ServerInfo serverInfo;
     private volatile @Nullable Alarm stopAlarm = null;
+    // The LSP requests sent to the language server that it hasn't answered yet, which its stop cancels
+    private final Set<CompletableFuture<?>> pendingRequests = ConcurrentHashMap.newKeySet();
     private ServerStatus serverStatus;
     private volatile boolean disposed;
 
@@ -2729,6 +2731,7 @@ public class LanguageServerWrapper implements Disposable {
                 disposeFileSupports(this.openedDocuments.values().stream()
                         .map(OpenedDocument::getFile)
                         .toList());
+                cancelPendingRequests();
                 while (!this.openedDocuments.isEmpty()) {
                     disconnect(this.openedDocuments.keySet().iterator().next(), false);
                 }
@@ -2748,6 +2751,36 @@ public class LanguageServerWrapper implements Disposable {
                 }
             }
         }
+    }
+
+    /**
+     * Cancels the given LSP request, sent to this language server, if the language server stops before it answers.
+     * LSP4J does not complete the requests which are still pending when the connection closes. The stop disposes the
+     * supports of the files of the language server, which ends their requests and drops their cached results; a
+     * request which isn't held by the support of a file, as {@code workspace/symbol} for Search Everywhere, would
+     * never complete without this, and so neither would the requests to the other language servers that it is merged
+     * with (#722). A request of the support of a file is left to its disposal: cancelled earlier, it would complete
+     * before its cached result is dropped, and the file would get it again as a result of the restarted server.
+     *
+     * @param request the LSP request, which isn't held by the support of a file.
+     */
+    @ApiStatus.Internal
+    public void cancelOnStop(@NotNull CompletableFuture<?> request) {
+        if (request.isDone()) {
+            return;
+        }
+        pendingRequests.add(request);
+        request.whenComplete((result, error) -> pendingRequests.remove(request));
+    }
+
+    /**
+     * Cancels the LSP requests that the stopped language server hasn't answered: a cancelled request gives no result.
+     */
+    private void cancelPendingRequests() {
+        for (var request : pendingRequests) {
+            CancellationSupport.cancel(request);
+        }
+        pendingRequests.clear();
     }
 
     /**
