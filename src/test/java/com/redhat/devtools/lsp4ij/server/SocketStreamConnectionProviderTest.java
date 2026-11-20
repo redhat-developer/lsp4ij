@@ -20,6 +20,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.net.Inet6Address;
 import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.nio.charset.StandardCharsets;
@@ -44,6 +45,14 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class SocketStreamConnectionProviderTest extends LightPlatformTestCase {
 
     private static final String HOST = InetAddress.getLoopbackAddress().getHostAddress();
+
+    /**
+     * {@link #HOST} as a provider writes it before a port: in brackets when it is ::1, as on a JVM that prefers IPv6
+     * addresses.
+     */
+    private static final String HOST_BEFORE_A_PORT = InetAddress.getLoopbackAddress() instanceof Inet6Address
+            ? "[" + HOST + "]" : HOST;
+
     private static final long HANG_BOUND_HOURS = 1;
 
     public void testConnectsToALanguageServerThatRunsAlreadyAndLeavesItRunningWhenItStops() throws Exception {
@@ -57,7 +66,7 @@ public class SocketStreamConnectionProviderTest extends LightPlatformTestCase {
                     assertTrue(provider.isAlive());
                     assertNull("LSP4IJ started no process", provider.getPid());
                     assertEquals(List.of(), provider.getCommands());
-                    assertEquals("connect to " + HOST + ":" + server.getLocalPort(), provider.getConnectionDescription());
+                    assertEquals("connect to " + HOST_BEFORE_A_PORT + ":" + server.getLocalPort(), provider.getConnectionDescription());
 
                     writeLine(provider.getOutputStream(), "ping");
                     assertEquals("ping", readLine(accepted.getInputStream()));
@@ -88,7 +97,7 @@ public class SocketStreamConnectionProviderTest extends LightPlatformTestCase {
             fail("nothing listens on port " + port);
         } catch (CannotStartProcessException e) {
             // it names the host and the port, and on the IPv4 loopback address, the IPv6 one
-            assertTrue(e.getMessage(), e.getMessage().contains(HOST + ":" + port));
+            assertTrue(e.getMessage(), e.getMessage().contains(HOST_BEFORE_A_PORT + ":" + port));
             assertEquals(e.getMessage(), HOST.startsWith("127."), e.getMessage().contains("::1"));
         }
         assertFalse(provider.isAlive());
@@ -518,7 +527,7 @@ public class SocketStreamConnectionProviderTest extends LightPlatformTestCase {
     public void testConnectionDescriptionForAttach() throws Exception {
         try (var server = new ServerSocket(0, 1, InetAddress.getLoopbackAddress())) {
             var provider = SocketStreamConnectionProvider.attachTo(HOST, server.getLocalPort());
-            assertEquals("connect to " + HOST + ":" + server.getLocalPort(), provider.getConnectionDescription());
+            assertEquals("connect to " + HOST_BEFORE_A_PORT + ":" + server.getLocalPort(), provider.getConnectionDescription());
         }
     }
 
