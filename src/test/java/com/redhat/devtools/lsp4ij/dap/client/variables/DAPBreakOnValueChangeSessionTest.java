@@ -61,6 +61,8 @@ import org.eclipse.lsp4j.debug.StoppedEventArgumentsReason;
 import org.eclipse.lsp4j.debug.Thread;
 import org.eclipse.lsp4j.debug.ThreadsResponse;
 import org.eclipse.lsp4j.debug.Variable;
+import org.eclipse.lsp4j.debug.VariablePresentationHint;
+import org.eclipse.lsp4j.debug.VariablePresentationHintAttributes;
 import org.eclipse.lsp4j.debug.VariablesArguments;
 import org.eclipse.lsp4j.debug.VariablesResponse;
 import org.eclipse.lsp4j.debug.launch.DSPLauncher;
@@ -83,7 +85,8 @@ import java.util.stream.IntStream;
 /**
  * "Break on Value Change" in a debug session, against a DAP server in the test's process which the session attaches
  * to: on a value of the stopped frame, as the Variables view shows it, it asks the DAP server for its data and adds a
- * data breakpoint, which is sent to the DAP server and goes with the session, since its data can't persist.
+ * data breakpoint, which is sent to the DAP server and goes with the session, since its data can't persist. And
+ * "Set Value…", which such a value has unless the DAP server marks it as read-only.
  */
 public class DAPBreakOnValueChangeSessionTest extends HeavyPlatformTestCase {
 
@@ -143,6 +146,12 @@ public class DAPBreakOnValueChangeSessionTest extends HeavyPlatformTestCase {
         debug(false);
         var event = breakOnValueChange(value("counter", "count"));
         assertFalse(event.getPresentation().isEnabledAndVisible());
+    }
+
+    public void testOnlyAValueWhichIsNotReadOnlyCanBeSet() throws Exception {
+        debug(true);
+        assertNotNull("A writable value can be set", value("counter", "count").getModifier());
+        assertNull("A read-only value can't be set", value("counter", "limit").getModifier());
     }
 
     /**
@@ -247,8 +256,9 @@ public class DAPBreakOnValueChangeSessionTest extends HeavyPlatformTestCase {
     }
 
     /**
-     * A DAP server of a program stopped in the frame 7, whose locals are a 'counter' with a field 'count'. With data
-     * breakpoints, it watches 'count', with the data id "2:count", which can't persist.
+     * A DAP server of a program stopped in the frame 7, whose locals are a 'counter' with a field 'count' and a
+     * read-only field 'limit'. It can set variables, and with data breakpoints, it watches 'count', with the data id
+     * "2:count", which can't persist.
      */
     private static class CounterServer implements IDebugProtocolServer {
 
@@ -298,6 +308,7 @@ public class DAPBreakOnValueChangeSessionTest extends HeavyPlatformTestCase {
             var capabilities = new Capabilities();
             capabilities.setSupportsConfigurationDoneRequest(true);
             capabilities.setSupportsDataBreakpoints(supportsDataBreakpoints);
+            capabilities.setSupportsSetVariable(true);
             return CompletableFuture.completedFuture(capabilities);
         }
 
@@ -355,7 +366,7 @@ public class DAPBreakOnValueChangeSessionTest extends HeavyPlatformTestCase {
             var response = new VariablesResponse();
             response.setVariables(switch (args.getVariablesReference()) {
                 case LOCALS_REFERENCE -> new Variable[]{variable("counter", "Counter", COUNTER_REFERENCE)};
-                case COUNTER_REFERENCE -> new Variable[]{variable("count", "0", 0)};
+                case COUNTER_REFERENCE -> new Variable[]{variable("count", "0", 0), readOnly(variable("limit", "10", 0))};
                 default -> new Variable[0];
             });
             return CompletableFuture.completedFuture(response);
@@ -396,6 +407,13 @@ public class DAPBreakOnValueChangeSessionTest extends HeavyPlatformTestCase {
             variable.setName(name);
             variable.setValue(value);
             variable.setVariablesReference(variablesReference);
+            return variable;
+        }
+
+        private static Variable readOnly(Variable variable) {
+            var hint = new VariablePresentationHint();
+            hint.setAttributes(new String[]{VariablePresentationHintAttributes.READ_ONLY});
+            variable.setPresentationHint(hint);
             return variable;
         }
     }

@@ -60,12 +60,14 @@ public class ApplicationUtilsTest extends BasePlatformTestCase {
         runWithoutTheWriteIntentLock(() -> {
             access.add(application.isReadAccessAllowed());
             access.add(ApplicationUtils.runCancellableReadAction(() -> hasWriteIntentLock(), getTestRootDisposable()));
+            access.add(application.isReadAccessAllowed());
             var writeIntent = new AtomicBoolean();
             ApplicationUtils.runCancellableReadAction(() -> writeIntent.set(hasWriteIntentLock()), getTestRootDisposable());
             access.add(writeIntent.get());
         });
 
-        assertEquals("The EDT has no read access, and both overloads take the write-intent lock", List.of(false, true, true), access);
+        assertEquals("The EDT has no read access before each overload, and each takes the write-intent lock",
+                List.of(false, true, false, true), access);
     }
 
     public void testAReadActionOffTheEdtIsANonBlockingReadAction() throws Exception {
