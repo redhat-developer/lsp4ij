@@ -13,6 +13,7 @@ package com.redhat.devtools.lsp4ij.dap.settings.ui;
 import com.intellij.execution.configuration.EnvironmentVariablesComponent;
 import com.intellij.execution.configuration.EnvironmentVariablesData;
 import com.intellij.openapi.Disposable;
+import com.intellij.openapi.fileChooser.FileChooserDescriptor;
 import com.intellij.openapi.fileChooser.FileChooserDescriptorFactory;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.ComboBox;
@@ -324,7 +325,10 @@ public class DebugAdapterServerPanel implements Disposable {
         configurationTab.addLabeledComponent(DAPBundle.message("dap.settings.editor.configuration.cwd.field"), workingDirectoryField);
 
         fileField = new TextFieldWithBrowseButton();
-        fileField.addBrowseFolderListener(new TextBrowseFolderListener(FileChooserDescriptorFactory.createSingleFileDescriptor(), getProject()));
+        // A file, a folder or a jar, as the deprecated FileChooserDescriptorFactory.createSingleFileDescriptor() lets
+        // you choose: a program to debug can be a folder, such as a Go package
+        var fileDescriptor = new FileChooserDescriptor(true, true, true, true, false, false);
+        fileField.addBrowseFolderListener(new TextBrowseFolderListener(fileDescriptor, getProject()));
         configurationTab.addLabeledComponent(DAPBundle.message("dap.settings.editor.configuration.file.field"), fileField);
 
         ButtonGroup buttonGroup = new ButtonGroup();

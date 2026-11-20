@@ -152,7 +152,7 @@ public class WorkspaceFoldersPanel extends JPanel implements Disposable {
                         });
                     }, 500);
                 }
-            });
+            }, this);
 
             jsonEditorPanel = new JPanel(new BorderLayout());
             jsonEditorPanel.add(jsonEditor, BorderLayout.CENTER);

@@ -8,8 +8,9 @@
 package com.redhat.devtools.lsp4ij.features.documentation;
 
 import com.intellij.model.Pointer;
-import com.intellij.openapi.application.ReadAction;
+import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.editor.Document;
+import com.intellij.openapi.util.Computable;
 import com.intellij.platform.backend.documentation.DocumentationResult;
 import com.intellij.platform.backend.documentation.DocumentationTarget;
 import com.intellij.platform.backend.presentation.TargetPresentation;
@@ -71,9 +72,10 @@ public class LSPPendingHoverDocumentationTarget implements DocumentationTarget {
      */
     public @NotNull List<LSPDocumentationTarget> getTargets() {
         LSPDocumentationTargetProvider.await(hoverFuture);
-        return ReadAction.compute(() -> file.isValid() && document.getModificationStamp() == modificationStamp
-                ? LSPDocumentationTargetProvider.toDocumentationTargets(hoverFuture, document, file)
-                : List.of());
+        return ApplicationManager.getApplication().runReadAction((Computable<List<LSPDocumentationTarget>>) () ->
+                file.isValid() && document.getModificationStamp() == modificationStamp
+                        ? LSPDocumentationTargetProvider.toDocumentationTargets(hoverFuture, document, file)
+                        : List.of());
     }
 
     /**
@@ -87,7 +89,7 @@ public class LSPPendingHoverDocumentationTarget implements DocumentationTarget {
             return null;
         }
         // The separator of the contents of one hover, see LSPDocumentationHelper.convertToHtml
-        return ReadAction.compute(() -> targets.stream()
+        return ApplicationManager.getApplication().runReadAction((Computable<String>) () -> targets.stream()
                 .map(LSPDocumentationTarget::getHtml)
                 .collect(Collectors.joining("<hr />")));
     }

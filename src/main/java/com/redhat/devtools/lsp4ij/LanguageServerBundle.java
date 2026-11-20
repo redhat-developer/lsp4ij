@@ -30,7 +30,7 @@ public final class LanguageServerBundle extends DynamicBundle {
   private static final LanguageServerBundle INSTANCE = new LanguageServerBundle();
 
   private LanguageServerBundle() {
-    super(BUNDLE);
+    super(LanguageServerBundle.class, BUNDLE);
   }
 
   @NotNull

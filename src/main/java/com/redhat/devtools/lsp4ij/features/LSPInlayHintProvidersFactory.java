@@ -12,7 +12,6 @@ package com.redhat.devtools.lsp4ij.features;
 
 import com.intellij.codeInsight.hints.InlayHintsProviderFactory;
 import com.intellij.codeInsight.hints.ProviderInfo;
-import com.intellij.openapi.project.Project;
 import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
 import com.redhat.devtools.lsp4ij.features.inlayhint.LSPInlayHintsProvider;
 import org.jetbrains.annotations.NotNull;
@@ -29,11 +28,5 @@ public class LSPInlayHintProvidersFactory implements InlayHintsProviderFactory {
     @Override
     public List<ProviderInfo<? extends Object>> getProvidersInfo() {
         return LanguageServersRegistry.getInstance().getInlayHintProviderInfos();
-    }
-
-    @NotNull
-    @Override
-    public List<ProviderInfo<? extends Object>> getProvidersInfo(@NotNull Project project) {
-        return getProvidersInfo();
     }
 }
