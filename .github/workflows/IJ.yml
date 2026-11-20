@@ -47,7 +47,7 @@ jobs:
           # A pull request is verified against the oldest and the newest release, where an API goes missing or is
           # removed, and main against all the releases since the oldest, and the current EAP. The newest release is the
           # one that ci.yml tests on.
-          ./gradlew verifyPlugin -Dplugin.verifier.home.dir=~/.pluginVerifier ${{ github.event_name == 'pull_request' && '-PverifiedIdes=2024.2,2026.3' || '' }}
+          ./gradlew verifyPlugin -Dplugin.verifier.home.dir=~/.pluginVerifier ${{ github.event_name == 'pull_request' && '-PverifiedIdes=2025.1,2026.3' || '' }}
           REPORTS=$(cat ${{ github.workspace }}/build/reports/pluginVerifier/*/report.md | sed 's/^#/##/')
           echo "$REPORTS" >> $GITHUB_STEP_SUMMARY
 

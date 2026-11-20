@@ -259,7 +259,7 @@ public class CommandUtils {
     /**
      * Looks up an executable in the given PATH: the file of that name that can be executed in the first of its
      * directories which has one, as {@code PathEnvironmentVariableUtil.findInPath} does. IntelliJ 2026.3 schedules
-     * {@code findInPath} for removal, and the {@code findFirst} which replaces it doesn't exist in IntelliJ 2024.2.
+     * {@code findInPath} for removal, and the {@code findFirst} which replaces it doesn't exist in IntelliJ 2025.1.
      *
      * @param executable the name of the executable, without a path.
      * @param path       the PATH to look it up in.

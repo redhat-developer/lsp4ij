@@ -32,7 +32,7 @@ import java.util.concurrent.CompletableFuture;
  * The tooltip of a breakpoint is refreshed each time its presentation in the session changes (see
  * {@link BreakpointHandlerBase#refreshTooltip}).
  * <p>
- * The tests run on IntelliJ 2024.2, where the refresh itself does nothing, so the handler records the breakpoints
+ * The tests run on IntelliJ 2025.1, where the refresh itself does nothing, so the handler records the breakpoints
  * whose tooltip it refreshes; one test checks the refresh itself on versions which have it. This test is only about
  * that workaround: remove it together with
  * {@code refreshTooltip()} once IntelliJ refreshes the tooltip itself.
@@ -122,7 +122,7 @@ public class DAPBreakpointTooltipRefreshTest extends HeavyPlatformTestCase {
     /**
      * Without an override of {@code refreshTooltip()}: on an IntelliJ version which has
      * {@code XBreakpointBase.emitBreakpointChanged()} (2025.2+, as the "Latest IJ" workflow uses), refreshing the
-     * tooltip emits the breakpoint change. Nothing to check on older versions, such as 2024.2.
+     * tooltip emits the breakpoint change. Nothing to check on older versions, such as 2025.1.
      */
     public void testTooltipRefreshEmitsTheBreakpointChange() throws Exception {
         Method breakpointChangedFlow;

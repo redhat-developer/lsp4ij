@@ -631,7 +631,7 @@ public abstract class BreakpointHandlerBase<B extends XBreakpoint<?>> extends XB
     /**
      * Shows the given breakpoint with the given icon and error message in the session.
      * <p>
-     * A line breakpoint is shown with {@link XDebugSession#updateBreakpointPresentation}. IntelliJ 2024.2 takes only
+     * A line breakpoint is shown with {@link XDebugSession#updateBreakpointPresentation}. IntelliJ 2025.1 takes only
      * line breakpoints there, so for other breakpoints the presentation which the session keeps for each of its
      * breakpoints is set here.
      *
@@ -668,7 +668,7 @@ public abstract class BreakpointHandlerBase<B extends XBreakpoint<?>> extends XB
      * state again without notifying the breakpoint listeners, so the breakpoint is not registered again in
      * the session.
      * <p>
-     * The method is called by reflection because it doesn't exist in IntelliJ 2024.2, the version LSP4IJ is
+     * The method is called by reflection because it doesn't exist in IntelliJ 2025.1, the version LSP4IJ is
      * compiled against. Nothing needs to be refreshed there: the tooltip reads the error message of the
      * breakpoint each time it is shown.
      * <p>

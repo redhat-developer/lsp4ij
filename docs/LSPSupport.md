@@ -868,7 +868,7 @@ You can also open the `Structure` view using the `View / Tool Windows / Structur
 
 The IDE's `breadcrumbsInfoProvider` extension point is also implemented using [textDocument/documentSymbol](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_documentSymbol). LSP4IJ registers the extension point for all file types and languages but filters at runtime for those associated with configured language server definitions.
 
-The feature is _enabled by default_ but can be disabled by overriding the respective feature flag either in code by overriding `LSPBreadcrumbsFeature#isEnabled()` (custom language server definitions) or client configuration (user-defined language server definitions). Note that sticky lines are only supported in JetBrains 2024.1+ IDE versions.
+The feature is _enabled by default_ but can be disabled by overriding the respective feature flag either in code by overriding `LSPBreadcrumbsFeature#isEnabled()` (custom language server definitions) or client configuration (user-defined language server definitions).
 
 Here is an example of breadcrumbs and sticky lines in TypeScript:
 

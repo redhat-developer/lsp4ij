@@ -184,7 +184,7 @@ public class DAPDebugRunner extends AsyncProgramRunner<RunnerSettings> {
      *
      * Uses cached reflection to support both old and new debugger APIs:
      * - 2026.1+: newSessionBuilder() + XSessionStartedResult (no warnings)
-     * - 2024.2-2025.3: startSession() + getRunContentDescriptor() (legacy API)
+     * - 2025.1-2025.3: startSession() + getRunContentDescriptor() (legacy API)
      *
      * @see <a href="https://blog.jetbrains.com/platform/2026/01/platform-debugger-architecture-redesign-for-remote-development-in-2026-1/">Debugger Architecture Redesign</a>
      */
