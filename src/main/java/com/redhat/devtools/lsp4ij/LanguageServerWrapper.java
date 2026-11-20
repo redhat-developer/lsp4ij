@@ -497,10 +497,14 @@ public class LanguageServerWrapper implements Disposable {
      * @throws LanguageServerException thrown when the language server cannot be started
      */
     public synchronized void start() throws LanguageServerException {
-        if (isDisposed()) {
-            // A disposed language server is not enabled (isEnabled()) and never starts again: nothing would stop the
-            // connection it created, and no one would read what it answered. getInitializedServer() and connect()
-            // then give no language server, as for one that cannot start.
+        if (!isEnabled()) {
+            // A language server that is switched off, as by stopAndDisable(), by a stop of its definition or by too
+            // many failed starts, starts again only once it is switched on, as restart() does. A feature can still
+            // hold it, as the quick fixes of the diagnostics that it showed do: started by the feature, it would run
+            // while switched off, and the stop that switched it off would never end as stopped. A disposed language
+            // server is not enabled either, and never starts again: nothing would stop the connection it created,
+            // and no one would read what it answered. getInitializedServer() and connect() then give no language
+            // server, as for one that cannot start.
             return;
         }
         // Check for errors in LSP messages
