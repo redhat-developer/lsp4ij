@@ -1016,7 +1016,6 @@
                 class="com.redhat.devtools.lsp4ij.features.references.LSPGoToReferenceAction"
                 text="LSP Reference(s)"
                 description="Find all references of the element at cursor if any.">
-            <keyboard-shortcut first-keystroke="control alt H" keymap="$default"/>
         </action>
 
         <group id="LSP.GoToGroup">
