@@ -2,4 +2,5 @@ You can use [Clojure LSP](https://clojure-lsp.io/) to edit Clojure files, by fol
 
 * [Download the asset compatible with your OS](https://github.com/clojure-lsp/clojure-lsp/releases)
  * After unzipping the asset, reference the file (ex : `clojure-lsp.exe` for Windows OS) in the Command prompt.
+   The command starts it where the installer puts it, in `$USER_HOME$/.lsp4ij/lsp/clojure-lsp`.
  

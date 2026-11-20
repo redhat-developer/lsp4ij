@@ -4,8 +4,8 @@
   "dev": true,
   "url": null,
   "programArgs": {
-    "windows": "\"${BASE_DIR}/bin/jdtls.bat\" -configuration \"$USER_HOME$/.cache/jdtls\" -data \"$PROJECT_DIR$/jdtls-data\"",
-    "default": "\"${BASE_DIR}/bin/jdtls\" -configuration \"$USER_HOME$/.cache/jdtls\" -data \"$PROJECT_DIR$/jdtls-data\""
+    "windows": "\"$USER_HOME$/.lsp4ij/lsp/jdt-ls/bin/jdtls.bat\" -configuration \"$USER_HOME$/.cache/jdtls\" -data \"$PROJECT_DIR$/jdtls-data\"",
+    "default": "\"$USER_HOME$/.lsp4ij/lsp/jdt-ls/bin/jdtls\" -configuration \"$USER_HOME$/.cache/jdtls\" -data \"$PROJECT_DIR$/jdtls-data\""
   },
   "languageMappings": [
     {

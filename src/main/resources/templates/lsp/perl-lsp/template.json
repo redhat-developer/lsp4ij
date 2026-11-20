@@ -2,8 +2,8 @@
   "id": "perl-lsp",
   "name": "Perl Language Server",
   "programArgs": {
-    "default": "${BASE_DIR}/perllsp --stdio",
-    "windows": "${BASE_DIR}/perllsp.exe --stdio"
+    "default": "\"$USER_HOME$/.lsp4ij/lsp/perl-lsp/perllsp\" --stdio",
+    "windows": "\"$USER_HOME$/.lsp4ij/lsp/perl-lsp/perllsp.exe\" --stdio"
   },
   "expandConfiguration": true,
   "fileTypeMappings": [

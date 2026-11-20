@@ -2,8 +2,8 @@
   "id": "harper-ls",
   "name": "Harper Language Server",
   "programArgs": {
-    "default": "${BASE_DIR}/harper-ls --stdio",
-    "windows": "${BASE_DIR}/harper-ls.exe --stdio"
+    "default": "\"$USER_HOME$/.lsp4ij/lsp/harper-ls/harper-ls\" --stdio",
+    "windows": "\"$USER_HOME$/.lsp4ij/lsp/harper-ls/harper-ls.exe\" --stdio"
   },
   "expandConfiguration": true,
   "fileTypeMappings": [
