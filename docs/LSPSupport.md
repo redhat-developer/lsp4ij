@@ -149,6 +149,9 @@ The [textDocument/references](https://microsoft.github.io/language-server-protoc
 * the `Navigate / LSP Reference(s)` global menu.
 * or with the `Go To/ LSP Reference(s)` editor menu.
 
+The action has no shortcut by default, since `Ctrl+Alt+H` is the shortcut of [Call Hierarchy](#call-hierarchy). One can be
+assigned to it in `Settings / Keymap`, and [Find Usages](./UserGuide.md#find-usages) (`Alt+F7`) shows the references too.
+
 ![textDocument/references menu](./images/lsp-support/textDocument_references_menu.png)
 
 This menu action either opens the reference in a popup or navigates to the reference if there are several references:
