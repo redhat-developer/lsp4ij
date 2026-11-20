@@ -109,10 +109,10 @@ public interface StreamConnectionProvider {
 
     /**
      * Returns a human-readable description of the connection when available (for example,
-     * {@code "connect to localhost:8080"} or {@code "accept on port 8080"}), and {@code null}
-     * for standard process streams (stdio) or when unknown.
+     * {@code "stdio"}, {@code "connect to localhost:8080"} or {@code "accept on port 8080"}),
+     * and {@code null} when unknown.
      *
-     * @return a description of the connection, or null for stdio.
+     * @return a description of the connection, or null when unknown.
      */
     default @Nullable String getConnectionDescription() {
         return null;

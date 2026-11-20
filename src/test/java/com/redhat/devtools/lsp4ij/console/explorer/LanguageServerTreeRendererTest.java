@@ -13,14 +13,18 @@
  *******************************************************************************/
 package com.redhat.devtools.lsp4ij.console.explorer;
 
+import com.redhat.devtools.lsp4ij.mock.MockLanguageServerDefinition;
+import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
 import org.eclipse.lsp4j.ServerInfo;
 import org.junit.jupiter.api.Test;
 
-import javax.swing.Icon;
 import javax.swing.JTree;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class LanguageServerTreeRendererTest {
 
@@ -44,46 +48,53 @@ public class LanguageServerTreeRendererTest {
         JTree tree = new JTree();
 
         ServerInfo serverInfo = new ServerInfo("zls", "0.13.0");
-        LanguageServerTreeNode nodeWithInfo = new LanguageServerTreeNode(null) {
+        LanguageServerDefinition zigDef = new MockLanguageServerDefinition("zig", false) {
             @Override
             public String getDisplayName() {
                 return "Zig";
             }
-
+        };
+        LanguageServerDefinition rustDef = new MockLanguageServerDefinition("rust", false) {
             @Override
-            public Icon getIcon() {
-                return null;
+            public String getDisplayName() {
+                return "Rust";
             }
+        };
 
+        LanguageServerTreeNode nodeWithInfo = new LanguageServerTreeNode(zigDef) {
             @Override
             public ServerInfo getServerInfo() {
                 return serverInfo;
             }
         };
 
-        LanguageServerTreeNode nodeWithoutInfo = new LanguageServerTreeNode(null) {
-            @Override
-            public String getDisplayName() {
-                return "Rust";
-            }
-
-            @Override
-            public Icon getIcon() {
-                return null;
-            }
-
+        LanguageServerTreeNode nodeWithoutInfo = new LanguageServerTreeNode(rustDef) {
             @Override
             public ServerInfo getServerInfo() {
                 return null;
             }
         };
 
-        // Render first node with ServerInfo
+        // Render first node with ServerInfo: tooltip must include server info and language server details
         renderer.customizeCellRenderer(tree, nodeWithInfo, false, false, true, 0, false);
-        assertEquals("zls 0.13.0", renderer.getToolTipText());
+        String tooltipWithInfo = renderer.getToolTipText();
+        assertNotNull(tooltipWithInfo);
+        assertTrue(tooltipWithInfo.contains("zls 0.13.0"));
+        assertTrue(tooltipWithInfo.contains("<b>Server:</b> zls 0.13.0"));
+        assertTrue(tooltipWithInfo.contains("<b>Language Server:</b> Zig (zig)"));
+        assertTrue(tooltipWithInfo.contains("<b>Status:</b>"));
 
-        // Render second node without ServerInfo: tooltip must be reset to null (no leak)
+        // Render second node without ServerInfo: tooltip must NOT contain server info
         renderer.customizeCellRenderer(tree, nodeWithoutInfo, false, false, true, 1, false);
+        String tooltipWithoutInfo = renderer.getToolTipText();
+        assertNotNull(tooltipWithoutInfo);
+        assertFalse(tooltipWithoutInfo.contains("zls 0.13.0"));
+        assertFalse(tooltipWithoutInfo.contains("<b>Server:</b>"));
+        assertTrue(tooltipWithoutInfo.contains("<b>Language Server:</b> Rust (rust)"));
+        assertTrue(tooltipWithoutInfo.contains("<b>Status:</b>"));
+
+        // Render non-LSP node: tooltip must be reset to null (no leak)
+        renderer.customizeCellRenderer(tree, "other", false, false, true, 2, false);
         assertNull(renderer.getToolTipText(), "Tooltip must not leak to subsequent rows");
     }
 }

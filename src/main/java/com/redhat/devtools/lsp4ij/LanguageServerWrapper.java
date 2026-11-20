@@ -183,16 +183,10 @@ public class LanguageServerWrapper implements Disposable {
     private volatile @Nullable Alarm stopAlarm = null;
     private ServerStatus serverStatus;
     private volatile boolean disposed;
-    public enum TransportKind {
-        STDIO,
-        SOCKET,
-        CUSTOM
-    }
 
     private LanguageServerException serverError;
     private Long currentProcessId;
     private List<String> currentProcessCommandLines;
-    private TransportKind transportKind;
     private String connectionDescription;
     private boolean initiallySupportsWorkspaceFolders = false;
     private FileOperationsManager fileOperationsManager;
@@ -643,16 +637,7 @@ public class LanguageServerWrapper implements Disposable {
                             this.currentProcessId = data.getPid();
                             this.currentProcessCommandLines = data.getCommands();
                         }
-                        if (provider instanceof SocketStreamConnectionProvider) {
-                            this.transportKind = TransportKind.SOCKET;
-                            this.connectionDescription = provider.getConnectionDescription();
-                        } else if (provider instanceof OSProcessStreamConnectionProvider || provider instanceof ProcessStreamConnectionProvider) {
-                            this.transportKind = TransportKind.STDIO;
-                            this.connectionDescription = null;
-                        } else {
-                            this.transportKind = TransportKind.CUSTOM;
-                            this.connectionDescription = provider.getConnectionDescription();
-                        }
+                        this.connectionDescription = provider.getConnectionDescription();
 
                         synchronized (this) {
                             if (isDisposed() || currentInitializingContext != initializingContext) {
@@ -2145,10 +2130,6 @@ public class LanguageServerWrapper implements Disposable {
      */
     public Long getCurrentProcessId() {
         return currentProcessId;
-    }
-
-    public @Nullable TransportKind getTransportKind() {
-        return transportKind;
     }
 
     public @Nullable String getConnectionDescription() {

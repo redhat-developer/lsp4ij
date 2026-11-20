@@ -221,6 +221,11 @@ public class OSProcessStreamConnectionProvider implements StreamConnectionProvid
     }
 
     @Override
+    public String getConnectionDescription() {
+        return "stdio";
+    }
+
+    @Override
     public String toString() {
         return "OSProcessStreamConnectionProvider [commandLine=" + this.getCommandLine() + "]";
     }

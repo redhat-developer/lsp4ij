@@ -791,8 +791,7 @@ public class LanguageServerProcessNodesTest extends LSPCodeInsightFixtureTestCas
         PlatformTestUtil.waitWithEventsDispatching("first must start", () -> first.getServerStatus() == ServerStatus.started, TIMEOUT);
         try {
             var node = processNode(first);
-            // Mock connection provider is classified as CUSTOM
-            assertEquals("custom", node.getSecondaryText());
+            assertNull(node.getSecondaryText());
         } finally {
             first.stop();
             PlatformTestUtil.waitWithEventsDispatching("first must stop", () -> first.getServerStatus() == ServerStatus.stopped, TIMEOUT);
@@ -856,32 +855,6 @@ public class LanguageServerProcessNodesTest extends LSPCodeInsightFixtureTestCas
         assertFalse(processTooltip.contains("<script>"));
         assertTrue(processTooltip.contains("&lt;script&gt;"));
         assertTrue(processTooltip.contains("&amp;"));
-    }
-
-    public void testRefreshPreservesStartTimeAndRecalculatesDisplay() throws Exception {
-        first.updateStatus(ServerStatus.starting);
-        PlatformTestUtil.dispatchAllEventsInIdeEventQueue();
-        var node = processNode(first);
-        var startTimeField = LanguageServerProcessTreeNode.class.getDeclaredField("startTime");
-        startTimeField.setAccessible(true);
-        long initialStartTime = (long) startTimeField.get(node);
-        assertTrue(initialStartTime > 0);
-
-        Thread.sleep(10);
-
-        // An error occurs during starting and refresh() is called
-        first.setServerError(new CannotStartProcessException("Starting failed"));
-        var refreshMethod = LanguageServerProcessTreeNode.class.getDeclaredMethod("refresh");
-        refreshMethod.setAccessible(true);
-        refreshMethod.invoke(node);
-        PlatformTestUtil.dispatchAllEventsInIdeEventQueue();
-
-        // startTime must NOT be reset or modified
-        assertEquals(initialStartTime, (long) startTimeField.get(node));
-        // lifecycle status must NOT be changed
-        assertEquals(ServerStatus.starting, node.getServerStatus());
-        // display name must be recalculated to include restart attempt info
-        assertTrue(node.getDisplayName().contains("[0/"));
     }
 
     /**

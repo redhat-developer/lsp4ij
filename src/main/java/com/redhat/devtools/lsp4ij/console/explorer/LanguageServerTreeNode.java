@@ -32,19 +32,19 @@ import javax.swing.tree.DefaultMutableTreeNode;
  */
 public class LanguageServerTreeNode extends DefaultMutableTreeNode {
 
-    private final @Nullable LanguageServerDefinition serverDefinition;
-    private @Nullable Project project;
+    private final @NotNull LanguageServerDefinition serverDefinition;
+    private final @Nullable Project project;
 
-    public LanguageServerTreeNode(@Nullable LanguageServerDefinition serverDefinition, @Nullable Project project) {
+    public LanguageServerTreeNode(@NotNull LanguageServerDefinition serverDefinition, @Nullable Project project) {
         this.serverDefinition = serverDefinition;
         this.project = project;
     }
 
-    public LanguageServerTreeNode(@Nullable LanguageServerDefinition serverDefinition) {
+    public LanguageServerTreeNode(@NotNull LanguageServerDefinition serverDefinition) {
         this(serverDefinition, null);
     }
 
-    public LanguageServerDefinition getServerDefinition() {
+    public @NotNull LanguageServerDefinition getServerDefinition() {
         return serverDefinition;
     }
 
@@ -123,11 +123,11 @@ public class LanguageServerTreeNode extends DefaultMutableTreeNode {
     }
 
     public Icon getIcon() {
-        return serverDefinition != null ? serverDefinition.getIcon() : null;
+        return serverDefinition.getIcon();
     }
 
     public String getDisplayName() {
-        return serverDefinition != null ? serverDefinition.getDisplayName() : null;
+        return serverDefinition.getDisplayName();
     }
 
     /**
@@ -139,12 +139,6 @@ public class LanguageServerTreeNode extends DefaultMutableTreeNode {
     public @Nullable ServerInfo getServerInfo() {
         var activeNode = getActiveProcessTreeNode();
         return activeNode != null ? activeNode.getLanguageServer().getServerInfo() : null;
-    }
-
-    public void setProject(@Nullable Project project) {
-        if (project != null) {
-            this.project = project;
-        }
     }
 
     public @Nullable Project getProject() {
@@ -159,7 +153,7 @@ public class LanguageServerTreeNode extends DefaultMutableTreeNode {
 
     public boolean isEnabled(@Nullable Project project) {
         Project p = project != null ? project : getProject();
-        return p != null && serverDefinition != null && serverDefinition.isEnabled(p);
+        return p != null && serverDefinition.isEnabled(p);
     }
 
     public boolean isEnabled() {
@@ -222,8 +216,10 @@ public class LanguageServerTreeNode extends DefaultMutableTreeNode {
     public @Nullable String getToolTipText(@Nullable Project project) {
         StringBuilder sb = new StringBuilder("<html>");
         sb.append("<b>Language Server:</b> ").append(escapeHtml(getDisplayName()));
-        if (serverDefinition != null) {
-            sb.append(" (").append(escapeHtml(serverDefinition.getId())).append(")");
+        sb.append(" (").append(escapeHtml(serverDefinition.getId())).append(")");
+        String serverInfo = LanguageServerTreeRenderer.formatServerInfo(getServerInfo());
+        if (serverInfo != null) {
+            sb.append("<br/><b>Server:</b> ").append(escapeHtml(serverInfo));
         }
         sb.append("<br/>");
         boolean enabled = isEnabled(project);

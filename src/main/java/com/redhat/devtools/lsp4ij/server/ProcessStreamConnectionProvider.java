@@ -211,6 +211,11 @@ public abstract class ProcessStreamConnectionProvider implements StreamConnectio
     }
 
     @Override
+    public String getConnectionDescription() {
+        return "stdio";
+    }
+
+    @Override
     public String toString() {
         return "ProcessStreamConnectionProvider [commands=" + this.getCommands() + ", workingDir="
                 + this.getWorkingDirectory() + "]";

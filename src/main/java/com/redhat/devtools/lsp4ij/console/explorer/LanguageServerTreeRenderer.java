@@ -74,7 +74,7 @@ public class LanguageServerTreeRenderer extends ColoredTreeCellRenderer {
             if (badge != null) {
                 append(" " + badge, SimpleTextAttributes.GRAYED_ATTRIBUTES);
             }
-            setToolTipText(formatServerInfo(languageServerTreeNode.getServerInfo()));
+            setToolTipText(languageServerTreeNode.getToolTipText(p));
             return;
         }
 

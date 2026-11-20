@@ -221,21 +221,11 @@ public class LanguageServerProcessTreeNode extends DefaultMutableTreeNode {
     }
 
     public @Nullable String getSecondaryText() {
-        var transport = languageServer.getTransportKind();
-        if (transport == null) {
-            return null;
-        }
-        return switch (transport) {
-            case SOCKET -> {
-                String desc = languageServer.getConnectionDescription();
-                yield desc != null ? "socket (" + desc + ")" : "socket";
-            }
-            case STDIO -> "stdio";
-            case CUSTOM -> {
-                String desc = languageServer.getConnectionDescription();
-                yield desc != null ? desc : "custom";
-            }
-        };
+        return languageServer.getConnectionDescription();
+    }
+
+    long getStartTime() {
+        return startTime;
     }
 
     public @Nullable String getToolTipText() {
@@ -245,21 +235,9 @@ public class LanguageServerProcessTreeNode extends DefaultMutableTreeNode {
             sb.append("<b>Instance:</b> ").append(escapeHtml(label)).append("<br/>");
         }
         sb.append("<b>Status:</b> ").append(escapeHtml(getStatusName(serverStatus)));
-        var transport = languageServer.getTransportKind();
-        if (transport != null) {
-            sb.append("<br/><b>Transport:</b> ");
-            if (transport == LanguageServerWrapper.TransportKind.SOCKET) {
-                sb.append("Socket");
-                String desc = languageServer.getConnectionDescription();
-                if (desc != null) {
-                    sb.append(" (").append(escapeHtml(desc)).append(")");
-                }
-            } else if (transport == LanguageServerWrapper.TransportKind.STDIO) {
-                sb.append("stdio");
-            } else {
-                String desc = languageServer.getConnectionDescription();
-                sb.append(desc != null ? escapeHtml(desc) : "custom");
-            }
+        String connectionDesc = languageServer.getConnectionDescription();
+        if (connectionDesc != null) {
+            sb.append("<br/><b>Connection:</b> ").append(escapeHtml(connectionDesc));
         }
         Long pid = languageServer.getCurrentProcessId();
         if (pid != null) {
