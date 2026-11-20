@@ -129,7 +129,10 @@ public class MarkdownConverter {
         MutableDataSet fileOptions = new MutableDataSet(options);
         fileOptions.set(LANGUAGE_CONTEXT, file.getLanguage());
         fileOptions.set(FILE_NAME_CONTEXT, file.getName());
-        Path baseDir = file.getVirtualFile().getParent().getFileSystem().getNioPath(file.getVirtualFile().getParent());
+        // A file outside any folder, such as a document a language server provides with
+        // workspace/textDocumentContent, has no base directory for relative links
+        var parent = file.getVirtualFile().getParent();
+        Path baseDir = parent != null ? parent.getFileSystem().getNioPath(parent) : null;
         fileOptions.set(FILE_BASE_DIR, baseDir);
 
         htmlRenderer = createHtmlRenderer(fileOptions);

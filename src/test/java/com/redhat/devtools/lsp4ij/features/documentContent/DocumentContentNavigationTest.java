@@ -10,11 +10,13 @@ package com.redhat.devtools.lsp4ij.features.documentContent;
 import com.intellij.openapi.fileEditor.FileDocumentManager;
 import com.intellij.openapi.fileEditor.FileEditorManager;
 import com.intellij.pom.Navigatable;
+import com.intellij.psi.PsiDocumentManager;
 import com.intellij.psi.PsiElement;
 import com.intellij.testFramework.PlatformTestUtil;
 import com.redhat.devtools.lsp4ij.JSONUtils;
 import com.redhat.devtools.lsp4ij.LanguageServerWrapper;
 import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
+import com.redhat.devtools.lsp4ij.features.documentation.MarkdownConverter;
 import com.redhat.devtools.lsp4ij.features.navigation.LSPGotoDeclarationHandler;
 import com.redhat.devtools.lsp4ij.fixtures.LSPCodeInsightFixtureTestCase;
 import com.redhat.devtools.lsp4ij.mock.MockLanguageServer;
@@ -48,6 +50,10 @@ public class DocumentContentNavigationTest extends LSPCodeInsightFixtureTestCase
     private static final String LIBRARY_TEXT = "module stdlib;\nclass Library {}";
     // "Library" on the second line of LIBRARY_TEXT
     private static final Range LIBRARY_NAME = new Range(new Position(1, 6), new Position(1, 13));
+    private static final String BASE = "lsp-source:///stdlib/Base.foo";
+    private static final String BASE_TEXT = "module stdlib;\nclass Base {}";
+    // "Base" on the second line of BASE_TEXT
+    private static final Range BASE_NAME = new Range(new Position(1, 6), new Position(1, 10));
 
     public DocumentContentNavigationTest() {
         super("*.foo");
@@ -81,6 +87,46 @@ public class DocumentContentNavigationTest extends LSPCodeInsightFixtureTestCase
         PlatformTestUtil.waitWithEventsDispatching("the server must be told that the document is open", opened::isDone, 10);
         assertEquals("the server knows the document by its own URI", LIBRARY, opened.get().getTextDocument().getUri());
         assertEquals(LIBRARY_TEXT, opened.get().getTextDocument().getText());
+    }
+
+    public void testGoToDefinitionWorksInTheContentOfTheServer() throws Exception {
+        serverServes("lsp-source");
+        MockLanguageServer.INSTANCE.getWorkspaceService().setDocumentContent(BASE, BASE_TEXT);
+        open();
+        var library = definitionTargets()[0].getContainingFile().getVirtualFile();
+        var opened = new CompletableFuture<DidOpenTextDocumentParams>();
+        MockLanguageServer.INSTANCE.setDidOpenCallback(opened);
+        var manager = FileEditorManager.getInstance(myFixture.getProject());
+        manager.openFile(library, true);
+        PlatformTestUtil.waitWithEventsDispatching("the server must be told that the document is open", opened::isDone, 10);
+        var editor = manager.getSelectedTextEditor();
+        assertNotNull(editor);
+        assertSame(library, editor.getVirtualFile());
+        var file = PsiDocumentManager.getInstance(myFixture.getProject()).getPsiFile(editor.getDocument());
+        assertNotNull(file);
+        // in the server's document, the definition of a name is in another document of the server
+        MockLanguageServer.INSTANCE.setDefinition(List.of(new Location(BASE, BASE_NAME)));
+
+        // "Library" in "class Library {}", as Go to Declaration asks
+        var targets = new LSPGotoDeclarationHandler().getGotoDeclarationTargets(file.findElementAt(21), 21, editor);
+
+        assertNotNull(targets);
+        assertEquals(1, targets.length);
+        var target = targets[0].getContainingFile().getVirtualFile();
+        assertInstanceOf(target, DocumentContentFile.class);
+        assertEquals(BASE, target.getUrl());
+        assertEquals("Base", targets[0].getText());
+    }
+
+    public void testDocumentationRendersInTheContentOfTheServer() throws Exception {
+        serverServes("lsp-source");
+        open();
+        var library = definitionTargets()[0].getContainingFile();
+
+        // a document of the server has no folder to resolve relative links against
+        var html = MarkdownConverter.getInstance(myFixture.getProject()).toHtml("`Library` [see](Base.foo)", library);
+
+        assertTrue(html, html.contains("<code>Library</code>"));
     }
 
     public void testTheServerCanShowItsContent() throws Exception {

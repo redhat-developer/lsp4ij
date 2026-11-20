@@ -200,27 +200,38 @@ public class EditorBehaviorFeature {
     ) {
         if (virtualFile == null) return false;
 
+        if (!(virtualFile instanceof VirtualFileWithId)) {
+            // A file outside the VFS, such as a document that a language server provides with
+            // workspace/textDocumentContent, holds its PSI, which the provider of a cached value must not keep
+            return compute(project, virtualFile, featureFlagChecker).getValue();
+        }
         Key<CachedValue<Boolean>> cacheKey = getCacheKey(virtualFile, featureFlagChecker);
         return CachedValuesManager.getManager(project).getCachedValue(
                 project,
                 cacheKey,
-                () -> {
-                    PsiFile file = LSPIJUtils.getPsiFile(virtualFile, project);
-                    if ((file == null) || !file.isValid()) {
-                        // If we couldn't find the PSI file, return false/disabled with no caching
-                        return Result.create(false, ModificationTracker.EVER_CHANGED);
-                    }
-
-                    return Result.create(
-                            LanguageServiceAccessor.getInstance(project).hasAny(
-                                    file,
-                                    ls -> featureFlagChecker.isEnabled(ls.getClientFeatures().getEditorBehaviorFeature(), file)
-                            ),
-                            // Evict if any language server definition config that could affect the file changes
-                            LanguageServiceAccessor.getInstance(project).getModificationTrackers(file).toArray()
-                    );
-                },
+                () -> compute(project, virtualFile, featureFlagChecker),
                 false
+        );
+    }
+
+    private static Result<Boolean> compute(
+            @NotNull Project project,
+            @NotNull VirtualFile virtualFile,
+            @NotNull FeatureFlagChecker featureFlagChecker
+    ) {
+        PsiFile file = LSPIJUtils.getPsiFile(virtualFile, project);
+        if ((file == null) || !file.isValid()) {
+            // If we couldn't find the PSI file, return false/disabled with no caching
+            return Result.create(false, ModificationTracker.EVER_CHANGED);
+        }
+
+        return Result.create(
+                LanguageServiceAccessor.getInstance(project).hasAny(
+                        file,
+                        ls -> featureFlagChecker.isEnabled(ls.getClientFeatures().getEditorBehaviorFeature(), file)
+                ),
+                // Evict if any language server definition config that could affect the file changes
+                LanguageServiceAccessor.getInstance(project).getModificationTrackers(file).toArray()
         );
     }
 
