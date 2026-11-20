@@ -6,14 +6,15 @@ You can leverage the [Visual Studio Code CSS Language Server](https://github.com
 
 You can use it by following these instructions:
 * [Install Node.js](https://nodejs.org/en/download)
-* [Download and install Visual Studio Code](https://code.visualstudio.com/download)
-
-Once Visual Studio Code is installed, it will store the CSS language server in:
-> **${BASE_DIR}/resources/app/extensions/css-language-features/server/dist/node/cssServerMain.js**
-
-After that you can create the CSS Language Server with the [language server template](../UserDefinedLanguageServer.md#using-template):
+* Create the CSS Language Server with the [language server template](../UserDefinedLanguageServer.md#using-template):
 
 ![CSS server dialog](../images/user-defined-ls/vscode-css-language-server/select_template.png)
 
-[LSP4IJ](https://github.com/redhat-developer/lsp4ij) tries to generate the proper **cssServerMain.js** file path according to your OS, but you may have to adjust it
-in the command text field.
+When the language server starts, if its command doesn't start it, its installer installs
+[vscode-langservers-extracted](https://github.com/hrsh7th/vscode-langservers-extracted), which has the CSS language
+server, with `npm install vscode-langservers-extracted`. The command starts the CSS language server where the installer
+puts it:
+> **$USER_HOME$/.lsp4ij/lsp/vscode-css-language-server/node_modules/vscode-langservers-extracted/lib/css-language-server/node/cssServerMain.js**
+
+If you installed vscode-langservers-extracted somewhere else, change the path of **cssServerMain.js** in the command
+text field.
