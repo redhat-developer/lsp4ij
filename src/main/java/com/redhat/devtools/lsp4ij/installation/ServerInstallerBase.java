@@ -10,7 +10,6 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.installation;
 
-import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.progress.ProgressIndicator;
 import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.progress.Task;
@@ -168,11 +167,8 @@ public abstract class ServerInstallerBase implements ServerInstaller {
                     install(indicator);
 
                     markAsInstalled(context, installFuture);
-                } catch (ProcessCanceledException e) {
-                    //Since 2024.2 ProcessCanceledException extends CancellationException so we can't use multicatch to keep backward compatibility
-                    //TODO delete block when minimum required version is 2024.2
-                    CancellationSupport.cancel(installFuture);
                 } catch (CancellationException e) {
+                    // Also a ProcessCanceledException, which extends CancellationException since IntelliJ 2024.2
                     CancellationSupport.cancel(installFuture);
                 } catch (Throwable e) {
                     updateStatus(ServerInstallationStatus.NOT_INSTALLED);
