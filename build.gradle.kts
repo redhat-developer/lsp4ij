@@ -62,15 +62,10 @@ dependencies {
         }
 
         // Plugin Dependencies. Uses `platformBundledPlugins` property from the gradle.properties file for bundled IntelliJ Platform plugins.
-        // starting from 2024.3, all json related code is know on its own plugin
         val platformBundledPlugins =  ArrayList<String>()
         platformBundledPlugins.addAll(properties("platformBundledPlugins").map { it.split(',').map(String::trim).filter(String::isNotEmpty) }.get())
-        /*
-         * platformVersion check for JSON breaking changes since 2024.3
-         */
-        if (ideaVersionInt >= 243) {
-            platformBundledPlugins.add("com.intellij.modules.json")
-        }
+        // The JSON support is in a plugin of its own since 2024.3
+        platformBundledPlugins.add("com.intellij.modules.json")
         println("use bundled Plugins: $platformBundledPlugins")
         bundledPlugins(platformBundledPlugins)
 
@@ -205,7 +200,7 @@ intellijPlatform {
                     // The latest release of each version, and the current EAP, so that an API that the coming
                     // version removes fails the verification before that version is released.
                     channels = listOf(ProductRelease.Channel.RELEASE, ProductRelease.Channel.EAP)
-                    sinceBuild = "242" // From your minimum supported version
+                    sinceBuild = "251" // From your minimum supported version
                 }
             }
         }
@@ -312,19 +307,9 @@ tasks {
         exclude(javaScriptPluginTests)
     }
 
-    // TODO: Once LSP4IJ no longer supports 2023.*, the hotswap JVM args can be added unconditionally
-    fun supportsEnhancedClassRedefinition(): Boolean {
-        // Versions before 2024.1 don't support enhanced class redefinition
-        return ideaVersionInt >= 241
-    }
-
     runIde {
         // Improved hotswap for the IDE's JVM
-        if (supportsEnhancedClassRedefinition()) {
-            println("Enabling enhanced class redefinition.")
-            jvmArgs("-XX:+AllowEnhancedClassRedefinition", "-XX:HotswapAgent=fatjar")
-        }
-
+        jvmArgs("-XX:+AllowEnhancedClassRedefinition", "-XX:HotswapAgent=fatjar")
     }
 
     publishPlugin {

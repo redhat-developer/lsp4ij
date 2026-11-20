@@ -115,7 +115,7 @@ Here are some projects that use LSP4IJ:
 
 ## Requirements
 
-* Intellij IDEA 2024.2 or more recent (we **try** to support the last 4 major IDEA releases)
+* IntelliJ IDEA 2025.1 or more recent (LSP4IJ supports the IntelliJ releases of the last two years)
 * Java JDK (or JRE) 17 or more recent
 
 ## Contributing
