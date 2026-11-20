@@ -17,6 +17,7 @@ import com.redhat.devtools.lsp4ij.server.SocketTestConnectingServer;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.Inet6Address;
 import java.net.InetAddress;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
@@ -30,8 +31,6 @@ import java.util.concurrent.TimeUnit;
  * port its command line takes, and the user's initialization options.
  */
 public class UserDefinedSocketConnectionTest extends BasePlatformTestCase {
-
-    private static final String LOOPBACK = InetAddress.getLoopbackAddress().getHostAddress();
 
     public void testTheStandardInputAndOutputIsTheProcessStreams() {
         var definition = definition("server --stdio", null);
@@ -48,9 +47,9 @@ public class UserDefinedSocketConnectionTest extends BasePlatformTestCase {
 
         assertSame(SocketStreamConnectionProvider.Direction.CONNECT, provider.getDirection());
         assertEquals(6005, provider.getPort());
-        // and then on the IPv6 one, as for a language server which listens on localhost and gets ::1
-        assertTrue(provider.toString(), provider.toString().contains(LOOPBACK + ":6005"));
-        assertTrue(provider.toString(), provider.toString().contains("[::1]:6005"));
+        // on the JVM's loopback address, and then on the other one, as for a language server which listens on
+        // localhost and gets the other address
+        assertTrue(provider.toString(), provider.toString().contains("connect to " + bothLoopbackAddresses(6005)));
     }
 
     public void testABlankHostIsTheLoopbackAddress() {
@@ -59,8 +58,7 @@ public class UserDefinedSocketConnectionTest extends BasePlatformTestCase {
 
         var provider = definition.createConnectionProvider(getProject());
 
-        assertTrue(provider.toString(), provider.toString().contains(LOOPBACK + ":6005"));
-        assertTrue(provider.toString(), provider.toString().contains("[::1]:6005"));
+        assertTrue(provider.toString(), provider.toString().contains("connect to " + bothLoopbackAddresses(6005)));
     }
 
     public void testALanguageServerWithoutSettingsHasNoInitializationOptions() {
@@ -82,8 +80,7 @@ public class UserDefinedSocketConnectionTest extends BasePlatformTestCase {
                 UserDefinedSocketStreamConnectionProvider.class);
 
         assertSame(SocketStreamConnectionProvider.Direction.CONNECT, provider.getDirection());
-        assertTrue(provider.toString(), provider.toString().contains(LOOPBACK + ":4389"));
-        assertTrue(provider.toString(), provider.toString().contains("[::1]:4389"));
+        assertTrue(provider.toString(), provider.toString().contains("connect to " + bothLoopbackAddresses(4389)));
     }
 
     public void testAStartedLanguageServerConnectsToTheFreePortItsCommandLineTakes() throws Exception {
@@ -145,6 +142,16 @@ public class UserDefinedSocketConnectionTest extends BasePlatformTestCase {
         } finally {
             LanguageServersRegistry.getInstance().removeServerDefinition(getProject(), definition);
         }
+    }
+
+    /**
+     * Both loopback addresses with the port, as a provider names them without a host: the JVM's first, which is ::1 on
+     * a JVM that prefers IPv6 addresses, and then the other one.
+     */
+    private static String bothLoopbackAddresses(int port) {
+        String ipv4 = "127.0.0.1:" + port;
+        String ipv6 = "[::1]:" + port;
+        return InetAddress.getLoopbackAddress() instanceof Inet6Address ? ipv6 + " or " + ipv4 : ipv4 + " or " + ipv6;
     }
 
     private static UserDefinedLanguageServerDefinition definition(String commandLine, String initializationOptions) {
