@@ -17,7 +17,6 @@ import com.intellij.codeInsight.CodeInsightBundle;
 import com.intellij.codeInsight.hint.ParameterInfoControllerBase;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.ModalityState;
-import com.intellij.openapi.application.ReadAction;
 import com.intellij.lang.parameterInfo.*;
 import com.intellij.openapi.util.Disposer;
 import com.intellij.openapi.progress.ProcessCanceledException;
@@ -214,7 +213,7 @@ public class LSPParameterInfoHandler implements ParameterInfoHandler<LSPSignatur
         int startOffset = context.getParameterListStart();
         int caretOffset = editor.getCaretModel().getOffset();
         long documentStamp = editor.getDocument().getModificationStamp();
-        ApplicationManager.getApplication().invokeLater(() -> ReadAction.run(() -> {
+        ApplicationManager.getApplication().invokeLater(() -> ApplicationManager.getApplication().runReadAction(() -> {
             if (editor.isDisposed() || !owner.isValid()
                     || editor.getCaretModel().getOffset() != caretOffset
                     || editor.getDocument().getModificationStamp() != documentStamp

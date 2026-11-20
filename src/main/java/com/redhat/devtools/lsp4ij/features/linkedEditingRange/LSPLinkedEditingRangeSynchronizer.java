@@ -15,7 +15,6 @@ import com.intellij.codeInsight.lookup.LookupManager;
 import com.intellij.openapi.Disposable;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.ModalityState;
-import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.application.WriteAction;
 import com.intellij.openapi.command.CommandEvent;
 import com.intellij.openapi.command.CommandListener;
@@ -30,6 +29,7 @@ import com.intellij.openapi.editor.event.DocumentEvent;
 import com.intellij.openapi.editor.event.DocumentListener;
 import com.intellij.openapi.fileEditor.FileDocumentManager;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.util.Computable;
 import com.intellij.openapi.util.Disposer;
 import com.intellij.openapi.util.Key;
 import com.intellij.openapi.util.TextRange;
@@ -266,7 +266,7 @@ public final class LSPLinkedEditingRangeSynchronizer implements CaretListener, D
             return;
         }
         Document document = editor.getDocument();
-        PsiFile file = ReadAction.compute(() -> {
+        PsiFile file = ApplicationManager.getApplication().runReadAction((Computable<PsiFile>) () -> {
             PsiFile psiFile = PsiDocumentManager.getInstance(project).getPsiFile(document);
             return psiFile != null
                     && LanguageServersRegistry.getInstance().isFileSupported(psiFile)

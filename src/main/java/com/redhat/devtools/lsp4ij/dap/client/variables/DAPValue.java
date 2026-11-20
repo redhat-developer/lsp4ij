@@ -10,7 +10,7 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.dap.client.variables;
 
-import com.intellij.openapi.application.ReadAction;
+import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.util.ThreeState;
 import com.intellij.xdebugger.XSourcePosition;
 import com.intellij.xdebugger.frame.*;
@@ -151,7 +151,7 @@ public class DAPValue extends XNamedValue {
                                   @NotNull XNavigatable navigatable) {
         sourcePosition.thenAccept(position -> {
             if (position != null) {
-                ReadAction.run(() -> navigatable.setSourcePosition(position));
+                ApplicationManager.getApplication().runReadAction(() -> navigatable.setSourcePosition(position));
             }
         });
     }

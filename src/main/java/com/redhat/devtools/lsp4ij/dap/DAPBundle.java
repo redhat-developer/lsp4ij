@@ -27,7 +27,7 @@ public final class DAPBundle extends DynamicBundle {
   private static final DAPBundle INSTANCE = new DAPBundle();
 
   private DAPBundle() {
-    super(BUNDLE);
+    super(DAPBundle.class, BUNDLE);
   }
 
   @NotNull

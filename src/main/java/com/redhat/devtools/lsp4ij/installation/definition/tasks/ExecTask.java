@@ -103,7 +103,7 @@ public class ExecTask extends InstallerTask {
             cmdLine.setCharset(java.nio.charset.StandardCharsets.UTF_8);
 
             handler = new CapturingProcessHandler(cmdLine);
-            handler.addProcessListener(new ProcessAdapter() {
+            handler.addProcessListener(new ProcessListener() {
                 @Override
                 public void onTextAvailable(@NotNull ProcessEvent event, @NotNull Key outputType) {
                     if (outputType == ProcessOutputType.STDERR) {
