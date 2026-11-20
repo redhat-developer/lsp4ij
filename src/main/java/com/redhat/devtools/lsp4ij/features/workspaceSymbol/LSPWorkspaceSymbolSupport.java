@@ -80,7 +80,7 @@ public class LSPWorkspaceSymbolSupport extends AbstractLSPWorkspaceFeatureSuppor
         var request = languageServer.getWorkspaceService().symbol(params);
         // The project holds the request, not the support of a file, which the stop of the language server disposes: so
         // the stop cancels it, and the merge with the other language servers ends (#722)
-        languageServer.getServerWrapper().cancelOnStop(request);
+        languageServer.getServerWrapper().cancelOnStop(languageServer.getServer(), request);
         return cancellationSupport.execute(request, languageServer, LSPRequestConstants.WORKSPACE_SYMBOL)
                 .thenApplyAsync(symbols -> {
                     if (symbols == null) {

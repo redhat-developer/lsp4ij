@@ -15,7 +15,7 @@ import com.intellij.testFramework.fixtures.IdeaProjectTestFixture;
 import com.intellij.testFramework.fixtures.IdeaTestFixtureFactory;
 import com.intellij.testFramework.fixtures.TestFixtureBuilder;
 import com.redhat.devtools.lsp4ij.LSPWorkspaceSupport;
-import com.redhat.devtools.lsp4ij.LanguageServerWrapper;
+import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
 import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
 import com.redhat.devtools.lsp4ij.fixtures.LSPCodeInsightTestFixture;
@@ -61,7 +61,7 @@ public class ServerStopPendingWorkspaceSymbolTest extends UsefulTestCase {
         PlatformTestUtil.waitWithEventsDispatching("The silent server must get the request",
                 () -> !silent.requests.isEmpty(), 10);
 
-        silentServer.stop();
+        silentServer.getServerWrapper().stop();
 
         PlatformTestUtil.waitWithEventsDispatching("The search must end once the silent server stopped",
                 symbols::isDone, 10);
@@ -70,16 +70,29 @@ public class ServerStopPendingWorkspaceSymbolTest extends UsefulTestCase {
                 .toList());
     }
 
-    private @NotNull LanguageServerWrapper connect(@NotNull PsiFile file,
-                                                   @NotNull SymbolServerDefinition definition) throws Exception {
+    public void testARequestToAServerWhichStopsBeforeTheRequestIsKeptForTheStopIsCancelled() throws Exception {
+        var file = myFixture.configureByText("main.foo", "content");
+        var silentServer = connect(file, silent);
+        var request = silentServer.getWorkspaceService().symbol(new WorkspaceSymbolParams("main"));
+        PlatformTestUtil.waitWithEventsDispatching("The silent server must get the request",
+                () -> !silent.requests.isEmpty(), 10);
+
+        // The stop, on another thread, can come between the send of the request and its keeping for the stop
+        silentServer.getServerWrapper().stop();
+        silentServer.getServerWrapper().cancelOnStop(silentServer.getServer(), request);
+
+        assertTrue("The request must be cancelled, as no later stop of its server cancels it", request.isCancelled());
+    }
+
+    private @NotNull LanguageServerItem connect(@NotNull PsiFile file,
+                                                @NotNull SymbolServerDefinition definition) throws Exception {
         var servers = LanguageServiceAccessor.getInstance(file.getProject())
                 .getLanguageServers(file, null, null).get(30, TimeUnit.SECONDS);
         assertSize(2, servers);
         return servers.stream()
                 .filter(server -> server.getServerDefinition() == definition)
                 .findFirst()
-                .orElseThrow()
-                .getServerWrapper();
+                .orElseThrow();
     }
 
     /**

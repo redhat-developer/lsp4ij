@@ -2761,16 +2761,36 @@ public class LanguageServerWrapper implements Disposable {
      * never complete without this, and so neither would the requests to the other language servers that it is merged
      * with (#722). A request of the support of a file is left to its disposal: cancelled earlier, it would complete
      * before its cached result is dropped, and the file would get it again as a result of the restarted server.
+     * <p>
+     * A request sent to a language server which is no longer the current one is cancelled at once: the language server
+     * stopped, or restarted, after the request was sent to it, and its stop didn't find the request to cancel it.
      *
+     * @param server  the LSP4J language server which the request was sent to.
      * @param request the LSP request, which isn't held by the support of a file.
      */
     @ApiStatus.Internal
-    public void cancelOnStop(@NotNull CompletableFuture<?> request) {
+    public void cancelOnStop(@NotNull LanguageServer server, @NotNull CompletableFuture<?> request) {
         if (request.isDone()) {
             return;
         }
-        pendingRequests.add(request);
+        if (!keepUntilStop(server, request)) {
+            CancellationSupport.cancel(request);
+            return;
+        }
         request.whenComplete((result, error) -> pendingRequests.remove(request));
+    }
+
+    /**
+     * Keeps the given request for the stop of the given language server, if it is still the current one. The stop takes
+     * this monitor too, and drops the language server once it has cancelled the kept requests: so a request is either
+     * kept before the stop, which cancels it, or refused after it.
+     */
+    private synchronized boolean keepUntilStop(@NotNull LanguageServer server, @NotNull CompletableFuture<?> request) {
+        if (server != this.languageServer) {
+            return false;
+        }
+        pendingRequests.add(request);
+        return true;
     }
 
     /**
