@@ -412,7 +412,7 @@ public class DebugAdapterServerPanel implements Disposable {
         });
         attachTab.addLabeledComponentFillVertically(DAPBundle.message("dap.settings.editor.configuration.launch.use"), attachCombo);
         attachConfigurationField = new SchemaBackedJsonTextField(project);
-        attachConfigurationField.getDocument()
+        attachConfigurationField
                 .addDocumentListener(new com.intellij.openapi.editor.event.DocumentListener() {
                     @Override
                     public void documentChanged(com.intellij.openapi.editor.event.@NotNull DocumentEvent event) {
