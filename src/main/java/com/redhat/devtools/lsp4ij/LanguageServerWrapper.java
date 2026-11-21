@@ -2826,7 +2826,9 @@ public class LanguageServerWrapper implements Disposable {
                     }
                     return null;
                 })
-                .expireWith(project)
+                // Not expireWith(project), which registers on the project in a read action taken at submission, as
+                // EditorFeatureManager.refreshEditorFeature says: the stop would wait for a write action with the monitor
+                .expireWhen(project::isDisposed)
                 .submit(AppExecutorUtil.getAppExecutorService());
     }
 
