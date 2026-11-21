@@ -36,20 +36,28 @@ jobs:
       - name: Find the newest IntelliJ IDEA
         id: latest
         run: |
-          ./gradlew intellijPlatformDiscover --kind=releases --type=IU --output=build/intellij-releases.json
-          LATEST=$(jq -r '
-            .data.releases
+          RELEASES=build/intellij-releases.json
+          ./gradlew intellijPlatformDiscover --kind=releases --type=IU --output=$RELEASES
+          # The releases, newest build first
+          SORTED='.data.releases
             | map(select(.buildNumber | test("^[0-9]+(\\.[0-9]+)*$")))
-            | max_by(.buildNumber | split(".") | map(tonumber))
-            | if . == null then empty
-              elif .channel == "RELEASE" then .version
-              else .buildNumber + "-EAP-SNAPSHOT" end
-          ' build/intellij-releases.json)
-          if [ -z "$LATEST" ]; then
-            echo "::error::No IntelliJ IDEA (IU) release found in build/intellij-releases.json"
+            | sort_by(.buildNumber | split(".") | map(tonumber)) | reverse'
+          LINE='"\(.notation)  \(.version)  \(.channel)"'
+
+          echo "::group::The 10 newest IntelliJ IDEA (IU) builds"
+          jq -r "$SORTED | .[:10][] | $LINE" $RELEASES
+          echo "::endgroup::"
+
+          NEWEST=$(jq -c "$SORTED | first // empty" $RELEASES)
+          if [ -z "$NEWEST" ]; then
+            echo "::error::No IntelliJ IDEA (IU) release found in $RELEASES"
             exit 1
           fi
-          echo "Newest IntelliJ IDEA build: $LATEST"
+          LATEST=$(echo "$NEWEST" | jq -r 'if .channel == "RELEASE" then .version else .buildNumber + "-EAP-SNAPSHOT" end')
+
+          echo "Newest IntelliJ IDEA: $(echo "$NEWEST" | jq -r "$LINE")"
+          echo "Platform version for Gradle: $LATEST"
+          echo "Tested against IntelliJ IDEA \`$(echo "$NEWEST" | jq -r "$LINE")\`, platform version \`$LATEST\`" >> "$GITHUB_STEP_SUMMARY"
           echo "version=$LATEST" >> "$GITHUB_OUTPUT"
 
       - name: Build with Gradle
