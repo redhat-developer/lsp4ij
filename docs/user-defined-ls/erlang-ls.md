@@ -8,15 +8,16 @@ To enable [Erlang](https://www.erlang.org/) language support in your IDE, you ca
 
 1. [Download Erlang/OTP](https://www.erlang.org/downloads).
 
-2. [Download Erlang LS](https://github.com/erlang-ls/erlang_ls/releases) according your OS. 
-Unzip the downloaded file which should contain the `erlang_ls` (escript) file which is the language server
-and copy/paste to your IntelliJ project base dir.
-
-To start it, you will need to use the following command:
+2. When the language server starts, the installer of the template downloads the `erlang_ls` escript of the latest
+[Erlang LS release](https://github.com/erlang-ls/erlang_ls/releases) into `$USER_HOME$/.lsp4ij/lsp/erlang-ls`,
+unless it is already there. On Linux and macOS, it takes the build for Erlang/OTP 27, which runs on OTP 27 to 29; on
+Windows, the only build, for OTP 26, which runs on OTP 26 to 28. The command starts it from there:
 
 ```
-escript erlang_ls
+escript "$USER_HOME$/.lsp4ij/lsp/erlang-ls/erlang_ls"
 ```
+
+If you use an `erlang_ls` built for another Erlang/OTP version, or put it somewhere else, change its path in the command.
 
 3. **Open the New Language Server Dialog**. This can usually be found under the IDE settings related to Language Server Protocol (LSP). For more information, refer to the [New Language Server Dialog documentation](../UserDefinedLanguageServer.md#new-language-server-dialog).
 

@@ -130,6 +130,11 @@ public class ServerInstallerManager extends InstallerTaskRegistry implements Dis
                         @NotNull InstallerContext context) {
         final var serverInstallerDescriptor = loadInstaller(installerConfigurationContent);
         String installerName = serverInstallerDescriptor.getName();
+        if (!hasTaskToExecute(serverInstallerDescriptor, context.getAction())) {
+            // Else the installation would do nothing, and report that it completed successfully (#1229)
+            notifyNothingToExecute(installerName, context);
+            return;
+        }
         StringBuilder title = new StringBuilder();
         switch (context.getAction()) {
             case CHECK -> title.append("Checking '");
@@ -152,6 +157,35 @@ public class ServerInstallerManager extends InstallerTaskRegistry implements Dis
                 install(serverInstallerDescriptor, context);
             }
         });
+    }
+
+    /**
+     * Returns true if the given installer declares the task that the given action is for: {@code check} for a check,
+     * and {@code run} for a run, with or without a check before it.
+     *
+     * @param installerDescriptor the installer.
+     * @param action              the action.
+     * @return true if the given installer declares the task that the given action is for and false otherwise.
+     */
+    static boolean hasTaskToExecute(@NotNull ServerInstallerDescriptor installerDescriptor,
+                                    @NotNull InstallerContext.InstallerAction action) {
+        return switch (action) {
+            case CHECK -> installerDescriptor.getCheck() != null;
+            case RUN, CHECK_AND_RUN -> installerDescriptor.getRun() != null;
+        };
+    }
+
+    private static void notifyNothingToExecute(@NotNull String name, @NotNull InstallerContext context) {
+        boolean check = context.getAction() == InstallerContext.InstallerAction.CHECK;
+        String task = check ? "check" : "run";
+        context.clear();
+        context.print(name);
+        context.printError("The installer has no \"" + task + "\".");
+        var notification = new Notification(ServerMessageHandler.LSP_WINDOW_SHOW_MESSAGE_GROUP_ID,
+                (check ? "Nothing to check for <code>" : "Nothing to install for <code>") + name + "</code>.",
+                "The installer has no <code>" + task + "</code>.",
+                NotificationType.WARNING);
+        Notifications.Bus.notify(notification, context.getProject());
     }
 
     public boolean install(@NotNull ServerInstallerDescriptor installerDescriptor,

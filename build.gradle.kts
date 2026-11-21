@@ -297,6 +297,9 @@ tasks {
         gradleVersion = properties("gradleVersion").get()
         // The default of 10 seconds is at times too short for a CI runner to download the distribution
         networkTimeout = 60_000
+        // A download of the distribution that fails, as on a CI runner, is tried again after 1, 2 and 4 seconds
+        retries = 3
+        retryBackOffMs = 1_000
     }
 
     prepareTestSandbox {

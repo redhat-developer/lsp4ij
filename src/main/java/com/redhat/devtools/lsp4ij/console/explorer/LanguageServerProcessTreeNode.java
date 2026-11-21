@@ -212,7 +212,9 @@ public class LanguageServerProcessTreeNode extends DefaultMutableTreeNode {
     }
 
     public @Nullable String getElapsedTime() {
-        if (!isEnabled()) {
+        if (!isEnabled() || startTime < 0) {
+            // A status that the node took while its language server was switched off has no start time: switched on
+            // since, it would show the time since 1970 (#1335)
             return null;
         }
         long endTime = System.currentTimeMillis();

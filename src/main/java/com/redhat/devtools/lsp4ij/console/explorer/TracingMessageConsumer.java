@@ -13,8 +13,12 @@ package com.redhat.devtools.lsp4ij.console.explorer;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonPrimitive;
 import com.redhat.devtools.lsp4ij.JSONUtils;
+import com.redhat.devtools.lsp4ij.LSPRequestConstants;
 import com.redhat.devtools.lsp4ij.settings.ServerTrace;
+import org.eclipse.lsp4j.ExecuteCommandParams;
 import org.eclipse.lsp4j.jsonrpc.JsonRpcException;
 import org.eclipse.lsp4j.jsonrpc.MessageConsumer;
 import org.eclipse.lsp4j.jsonrpc.MessageIssueException;
@@ -25,6 +29,7 @@ import org.eclipse.lsp4j.jsonrpc.messages.Message;
 import org.eclipse.lsp4j.jsonrpc.messages.NotificationMessage;
 import org.eclipse.lsp4j.jsonrpc.messages.RequestMessage;
 import org.eclipse.lsp4j.jsonrpc.messages.ResponseMessage;
+import org.jetbrains.annotations.Nullable;
 
 import java.time.Clock;
 import java.time.Instant;
@@ -93,7 +98,7 @@ public class TracingMessageConsumer {
         if (message instanceof RequestMessage) {
             RequestMessage requestMessage = (RequestMessage) message;
             String id = requestMessage.getId();
-            String method = requestMessage.getMethod();
+            String method = getTracedMethod(requestMessage);
             RequestMetadata requestMetadata = new RequestMetadata(method, now);
             sentRequests.put(id, requestMetadata);
             if (serverTrace == ServerTrace.messages) {
@@ -139,7 +144,7 @@ public class TracingMessageConsumer {
     private String consumeMessageReceiving(Message message, Instant now, String date, ServerTrace serverTrace) {
         if (message instanceof RequestMessage) {
             RequestMessage requestMessage = (RequestMessage) message;
-            String method = requestMessage.getMethod();
+            String method = getTracedMethod(requestMessage);
             String id = requestMessage.getId();
             RequestMetadata requestMetadata = new RequestMetadata(method, now);
             receivedRequests.put(id, requestMetadata);
@@ -197,6 +202,37 @@ public class TracingMessageConsumer {
             result.append(errorJson);
         }
         return result.toString();
+    }
+
+    /**
+     * Returns the method of the given request as the traces show it, for the request and for its response: a
+     * {@code workspace/executeCommand} request also shows the command that it executes, as
+     * {@code workspace/executeCommand [gopls.tidy]}, which the traces would otherwise show only in its params, with
+     * the verbose level (#284).
+     */
+    private static String getTracedMethod(RequestMessage requestMessage) {
+        String method = requestMessage.getMethod();
+        if (!LSPRequestConstants.WORKSPACE_EXECUTE_COMMAND.equals(method)) {
+            return method;
+        }
+        String command = getCommand(requestMessage.getParams());
+        return command != null ? method + " [" + command + "]" : method;
+    }
+
+    /**
+     * Returns the command of the given params of a {@code workspace/executeCommand} request: LSP4IJ sends them as
+     * {@link ExecuteCommandParams}, while a request that hasn't been read into its type has them as JSON.
+     */
+    private static @Nullable String getCommand(@Nullable Object params) {
+        if (params instanceof ExecuteCommandParams executeCommandParams) {
+            return executeCommandParams.getCommand();
+        }
+        if (params instanceof JsonObject json
+                && json.get("command") instanceof JsonPrimitive command
+                && command.isString()) {
+            return command.getAsString();
+        }
+        return null;
     }
 
     private static String getMethod(RequestMetadata requestMetadata) {
