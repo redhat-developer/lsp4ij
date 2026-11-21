@@ -2,12 +2,21 @@
   "id": "erlang-ls-installer",
   "name": "erlang-ls",
   "executeOnStartServer": false,
+  "properties": {
+    "serverDist": "$USER_HOME$/.lsp4ij/lsp/erlang-ls"
+  },
   "check": {
     "exec": {
       "name": "Check erlang runtime",
       "command": {
         "windows": "where escript",
         "default": "which escript"
+      },
+      "onSuccess": {
+        "fileExists": {
+          "name": "Check if erlang-ls is installed",
+          "file": "${serverDist}/erlang_ls"
+        }
       }
     }
   },
@@ -16,17 +25,17 @@
       "name": "Download erlang-ls",
       "github": {
         "owner": "erlang-ls",
-        "repository": "erlang_ls",        
+        "repository": "erlang_ls",
         "asset": {
           "windows": "erlang_ls-win*.tar.gz",
-          "unix": "erlang-linux*.zip",
-          "mac": "erlang-macos*.zip"
+          "unix": "erlang_ls-linux-27.tar.gz",
+          "mac": "erlang_ls-macos-27.tar.gz"
         }
       },
       "output": {
-        "dir": "$USER_HOME$/.lsp4ij/lsp",
+        "dir": "${serverDist}",
         "file": {
-          "name": "erlang/erlang_ls",
+          "name": "erlang_ls",
           "executable": true
         }
       },
