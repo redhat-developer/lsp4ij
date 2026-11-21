@@ -112,7 +112,7 @@ public class BundledTemplateCommandsTest {
     void aTemplateStartsItsLanguageServerWhereItsInstallerPutsIt() throws IOException, URISyntaxException {
         var files = bundledFiles();
         List<String> problems = new ArrayList<>();
-        for (String server : List.of("clojure-lsp", "harper-ls", "jdtls", "lemminx", "luau-lsp", "perl-lsp")) {
+        for (String server : List.of("clojure-lsp", "erlang-ls", "harper-ls", "jdtls", "lemminx", "luau-lsp", "perl-lsp")) {
             var template = files.get("lsp/" + server + "/template.json");
             var installer = files.get("lsp/" + server + "/installer.json");
             assertNotNull(template, server);

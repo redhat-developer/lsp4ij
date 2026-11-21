@@ -351,6 +351,15 @@ public class InstallerTaskRegistryFileExistsTest {
     }
 
     @Test
+    public void testErlangLsInstallerJsonChecksForErlangLsOnceItFindsEscript() throws IOException {
+        // escript, of Erlang/OTP, starts erlang_ls, which the download puts in the folder of the template: without
+        // looking for erlang_ls, the check would find erlang-ls installed wherever Erlang/OTP is, and never download it
+        var descriptor = assertTemplateInstaller("lsp/erlang-ls", ExecTask.class, DownloadTask.class);
+        assertInstanceOf(FileExistsTask.class, descriptor.getCheck().getOnSuccess(),
+                "The check of erlang-ls should look for erlang_ls once it has found escript");
+    }
+
+    @Test
     public void testAllDapTemplatesParseWithoutError() throws IOException {
         assertAllTemplatesInDirectoryParse("dap");
     }
@@ -362,9 +371,9 @@ public class InstallerTaskRegistryFileExistsTest {
 
     // --- Helper methods ---
 
-    private void assertTemplateInstaller(String templatePath,
-                                         Class<? extends InstallerTask> expectedCheckType,
-                                         Class<? extends InstallerTask> expectedRunType) throws IOException {
+    private ServerInstallerDescriptor assertTemplateInstaller(String templatePath,
+                                                             Class<? extends InstallerTask> expectedCheckType,
+                                                             Class<? extends InstallerTask> expectedRunType) throws IOException {
         InstallerTaskRegistry registry = createRegistry();
         Path jsonPath = Paths.get("src/main/resources/templates", templatePath, "installer.json");
         assertTrue(Files.exists(jsonPath), "installer.json not found: " + jsonPath);
@@ -379,6 +388,7 @@ public class InstallerTaskRegistryFileExistsTest {
         assertNotNull(descriptor.getRun(), "Run task should not be null for " + templatePath);
         assertInstanceOf(expectedRunType, descriptor.getRun(),
                 "Run task should be " + expectedRunType.getSimpleName() + " for " + templatePath);
+        return descriptor;
     }
 
     private void assertAllTemplatesInDirectoryParse(String subDir) throws IOException {
