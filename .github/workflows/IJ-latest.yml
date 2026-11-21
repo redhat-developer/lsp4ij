@@ -65,7 +65,17 @@ jobs:
           # ci.yml tests pull requests against a fixed IntelliJ IDEA (IU) release, so that a new release does not turn
           # them red. Warn, without failing, when a newer release is out, so that someone updates ci.yml.
           NEWEST_RELEASE=$(jq -r "$SORTED | map(select(.channel == \"RELEASE\")) | first | .version // empty" $RELEASES)
-          CI_RELEASE=$(yq '.jobs[].strategy.matrix.include[] | select(.platformType == "IU") | .platformVersion' .github/workflows/ci.yml | head -n 1)
+          # Every IU release that ci.yml tests, the highest of them counts. A matrix entry without platformType or
+          # platformVersion takes the one of gradle.properties.
+          DEFAULT_TYPE=$(sed -n 's/^platformType=//p' gradle.properties)
+          DEFAULT_VERSION=$(sed -n 's/^platformVersion=//p' gradle.properties)
+          CI_RELEASE=$(DEFAULT_TYPE="$DEFAULT_TYPE" DEFAULT_VERSION="$DEFAULT_VERSION" yq '
+            .jobs[].strategy.matrix
+            | ((.platformVersion // [""]) | map({"platformVersion": .})) + (.include // [])
+            | .[]
+            | select((.platformType // strenv(DEFAULT_TYPE)) == "IU")
+            | (.platformVersion // "") | (select(. != "") // strenv(DEFAULT_VERSION))
+          ' .github/workflows/ci.yml | grep -v '^$' | sort -V | tail -n 1)
           echo "Newest IntelliJ IDEA release: ${NEWEST_RELEASE:-none}, ci.yml tests: ${CI_RELEASE:-none}"
           if [ -z "$NEWEST_RELEASE" ] || [ -z "$CI_RELEASE" ]; then
             echo "::warning::Could not compare the IntelliJ IDEA release of ci.yml (${CI_RELEASE:-not found}) with the newest release (${NEWEST_RELEASE:-not found})"
