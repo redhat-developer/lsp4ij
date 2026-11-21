@@ -3,7 +3,7 @@
   "name": "Vue.js Language Server",
   "executeOnStartServer": false,
   "properties": {
-    "workingDir" : "$USER_HOME$/.lsp4ij/lsp/vue-js-language-server-ls"
+    "workingDir" : "$USER_HOME$/.lsp4ij/lsp/vue-js-language-server"
   },
   "check": {
     "exec": {
