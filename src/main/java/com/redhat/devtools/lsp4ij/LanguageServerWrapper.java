@@ -75,6 +75,7 @@ import org.slf4j.LoggerFactory;
 import java.io.File;
 import java.net.URI;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -205,6 +206,8 @@ public class LanguageServerWrapper implements Disposable {
     private volatile @Nullable ConcurrentLinkedQueue<LSPTrace> traces;
     // The size of traces, which ConcurrentLinkedQueue.size() counts one by one
     private final AtomicInteger traceCount = new AtomicInteger();
+    // Held to remove a trace and read it, so that the traces are read in their order
+    private final Object traceLock = new Object();
     private @Nullable Alarm traceFlushAlarm;
     private volatile @Nullable InitializingContext currentInitializingContext;
     // Where the connection of a document runs once its start attempt is initialized: the executor that
@@ -2529,7 +2532,7 @@ public class LanguageServerWrapper implements Disposable {
      * The traces are kept until the LSP console shows them, which can be later, as when it opens after the language
      * server started. If more than {@link #MAX_PENDING_TRACES} wait, as for a language server whose LSP console never
      * opens, the oldest goes; it is still read, so that the trace of the response to a request it dropped shows the
-     * method and the latency of the request.
+     * method and the latency of the request. A trace keeps the time of its message, which it shows when it is read.
      *
      * @param message         the LSP request/response message to display in the LSP consle.
      * @param messageConsumer the message consumer.
@@ -2546,29 +2549,34 @@ public class LanguageServerWrapper implements Disposable {
             // This case can occur when language server is restarted
             return false;
         }
-        traces.add(new LSPTrace(message, messageConsumer, serverTrace, tracing));
+        traces.add(new LSPTrace(message, messageConsumer, serverTrace, tracing, Instant.now()));
         if (traceCount.incrementAndGet() > MAX_PENDING_TRACES) {
-            LSPTrace oldest = pollTrace();
-            if (oldest != null) {
-                oldest.toMessage();
-            }
+            pollTraceMessage();
         }
         return true;
     }
 
     /**
-     * Returns the oldest LSP trace that the LSP console hasn't shown yet, and removes it, or null if there is none.
+     * Removes the oldest LSP trace that the LSP console hasn't shown yet, and returns its message, or null if there is
+     * none.
+     * <p>
+     * The LSP console and {@link #addTrace(Message, MessageConsumer)} remove and read the traces one at a time, so
+     * that the trace of a request is read before the trace of its response, which then shows the method and the
+     * latency of the request.
      *
-     * @return the oldest LSP trace that the LSP console hasn't shown yet, or null.
+     * @return the message of the oldest LSP trace that the LSP console hasn't shown yet, or null.
      */
     @ApiStatus.Internal
-    public @Nullable LSPTrace pollTrace() {
-        var traces = this.traces;
-        LSPTrace trace = traces != null ? traces.poll() : null;
-        if (trace != null) {
+    public @Nullable String pollTraceMessage() {
+        synchronized (traceLock) {
+            var traces = this.traces;
+            LSPTrace trace = traces != null ? traces.poll() : null;
+            if (trace == null) {
+                return null;
+            }
             traceCount.decrementAndGet();
+            return trace.toMessage();
         }
-        return trace;
     }
 
     /**
@@ -2985,9 +2993,10 @@ public class LanguageServerWrapper implements Disposable {
     public record LSPTrace(@NotNull Message message,
                            @NotNull MessageConsumer messageConsumer,
                            @NotNull ServerTrace serverTrace,
-                           @NotNull TracingMessageConsumer tracing) {
+                           @NotNull TracingMessageConsumer tracing,
+                           @NotNull Instant time) {
         public String toMessage() {
-            return tracing.log(message, messageConsumer, serverTrace);
+            return tracing.log(message, messageConsumer, serverTrace, time);
         }
     }
 

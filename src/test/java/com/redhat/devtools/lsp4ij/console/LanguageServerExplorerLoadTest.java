@@ -39,6 +39,7 @@ import java.io.ByteArrayOutputStream;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import java.util.regex.Pattern;
 
 /**
  * Tests what the Language Servers view shows when it opens.
@@ -132,6 +133,26 @@ public class LanguageServerExplorerLoadTest extends LSPCodeInsightFixtureTestCas
             assertFalse(traces.contains("Sending request 'test/droppedRequest"));
             // Its response still shows its method
             assertTrue(traces, traces.contains("Received response 'test/droppedRequest - (7)'"));
+        } finally {
+            Disposer.dispose(panel);
+        }
+    }
+
+    public void testATraceFromBeforeTheViewOpenedShowsTheLatencyOfTheResponse() throws InterruptedException {
+        traceWith(ServerTrace.messages);
+        var languageServer = LanguageServiceAccessor.getInstance(project).forceCreateServer(definition);
+        languageServer.updateStatus(ServerStatus.started);
+        log(request("3", "test/slowRequest"), SENT, languageServer);
+        Thread.sleep(300);
+        log(response("3"), RECEIVED, languageServer);
+
+        var panel = new LSPConsoleToolWindowPanel(project);
+        try {
+            String traces = waitForTraces(panel, "Received response");
+            // The view shows both traces at once, with the latency from the times of their messages
+            var latency = Pattern.compile("Received response 'test/slowRequest - \\(3\\)' in (\\d+)ms").matcher(traces);
+            assertTrue(traces, latency.find());
+            assertTrue(traces, Long.parseLong(latency.group(1)) >= 300);
         } finally {
             Disposer.dispose(panel);
         }

@@ -83,10 +83,10 @@ public class LanguageServerExplorerLifecycleListener implements LanguageServerLi
 
             // There are some LSP traces to display in the LSP console
             StringBuilder batch = new StringBuilder();
-            LanguageServerWrapper.LSPTrace lspTrace;
+            String trace;
             // Merge LSP traces in one String
-            while ((lspTrace = languageServer.pollTrace()) != null) {
-                batch.append(lspTrace.toMessage());
+            while ((trace = languageServer.pollTraceMessage()) != null) {
+                batch.append(trace);
             }
 
             // Flush logs in the UI Thread
