@@ -13,6 +13,7 @@ package com.redhat.devtools.lsp4ij.features.diagnostics;
 import com.intellij.codeInsight.daemon.impl.HighlightInfo;
 import com.intellij.codeInsight.daemon.impl.UpdateHighlightersUtil;
 import com.intellij.openapi.Disposable;
+import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.ModalityState;
 import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.components.Service;
@@ -109,6 +110,34 @@ public final class LSPDiagnosticsApplier implements Disposable {
         Object refresh = new Object();
         synchronized (pendingRefreshes) {
             submittedRefreshes.computeIfAbsent(key, ignored -> new HashSet<>()).add(refresh);
+        }
+        Runnable submit = () -> submitRefresh(key, refresh, file, psiFile, document, modificationStamp);
+        var application = ApplicationManager.getApplication();
+        if (application.isDispatchThread() || application.isReadAccessAllowed()) {
+            submit.run();
+            return;
+        }
+        // submit() runs a read action, for the project of withDocumentsCommitted, which waits while a write action
+        // runs. The caller can hold a lock that the UI thread takes in a write action, as a document does while it
+        // applies a pulled report, and the UI thread as the document changes: another thread of the pool waits instead
+        try {
+            AppExecutorUtil.getAppExecutorService().execute(submit);
+        } catch (RuntimeException | Error e) {
+            // Not submitted, as when the executor rejects it: the refresh never runs
+            refreshEnded(key, refresh);
+            throw e;
+        }
+    }
+
+    private void submitRefresh(@NotNull Object key,
+                               @NotNull Object refresh,
+                               @Nullable VirtualFile file,
+                               @Nullable PsiFile psiFile,
+                               @Nullable Document document,
+                               @Nullable Long modificationStamp) {
+        if (project.isDisposed()) {
+            refreshEnded(key, refresh);
+            return;
         }
         try {
             ReadAction

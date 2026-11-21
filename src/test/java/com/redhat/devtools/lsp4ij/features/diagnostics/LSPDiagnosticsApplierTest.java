@@ -12,6 +12,8 @@ import com.intellij.codeHighlighting.TextEditorHighlightingPassRegistrar;
 import com.intellij.codeInsight.daemon.impl.DaemonCodeAnalyzerImpl;
 import com.intellij.codeInsight.daemon.impl.HighlightInfo;
 import com.intellij.codeInsight.daemon.impl.UpdateHighlightersUtil;
+import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.application.WriteAction;
 import com.intellij.openapi.application.impl.NonBlockingReadActionImpl;
 import com.intellij.openapi.command.WriteCommandAction;
 import com.intellij.openapi.editor.Document;
@@ -30,6 +32,7 @@ import org.eclipse.lsp4j.Range;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 /**
  * Tests for {@link LSPDiagnosticsApplier}.
@@ -96,6 +99,32 @@ public class LSPDiagnosticsApplierTest extends LSPCodeInsightFixtureTestCase {
         // the second refresh replaces the first, which is cancelled and never applied
         applier.scheduleRefresh(virtualFile, document);
         assertTrue("a refresh that replaces another must be pending", applier.isRefreshPending(virtualFile));
+
+        awaitShownWhilePending(applier, virtualFile);
+        assertFalse("no refresh may be pending once the diagnostics are shown", applier.isRefreshPending(virtualFile));
+    }
+
+    public void testARefreshScheduledFromAnotherThreadDoesNotWaitForTheWriteActionOfTheUIThread() throws Exception {
+        int groupId = registeredGroupId();
+        var file = openWithItsDiagnosticsShown();
+        var applier = LSPDiagnosticsApplier.getInstance(myFixture.getProject());
+        VirtualFile virtualFile = file.getVirtualFile();
+        Document document = myFixture.getEditor().getDocument();
+        clearDiagnostics(document, groupId);
+        assertEmpty(shownDiagnostics());
+
+        // As a document applies a pulled report on a thread of the pool, holding a lock that the UI thread takes in a
+        // write action as the document changes: a refresh that waited for the write action would never be scheduled
+        WriteAction.<Exception>run(() -> {
+            var scheduling = ApplicationManager.getApplication()
+                    .executeOnPooledThread(() -> applier.scheduleRefresh(virtualFile, document));
+            try {
+                scheduling.get(10, TimeUnit.SECONDS);
+            } catch (TimeoutException e) {
+                fail("the refresh must be scheduled without waiting for the write action");
+            }
+            assertTrue("a refresh scheduled from another thread must be pending", applier.isRefreshPending(virtualFile));
+        });
 
         awaitShownWhilePending(applier, virtualFile);
         assertFalse("no refresh may be pending once the diagnostics are shown", applier.isRefreshPending(virtualFile));
