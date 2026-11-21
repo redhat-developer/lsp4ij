@@ -63,6 +63,19 @@ public class NestedPlaceholderCompletionTest extends LSPCompletionFixtureTestCas
         assertEquals("hello test", myFixture.getEditor().getSelectionModel().getSelectedText());
     }
 
+    public void testTheLeadingVariableOfAPlaceholderGivesItsValueToTheText() {
+        complete("${1:${TM_FILENAME_BASE} suffix} x$0");
+
+        assertApplyCompletionItem(0, "test suffix x");
+        assertEquals("test suffix", myFixture.getEditor().getSelectionModel().getSelectedText());
+    }
+
+    public void testTheLeadingUnbracedVariableOfAPlaceholderGivesItsValueToTheText() {
+        complete("${1:$TM_FILENAME_BASE suffix} x$0");
+
+        assertApplyCompletionItem(0, "test suffix x");
+    }
+
     private void complete(String snippet) {
         TemplateManagerImpl.setTemplateTesting(getTestRootDisposable());
         var item = new CompletionItem("block");

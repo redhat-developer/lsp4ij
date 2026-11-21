@@ -271,8 +271,11 @@ public class LspSnippetParser {
                 handler.startPlaceholder(index, "$" + name, nestingLevel);
             } else {
                 // - ${1:$name} <-- the text of the placeholder starts with the variable, which the handlers resolve
-                // (#1313)
-                handler.startPlaceholder(index, continueString('}', '$'), nestingLevel);
+                // (#1313). Its name ends where the identifier does: var ::= [_a-zA-Z] [_a-zA-Z0-9]*
+                while (isIdentifierPart()) {
+                    read();
+                }
+                handler.startPlaceholder(index, endCapture(), nestingLevel);
             }
         } else {
             handler.startPlaceholder(index, readString('}', '$'), nestingLevel);
@@ -337,30 +340,8 @@ public class LspSnippetParser {
         return endCapture();
     }
 
-    /**
-     * Reads the rest of a string, as {@link #readString(int...)} reads it, once the capture started and its first
-     * character was read.
-     */
-    private String continueString(int... stopOn) throws IOException {
-        while (!isOneOf(stopOn) && !isEndOfText()) {
-            if (current == '\\') {
-                pauseCapture();
-                readEscape();
-                startCapture();
-            } else {
-                read();
-            }
-        }
-        return endCapture();
-    }
-
-    private boolean isOneOf(int... characters) {
-        for (int character : characters) {
-            if (current == character) {
-                return true;
-            }
-        }
-        return false;
+    private boolean isIdentifierPart() {
+        return current == '_' || (current >= 'a' && current <= 'z') || (current >= 'A' && current <= 'Z') || isDigit();
     }
 
     private void cancelCapture() {

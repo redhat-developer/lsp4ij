@@ -55,6 +55,8 @@ public class SnippetTemplateLoader extends AbstractLspSnippetHandler {
     // own
     private @Nullable StringBuilder placeholderText;
     private int placeholderIndex;
+    // The leading text of that placeholder, until another text joins it
+    private @Nullable String placeholderLeadingText;
 
     /**
      * Load the given Intellij template from a LSP snippet content by using the given variable resolver.
@@ -178,7 +180,7 @@ public class SnippetTemplateLoader extends AbstractLspSnippetHandler {
     @Override
     public void text(String text) {
         if (placeholderText != null) {
-            placeholderText.append(formatText(text));
+            appendToPlaceholder(formatText(text));
             return;
         }
         templateSegments.add(SnippetTemplateSegment.textSegment(formatText(text)));
@@ -207,7 +209,7 @@ public class SnippetTemplateLoader extends AbstractLspSnippetHandler {
     public void choice(String name, List<String> choices) {
         if (placeholderText != null) {
             // A choice in a placeholder gives its first value to the text of the placeholder
-            placeholderText.append(name);
+            appendToPlaceholder(name);
             return;
         }
         templateSegments.add(SnippetTemplateSegment.variable(new ConstantNode(name).withLookupStrings(choices), true));
@@ -219,11 +221,31 @@ public class SnippetTemplateLoader extends AbstractLspSnippetHandler {
             // A nested placeholder gives its text to the text of the placeholder that contains it, once resolved, as
             // the text of a placeholder can be a variable, such as $TM_FILENAME_BASE
             String value = super.resolveVariable(name);
-            placeholderText.append(value != null ? value : name);
+            appendToPlaceholder(value != null ? value : name);
             return;
         }
         placeholderIndex = index;
         placeholderText = new StringBuilder(name);
+        placeholderLeadingText = name;
+    }
+
+    /**
+     * Appends the given text to the text of the placeholder being read. Its leading text, which can be a variable, as
+     * in ${1:${TM_FILENAME_BASE} suffix}, is resolved first: the whole text, as a variable, is not.
+     */
+    private void appendToPlaceholder(@NotNull String text) {
+        if (placeholderText == null) {
+            return;
+        }
+        if (placeholderLeadingText != null) {
+            String value = super.resolveVariable(placeholderLeadingText);
+            if (value != null) {
+                placeholderText.setLength(0);
+                placeholderText.append(value);
+            }
+            placeholderLeadingText = null;
+        }
+        placeholderText.append(text);
     }
 
     @Override
@@ -233,6 +255,7 @@ public class SnippetTemplateLoader extends AbstractLspSnippetHandler {
         }
         String text = placeholderText.toString();
         placeholderText = null;
+        placeholderLeadingText = null;
         if (text.isEmpty()) {
             // As ${1:}, a tab stop
             tabstop(placeholderIndex);
@@ -246,7 +269,7 @@ public class SnippetTemplateLoader extends AbstractLspSnippetHandler {
         if (placeholderText != null) {
             // A variable in a placeholder gives its value, or its name, to the text of the placeholder
             String value = super.resolveVariable(name);
-            placeholderText.append(value != null ? value : name);
+            appendToPlaceholder(value != null ? value : name);
             return;
         }
         String resolvedValue = super.resolveVariable(name);

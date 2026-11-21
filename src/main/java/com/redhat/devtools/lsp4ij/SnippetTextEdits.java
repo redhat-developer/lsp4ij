@@ -155,9 +155,36 @@ final class SnippetTextEdits {
      * placeholders, as {@code ${1:a ${2:b}} = $1} gives {@code a b = a b}.
      */
     private static @NotNull String textOf(@NotNull String snippet, @NotNull Function<String, String> variables) {
+        // A tab stop in the default of a placeholder repeats a default too, as in ${1:${2:x}-$2}=$1, and the default
+        // that it repeats can come later in the snippet: a second pass expands it with the defaults of the first
+        Map<Integer, String> defaults = defaultsOf(snippet, variables, Map.of());
+        Map<Integer, String> expanded = defaultsOf(snippet, variables, defaults);
+        var text = new SnippetText(variables) {
+            @Override
+            public void tabstop(int index) {
+                appendContent(expanded.get(index));
+            }
+        };
+        new LspSnippetParser(text).parse(snippet);
+        return text.getTemplateContent();
+    }
+
+    /**
+     * Returns the default of each index of the given snippet: the text of the first placeholder with that index, with
+     * the text of its nested placeholders, or the first value of the first choice with that index. A tab stop in a
+     * default repeats the default of its index that comes before it, or else the given one.
+     */
+    private static @NotNull Map<Integer, String> defaultsOf(@NotNull String snippet,
+                                                          @NotNull Function<String, String> variables,
+                                                          @NotNull Map<Integer, String> known) {
         Map<Integer, String> defaults = new HashMap<>();
         new LspSnippetParser(new SnippetText(variables) {
             private final Deque<PlaceholderStart> placeholders = new ArrayDeque<>();
+
+            @Override
+            public void tabstop(int index) {
+                appendContent(defaults.containsKey(index) ? defaults.get(index) : known.get(index));
+            }
 
             @Override
             public void startPlaceholder(int index, String name, int level) {
@@ -178,14 +205,7 @@ final class SnippetTextEdits {
                 super.choice(index, choices);
             }
         }).parse(snippet);
-        var text = new SnippetText(variables) {
-            @Override
-            public void tabstop(int index) {
-                appendContent(defaults.get(index));
-            }
-        };
-        new LspSnippetParser(text).parse(snippet);
-        return text.getTemplateContent();
+        return defaults;
     }
 
     /**

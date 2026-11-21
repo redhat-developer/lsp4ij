@@ -88,6 +88,18 @@ public class PlaceholderTest {
     }
 
     @Test
+    public void leadingVariableOfAPlaceholderEndsWithItsName() {
+        LspSnippetNode[] unbraced = LspSnippetAssert.parse("${1:$TM_FILENAME_BASE suffix} x");
+        assertEquals(unbraced, LspSnippetAssert.placeholder(1, "$TM_FILENAME_BASE", 1),
+                LspSnippetAssert.text(" suffix"),
+                LspSnippetAssert.text(" x"));
+        LspSnippetNode[] braced = LspSnippetAssert.parse("${1:${TM_FILENAME_BASE} suffix} x");
+        assertEquals(braced, LspSnippetAssert.placeholder(1, "$TM_FILENAME_BASE", 1),
+                LspSnippetAssert.text(" suffix"),
+                LspSnippetAssert.text(" x"));
+    }
+
+    @Test
     public void tabstopAndVariableInPlaceholder() {
         LspSnippetNode[] actual = LspSnippetAssert.parse("${1:a $2 $name} b");
         assertEquals(actual, LspSnippetAssert.placeholder(1, "a ", 1),
