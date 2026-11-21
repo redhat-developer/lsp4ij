@@ -67,8 +67,8 @@ jobs:
           NEWEST_RELEASE=$(jq -r "$SORTED | map(select(.channel == \"RELEASE\")) | first | .version // empty" $RELEASES)
           # Every IU release that ci.yml tests, the highest of them counts. A matrix entry without platformType or
           # platformVersion takes the one of gradle.properties.
-          DEFAULT_TYPE=$(sed -n 's/^platformType=//p' gradle.properties)
-          DEFAULT_VERSION=$(sed -n 's/^platformVersion=//p' gradle.properties)
+          DEFAULT_TYPE=$(yq -p=props -o=yaml '.platformType // ""' gradle.properties)
+          DEFAULT_VERSION=$(yq -p=props -o=yaml '.platformVersion // ""' gradle.properties)
           CI_RELEASE=$(DEFAULT_TYPE="$DEFAULT_TYPE" DEFAULT_VERSION="$DEFAULT_VERSION" yq '
             .jobs[].strategy.matrix
             | ((.platformVersion // [""]) | map({"platformVersion": .})) + (.include // [])
