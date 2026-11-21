@@ -98,6 +98,12 @@ public class LanguageServerWrapper implements Disposable {
 
     private static final int MAX_NUMBER_OF_RESTART_ATTEMPTS = 20; // TODO move this max value in settings
 
+    /**
+     * The most LSP traces that wait for the LSP console to show them.
+     */
+    @ApiStatus.Internal
+    public static final int MAX_PENDING_TRACES = 1_000;
+
     private static final @NotNull TextDocumentSyncOptions DEFAULT_SYNC_OPTIONS;
 
     static {
@@ -197,6 +203,8 @@ public class LanguageServerWrapper implements Disposable {
     private volatile @Nullable Notification errorNotification;
     private @Nullable TracingMessageConsumer tracing;
     private volatile @Nullable ConcurrentLinkedQueue<LSPTrace> traces;
+    // The size of traces, which ConcurrentLinkedQueue.size() counts one by one
+    private final AtomicInteger traceCount = new AtomicInteger();
     private @Nullable Alarm traceFlushAlarm;
     private volatile @Nullable InitializingContext currentInitializingContext;
     // Where the connection of a document runs once its start attempt is initialized: the executor that
@@ -2517,6 +2525,11 @@ public class LanguageServerWrapper implements Disposable {
 
     /**
      * Add LSP trace in the cached LSP traces.
+     * <p>
+     * The traces are kept until the LSP console shows them, which can be later, as when it opens after the language
+     * server started. If more than {@link #MAX_PENDING_TRACES} wait, as for a language server whose LSP console never
+     * opens, the oldest goes; it is still read, so that the trace of the response to a request it dropped shows the
+     * method and the latency of the request.
      *
      * @param message         the LSP request/response message to display in the LSP consle.
      * @param messageConsumer the message consumer.
@@ -2534,7 +2547,39 @@ public class LanguageServerWrapper implements Disposable {
             return false;
         }
         traces.add(new LSPTrace(message, messageConsumer, serverTrace, tracing));
+        if (traceCount.incrementAndGet() > MAX_PENDING_TRACES) {
+            LSPTrace oldest = pollTrace();
+            if (oldest != null) {
+                oldest.toMessage();
+            }
+        }
         return true;
+    }
+
+    /**
+     * Returns the oldest LSP trace that the LSP console hasn't shown yet, and removes it, or null if there is none.
+     *
+     * @return the oldest LSP trace that the LSP console hasn't shown yet, or null.
+     */
+    @ApiStatus.Internal
+    public @Nullable LSPTrace pollTrace() {
+        var traces = this.traces;
+        LSPTrace trace = traces != null ? traces.poll() : null;
+        if (trace != null) {
+            traceCount.decrementAndGet();
+        }
+        return trace;
+    }
+
+    /**
+     * Returns true if some LSP traces wait for the LSP console to show them and false otherwise.
+     *
+     * @return true if some LSP traces wait for the LSP console to show them and false otherwise.
+     */
+    @ApiStatus.Internal
+    public boolean hasTraces() {
+        var traces = this.traces;
+        return traces != null && !traces.isEmpty();
     }
 
     private void initLSPTracesIfNeeded() {

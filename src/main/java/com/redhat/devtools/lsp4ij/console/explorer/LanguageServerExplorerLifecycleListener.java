@@ -23,8 +23,6 @@ import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.concurrent.ConcurrentLinkedQueue;
-
 import static com.redhat.devtools.lsp4ij.internal.ApplicationUtils.invokeLaterIfNeeded;
 
 /**
@@ -47,7 +45,11 @@ public class LanguageServerExplorerLifecycleListener implements LanguageServerLi
     public void handleStatusChanged(@NotNull LanguageServerWrapper languageServer) {
         ServerStatus serverStatus = languageServer.getServerStatus();
         boolean selectProcess = (serverStatus == ServerStatus.starting || serverStatus ==  ServerStatus.installing);
-        updateServerStatus(languageServer, serverStatus, selectProcess);
+        @Nullable LanguageServerProcessTreeNode processTreeNode = updateServerStatus(languageServer, serverStatus, selectProcess);
+        if (processTreeNode != null && languageServer.hasTraces()) {
+            // The traces from before the node, as from before the LSP console opened (#19)
+            scheduleFlushLogs(languageServer, processTreeNode);
+        }
     }
 
     @Override
@@ -60,7 +62,8 @@ public class LanguageServerExplorerLifecycleListener implements LanguageServerLi
 
         // Update UI server status
         @Nullable LanguageServerProcessTreeNode processTreeNode = updateServerStatus(languageServer, null, false);
-        if (processTreeNode != null && languageServer.addTrace(message, messageConsumer)) {
+        // LanguageServerLifecycleManager has kept the trace of the message, if the language server is traced
+        if (processTreeNode != null && languageServer.hasTraces()) {
             // Display traces in LSP console
             scheduleFlushLogs(languageServer, processTreeNode);
         }
@@ -76,14 +79,13 @@ public class LanguageServerExplorerLifecycleListener implements LanguageServerLi
             if (disposed || explorer.isDisposed()) return;
 
             // Get cached LSP traces
-            ConcurrentLinkedQueue<LanguageServerWrapper.LSPTrace> traces = languageServer.getTraces();
-            if (traces == null || traces.isEmpty()) return;
+            if (!languageServer.hasTraces()) return;
 
             // There are some LSP traces to display in the LSP console
             StringBuilder batch = new StringBuilder();
             LanguageServerWrapper.LSPTrace lspTrace;
             // Merge LSP traces in one String
-            while ((lspTrace = traces.poll()) != null) {
+            while ((lspTrace = languageServer.pollTrace()) != null) {
                 batch.append(lspTrace.toMessage());
             }
 
