@@ -54,6 +54,11 @@ public class BundledTemplateCommandsTest {
     /**
      * A folder under {@code ~/.lsp4ij}: {@code lsp} or {@code dap}, and the folder of the server in it, if there is one.
      */
+    // The templates which share the folder of one install, as the npm package which has both language servers
+    private static final Map<String, String> SHARED_FOLDERS = Map.of(
+            "lsp/vscode-css-language-server", "vscode-langservers-extracted",
+            "lsp/vscode-eslint-language-server", "vscode-langservers-extracted");
+
     private static final Pattern INSTALL_FOLDER = Pattern.compile("\\.lsp4ij/([^/\"\\\\$]*)(?:/([^/\"\\\\$]*))?");
 
     @Test
@@ -142,7 +147,8 @@ public class BundledTemplateCommandsTest {
      * there: so two templates that download the same archive, as {@code perl-lsp} and {@code perl-dap}, don't share a
      * folder, and the folder of a server is found from its template (#1960). The name is the id of the template, or its
      * directory, as {@code jdt-ls} for the template in {@code jdtls}. Not clangd, which unpacks its archive, a folder
-     * named after the version of clangd, into {@code ~/.lsp4ij/lsp} itself (#2011).
+     * named after the version of clangd, into {@code ~/.lsp4ij/lsp} itself (#2011). The CSS and ESLint language servers
+     * share the folder of the npm package which has both, {@code vscode-langservers-extracted} (#1960).
      */
     @Test
     void anInstallerPutsItsServerInTheFolderOfItsTemplate() throws IOException, URISyntaxException {
@@ -160,7 +166,7 @@ public class BundledTemplateCommandsTest {
             String template = file.substring(0, file.lastIndexOf('/'));
             String kind = template.substring(0, template.indexOf('/'));
             Set<String> names = Set.copyOf(List.of(template.substring(template.indexOf('/') + 1),
-                    templateIds.getOrDefault(template, "")));
+                    templateIds.getOrDefault(template, ""), SHARED_FOLDERS.getOrDefault(template, "")));
             Matcher matcher = INSTALL_FOLDER.matcher(text);
             while (matcher.find()) {
                 folders.add(file + ": " + matcher.group());
