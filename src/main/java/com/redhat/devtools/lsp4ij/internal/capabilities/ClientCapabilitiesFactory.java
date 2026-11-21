@@ -71,6 +71,8 @@ public class ClientCapabilitiesFactory {
         // See https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspaceEditClientCapabilities
         WorkspaceEditCapabilities editCapabilities = new WorkspaceEditCapabilities();
         editCapabilities.setDocumentChanges(Boolean.TRUE);
+        // A SnippetTextEdit (LSP 3.18) in a text document edit: see SnippetTextEdits
+        editCapabilities.setSnippetEditSupport(Boolean.TRUE);
         editCapabilities.setResourceOperations(List.of(
                 ResourceOperationKind.Create,
                 ResourceOperationKind.Delete,
