@@ -26,6 +26,7 @@ import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.Objects;
 import java.util.ResourceBundle;
 
 /**
@@ -156,7 +157,10 @@ public class DebugAdapterServerExtensionPointBean extends BaseKeyedLazyInstance<
             }
             return null;
         }
-        ResourceBundle resourceBundle = DynamicBundle.getResourceBundle(descriptor.getClassLoader(), baseName);
+        // As the deprecated PluginDescriptor.getClassLoader() does
+        ClassLoader classLoader = Objects.requireNonNullElse(descriptor.getPluginClassLoader(),
+                descriptor.getClass().getClassLoader());
+        ResourceBundle resourceBundle = DynamicBundle.getResourceBundle(classLoader, baseName);
         return AbstractBundle.message(resourceBundle, key);
     }
 

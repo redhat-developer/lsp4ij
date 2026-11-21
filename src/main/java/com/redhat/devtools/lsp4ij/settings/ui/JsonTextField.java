@@ -71,7 +71,7 @@ public class JsonTextField extends JPanel {
         add(editorTextField, BorderLayout.CENTER);
 
         validationHandlers = new ArrayList<>();
-        editorTextField.getDocument().addDocumentListener(new DocumentListener() {
+        addDocumentListener(new DocumentListener() {
             @Override
             public void documentChanged(@NotNull DocumentEvent event) {
                 boolean hasErrors = hasErrors();
@@ -134,5 +134,15 @@ public class JsonTextField extends JPanel {
     @NotNull
     public Document getDocument() {
         return editorTextField.getDocument();
+    }
+
+    /**
+     * Adds a listener to the document of this field, which the field keeps as long as it exists, also on a document
+     * that it is given later.
+     *
+     * @param listener the listener.
+     */
+    public void addDocumentListener(@NotNull DocumentListener listener) {
+        editorTextField.addDocumentListener(listener);
     }
 }

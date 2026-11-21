@@ -45,7 +45,7 @@ public final class MockLanguageServer implements LanguageServer {
 
 	private volatile MockTextDocumentService textDocumentService = new MockTextDocumentService(
 			this::buildMaybeDelayedFuture);
-	private final MockWorkspaceService workspaceService = new MockWorkspaceService(this::buildMaybeDelayedFuture);
+	private MockWorkspaceService workspaceService = new MockWorkspaceService(this::buildMaybeDelayedFuture);
 	private final InitializeResult initializeResult = new InitializeResult();
 	private volatile long delay = 0;
 	private volatile CompletableFuture<Void> initializeGate = CompletableFuture.completedFuture(null);
@@ -203,6 +203,10 @@ public final class MockLanguageServer implements LanguageServer {
 	@Override
 	public MockWorkspaceService getWorkspaceService() {
 		return workspaceService;
+	}
+
+	public void setWorkspaceService(MockWorkspaceService custom) {
+		workspaceService = custom;
 	}
 
 	public void setCompletionList(CompletionList completionList) {
