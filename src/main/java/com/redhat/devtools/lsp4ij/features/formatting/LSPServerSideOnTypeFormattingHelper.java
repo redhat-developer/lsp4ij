@@ -13,7 +13,6 @@ package com.redhat.devtools.lsp4ij.features.formatting;
 
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
-import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.psi.PsiFile;
 import com.intellij.util.containers.ContainerUtil;
 import com.redhat.devtools.lsp4ij.LSPFileSupport;
@@ -75,12 +74,8 @@ final class LSPServerSideOnTypeFormattingHelper {
         CompletableFuture<List<TextEdit>> onTypeFormattingFutures = onTypeFormattingSupport.onTypeFormatting(onTypeFormattingParams);
         try {
             onTypeFormattingFutures.get(500, TimeUnit.MILLISECONDS);
-        } catch (ProcessCanceledException e) {
-            //Since 2024.2 ProcessCanceledException extends CancellationException so we can't use multicatch to keep backward compatibility
-            //TODO delete block when minimum required version is 2024.2
-            onTypeFormattingSupport.cancel();
-            return false;
         } catch (CancellationException e) {
+            // Also a ProcessCanceledException, which extends CancellationException since IntelliJ 2024.2
             onTypeFormattingSupport.cancel();
             return false;
         } catch (TimeoutException e) {
