@@ -28,8 +28,8 @@
         "repository": "erlang_ls",
         "asset": {
           "windows": "erlang_ls-win*.tar.gz",
-          "unix": "erlang_ls-linux-26.tar.gz",
-          "mac": "erlang_ls-macos-26.tar.gz"
+          "unix": "erlang_ls-linux-27.tar.gz",
+          "mac": "erlang_ls-macos-27.tar.gz"
         }
       },
       "output": {

@@ -9,8 +9,9 @@ To enable [Erlang](https://www.erlang.org/) language support in your IDE, you ca
 1. [Download Erlang/OTP](https://www.erlang.org/downloads).
 
 2. When the language server starts, the installer of the template downloads the `erlang_ls` escript of the latest
-[Erlang LS release](https://github.com/erlang-ls/erlang_ls/releases), built for Erlang/OTP 26, into
-`$USER_HOME$/.lsp4ij/lsp/erlang-ls`, unless it is already there. The command starts it from there:
+[Erlang LS release](https://github.com/erlang-ls/erlang_ls/releases) into `$USER_HOME$/.lsp4ij/lsp/erlang-ls`,
+unless it is already there. On Linux and macOS, it takes the build for Erlang/OTP 27, which runs on OTP 27 to 29; on
+Windows, the only build, for OTP 26, which runs on OTP 26 to 28. The command starts it from there:
 
 ```
 escript "$USER_HOME$/.lsp4ij/lsp/erlang-ls/erlang_ls"
