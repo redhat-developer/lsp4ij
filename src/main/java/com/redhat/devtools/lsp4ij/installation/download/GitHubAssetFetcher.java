@@ -223,13 +223,27 @@ public class GitHubAssetFetcher implements AssetFetcher {
     }
 
     /**
+     * Returns the URL of the GitHub API which lists the releases of the given repository, the newest first. The API
+     * lists 30 releases by default, and up to 100 with {@code per_page}: a repository which publishes many
+     * prereleases, as the nightly builds of Open-MBEE/OpenSysML, can push its latest release out of the first 30, and
+     * the installer then installs its fallback URL, an older version (#1961).
+     *
+     * @param owner      the owner of the repository.
+     * @param repository the repository.
+     * @return the URL which lists the releases of the repository.
+     */
+    static @NotNull String releasesUrl(@NotNull String owner, @NotNull String repository) {
+        return "https://api.github.com/repos/" + owner + "/" + repository + "/releases?per_page=100";
+    }
+
+    /**
      * Fetches the raw JSON string of releases from the GitHub API.
      *
      * @param reporter an object to report progress or status messages
      * @return the JSON string of releases, or null if an error occurred
      */
     private @Nullable String fetchReleasesJson(@NotNull Reporter reporter)  {
-        String urlStr = "https://api.github.com/repos/" + owner + "/" + repository + "/releases";
+        String urlStr = releasesUrl(owner, repository);
         reporter.setText("> Loading GitHub releases: " + urlStr);
 
         try {
