@@ -54,6 +54,11 @@ public class BundledTemplateCommandsTest {
     /**
      * A folder under {@code ~/.lsp4ij}: {@code lsp} or {@code dap}, and the folder of the server in it, if there is one.
      */
+    // The templates which share the folder of one install, as the npm package which has both language servers
+    private static final Map<String, String> SHARED_FOLDERS = Map.of(
+            "lsp/vscode-css-language-server", "vscode-langservers-extracted",
+            "lsp/vscode-eslint-language-server", "vscode-langservers-extracted");
+
     private static final Pattern INSTALL_FOLDER = Pattern.compile("\\.lsp4ij/([^/\"\\\\$]*)(?:/([^/\"\\\\$]*))?");
 
     @Test
@@ -111,13 +116,15 @@ public class BundledTemplateCommandsTest {
      * there, as the command that the installer gives it once it has downloaded it: when the check finds the language
      * server installed, the download doesn't run, and the language server keeps the command of its template (#2011).
      * Not the templates that start a language server on the PATH, as cpp_ls, nor those whose installer puts it in a
-     * folder named after its version, as clangd.
+     * folder named after its version, as clangd. The CSS and ESLint language servers start from the npm package that
+     * their installers share (#1960).
      */
     @Test
     void aTemplateStartsItsLanguageServerWhereItsInstallerPutsIt() throws IOException, URISyntaxException {
         var files = bundledFiles();
         List<String> problems = new ArrayList<>();
-        for (String server : List.of("clojure-lsp", "erlang-ls", "harper-ls", "jdtls", "lemminx", "luau-lsp", "perl-lsp")) {
+        for (String server : List.of("clojure-lsp", "erlang-ls", "harper-ls", "jdtls", "lemminx", "luau-lsp", "perl-lsp",
+                "vscode-css-language-server", "vscode-eslint-language-server")) {
             var template = files.get("lsp/" + server + "/template.json");
             var installer = files.get("lsp/" + server + "/installer.json");
             assertNotNull(template, server);
@@ -140,7 +147,8 @@ public class BundledTemplateCommandsTest {
      * there: so two templates that download the same archive, as {@code perl-lsp} and {@code perl-dap}, don't share a
      * folder, and the folder of a server is found from its template (#1960). The name is the id of the template, or its
      * directory, as {@code jdt-ls} for the template in {@code jdtls}. Not clangd, which unpacks its archive, a folder
-     * named after the version of clangd, into {@code ~/.lsp4ij/lsp} itself (#2011).
+     * named after the version of clangd, into {@code ~/.lsp4ij/lsp} itself (#2011). The CSS and ESLint language servers
+     * share the folder of the npm package which has both, {@code vscode-langservers-extracted} (#1960).
      */
     @Test
     void anInstallerPutsItsServerInTheFolderOfItsTemplate() throws IOException, URISyntaxException {
@@ -158,7 +166,7 @@ public class BundledTemplateCommandsTest {
             String template = file.substring(0, file.lastIndexOf('/'));
             String kind = template.substring(0, template.indexOf('/'));
             Set<String> names = Set.copyOf(List.of(template.substring(template.indexOf('/') + 1),
-                    templateIds.getOrDefault(template, "")));
+                    templateIds.getOrDefault(template, ""), SHARED_FOLDERS.getOrDefault(template, "")));
             Matcher matcher = INSTALL_FOLDER.matcher(text);
             while (matcher.find()) {
                 folders.add(file + ": " + matcher.group());
@@ -175,8 +183,9 @@ public class BundledTemplateCommandsTest {
     }
 
     /**
-     * Returns the command that the download of the given installer gives the language server on the given OS,
-     * {@code windows} or {@code default}, with the directory and the file of the download.
+     * Returns the command that the download or the install command of the given installer gives the language server on
+     * the given OS, {@code windows} or {@code default}, with the directory and the file of the download, or the
+     * properties of the installer, as the working directory of an {@code npm install}.
      */
     private static @NotNull String installedCommand(@NotNull JsonObject installer, @NotNull String os) {
         Map<String, String> properties = new HashMap<>();
@@ -184,7 +193,13 @@ public class BundledTemplateCommandsTest {
         if (declared != null) {
             declared.entrySet().forEach(property -> properties.put(property.getKey(), property.getValue().getAsString()));
         }
-        var download = installer.getAsJsonObject("run").getAsJsonObject("download");
+        var run = installer.getAsJsonObject("run");
+        var exec = run.getAsJsonObject("exec");
+        if (exec != null) {
+            var command = exec.getAsJsonObject("onSuccess").getAsJsonObject("configureServer").get("command");
+            return resolve(byOs(command, os), properties);
+        }
+        var download = run.getAsJsonObject("download");
         var output = download.getAsJsonObject("output");
         properties.put("output.dir", resolve(output.get("dir").getAsString(), properties));
         var file = output.getAsJsonObject("file");
