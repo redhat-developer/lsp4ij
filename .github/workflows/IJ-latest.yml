@@ -31,11 +31,20 @@ jobs:
 
       # The newest build of the unified IntelliJ IDEA (IU): the current EAP if there is one, else the newest release.
       # Since 2025.3 there is no IntelliJ IDEA Community (IC) any more, so only IU has the newest builds.
+      # build.gradle.kts takes the IDE from the IntelliJ Maven repository (useInstaller = false), where a release has
+      # its version, such as 2026.3, and an EAP, RC or other preview build is '<build number>-EAP-SNAPSHOT'.
       - name: Find the newest IntelliJ IDEA
         id: latest
         run: |
           ./gradlew intellijPlatformDiscover --kind=releases --type=IU --output=build/intellij-releases.json
-          LATEST=$(jq -r '.data.releases | map(select(.buildNumber | test("^[0-9]+(\\.[0-9]+)*$"))) | max_by(.buildNumber | split(".") | map(tonumber)) | .buildNumber // empty' build/intellij-releases.json)
+          LATEST=$(jq -r '
+            .data.releases
+            | map(select(.buildNumber | test("^[0-9]+(\\.[0-9]+)*$")))
+            | max_by(.buildNumber | split(".") | map(tonumber))
+            | if . == null then empty
+              elif .channel == "RELEASE" then .version
+              else .buildNumber + "-EAP-SNAPSHOT" end
+          ' build/intellij-releases.json)
           if [ -z "$LATEST" ]; then
             echo "::error::No IntelliJ IDEA (IU) release found in build/intellij-releases.json"
             exit 1
