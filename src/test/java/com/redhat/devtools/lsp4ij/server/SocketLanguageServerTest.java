@@ -219,7 +219,9 @@ public class SocketLanguageServerTest extends LSPCodeInsightFixtureTestCase {
             };
             lifecycle.addLanguageServerLifecycleListener(listener);
             try {
-                var psiFile = myFixture.configureByText("main.sock", "main");
+                // Without an editor: the editor of a file connects it to its language servers once indexing is done,
+                // which can be after the stop, as on a slow machine, and would then start the language server again
+                var psiFile = myFixture.addFileToProject("main.sock", "main");
                 LanguageServerItem item = LanguageServiceAccessor.getInstance(project).getLanguageServers(psiFile, null, null)
                         .get(BOUND_SECONDS, TimeUnit.SECONDS).stream()
                         .filter(languageServer -> languageServer.getServerDefinition() == definition)
