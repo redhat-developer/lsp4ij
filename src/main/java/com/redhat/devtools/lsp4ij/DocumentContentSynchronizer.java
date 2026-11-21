@@ -746,25 +746,30 @@ public class DocumentContentSynchronizer implements DocumentListener, Disposable
         ls.getTextDocumentService()
                 .diagnostic(params)
                 .thenAcceptAsync(diagnosticReport -> {
-                    // Disposal must wait for publication, or prevent the entire reply from being applied.
-                    synchronized (diagnosticLifetime) {
-                        if (debouncePullDiagnosticsAlarm.isDisposed() || diagnosticReport == null ||
-                                (version != -1 && version != this.version)) {
-                            // The document changed or its synchronizer was retired while the request was pending.
-                            return;
-                        }
-                        var clientFeatures = languageServerWrapper.getClientFeatures();
-                        // Update the diagnostics cache from the opened file and refresh UI to process LSPDiagnosticsApplier.
-                        if (diagnosticReport.isLeft()) {
-                            RelatedFullDocumentDiagnosticReport fileReport = diagnosticReport.getLeft();
-                            // Update the diagnostics cache from the opened file
-                            updatePullDiagnostics(file, fileReport);
-                            updateRelatedPullDiagnostics(fileReport.getRelatedDocuments(), clientFeatures);
-                            pullResultId = fileReport.getResultId();
-                        } else if (diagnosticReport.isRight()) {
-                            // The opened file's diagnostics are unchanged, but those of related documents can change.
-                            updateRelatedPullDiagnostics(diagnosticReport.getRight().getRelatedDocuments(), clientFeatures);
-                            pullResultId = diagnosticReport.getRight().getResultId();
+                    // Disposal must wait for publication, or prevent the entire reply from being applied. The
+                    // documents lock of the language server comes first: the publication of the diagnostics of a
+                    // document that isn't open takes it, and a disconnect holds it while it disposes this
+                    // synchronizer, which takes diagnosticLifetime
+                    synchronized (languageServerWrapper.getDocumentsLock()) {
+                        synchronized (diagnosticLifetime) {
+                            if (debouncePullDiagnosticsAlarm.isDisposed() || diagnosticReport == null ||
+                                    (version != -1 && version != this.version)) {
+                                // The document changed or its synchronizer was retired while the request was pending.
+                                return;
+                            }
+                            var clientFeatures = languageServerWrapper.getClientFeatures();
+                            // Update the diagnostics cache from the opened file and refresh UI to process LSPDiagnosticsApplier.
+                            if (diagnosticReport.isLeft()) {
+                                RelatedFullDocumentDiagnosticReport fileReport = diagnosticReport.getLeft();
+                                // Update the diagnostics cache from the opened file
+                                updatePullDiagnostics(file, fileReport);
+                                updateRelatedPullDiagnostics(fileReport.getRelatedDocuments(), clientFeatures);
+                                pullResultId = fileReport.getResultId();
+                            } else if (diagnosticReport.isRight()) {
+                                // The opened file's diagnostics are unchanged, but those of related documents can change.
+                                updateRelatedPullDiagnostics(diagnosticReport.getRight().getRelatedDocuments(), clientFeatures);
+                                pullResultId = diagnosticReport.getRight().getResultId();
+                            }
                         }
                     }
                 });
