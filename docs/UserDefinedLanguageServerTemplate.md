@@ -517,6 +517,11 @@ You can customize the output directory and executable name:
 
 * `dir`: base folder where the downloaded file will be saved or extracted.
   The value is available as `${output.dir}` for use in other tasks.
+  An archive with a single root folder, as `perllsp-0.17.0-x86_64-unknown-linux-gnu/`, is extracted with that folder,
+  which is then added to `${output.dir}`.
+* `stripRootFolder` (optional, `false` by default): extracts the content of the single root folder of the archive into
+  `dir` itself, so the server is found at the same place from one version to the next, as the
+  [perl-lsp installer](../src/main/resources/templates/lsp/perl-lsp/installer.json) does.
 * `file.name`: name of the executable file (registered as `${output.file.name}`).
 
 #### Task configureServer

@@ -56,6 +56,12 @@ public abstract class ServerInstallerBase implements ServerInstaller {
     @NotNull
     private ServerInstallationStatus status;
 
+    /**
+     * True while the server installs because the check found it not installed, rather than because the installation
+     * is forced.
+     */
+    private volatile boolean installingAfterFailedCheck;
+
     private final List<ConsoleProvider> consoleProviders;
 
     public ServerInstallerBase() {
@@ -164,7 +170,12 @@ public abstract class ServerInstallerBase implements ServerInstaller {
                     ProgressManager.checkCanceled();
 
                     // Process the installation
-                    install(indicator);
+                    installingAfterFailedCheck = !context.isForceInstall();
+                    try {
+                        install(indicator);
+                    } finally {
+                        installingAfterFailedCheck = false;
+                    }
 
                     markAsInstalled(context, installFuture);
                 } catch (CancellationException e) {
@@ -284,6 +295,16 @@ public abstract class ServerInstallerBase implements ServerInstaller {
      * @throws Exception if an error occurs during installation.
      */
     protected abstract void install(@NotNull ProgressIndicator indicator) throws Exception;
+
+    /**
+     * Returns true while {@link #install(ProgressIndicator)} installs the server because the check found it not
+     * installed, and false otherwise, as when the installation is forced, as by the Reinstall action.
+     *
+     * @return true while the server installs because the check found it not installed, and false otherwise.
+     */
+    protected boolean isInstallingAfterFailedCheck() {
+        return installingAfterFailedCheck;
+    }
 
     /**
      * Gets the project associated with this server installation process.

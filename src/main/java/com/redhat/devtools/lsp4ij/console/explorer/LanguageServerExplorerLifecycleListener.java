@@ -173,8 +173,11 @@ public class LanguageServerExplorerLifecycleListener implements LanguageServerLi
                 created = true;
             }
         }
-        boolean serverStatusChanged = serverStatus != null && serverStatus != processTreeNode.getServerStatus();
-        boolean updateUI = serverStatusChanged || selectProcess || takenOver;
+        // The node takes a status on the EDT, so here it can still have the status before one that is queued: compared
+        // with it, the status that follows at once, as the stopped of a stop with nothing to shut down, would look
+        // unchanged and be lost, and the node would stay stopping (#1335). A status is compared once the node takes it.
+        boolean hasStatus = serverStatus != null;
+        boolean updateUI = hasStatus || selectProcess || takenOver;
         if (updateUI) {
             final var node = processTreeNode;
             final var status = serverStatus;
@@ -193,8 +196,10 @@ public class LanguageServerExplorerLifecycleListener implements LanguageServerLi
                 }
                 // A status that comes once another language server took the node over is no longer the node's, and one
                 // that comes after the disposal of its language server, as from another thread, must not outlast it
-                if ((serverStatusChanged || replaced) && node.getLanguageServer() == languageServer) {
-                    node.setServerStatus(languageServer.isDisposed() ? ServerStatus.stopped : status);
+                var newStatus = languageServer.isDisposed() ? ServerStatus.stopped : status;
+                boolean statusChanged = hasStatus && newStatus != node.getServerStatus();
+                if ((statusChanged || replaced) && node.getLanguageServer() == languageServer) {
+                    node.setServerStatus(newStatus);
                     // A stop or start changes the enabled flag of the definition, which the other nodes show too
                     refreshProcessNodes(serverNode);
                 }

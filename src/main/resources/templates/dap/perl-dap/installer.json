@@ -2,7 +2,7 @@
   "id": "perl-dap-installer",
   "name": "perl-dap",
   "properties": {
-    "serverDist": "$USER_HOME$/.lsp4ij/dap/perl-lsp"
+    "serverDist": "$USER_HOME$/.lsp4ij/dap/perl-dap"
   },
   "check": {
     "fileExists": {
@@ -45,6 +45,7 @@
       },
       "output": {
         "dir": "${serverDist}",
+        "stripRootFolder": true,
         "file": {
           "name": {
             "windows": "perl-dap.exe",

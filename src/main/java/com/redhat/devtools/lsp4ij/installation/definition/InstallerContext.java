@@ -66,6 +66,7 @@ public class InstallerContext implements Reporter {
     private @Nullable Set<Runnable> onPostInstall;
 
     private boolean showNotification;
+    private boolean checkAgainAfterWaiting;
 
     /**
      * Constructs a new {@code InstallerContext}.
@@ -312,6 +313,27 @@ public class InstallerContext implements Reporter {
 
     public boolean isShowNotification() {
         return showNotification;
+    }
+
+    /**
+     * Returns true if an exec task which waited for another one to leave its working directory runs the check of the
+     * installer again, and doesn't run its command if the check then passes, as when the other one installed the
+     * server; and false otherwise, as when the installation is forced.
+     *
+     * @return true if an exec task which waited runs the check of the installer again, and false otherwise.
+     */
+    public boolean isCheckAgainAfterWaiting() {
+        return checkAgainAfterWaiting;
+    }
+
+    /**
+     * Sets whether an exec task which waited for another one to leave its working directory runs the check of the
+     * installer again, and doesn't run its command if the check then passes.
+     *
+     * @param checkAgainAfterWaiting true if an exec task which waited runs the check of the installer again.
+     */
+    public void setCheckAgainAfterWaiting(boolean checkAgainAfterWaiting) {
+        this.checkAgainAfterWaiting = checkAgainAfterWaiting;
     }
 
     /**

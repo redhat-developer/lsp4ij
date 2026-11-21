@@ -26,6 +26,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
@@ -50,6 +51,15 @@ public class BundledTemplateCommandsTest {
 
     private static final String HOME = "C:/Users/Jane Doe";
     private static final Pattern PROPERTY = Pattern.compile("\\$\\{([\\w.]+)}");
+    /**
+     * A folder under {@code ~/.lsp4ij}: {@code lsp} or {@code dap}, and the folder of the server in it, if there is one.
+     */
+    // The templates which share the folder of one install, as the npm package which has both language servers
+    private static final Map<String, String> SHARED_FOLDERS = Map.of(
+            "lsp/vscode-css-language-server", "vscode-langservers-extracted",
+            "lsp/vscode-eslint-language-server", "vscode-langservers-extracted");
+
+    private static final Pattern INSTALL_FOLDER = Pattern.compile("\\.lsp4ij/([^/\"\\\\$]*)(?:/([^/\"\\\\$]*))?");
 
     @Test
     void shRunsTheWholeCommandWhereABundledTemplateUsesIt() throws IOException, URISyntaxException {
@@ -106,13 +116,15 @@ public class BundledTemplateCommandsTest {
      * there, as the command that the installer gives it once it has downloaded it: when the check finds the language
      * server installed, the download doesn't run, and the language server keeps the command of its template (#2011).
      * Not the templates that start a language server on the PATH, as cpp_ls, nor those whose installer puts it in a
-     * folder named after its version, as clangd.
+     * folder named after its version, as clangd. The CSS and ESLint language servers start from the npm package that
+     * their installers share (#1960).
      */
     @Test
     void aTemplateStartsItsLanguageServerWhereItsInstallerPutsIt() throws IOException, URISyntaxException {
         var files = bundledFiles();
         List<String> problems = new ArrayList<>();
-        for (String server : List.of("clojure-lsp", "harper-ls", "jdtls", "lemminx", "luau-lsp", "perl-lsp")) {
+        for (String server : List.of("clojure-lsp", "erlang-ls", "harper-ls", "jdtls", "lemminx", "luau-lsp", "perl-lsp",
+                "vscode-css-language-server", "vscode-eslint-language-server")) {
             var template = files.get("lsp/" + server + "/template.json");
             var installer = files.get("lsp/" + server + "/installer.json");
             assertNotNull(template, server);
@@ -129,8 +141,51 @@ public class BundledTemplateCommandsTest {
     }
 
     /**
-     * Returns the command that the download of the given installer gives the language server on the given OS,
-     * {@code windows} or {@code default}, with the directory and the file of the download.
+     * An installer puts its language server or debug adapter in {@code ~/.lsp4ij/lsp} or {@code ~/.lsp4ij/dap}, in a
+     * folder of its own, named after its template, as {@code ~/.lsp4ij/dap/perl-dap} for the debug adapter
+     * {@code perl-dap}, and the files of the template, as its command or its initialization options, take it from
+     * there: so two templates that download the same archive, as {@code perl-lsp} and {@code perl-dap}, don't share a
+     * folder, and the folder of a server is found from its template (#1960). The name is the id of the template, or its
+     * directory, as {@code jdt-ls} for the template in {@code jdtls}. Not clangd, which unpacks its archive, a folder
+     * named after the version of clangd, into {@code ~/.lsp4ij/lsp} itself (#2011). The CSS and ESLint language servers
+     * share the folder of the npm package which has both, {@code vscode-langservers-extracted} (#1960).
+     */
+    @Test
+    void anInstallerPutsItsServerInTheFolderOfItsTemplate() throws IOException, URISyntaxException {
+        Map<String, String> templateIds = new HashMap<>();
+        bundledFiles().forEach((file, json) -> {
+            if (file.endsWith("/template.json")) {
+                templateIds.put(file.substring(0, file.lastIndexOf('/')), json.get("id").getAsString());
+            }
+        });
+        var texts = bundledTexts(".*\\.json");
+        List<String> folders = new ArrayList<>();
+        List<String> problems = new ArrayList<>();
+        texts.forEach((file, text) -> {
+            // As lsp/perl-lsp
+            String template = file.substring(0, file.lastIndexOf('/'));
+            String kind = template.substring(0, template.indexOf('/'));
+            Set<String> names = Set.copyOf(List.of(template.substring(template.indexOf('/') + 1),
+                    templateIds.getOrDefault(template, ""), SHARED_FOLDERS.getOrDefault(template, "")));
+            Matcher matcher = INSTALL_FOLDER.matcher(text);
+            while (matcher.find()) {
+                folders.add(file + ": " + matcher.group());
+                if (template.equals("lsp/clangd")) {
+                    continue;
+                }
+                if (!kind.equals(matcher.group(1)) || matcher.group(2) == null || !names.contains(matcher.group(2))) {
+                    problems.add(file + ": " + matcher.group());
+                }
+            }
+        });
+        assertTrue(folders.size() > 30, "the folders of the installers and of the templates: " + folders);
+        assertEquals(List.of(), problems, "install a server in ~/.lsp4ij/lsp or ~/.lsp4ij/dap, in the folder of its template");
+    }
+
+    /**
+     * Returns the command that the download or the install command of the given installer gives the language server on
+     * the given OS, {@code windows} or {@code default}, with the directory and the file of the download, or the
+     * properties of the installer, as the working directory of an {@code npm install}.
      */
     private static @NotNull String installedCommand(@NotNull JsonObject installer, @NotNull String os) {
         Map<String, String> properties = new HashMap<>();
@@ -138,7 +193,13 @@ public class BundledTemplateCommandsTest {
         if (declared != null) {
             declared.entrySet().forEach(property -> properties.put(property.getKey(), property.getValue().getAsString()));
         }
-        var download = installer.getAsJsonObject("run").getAsJsonObject("download");
+        var run = installer.getAsJsonObject("run");
+        var exec = run.getAsJsonObject("exec");
+        if (exec != null) {
+            var command = exec.getAsJsonObject("onSuccess").getAsJsonObject("configureServer").get("command");
+            return resolve(byOs(command, os), properties);
+        }
+        var download = run.getAsJsonObject("download");
         var output = download.getAsJsonObject("output");
         properties.put("output.dir", resolve(output.get("dir").getAsString(), properties));
         var file = output.getAsJsonObject("file");
@@ -216,6 +277,18 @@ public class BundledTemplateCommandsTest {
      */
     private static @NotNull Map<String, JsonObject> bundledFiles() throws IOException, URISyntaxException {
         Map<String, JsonObject> files = new LinkedHashMap<>();
+        bundledTexts("template\\.json|installer\\.json")
+                .forEach((file, text) -> files.put(file, JsonParser.parseString(text).getAsJsonObject()));
+        return files;
+    }
+
+    /**
+     * Returns the text of the files of the bundled language servers and debug adapters whose name matches the given
+     * regular expression, by their path, as {@code lsp/jdtls/installer.json}.
+     */
+    private static @NotNull Map<String, String> bundledTexts(@NotNull String fileNames)
+            throws IOException, URISyntaxException {
+        Map<String, String> texts = new LinkedHashMap<>();
         for (String kind : List.of("templates/lsp", "templates/dap")) {
             var url = BundledTemplateCommandsTest.class.getClassLoader().getResource(kind);
             assertNotNull(url, kind);
@@ -223,21 +296,22 @@ public class BundledTemplateCommandsTest {
             if ("jar".equals(uri.getScheme())) {
                 // As in the sandbox of the tests, which has the plugin's jar
                 try (FileSystem jar = FileSystems.newFileSystem(uri, Map.of())) {
-                    read(jar.provider().getPath(uri), files);
+                    read(jar.provider().getPath(uri), fileNames, texts);
                 }
             } else {
-                read(Path.of(uri), files);
+                read(Path.of(uri), fileNames, texts);
             }
         }
-        return files;
+        return texts;
     }
 
-    private static void read(@NotNull Path templates, @NotNull Map<String, JsonObject> files) throws IOException {
+    private static void read(@NotNull Path templates, @NotNull String fileNames, @NotNull Map<String, String> texts)
+            throws IOException {
         try (Stream<Path> paths = Files.walk(templates)) {
             for (Path path : paths.filter(p -> p.getFileName() != null
-                    && p.getFileName().toString().matches("template\\.json|installer\\.json")).toList()) {
-                files.put(templates.getFileName() + "/" + path.getParent().getFileName() + "/" + path.getFileName(),
-                        JsonParser.parseString(Files.readString(path)).getAsJsonObject());
+                    && p.getFileName().toString().matches(fileNames)).toList()) {
+                texts.put(templates.getFileName() + "/" + path.getParent().getFileName() + "/" + path.getFileName(),
+                        Files.readString(path));
             }
         }
     }
