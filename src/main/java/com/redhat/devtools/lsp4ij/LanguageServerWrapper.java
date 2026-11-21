@@ -1640,6 +1640,17 @@ public class LanguageServerWrapper implements Disposable {
         return openedDocument;
     }
 
+    /**
+     * Returns the lock of the opened and closed documents of this language server. A document synchronizer that applies
+     * a pulled report takes it before the lock of its diagnostics, in the order of {@link #disconnect(URI, boolean)},
+     * which disposes the synchronizer holding it.
+     *
+     * @return the lock of the opened and closed documents of this language server.
+     */
+    @NotNull Object getDocumentsLock() {
+        return documentsLock;
+    }
+
     private void invalidateWorkspaceDiagnosticCache(@NotNull URI fileUri) {
         var client = languageClient;
         if (client != null) {
