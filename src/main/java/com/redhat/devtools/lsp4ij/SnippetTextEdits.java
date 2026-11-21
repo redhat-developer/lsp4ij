@@ -169,7 +169,7 @@ final class SnippetTextEdits {
             public void endPlaceholder(int level) {
                 // The text of the placeholder, with the text of its nested placeholders
                 PlaceholderStart start = placeholders.pop();
-                defaults.putIfAbsent(start.index(), getTemplateContent().substring(start.offset()));
+                defaults.putIfAbsent(start.index(), getTemplateContent(start.offset()));
             }
 
             @Override
