@@ -25,11 +25,13 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.io.File;
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.UUID;
 import java.util.function.Function;
+import java.util.stream.Stream;
 
 /**
  * <pre>
@@ -131,10 +133,16 @@ public class DownloadTask extends InstallerTask {
             if (extracted) {
                 // Downloaded asset is a zip, tar, etc file
                 if (decompressedDir != null && Files.isDirectory(decompressedDir)) {
-                    // The extracted downloaded asset is a directory, adjust the dir where the server will be hosted
-                    var decompressFolderName = decompressedDir.getName(decompressedDir.getNameCount() - 1);
-                    dir = dir + "/" + decompressFolderName;
-                    outputDir = outputDir.resolve(decompressFolderName);
+                    if (outputInfo != null && outputInfo.stripRootFolder()) {
+                        // The content of the root folder of the archive, as perllsp-0.17.0-x86_64-apple-darwin/, goes
+                        // into the dir itself, so the server is found at the same place from one version to the next
+                        moveContentInto(decompressedDir, outputDir);
+                    } else {
+                        // The extracted downloaded asset is a directory, adjust the dir where the server will be hosted
+                        var decompressFolderName = decompressedDir.getName(decompressedDir.getNameCount() - 1);
+                        dir = dir + "/" + decompressFolderName;
+                        outputDir = outputDir.resolve(decompressFolderName);
+                    }
                 }
             } else {
                 // Downloaded asset is a simple file (ex: *.jar file)
@@ -194,6 +202,23 @@ public class DownloadTask extends InstallerTask {
         }
     }
 
+    /**
+     * Moves the content of the given folder into the given parent folder, replacing what is there under the same names,
+     * as the files of an earlier install, and deletes the folder.
+     */
+    private static void moveContentInto(@NotNull Path folder, @NotNull Path parent) throws IOException {
+        // Renamed first, since it can hold a file or a folder of its own name
+        Path renamed = Files.move(folder, folder.resolveSibling(folder.getFileName() + "-" + UUID.randomUUID()));
+        try (Stream<Path> children = Files.list(renamed)) {
+            for (Path child : children.toList()) {
+                Path target = parent.resolve(child.getFileName().toString());
+                FileUtil.delete(target);
+                Files.move(child, target);
+            }
+        }
+        Files.delete(renamed);
+    }
+
     private String getDir() {
         String dir = outputInfo != null ? outputInfo.dir() : null;
         if (dir == null) {
@@ -222,7 +247,8 @@ public class DownloadTask extends InstallerTask {
 
     public record OutputInfo(@Nullable String dir,
                              @Nullable String fileName,
-                             boolean executable) {
+                             boolean executable,
+                             boolean stripRootFolder) {
     }
 
 }

@@ -46,6 +46,7 @@
       },
       "output": {
         "dir": "${serverDist}",
+        "stripRootFolder": true,
         "file": {
           "name": {
             "windows": "perllsp.exe",

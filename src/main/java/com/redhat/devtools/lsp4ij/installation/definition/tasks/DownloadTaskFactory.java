@@ -57,6 +57,7 @@ public class DownloadTaskFactory extends InstallerTaskFactoryBase {
     private static final String OUTPUT_FILE_JSON_PROPERTY = "file";
     private static final String OUTPUT_FILE_NAME_JSON_PROPERTY = "name";
     private static final String OUTPUT_FILE_EXECUTABLE_JSON_PROPERTY = "executable";
+    private static final String OUTPUT_STRIP_ROOT_FOLDER_JSON_PROPERTY = "stripRootFolder";
 
     @Override
     protected @NotNull InstallerTask create(@Nullable String id,
@@ -145,7 +146,8 @@ public class DownloadTaskFactory extends InstallerTaskFactoryBase {
             fileName = getStringFromOs(fileObj, OUTPUT_FILE_NAME_JSON_PROPERTY);
             executable = JSONUtils.getBoolean(fileObj, OUTPUT_FILE_EXECUTABLE_JSON_PROPERTY);
         }
-        return new DownloadTask.OutputInfo(dir, fileName, executable);
+        boolean stripRootFolder = JSONUtils.getBoolean(outputObj, OUTPUT_STRIP_ROOT_FOLDER_JSON_PROPERTY);
+        return new DownloadTask.OutputInfo(dir, fileName, executable, stripRootFolder);
     }
 
 }

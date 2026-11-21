@@ -10,15 +10,25 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.installation.definition;
 
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
+import com.intellij.openapi.util.io.FileUtil;
 import com.intellij.testFramework.TestApplicationManager;
+import com.redhat.devtools.lsp4ij.installation.CommandLineUpdater;
 import com.redhat.devtools.lsp4ij.installation.definition.tasks.*;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.regex.Pattern;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -360,6 +370,16 @@ public class InstallerTaskRegistryFileExistsTest {
     }
 
     @Test
+    public void testPerlLspChecksForTheServerWhereItsDownloadPutsIt() throws Exception {
+        assertTheCheckFindsWhatTheDownloadInstalled("lsp/perl-lsp");
+    }
+
+    @Test
+    public void testPerlDapChecksForTheDebugAdapterWhereItsDownloadPutsIt() throws Exception {
+        assertTheCheckFindsWhatTheDownloadInstalled("dap/perl-dap");
+    }
+
+    @Test
     public void testAllDapTemplatesParseWithoutError() throws IOException {
         assertAllTemplatesInDirectoryParse("dap");
     }
@@ -370,6 +390,68 @@ public class InstallerTaskRegistryFileExistsTest {
     }
 
     // --- Helper methods ---
+
+    /**
+     * Runs the download of the given bundled installer, twice, as a reinstall does, from an archive laid out as the
+     * perl-lsp releases are, with one root folder, {@code perllsp-<version>-<target>/}; then its check, which must
+     * find what the download installed, where the command that the download configures starts it.
+     */
+    private void assertTheCheckFindsWhatTheDownloadInstalled(String templatePath) throws Exception {
+        Path serverDist = Files.createTempDirectory("lsp4ij-server-dist");
+        Path downloads = Files.createTempDirectory("lsp4ij-release");
+        try {
+            String root = "perllsp-0.17.0-x86_64-pc-windows-msvc/";
+            Path archive = downloads.resolve("perllsp-0.17.0-x86_64-pc-windows-msvc.zip");
+            try (var zip = new ZipOutputStream(Files.newOutputStream(archive))) {
+                for (String file : List.of("perllsp", "perllsp.exe", "perl-dap", "perl-dap.exe", "README.md")) {
+                    zip.putNextEntry(new ZipEntry(root + file));
+                    zip.write(file.getBytes(StandardCharsets.UTF_8));
+                    zip.closeEntry();
+                }
+            }
+            JsonObject json = JsonParser.parseString(
+                    Files.readString(Paths.get("src/main/resources/templates", templatePath, "installer.json")))
+                    .getAsJsonObject();
+            json.getAsJsonObject("properties").addProperty("serverDist", serverDist.toString().replace('\\', '/'));
+            JsonObject download = json.getAsJsonObject("run").getAsJsonObject("download");
+            download.remove("github");
+            download.addProperty("url", archive.toUri().toString());
+            ServerInstallerDescriptor descriptor = createRegistry().loadInstaller(json.toString());
+
+            List<String> commands = new ArrayList<>();
+            assertTrue(execute(descriptor, descriptor.getRun(), commands), "The download should install " + templatePath);
+            assertTrue(execute(descriptor, descriptor.getRun(), commands), "A reinstall should replace what is installed");
+            assertTrue(execute(descriptor, descriptor.getCheck(), commands),
+                    "The check should find what the download of " + templatePath + " installed");
+
+            var started = Pattern.compile("^\"([^\"]+)\"").matcher(commands.get(commands.size() - 1));
+            assertTrue(started.find(), "The command should start with the quoted path of the server: " + commands);
+            Path server = Paths.get(started.group(1));
+            assertTrue(Files.isRegularFile(server), "The command should start what the download installed: " + server);
+            assertEquals(serverDist.toRealPath(), server.getParent().toRealPath(),
+                    "The download should put the server in the folder that the check looks in");
+        } finally {
+            FileUtil.delete(serverDist);
+            FileUtil.delete(downloads);
+        }
+    }
+
+    private static boolean execute(ServerInstallerDescriptor descriptor, InstallerTask task, List<String> commands) {
+        var context = new InstallerContext(null, InstallerContext.InstallerAction.CHECK_AND_RUN);
+        context.setCommandLineUpdater(new CommandLineUpdater() {
+            @Override
+            public String getCommandLine() {
+                return commands.isEmpty() ? null : commands.get(commands.size() - 1);
+            }
+
+            @Override
+            public void setCommandLine(String commandLine) {
+                commands.add(commandLine);
+            }
+        });
+        descriptor.getProperties().forEach(context::putProperty);
+        return task.execute(context);
+    }
 
     private ServerInstallerDescriptor assertTemplateInstaller(String templatePath,
                                                              Class<? extends InstallerTask> expectedCheckType,
