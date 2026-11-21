@@ -98,6 +98,27 @@ public class FileOperationEditSaveTest extends LSPCodeInsightFixtureTestCase {
                 NEW_TEXT, textAtDidRename.get());
     }
 
+    public void testTheServerIsToldOfTheRenameOfItsLastDocumentBeforeItStops() throws Exception {
+        var renamed = myFixture.getTempDirFixture().createFile("renamed.foo", "text");
+        var other = myFixture.getTempDirFixture().createFile("other.foo", OLD_TEXT);
+        connect(renamed);
+        answerWillRenameWithAnEditTo(other);
+        // How many connections the server had when it was told of the rename
+        var didRename = new CompletableFuture<RenameFilesParams>();
+        CompletableFuture<Integer> connectionsAtDidRename =
+                didRename.thenApply(params -> MockLanguageServer.INSTANCE.getRemoteProxies().size());
+        MockLanguageServer.INSTANCE.getWorkspaceService().setDidRenameCallback(didRename);
+
+        rename(renamed, "moved.foo");
+        // A busy UI thread: the moved document, which has no editor, isn't connected again at its new place, and its
+        // language server, which has no document left, would stop before the save and the notification
+        Thread.sleep(500);
+
+        PlatformTestUtil.waitWithEventsDispatching("the server must be told of the rename", connectionsAtDidRename::isDone, BOUND_SECONDS);
+        assertEquals("the server must be told of the rename before it stops, not as it starts again",
+                1, connectionsAtDidRename.get().intValue());
+    }
+
     private static void answerWillRenameWithAnEditTo(VirtualFile file) {
         MockLanguageServer.INSTANCE.getWorkspaceService().setWillRename(new WorkspaceEdit(Map.of(
                 LSPIJUtils.toUri(file).toString(),

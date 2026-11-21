@@ -21,6 +21,7 @@ import com.intellij.openapi.vfs.AsyncFileListener;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.openapi.vfs.VirtualFilePropertyEvent;
 import com.intellij.openapi.vfs.newvfs.events.*;
+import com.intellij.util.concurrency.AppExecutorUtil;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import com.redhat.devtools.lsp4ij.LanguageServerWrapper;
@@ -28,6 +29,7 @@ import com.redhat.devtools.lsp4ij.features.files.WillRenameFilesPreparation.File
 import com.redhat.devtools.lsp4ij.features.files.watcher.FileSystemWatcherManager;
 import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
 import com.redhat.devtools.lsp4ij.internal.CompletableFutures;
+import com.redhat.devtools.lsp4ij.server.Lease;
 import com.redhat.devtools.lsp4ij.settings.GlobalLanguageServerSettings;
 import org.eclipse.lsp4j.*;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
@@ -48,6 +50,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Supplier;
 
 /**
  * Abstract listener that bridges IntelliJ Virtual File System (VFS) events
@@ -162,9 +165,13 @@ public abstract class AbstractLSPFileListener implements FileEditorManagerListen
 
             @Override
             public void afterVfsChange() {
-                Runnable sendNotifications = after(supportedEvents);
+                Supplier<CompletableFuture<?>> sendNotifications = after(supportedEvents);
+                // The language server is told of the file operations before it can stop. A move of its last document,
+                // which isn't connected again at its new place when it has no editor there, lets it stop, and a
+                // notification sent after the stop starts it again
+                Lease<LanguageServerItem> lease = new LanguageServerItem(null, languageServerWrapper).keepAlive();
                 if (documentsToSave.isEmpty()) {
-                    sendNotifications.run();
+                    sendThenRelease(sendNotifications, lease);
                 } else {
                     // A language server reads a document without an editor from disk, so save the edited
                     // ones, which cannot happen during the VFS event this runs in, before telling the server
@@ -173,7 +180,7 @@ public abstract class AbstractLSPFileListener implements FileEditorManagerListen
                         try {
                             LSPIJUtils.saveDocumentsWithoutEditor(documentsToSave);
                         } finally {
-                            sendNotifications.run();
+                            sendThenRelease(sendNotifications, lease);
                         }
                     });
                 }
@@ -596,9 +603,10 @@ public abstract class AbstractLSPFileListener implements FileEditorManagerListen
      * Collects the "did*" LSP notifications for file creation, deletion, renaming/movement, and content changes.
      *
      * @param events the list of VFS events after execution
-     * @return the action that sends the collected notifications
+     * @return the action that sends the collected notifications, and returns the last of them, which is sent after
+     * the others, or a completed future when there is none
      */
-    private @NotNull Runnable after(@NotNull List<? extends @NotNull VFileEvent> events) {
+    private @NotNull Supplier<CompletableFuture<?>> after(@NotNull List<? extends @NotNull VFileEvent> events) {
         List<FileEvent> fileEvents = new ArrayList<>(); // workspace/didChangeWatchedFiles events
         List<FileCreate> fileCreates = new ArrayList<>(); // workspace/didCreateFiles events
         List<FileDelete> fileDeletes = new ArrayList<>(); // workspace/didDeleteFiles events
@@ -646,19 +654,38 @@ public abstract class AbstractLSPFileListener implements FileEditorManagerListen
         }
 
         return () -> {
+            // The notifications are sent in order, so the last one is sent after the others
+            CompletableFuture<?> last = CompletableFuture.completedFuture(null);
             if (!fileCreates.isEmpty()) {
-                didCreateFiles(fileCreates);
+                last = didCreateFiles(fileCreates);
             }
             if (!fileDeletes.isEmpty()) {
-                didDeleteFiles(fileDeletes);
+                last = didDeleteFiles(fileDeletes);
             }
             if (!fileRenames.isEmpty()) {
-                didRenameFiles(fileRenames);
+                last = didRenameFiles(fileRenames);
             }
             if (!fileEvents.isEmpty()) {
-                didChangeWatchedFiles(fileEvents);
+                last = didChangeWatchedFiles(fileEvents);
             }
+            return last;
         };
+    }
+
+    /**
+     * Sends the notifications of file operations, and then releases the lease that kept the language server running
+     * until they were sent, off the thread that sends them, as the release can stop the language server.
+     */
+    private static void sendThenRelease(@NotNull Supplier<CompletableFuture<?>> notifications,
+                                        @NotNull Lease<LanguageServerItem> lease) {
+        CompletableFuture<?> sent;
+        try {
+            sent = notifications.get();
+        } catch (RuntimeException | Error e) {
+            lease.dispose();
+            throw e;
+        }
+        sent.whenCompleteAsync((result, error) -> lease.dispose(), AppExecutorUtil.getAppExecutorService());
     }
 
     // -------------------- Abstract hooks --------------------
@@ -729,8 +756,8 @@ public abstract class AbstractLSPFileListener implements FileEditorManagerListen
     /**
      * Sends a {@code workspace/didCreateFiles} notification.
      */
-    private void didCreateFiles(@NotNull List<FileCreate> fileCreates) {
-        languageServerWrapper.sendNotification(ls -> {
+    private @NotNull CompletableFuture<LanguageServer> didCreateFiles(@NotNull List<FileCreate> fileCreates) {
+        return languageServerWrapper.sendNotification(ls -> {
             var params = new CreateFilesParams(fileCreates);
             ls.getWorkspaceService().didCreateFiles(params);
             return ls;
@@ -740,8 +767,8 @@ public abstract class AbstractLSPFileListener implements FileEditorManagerListen
     /**
      * Sends a {@code workspace/didDeleteFiles} notification.
      */
-    private void didDeleteFiles(@NotNull List<FileDelete> fileDeletes) {
-        languageServerWrapper.sendNotification(ls -> {
+    private @NotNull CompletableFuture<LanguageServer> didDeleteFiles(@NotNull List<FileDelete> fileDeletes) {
+        return languageServerWrapper.sendNotification(ls -> {
             var params = new DeleteFilesParams(fileDeletes);
             ls.getWorkspaceService().didDeleteFiles(params);
             return ls;
@@ -751,8 +778,8 @@ public abstract class AbstractLSPFileListener implements FileEditorManagerListen
     /**
      * Sends a {@code workspace/didRenameFiles} notification.
      */
-    private void didRenameFiles(@NotNull List<FileRename> fileRenames) {
-        languageServerWrapper.sendNotification(ls -> {
+    private @NotNull CompletableFuture<LanguageServer> didRenameFiles(@NotNull List<FileRename> fileRenames) {
+        return languageServerWrapper.sendNotification(ls -> {
             var params = new RenameFilesParams(fileRenames);
             ls.getWorkspaceService().didRenameFiles(params);
             return ls;
@@ -762,8 +789,8 @@ public abstract class AbstractLSPFileListener implements FileEditorManagerListen
     /**
      * Sends a {@code workspace/didChangeWatchedFiles} notification.
      */
-    private void didChangeWatchedFiles(@NotNull List<FileEvent> fileEvents) {
-        languageServerWrapper.sendNotification(ls -> {
+    private @NotNull CompletableFuture<LanguageServer> didChangeWatchedFiles(@NotNull List<FileEvent> fileEvents) {
+        return languageServerWrapper.sendNotification(ls -> {
             DidChangeWatchedFilesParams params = new DidChangeWatchedFilesParams(fileEvents);
             ls.getWorkspaceService().didChangeWatchedFiles(params);
             return ls;
