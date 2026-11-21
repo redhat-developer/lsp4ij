@@ -148,6 +148,11 @@ tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach 
 
 // Configure IntelliJ Platform Gradle Plugin - read more: https://plugins.jetbrains.com/docs/intellij/tools-intellij-platform-gradle-plugin-extension.html
 intellijPlatform {
+    // LSP4IJ has no GUI Designer forms, so instrumentation only added null checks for @NotNull to the classes. It goes
+    // through Gradle's Ant integration (Task.getAnt()), which Gradle 9.9 deprecates and Gradle 10 removes
+    // (JetBrains/intellij-platform-gradle-plugin#2294)
+    instrumentCode = false
+
     pluginConfiguration {
         name = properties("pluginName")
 
