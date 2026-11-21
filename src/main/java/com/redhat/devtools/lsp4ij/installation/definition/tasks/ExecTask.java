@@ -17,6 +17,7 @@ import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.project.ProjectUtil;
 import com.intellij.openapi.util.Key;
 import com.intellij.util.EnvironmentUtil;
+import com.intellij.util.SystemProperties;
 import com.redhat.devtools.lsp4ij.installation.definition.InstallerContext;
 import com.redhat.devtools.lsp4ij.installation.definition.InstallerTask;
 import com.redhat.devtools.lsp4ij.installation.definition.ServerInstallerDescriptor;
@@ -24,16 +25,24 @@ import com.redhat.devtools.lsp4ij.server.definition.launching.CommandUtils;
 import com.redhat.devtools.lsp4ij.server.definition.launching.WorkingDirectoryCommandLine;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.jetbrains.annotations.VisibleForTesting;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
+import java.nio.channels.FileChannel;
+import java.nio.channels.OverlappingFileLockException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardOpenOption;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
 /**
@@ -51,12 +60,21 @@ import java.util.concurrent.locks.ReentrantLock;
  */
 public class ExecTask extends InstallerTask {
 
+    private static final Logger LOGGER = LoggerFactory.getLogger(ExecTask.class);
+
     /**
      * The locks of the working directories that exec tasks declare, by absolute path: the installers of two language
      * servers which install into the same directory, as the CSS and ESLint language servers, which share their npm
      * package, run there one at a time, else two {@code npm install} would break each other's install.
      */
-    private static final Map<Path, Lock> WORKING_DIR_LOCKS = new ConcurrentHashMap<>();
+    private static final Map<Path, ReentrantLock> WORKING_DIR_LOCKS = new ConcurrentHashMap<>();
+
+    /**
+     * The directory of the lock files of the working directories, which keep the exec tasks of the other IDEs with
+     * LSP4IJ, as IntelliJ IDEA and WebStorm, out of a working directory, since they share the directories into which
+     * the installers install, as {@code $USER_HOME$/.lsp4ij/lsp}.
+     */
+    private static final Path LOCK_FILES_DIR = Path.of(SystemProperties.getUserHome(), ".lsp4ij", "locks");
 
     private final @NotNull List<String> command;
     private final @Nullable Integer timeout;
@@ -93,22 +111,31 @@ public class ExecTask extends InstallerTask {
 
     @Override
     public boolean run(@NotNull InstallerContext context) {
-        @Nullable Lock workingDirLock = lockWorkingDir(context);
-        try {
-            return runCommand(context);
-        } finally {
-            if (workingDirLock != null) {
-                workingDirLock.unlock();
+        try (@Nullable WorkingDirLock workingDirLock = lockWorkingDir(context)) {
+            if (workingDirLock != null && workingDirLock.waited() && context.isCheckAgainAfterWaiting() && checkAgain(context)) {
+                // As when the installers of the CSS and ESLint language servers start together: the one which waited
+                // doesn't install their npm package again (#1960)
+                context.print("The installation which ran in the working directory meanwhile installed it: the command doesn't run");
+                return true;
             }
+            return runCommand(context);
         }
     }
 
     /**
-     * Waits until no other exec task runs in the working directory that this task declares, and returns the lock of
-     * the directory, which the caller must unlock; or null without a declared working directory. The wait ends with a
-     * {@link ProcessCanceledException} if the installation is cancelled.
+     * Runs the check of the installer again, and returns true if it passes and false otherwise, or without a check.
      */
-    private @Nullable Lock lockWorkingDir(@NotNull InstallerContext context) {
+    private boolean checkAgain(@NotNull InstallerContext context) {
+        InstallerTask check = getServerInstallerDeclaration().getCheck();
+        return check != null && check.execute(context);
+    }
+
+    /**
+     * Waits until no other exec task runs in the working directory that this task declares, in this IDE or in another
+     * one, and returns the lock of the directory, which the caller must close; or null without a declared working
+     * directory. The wait ends with a {@link ProcessCanceledException} if the installation is cancelled.
+     */
+    private @Nullable WorkingDirLock lockWorkingDir(@NotNull InstallerContext context) {
         if (this.workingDir == null) {
             return null;
         }
@@ -122,16 +149,89 @@ public class ExecTask extends InstallerTask {
         if (workingDir == null) {
             return null;
         }
-        Lock lock = WORKING_DIR_LOCKS.computeIfAbsent(workingDir.toAbsolutePath().normalize(), dir -> new ReentrantLock());
+        Path dir = workingDir.toAbsolutePath().normalize();
+        ReentrantLock lock = WORKING_DIR_LOCKS.computeIfAbsent(dir, key -> new ReentrantLock());
+        boolean waited = !lock.tryLock();
+        if (waited) {
+            await(() -> lock.tryLock(100, TimeUnit.MILLISECONDS));
+        }
+        if (lock.getHoldCount() > 1) {
+            // This thread runs in the directory already, as the check that the run of an installer runs again, and
+            // holds its lock file
+            return new WorkingDirLock(lock, null, false);
+        }
+        @Nullable FileChannel lockFile = openLockFile(dir);
         try {
-            while (!lock.tryLock(100, TimeUnit.MILLISECONDS)) {
+            if (lockFile != null && !tryLockFile(lockFile)) {
+                waited = true;
+                await(() -> {
+                    Thread.sleep(100);
+                    return tryLockFile(lockFile);
+                });
+            }
+        } catch (RuntimeException e) {
+            // Cancelled
+            new WorkingDirLock(lock, lockFile, false).close();
+            throw e;
+        }
+        return new WorkingDirLock(lock, lockFile, waited);
+    }
+
+    /**
+     * Tries the given attempt to lock until it succeeds, or ends with a {@link ProcessCanceledException} if the
+     * installation is cancelled.
+     */
+    private static void await(@NotNull LockAttempt attempt) {
+        try {
+            while (!attempt.tryLock()) {
                 ProgressManager.checkCanceled();
             }
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new ProcessCanceledException(e);
         }
-        return lock;
+    }
+
+    /**
+     * Returns the lock file of the given working directory, in {@link #LOCK_FILES_DIR}.
+     */
+    @VisibleForTesting
+    static @NotNull Path getLockFile(@NotNull Path workingDir) {
+        Path dir = workingDir.toAbsolutePath().normalize();
+        String name = dir.getFileName() != null ? dir.getFileName().toString() : "root";
+        UUID id = UUID.nameUUIDFromBytes(dir.toString().getBytes(StandardCharsets.UTF_8));
+        return LOCK_FILES_DIR.resolve(name + "-" + id + ".lock");
+    }
+
+    /**
+     * Opens the lock file of the given working directory, or returns null if it can't, as in a read-only home: the
+     * exec tasks of the other IDEs are then not kept out of the directory.
+     */
+    private static @Nullable FileChannel openLockFile(@NotNull Path dir) {
+        Path lockFile = getLockFile(dir);
+        try {
+            Files.createDirectories(lockFile.getParent());
+            return FileChannel.open(lockFile, StandardOpenOption.CREATE, StandardOpenOption.WRITE);
+        } catch (IOException e) {
+            LOGGER.warn("Cannot open the lock file '{}' of the working directory '{}'", lockFile, dir, e);
+            return null;
+        }
+    }
+
+    /**
+     * Tries to lock the given lock file, and returns true if it is locked, or if it can't be, as on a file system
+     * without file locks, and false if another IDE holds it.
+     */
+    private static boolean tryLockFile(@NotNull FileChannel lockFile) {
+        try {
+            return lockFile.tryLock() != null;
+        } catch (OverlappingFileLockException e) {
+            // This IDE holds it, for another working directory whose lock file has the same name
+            return false;
+        } catch (IOException e) {
+            LOGGER.warn("Cannot lock the lock file of a working directory", e);
+            return true;
+        }
     }
 
     private boolean runCommand(@NotNull InstallerContext context) {
@@ -204,5 +304,40 @@ public class ExecTask extends InstallerTask {
             }
         }
         return null;
+    }
+
+    /**
+     * An attempt to lock, which can wait.
+     */
+    @FunctionalInterface
+    private interface LockAttempt {
+        boolean tryLock() throws InterruptedException;
+    }
+
+    /**
+     * The lock of a working directory that an exec task holds: the lock of the directory in this IDE, and the lock file
+     * of the directory, whose file lock keeps out the exec tasks of the other IDEs, if this task holds it.
+     *
+     * @param lock     the lock of the directory in this IDE.
+     * @param lockFile the lock file of the directory, if this task holds it.
+     * @param waited   true if the exec task waited for another one to leave the directory, and false otherwise.
+     */
+    private record WorkingDirLock(@NotNull ReentrantLock lock,
+                                  @Nullable FileChannel lockFile,
+                                  boolean waited) implements AutoCloseable {
+
+        @Override
+        public void close() {
+            try {
+                if (lockFile != null) {
+                    // Releases its file lock
+                    lockFile.close();
+                }
+            } catch (IOException e) {
+                LOGGER.warn("Cannot close the lock file of a working directory", e);
+            } finally {
+                lock.unlock();
+            }
+        }
     }
 }

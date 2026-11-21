@@ -147,6 +147,9 @@ public abstract class DeclarativeDebugAdapterServerInstaller extends DebugAdapte
             return;
         }
         var context = createInstallerContext(InstallerContext.InstallerAction.RUN, indicator);
+        // Once another installation into the same directory, which it waited for, installed the server, as with the
+        // CSS and ESLint language servers, an installation that the check started isn't needed
+        context.setCheckAgainAfterWaiting(isInstallingAfterFailedCheck());
         ServerInstallerManager.getInstance().install(serverInstallerDescriptor, context);
     }
 

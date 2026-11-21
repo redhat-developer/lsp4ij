@@ -16,6 +16,9 @@ import org.jetbrains.annotations.NotNull;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -25,12 +28,16 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.IntStream;
+import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Tests that the installers of two language servers which install into the same directory, as the CSS and ESLint
- * language servers, which share their npm package, run their commands there one at a time (#1960).
+ * language servers, which share their npm package, run their commands there one at a time, also in two IDEs, and that
+ * the one which waited doesn't install again once the other one installed the server (#1960).
  */
 public class ExecTaskTest {
 
@@ -51,7 +58,7 @@ public class ExecTaskTest {
                     .mapToObj(i -> executor.submit(() -> {
                         start.await();
                         var context = new InstallerContext(null, InstallerContext.InstallerAction.RUN);
-                        return createTask(held, directory).run(context);
+                        return createTask(java(HoldFile.class.getName(), held), directory, descriptor()).run(context);
                     }))
                     .toList();
             start.countDown();
@@ -66,19 +73,90 @@ public class ExecTaskTest {
         }
     }
 
+    @Test
+    public void testAnInstallationWhichWaitedForAnotherOneDoesNotRunItsCommandIfTheServerIsInstalledThen() throws Exception {
+        assertTrue(installAfterAnotherInstallation(true), "the command must not run, since the check passes");
+    }
+
+    @Test
+    public void testAForcedInstallationWhichWaitedForAnotherOneRunsItsCommand() throws Exception {
+        assertFalse(installAfterAnotherInstallation(false), "the command must run, as for the Reinstall action");
+    }
+
+    @Test
+    public void testAnInstallerWaitsForTheInstallerOfAnotherIDEWhichRunsACommandInTheSameDirectory() throws Exception {
+        Path directory = Files.createTempDirectory("lsp4ij-exec");
+        String held = directory.resolve("installing").toString();
+        Process otherIDE = new ProcessBuilder(java(HoldLock.class.getName(), ExecTask.getLockFile(directory).toString(), held))
+                .redirectError(ProcessBuilder.Redirect.INHERIT)
+                .start();
+        try {
+            var output = new BufferedReader(new InputStreamReader(otherIDE.getInputStream(), StandardCharsets.UTF_8));
+            assertEquals("locked", output.readLine(), "the other IDE must hold the lock file of the directory");
+            // The command fails if it runs while the other IDE holds the file
+            var context = new InstallerContext(null, InstallerContext.InstallerAction.RUN);
+            assertTrue(createTask(java(HoldFile.class.getName(), held), directory, descriptor()).run(context),
+                    "the command must wait until the other IDE leaves the directory");
+        } finally {
+            otherIDE.destroy();
+            NioFiles.deleteRecursively(directory);
+        }
+    }
+
     /**
-     * Returns an exec task which runs {@link HoldFile} with the given file, in the given working directory.
+     * Runs an installation into a directory while another installation runs there and installs the server, and returns
+     * the result of the one that waited, whose command fails if it runs: true if it ran the check of the installer
+     * again, and false if it ran its command.
      */
-    private static @NotNull ExecTask createTask(@NotNull String held, @NotNull Path workingDir) throws Exception {
+    private static boolean installAfterAnotherInstallation(boolean checkAgainAfterWaiting) throws Exception {
+        Path directory = Files.createTempDirectory("lsp4ij-exec");
+        var executor = Executors.newSingleThreadExecutor();
+        try {
+            String held = directory.resolve("installing").toString();
+            Future<Boolean> other = executor.submit(() -> createTask(java(HoldFile.class.getName(), held), directory, descriptor())
+                    .run(new InstallerContext(null, InstallerContext.InstallerAction.RUN)));
+            for (long end = System.nanoTime() + TimeUnit.SECONDS.toNanos(30); !Files.exists(Path.of(held)); ) {
+                assertTrue(System.nanoTime() < end, "the other installation must start");
+                Thread.sleep(10);
+            }
+            // The other installation installs the server, which the check of the installer finds
+            Path installed = Files.createFile(directory.resolve("installed"));
+            var descriptor = descriptor();
+            descriptor.setCheck(new FileExistsTask(null, "check", null, null, installed.toString(), descriptor));
+            var context = new InstallerContext(null, InstallerContext.InstallerAction.RUN);
+            context.setCheckAgainAfterWaiting(checkAgainAfterWaiting);
+            boolean result = createTask(java("NoSuchProgram"), directory, descriptor).run(context);
+            assertTrue(other.get(60, TimeUnit.SECONDS));
+            return result;
+        } finally {
+            executor.shutdownNow();
+            NioFiles.deleteRecursively(directory);
+        }
+    }
+
+    private static @NotNull ServerInstallerDescriptor descriptor() {
+        return new ServerInstallerDescriptor("test", false, new InstallerTaskRegistry());
+    }
+
+    /**
+     * Returns an exec task which runs the given command in the given working directory.
+     */
+    private static @NotNull ExecTask createTask(@NotNull List<String> command,
+                                                @NotNull Path workingDir,
+                                                @NotNull ServerInstallerDescriptor descriptor) {
+        return new ExecTask(null, "install", null, null, command, workingDir.toString(), null, true, descriptor);
+    }
+
+    /**
+     * Returns the command which runs the given main class of the test classes with the given arguments.
+     */
+    private static @NotNull List<String> java(@NotNull String mainClass, @NotNull String... args) throws Exception {
         String java = ProcessHandle.current().info().command().orElseThrow();
         // The directory of the compiled test classes, above the folders of the package of HoldFile
         Path classes = Path.of(HoldFile.class.getResource("HoldFile.class").toURI());
         for (int i = HoldFile.class.getName().split("\\.").length; i > 0; i--) {
             classes = classes.getParent();
         }
-        var descriptor = new ServerInstallerDescriptor("test", false, new InstallerTaskRegistry());
-        return new ExecTask(null, "install", null, null,
-                List.of(java, "-cp", classes.toString(), HoldFile.class.getName(), held),
-                workingDir.toString(), null, true, descriptor);
+        return Stream.concat(Stream.of(java, "-cp", classes.toString(), mainClass), Stream.of(args)).toList();
     }
 }
