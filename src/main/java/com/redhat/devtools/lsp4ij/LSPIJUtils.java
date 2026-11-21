@@ -1044,6 +1044,8 @@ public class LSPIJUtils {
             }
         };
         String failure = null;
+        // The snippet edits to start as live templates once the edit is applied
+        List<SnippetTextEdits.Interactive> interactiveSnippets = new ArrayList<>();
         if (edit.getDocumentChanges() != null) {
             for (Either<TextDocumentEdit, ResourceOperation> change : edit.getDocumentChanges()) {
                 if (change.isLeft()) {
@@ -1052,11 +1054,9 @@ public class LSPIJUtils {
                     if (file != null) {
                         Document document = getDocument(file);
                         if (document != null) {
-                            // Extract TextEdit from Either<TextEdit, SnippetTextEdit>
-                            List<TextEdit> textEdits = textDocumentEdit.getEdits().stream()
-                                    .filter(Either::isLeft)
-                                    .map(Either::getLeft)
-                                    .toList();
+                            // A SnippetTextEdit gets the text of its snippet
+                            List<TextEdit> textEdits = SnippetTextEdits.toTextEdits(textDocumentEdit.getEdits(), file,
+                                    document, interactiveSnippets::add);
                             beforeEdit.accept(document);
                             applyEdits(null, document, textEdits, false);
                         }
@@ -1101,6 +1101,10 @@ public class LSPIJUtils {
             saveDocumentsWithoutEditor(documentsToSave);
             // Redo applies the changes before it reaches this action, so this saves them after Redo
             saveOnUndoOrRedo(documentsToSave, false);
+        }
+        if (!interactiveSnippets.isEmpty()) {
+            // Only one editor is selected, so the first snippet edit of its document
+            interactiveSnippets.get(0).start();
         }
         return failure;
     }
