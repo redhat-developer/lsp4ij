@@ -7,25 +7,48 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.console;
 
+import com.intellij.execution.impl.ConsoleViewImpl;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.Disposer;
 import com.intellij.testFramework.PlatformTestUtil;
+import com.redhat.devtools.lsp4ij.LanguageServerWrapper;
 import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
 import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
 import com.redhat.devtools.lsp4ij.ServerStatus;
 import com.redhat.devtools.lsp4ij.console.explorer.LanguageServerTreeRenderer;
 import com.redhat.devtools.lsp4ij.fixtures.LSPCodeInsightFixtureTestCase;
+import com.redhat.devtools.lsp4ij.lifecycle.LanguageServerLifecycleManager;
 import com.redhat.devtools.lsp4ij.mock.MockLanguageServerDefinition;
+import com.redhat.devtools.lsp4ij.settings.LanguageServerSettings;
+import com.redhat.devtools.lsp4ij.settings.ProjectLanguageServerSettings;
+import com.redhat.devtools.lsp4ij.settings.ServerTrace;
 import com.redhat.devtools.lsp4ij.templates.ServerMappingSettings;
 import org.eclipse.lsp4j.ServerInfo;
+import org.eclipse.lsp4j.jsonrpc.MessageConsumer;
+import org.eclipse.lsp4j.jsonrpc.RemoteEndpoint;
+import org.eclipse.lsp4j.jsonrpc.json.MessageJsonHandler;
+import org.eclipse.lsp4j.jsonrpc.json.StreamMessageConsumer;
+import org.eclipse.lsp4j.jsonrpc.messages.Message;
+import org.eclipse.lsp4j.jsonrpc.messages.NotificationMessage;
+import org.eclipse.lsp4j.jsonrpc.messages.RequestMessage;
+import org.eclipse.lsp4j.jsonrpc.messages.ResponseMessage;
+import org.eclipse.lsp4j.jsonrpc.services.GenericEndpoint;
+import org.jetbrains.annotations.NotNull;
 
+import java.io.ByteArrayOutputStream;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import java.util.regex.Pattern;
 
 /**
  * Tests what the Language Servers view shows when it opens.
  */
 public class LanguageServerExplorerLoadTest extends LSPCodeInsightFixtureTestCase {
+
+    // The consumers of a message that LSP4IJ sends and of one that it receives, which tell the traces which it is
+    private static final MessageConsumer SENT = new StreamMessageConsumer(new ByteArrayOutputStream(), new MessageJsonHandler(Map.of()));
+    private static final MessageConsumer RECEIVED = new RemoteEndpoint(message -> {}, new GenericEndpoint(new Object()));
 
     private Project project;
     private MockLanguageServerDefinition definition;
@@ -70,6 +93,114 @@ public class LanguageServerExplorerLoadTest extends LSPCodeInsightFixtureTestCas
                 Disposer.dispose(panel);
             }
         }
+    }
+
+    public void testTheViewShowsTheTracesOfALanguageServerFromBeforeItOpened() {
+        traceWith(ServerTrace.messages);
+        var languageServer = LanguageServiceAccessor.getInstance(project).forceCreateServer(definition);
+        languageServer.updateStatus(ServerStatus.started);
+        // A request and its response, before the view exists, as at the start of the IDE (#19)
+        log(request("1", "test/requestBeforeTheView"), SENT, languageServer);
+        log(response("1"), RECEIVED, languageServer);
+
+        var panel = new LSPConsoleToolWindowPanel(project);
+        try {
+            String traces = waitForTraces(panel, "Received response");
+            assertTrue(traces, traces.contains("Sending request 'test/requestBeforeTheView - (1)'."));
+            assertTrue(traces, traces.contains("Received response 'test/requestBeforeTheView - (1)'"));
+        } finally {
+            Disposer.dispose(panel);
+        }
+    }
+
+    public void testOnlyTheLatestTracesWaitForTheView() {
+        traceWith(ServerTrace.messages);
+        var languageServer = LanguageServiceAccessor.getInstance(project).forceCreateServer(definition);
+        languageServer.updateStatus(ServerStatus.started);
+        log(request("7", "test/droppedRequest"), SENT, languageServer);
+        for (int i = 0; i < LanguageServerWrapper.MAX_PENDING_TRACES; i++) {
+            var notification = new NotificationMessage();
+            notification.setMethod("test/notification");
+            log(notification, RECEIVED, languageServer);
+        }
+        log(response("7"), RECEIVED, languageServer);
+
+        // The request went, as the oldest trace
+        assertEquals(LanguageServerWrapper.MAX_PENDING_TRACES, languageServer.getTraces().size());
+        var panel = new LSPConsoleToolWindowPanel(project);
+        try {
+            String traces = waitForTraces(panel, "Received response");
+            assertFalse(traces.contains("Sending request 'test/droppedRequest"));
+            // Its response still shows its method
+            assertTrue(traces, traces.contains("Received response 'test/droppedRequest - (7)'"));
+        } finally {
+            Disposer.dispose(panel);
+        }
+    }
+
+    public void testATraceFromBeforeTheViewOpenedShowsTheLatencyOfTheResponse() throws InterruptedException {
+        traceWith(ServerTrace.messages);
+        var languageServer = LanguageServiceAccessor.getInstance(project).forceCreateServer(definition);
+        languageServer.updateStatus(ServerStatus.started);
+        log(request("3", "test/slowRequest"), SENT, languageServer);
+        Thread.sleep(300);
+        log(response("3"), RECEIVED, languageServer);
+
+        var panel = new LSPConsoleToolWindowPanel(project);
+        try {
+            String traces = waitForTraces(panel, "Received response");
+            // The view shows both traces at once, with the latency from the times of their messages
+            var latency = Pattern.compile("Received response 'test/slowRequest - \\(3\\)' in (\\d+)ms").matcher(traces);
+            assertTrue(traces, latency.find());
+            assertTrue(traces, Long.parseLong(latency.group(1)) >= 300);
+        } finally {
+            Disposer.dispose(panel);
+        }
+    }
+
+    private void traceWith(@NotNull ServerTrace serverTrace) {
+        var settings = ProjectLanguageServerSettings.getInstance(project);
+        settings.updateSettings(definition.getId(), new LanguageServerSettings.LanguageServerDefinitionSettings().setServerTrace(serverTrace));
+        Disposer.register(getTestRootDisposable(), () -> settings.updateSettings(definition.getId(),
+                new LanguageServerSettings.LanguageServerDefinitionSettings().setServerTrace(ServerTrace.off)));
+    }
+
+    private void log(@NotNull Message message, @NotNull MessageConsumer consumer, @NotNull LanguageServerWrapper languageServer) {
+        LanguageServerLifecycleManager.getInstance(project).logLSPMessage(message, consumer, languageServer);
+    }
+
+    private static @NotNull RequestMessage request(@NotNull String id, @NotNull String method) {
+        var request = new RequestMessage();
+        request.setId(id);
+        request.setMethod(method);
+        return request;
+    }
+
+    private static @NotNull ResponseMessage response(@NotNull String id) {
+        var response = new ResponseMessage();
+        response.setId(id);
+        response.setResult("done");
+        return response;
+    }
+
+    /**
+     * Waits until the traces of the language server in the given view contain the given text, and returns them.
+     */
+    private @NotNull String waitForTraces(@NotNull LSPConsoleToolWindowPanel panel, @NotNull String text) {
+        var explorer = panel.getExplorer();
+        String[] traces = {""};
+        PlatformTestUtil.waitWithEventsDispatching("The view must show the traces of the language server", () -> {
+            var node = explorer.findNodeForServer(definition);
+            var processNode = node != null ? node.getActiveProcessTreeNode() : null;
+            var view = processNode != null ? panel.getTracesConsoleView(processNode) : null;
+            if (view == null) {
+                return false;
+            }
+            ((ConsoleViewImpl) view).flushDeferredText();
+            traces[0] = ((ConsoleViewImpl) view).getText();
+            return traces[0].contains(text);
+        }, 10);
+        return traces[0];
     }
 
     public void testTheViewShowsServerInfoOnHoverAndRetainsAfterShutdown() throws Exception {

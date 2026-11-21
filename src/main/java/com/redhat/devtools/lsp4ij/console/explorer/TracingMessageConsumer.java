@@ -77,7 +77,14 @@ public class TracingMessageConsumer {
      * if it is a request, response, or notification.
      */
     public String log(Message message, MessageConsumer messageConsumer, ServerTrace serverTrace) throws MessageIssueException, JsonRpcException {
-        final Instant now = clock.instant();
+        return log(message, messageConsumer, serverTrace, clock.instant());
+    }
+
+    /**
+     * Constructs a log string for a given {@link Message} that LSP4IJ sent or received at the given time, which the
+     * log string shows, and from which it computes the latency of a response.
+     */
+    public String log(Message message, MessageConsumer messageConsumer, ServerTrace serverTrace, Instant now) throws MessageIssueException, JsonRpcException {
         final String date = dateTimeFormatter.format(now);
 
         if (messageConsumer instanceof StreamMessageConsumer) {
