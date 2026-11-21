@@ -106,7 +106,8 @@ public class SocketStreamConnectionProviderTest extends LightPlatformTestCase {
 
     public void testWithoutAHostItReachesALanguageServerWhichListensOnTheIPv6LoopbackAddressOnly() throws Exception {
         // As a language server which listens on localhost, which Node.js may bind to ::1 only
-        try (var server = new ServerSocket(0, 1, InetAddress.getByName("::1"))) {
+        try (var ipv6Only = IPv6OnlyLoopbackPort.listen()) {
+            var server = ipv6Only.server();
             var provider = new SocketStreamConnectionProvider(SocketStreamConnectionProvider.Direction.CONNECT, null,
                     server.getLocalPort(), null);
             try {
@@ -141,8 +142,8 @@ public class SocketStreamConnectionProviderTest extends LightPlatformTestCase {
     }
 
     public void testAnIPv4AddressAsTheHostIsNotTriedOverIPv6() throws Exception {
-        try (var server = new ServerSocket(0, 1, InetAddress.getByName("::1"))) {
-            var provider = SocketStreamConnectionProvider.attachTo("127.0.0.1", server.getLocalPort());
+        try (var ipv6Only = IPv6OnlyLoopbackPort.listen()) {
+            var provider = SocketStreamConnectionProvider.attachTo("127.0.0.1", ipv6Only.port());
 
             try {
                 provider.start();
