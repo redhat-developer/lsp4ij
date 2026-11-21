@@ -46,9 +46,9 @@ jobs:
           ROW='[.buildNumber, .version, .channel]'
           LINE="$ROW | join(\"  \")"
 
-          echo "::group::The 10 newest IntelliJ IDEA (IU) builds"
+          echo "The 10 newest IntelliJ IDEA (IU) builds:"
           jq -r "$SORTED | .[:10][] | $ROW | @tsv" $RELEASES | column -t
-          echo "::endgroup::"
+          echo
 
           NEWEST=$(jq -c "$SORTED | first // empty" $RELEASES)
           if [ -z "$NEWEST" ]; then
