@@ -30,7 +30,8 @@ jobs:
         uses: gradle/actions/setup-gradle@v5
 
       # The newest build of the unified IntelliJ IDEA (IU): the current EAP if there is one, else the newest release.
-      # Since 2025.3 there is no IntelliJ IDEA Community (IC) any more, so only IU has the newest builds.
+      # From 2025.3 on, the list of releases has only IntelliJ IDEA (IU), so only IU has the newest builds; the IntelliJ
+      # Maven repository still has IC.
       # build.gradle.kts takes the IDE from the IntelliJ Maven repository (useInstaller = false), where a release has
       # its version, such as 2026.3, and an EAP, RC or other preview build is '<build number>-EAP-SNAPSHOT'.
       - name: Find the newest IntelliJ IDEA
