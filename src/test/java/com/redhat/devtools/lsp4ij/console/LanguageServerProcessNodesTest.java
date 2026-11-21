@@ -71,6 +71,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.TimeUnit;
 
 import static com.redhat.devtools.lsp4ij.console.LSPConsoleToolWindowPanel.LANGUAGE_SERVERS_TOOL_WINDOW_ID;
 
@@ -746,6 +747,23 @@ public class LanguageServerProcessNodesTest extends LSPCodeInsightFixtureTestCas
         var node = processNodeOrNull(languageServer);
         assertNotNull(node);
         return node;
+    }
+
+    public void testAStatusThatFollowsAnotherAtOnceOnAnotherThreadIsNotLost() throws Exception {
+        first.updateStatus(ServerStatus.stopped);
+        PlatformTestUtil.dispatchAllEventsInIdeEventQueue();
+        assertEquals(ServerStatus.stopped, processNode(first).getServerStatus());
+
+        // As the stop of an installation from the Installer tab, of a language server that is stopped already: with
+        // nothing to shut down, stopping and stopped come at once, from another thread, before the EDT gives the node
+        // the first one (#1335)
+        ApplicationManager.getApplication().executeOnPooledThread(() -> {
+            first.updateStatus(ServerStatus.stopping);
+            first.updateStatus(ServerStatus.stopped);
+        }).get(TIMEOUT, TimeUnit.SECONDS);
+        PlatformTestUtil.dispatchAllEventsInIdeEventQueue();
+
+        assertEquals(ServerStatus.stopped, processNode(first).getServerStatus());
     }
 
     public void testParentNodeStatusSingleInstance() {

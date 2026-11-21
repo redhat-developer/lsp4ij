@@ -47,6 +47,28 @@ public class LanguageServerProcessTreeNodeTest extends LightPlatformTestCase {
         assertTrue("Display name must contain restart attempt info", node.getDisplayName().contains("[0/"));
     }
 
+    public void testAStatusTakenWhileSwitchedOffShowsNoTimeOnceSwitchedOn() {
+        var definition = new MockLanguageServerDefinition("test-server", false);
+        var wrapper = new LanguageServerWrapper(getProject(), definition);
+        var parent = new LanguageServerTreeNode(definition, getProject());
+        var node = new LanguageServerProcessTreeNode(wrapper, new DefaultTreeModel(parent));
+        parent.add(node);
+        try {
+            // As the stop of an installation from the Installer tab, which switches the language server off first
+            definition.setEnabled(false, getProject());
+            node.setServerStatus(ServerStatus.stopping);
+            assertNull(node.getElapsedTime());
+
+            // The end of the installation switches it on again (#1335)
+            definition.setEnabled(true, getProject());
+
+            assertNull("A status without a start time must show no time, not the time since 1970",
+                    node.getElapsedTime());
+        } finally {
+            definition.setEnabled(true, getProject());
+        }
+    }
+
     public void testSecondaryTextAndTooltipConnectionDescription() {
         var definition = new MockLanguageServerDefinition("test-server", false);
 
