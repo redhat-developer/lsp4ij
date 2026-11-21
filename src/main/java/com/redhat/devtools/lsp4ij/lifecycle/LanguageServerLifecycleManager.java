@@ -72,6 +72,13 @@ public class LanguageServerLifecycleManager {
         if (isDisposed()) {
             return;
         }
+        try {
+            // The trace is kept even if no LSP console takes it yet, as at the start of the IDE, before the LSP console
+            // exists: it shows the trace once it opens (#19)
+            languageServer.addTrace(message, consumer);
+        } catch (Exception e) {
+            LOGGER.error("Error while tracing LSP message of the language server '{}'", languageServer.getServerDefinition().getId(), e);
+        }
         for (LanguageServerLifecycleListener listener : this.listeners) {
             try {
                 listener.handleLSPMessage(message, consumer, languageServer);
