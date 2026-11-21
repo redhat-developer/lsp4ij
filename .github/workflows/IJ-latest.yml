@@ -29,10 +29,22 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v5
 
-      - name: Build with Gradle
+      # The newest build of the unified IntelliJ IDEA (IU): the current EAP if there is one, else the newest release.
+      # Since 2025.3 there is no IntelliJ IDEA Community (IC) any more, so only IU has the newest builds.
+      - name: Find the newest IntelliJ IDEA
+        id: latest
         run: |
-          LATEST_EAP_SNAPSHOT=$(./gradlew printProductsReleases | grep 'IC-' | head -n 1 | cut -d'-' -f2)
-          ./gradlew check -PplatformVersion=$LATEST_EAP_SNAPSHOT
+          ./gradlew intellijPlatformDiscover --kind=releases --type=IU --output=build/intellij-releases.json
+          LATEST=$(jq -r '.data.releases | map(select(.buildNumber | test("^[0-9]+(\\.[0-9]+)*$"))) | max_by(.buildNumber | split(".") | map(tonumber)) | .buildNumber // empty' build/intellij-releases.json)
+          if [ -z "$LATEST" ]; then
+            echo "::error::No IntelliJ IDEA (IU) release found in build/intellij-releases.json"
+            exit 1
+          fi
+          echo "Newest IntelliJ IDEA build: $LATEST"
+          echo "version=$LATEST" >> "$GITHUB_OUTPUT"
+
+      - name: Build with Gradle
+        run: ./gradlew check -PplatformType=IU -PplatformVersion=${{ steps.latest.outputs.version }}
 
       - name: Collect Tests Result
         uses: actions/upload-artifact@v7
