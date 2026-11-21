@@ -166,9 +166,17 @@ public class LspSnippetParser {
      * @throws IOException
      */
     private void readAny() throws IOException {
-        if (isEndOfText()) {
-            return;
+        while (!isEndOfText()) {
+            readElement();
         }
+    }
+
+    /**
+     * Reads one element of the snippet: a text, a tab stop, a placeholder, a choice or a variable.
+     *
+     * @throws IOException
+     */
+    private void readElement() throws IOException {
         switch (current) {
             case '$':
                 // read next character
@@ -193,11 +201,13 @@ public class LspSnippetParser {
                                 nestingLevel++;
                                 handler.startPlaceholder(index, name, nestingLevel);
                                 // placeholder ::= '${' int ':' any '}'
+                                // The rest of the placeholder, as a nested placeholder, ends at its '}'
+                                while (!isEndOfText() && current != '}') {
+                                    readElement();
+                                }
                                 if (current == '}') {
                                     // read next character
                                     read();
-                                } else {
-                                    readAny();
                                 }
                                 handler.endPlaceholder(nestingLevel);
                                 nestingLevel--;
@@ -219,7 +229,8 @@ public class LspSnippetParser {
 
                 } else {
                     // - $name <-- variable
-                    String name = readString('$', ' ');
+                    // In a placeholder, the name ends at the '}' of the placeholder
+                    String name = nestingLevel > 0 ? readString('$', ' ', '}') : readString('$', ' ');
                     handleVariable(name);
                 }
                 break;
@@ -227,7 +238,6 @@ public class LspSnippetParser {
                 handleText();
                 break;
         }
-        readAny();
     }
 
     private void handleChoice(String name, Integer index) throws IOException {
@@ -304,7 +314,8 @@ public class LspSnippetParser {
     }
 
     private void handleText() throws IOException {
-        String text = readString('$');
+        // In a placeholder, the text ends at the '}' of the placeholder
+        String text = nestingLevel > 0 ? readString('$', '}') : readString('$');
         handler.text(text);
     }
 

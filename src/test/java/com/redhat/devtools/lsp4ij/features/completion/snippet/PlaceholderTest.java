@@ -33,6 +33,35 @@ public class PlaceholderTest {
     }
 
     @Test
+    public void nestedPlaceholderEndsAtItsClosingBrace() {
+        // The '}' of the outer placeholder is no text
+        LspSnippetNode[] actual = LspSnippetAssert.parse("${1:a ${2:b} c} d");
+        assertEquals(actual, LspSnippetAssert.placeholder(1, "a ", 1),
+                LspSnippetAssert.placeholder(2, "b", 2),
+                LspSnippetAssert.text(" c"),
+                LspSnippetAssert.text(" d"));
+    }
+
+    @Test
+    public void nestedPlaceholderWithEscapedClosingBrace() {
+        LspSnippetNode[] actual = LspSnippetAssert.parse("${1:a ${2:b} \\} c} d");
+        assertEquals(actual, LspSnippetAssert.placeholder(1, "a ", 1),
+                LspSnippetAssert.placeholder(2, "b", 2),
+                LspSnippetAssert.text(" } c"),
+                LspSnippetAssert.text(" d"));
+    }
+
+    @Test
+    public void tabstopAndVariableInPlaceholder() {
+        LspSnippetNode[] actual = LspSnippetAssert.parse("${1:a $2 $name} b");
+        assertEquals(actual, LspSnippetAssert.placeholder(1, "a ", 1),
+                LspSnippetAssert.tabstop(2),
+                LspSnippetAssert.text(" "),
+                LspSnippetAssert.variable("name"),
+                LspSnippetAssert.text(" b"));
+    }
+
+    @Test
     public void placeholderWithEscapeDollar() {
         LspSnippetNode[] actual = LspSnippetAssert.parse("\\$${1:var}");
         assertEquals(actual, LspSnippetAssert.text("$"),

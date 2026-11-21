@@ -27,7 +27,9 @@ import org.eclipse.lsp4j.jsonrpc.messages.Either;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Deque;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -149,35 +151,64 @@ final class SnippetTextEdits {
     /**
      * Returns the text of the given snippet, in which a placeholder or a choice has its default value, and a tab stop
      * repeats the default of the placeholder or the choice with its index, wherever that one is, as
-     * {@code ${1:name} = $1} gives {@code name = name}.
+     * {@code ${1:name} = $1} gives {@code name = name}. The default of a placeholder is its text with that of its nested
+     * placeholders, as {@code ${1:a ${2:b}} = $1} gives {@code a b = a b}.
      */
     private static @NotNull String textOf(@NotNull String snippet, @NotNull Function<String, String> variables) {
         Map<Integer, String> defaults = new HashMap<>();
-        new LspSnippetParser(new DefaultLspSnippetHandler(variables, null) {
+        new LspSnippetParser(new SnippetText(variables) {
+            private final Deque<PlaceholderStart> placeholders = new ArrayDeque<>();
+
             @Override
             public void startPlaceholder(int index, String name, int level) {
-                defaults.putIfAbsent(index, name);
+                placeholders.push(new PlaceholderStart(index, getCurrentOffset()));
+                super.startPlaceholder(index, name, level);
+            }
+
+            @Override
+            public void endPlaceholder(int level) {
+                // The text of the placeholder, with the text of its nested placeholders
+                PlaceholderStart start = placeholders.pop();
+                defaults.putIfAbsent(start.index(), getTemplateContent().substring(start.offset()));
             }
 
             @Override
             public void choice(int index, List<String> choices) {
                 defaults.putIfAbsent(index, choices.isEmpty() ? "" : choices.get(0));
+                super.choice(index, choices);
             }
         }).parse(snippet);
-        var handler = new DefaultLspSnippetHandler(variables, null) {
+        var text = new SnippetText(variables) {
             @Override
             public void tabstop(int index) {
                 appendContent(defaults.get(index));
             }
-
-            @Override
-            public void variable(String name) {
-                String value = resolveVariable(name);
-                super.variable(value != null ? value : name);
-            }
         };
-        new LspSnippetParser(handler).parse(snippet);
-        return handler.getTemplateContent();
+        new LspSnippetParser(text).parse(snippet);
+        return text.getTemplateContent();
+    }
+
+    /**
+     * The text of a snippet, in which a placeholder or a choice has its default value, and a variable its value, or
+     * its name for a variable that has none here.
+     */
+    private static class SnippetText extends DefaultLspSnippetHandler {
+
+        SnippetText(@NotNull Function<String, String> variables) {
+            super(variables, null);
+        }
+
+        @Override
+        public void variable(String name) {
+            String value = resolveVariable(name);
+            super.variable(value != null ? value : name);
+        }
+    }
+
+    /**
+     * Where the text of a placeholder starts in the text of its snippet.
+     */
+    private record PlaceholderStart(int index, int offset) {
     }
 
     private static @NotNull Template createTemplate(@NotNull String snippet,

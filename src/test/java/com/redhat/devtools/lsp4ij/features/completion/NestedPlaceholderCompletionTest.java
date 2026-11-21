@@ -1,0 +1,40 @@
+/*******************************************************************************
+ * Copyright (c) 2026 Red Hat, Inc.
+ * Distributed under license by Red Hat, Inc. All rights reserved.
+ * This program is made available under the terms of the
+ * Eclipse Public License v2.0 which accompanies this distribution,
+ * and is available at https://www.eclipse.org/legal/epl-v20.html
+ ******************************************************************************/
+package com.redhat.devtools.lsp4ij.features.completion;
+
+import com.intellij.codeInsight.template.impl.TemplateManagerImpl;
+import com.redhat.devtools.lsp4ij.fixtures.LSPCompletionFixtureTestCase;
+import org.eclipse.lsp4j.CompletionItem;
+import org.eclipse.lsp4j.CompletionList;
+import org.eclipse.lsp4j.InsertTextFormat;
+
+import java.util.List;
+
+/**
+ * A completion snippet with a nested placeholder inserts the text of both placeholders, without the closing brace of
+ * the outer one (#2074).
+ */
+public class NestedPlaceholderCompletionTest extends LSPCompletionFixtureTestCase {
+
+    public NestedPlaceholderCompletionTest() {
+        super("*.snippet-test");
+    }
+
+    public void testANestedPlaceholderInsertsNoClosingBrace() {
+        TemplateManagerImpl.setTemplateTesting(getTestRootDisposable());
+        var item = new CompletionItem("block");
+        item.setInsertText("${1:a ${2:b} c} d$0");
+        item.setInsertTextFormat(InsertTextFormat.Snippet);
+        var other = new CompletionItem("blockOther");
+        assertCompletion("test.snippet-test", "blo<caret>",
+                new CompletionList(false, List.of(item, other)), "block", "blockOther");
+
+        assertApplyCompletionItem(0, "a b c d");
+        assertNotNull("the snippet must start as a template", TemplateManagerImpl.getTemplateState(myFixture.getEditor()));
+    }
+}

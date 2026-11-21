@@ -115,6 +115,21 @@ public class SnippetTextEditCodeActionTest extends LSPCodeActionFixtureTestCase 
         assertEquals("name = name, one one world", otherDocument.getText());
     }
 
+    public void testATabStopRepeatsTheTextOfANestedPlaceholderWithItsIndex() {
+        var other = myFixture.addFileToProject("other.txt", "world");
+        var intention = greetingIntention();
+        resolveTo(other, Either.forRight(new SnippetTextEdit(range(0, 0),
+                new StringValue("snippet", "${1:hello ${2:you}} = $1, $2 "))));
+
+        invoke(intention);
+        PlatformTestUtil.dispatchAllEventsInIdeEventQueue();
+
+        Document otherDocument = FileDocumentManager.getInstance().getDocument(other.getVirtualFile());
+        assertNotNull(otherDocument);
+        // The closing brace of the outer placeholder is no text (#2074)
+        assertEquals("hello you = hello you, you world", otherDocument.getText());
+    }
+
     private IntentionAction greetingIntention() {
         var actions = assertCodeActions("test.greeting", IntentionActionKind.INTENTION_ONLY, "world<caret>",
                 // language=JSON
