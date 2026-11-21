@@ -28,7 +28,9 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
@@ -145,10 +147,29 @@ final class SnippetTextEdits {
     }
 
     /**
-     * Returns the text of the given snippet, in which a placeholder or a choice has its default value.
+     * Returns the text of the given snippet, in which a placeholder or a choice has its default value, and a tab stop
+     * repeats the default of the placeholder or the choice with its index, wherever that one is, as
+     * {@code ${1:name} = $1} gives {@code name = name}.
      */
     private static @NotNull String textOf(@NotNull String snippet, @NotNull Function<String, String> variables) {
+        Map<Integer, String> defaults = new HashMap<>();
+        new LspSnippetParser(new DefaultLspSnippetHandler(variables, null) {
+            @Override
+            public void startPlaceholder(int index, String name, int level) {
+                defaults.putIfAbsent(index, name);
+            }
+
+            @Override
+            public void choice(int index, List<String> choices) {
+                defaults.putIfAbsent(index, choices.isEmpty() ? "" : choices.get(0));
+            }
+        }).parse(snippet);
         var handler = new DefaultLspSnippetHandler(variables, null) {
+            @Override
+            public void tabstop(int index) {
+                appendContent(defaults.get(index));
+            }
+
             @Override
             public void variable(String name) {
                 String value = resolveVariable(name);

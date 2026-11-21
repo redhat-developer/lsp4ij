@@ -100,6 +100,21 @@ public class SnippetTextEditCodeActionTest extends LSPCodeActionFixtureTestCase 
                 TemplateManagerImpl.getTemplateState(myFixture.getEditor()));
     }
 
+    public void testATabStopRepeatsTheDefaultOfThePlaceholderOrTheChoiceWithItsIndex() {
+        var other = myFixture.addFileToProject("other.txt", "world");
+        var intention = greetingIntention();
+        resolveTo(other, Either.forRight(new SnippetTextEdit(range(0, 0),
+                // After its placeholder, and before its choice
+                new StringValue("snippet", "${1:name} = $1, $2 ${2|one,two|} "))));
+
+        invoke(intention);
+        PlatformTestUtil.dispatchAllEventsInIdeEventQueue();
+
+        Document otherDocument = FileDocumentManager.getInstance().getDocument(other.getVirtualFile());
+        assertNotNull(otherDocument);
+        assertEquals("name = name, one one world", otherDocument.getText());
+    }
+
     private IntentionAction greetingIntention() {
         var actions = assertCodeActions("test.greeting", IntentionActionKind.INTENTION_ONLY, "world<caret>",
                 // language=JSON
