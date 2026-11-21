@@ -21,6 +21,7 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
@@ -32,6 +33,15 @@ import java.util.concurrent.CompletableFuture;
  * </ul>
  */
 public class LSPHoverSupport extends AbstractLSPDocumentFeatureSupport<HoverParams, List<HoverData>> {
+
+    /**
+     * The order of the hovers of several language servers: by the names of the language servers, then by their ids,
+     * rather than the order in which they are found for the file, which can change from one hover to the next (#390).
+     */
+    private static final Comparator<LanguageServerItem> BY_SERVER_NAME = Comparator
+            .comparing((LanguageServerItem server) -> server.getServerDefinition().getDisplayName(),
+                    String.CASE_INSENSITIVE_ORDER)
+            .thenComparing(server -> server.getServerDefinition().getId());
 
     private Integer previousOffset;
 
@@ -67,9 +77,10 @@ public class LSPHoverSupport extends AbstractLSPDocumentFeatureSupport<HoverPara
                         return CompletableFuture.completedFuture(Collections.emptyList());
                     }
 
-                    // Collect list of textDocument/hover future for each language servers
+                    // Collect list of textDocument/hover future for each language servers, in the order of their names
                     List<CompletableFuture<HoverData>> hoverPerServerFutures = languageServers
                             .stream()
+                            .sorted(BY_SERVER_NAME)
                             .map(languageServer -> getHoverFor(params, file, languageServer, cancellationSupport))
                             .toList();
 
