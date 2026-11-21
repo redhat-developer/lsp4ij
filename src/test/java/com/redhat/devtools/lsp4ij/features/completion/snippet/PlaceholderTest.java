@@ -52,6 +52,34 @@ public class PlaceholderTest {
     }
 
     @Test
+    public void placeholderThatStartsWithANestedPlaceholder() {
+        LspSnippetNode[] actual = LspSnippetAssert.parse("${1:${2:b} c} d");
+        assertEquals(actual, LspSnippetAssert.placeholder(1, "", 1),
+                LspSnippetAssert.placeholder(2, "b", 2),
+                LspSnippetAssert.text(" c"),
+                LspSnippetAssert.text(" d"));
+    }
+
+    @Test
+    public void placeholderThatStartsWithATabstopOrAChoice() {
+        LspSnippetNode[] actual = LspSnippetAssert.parse("${1:$2 c}${3:${4|x,y|}} d");
+        assertEquals(actual, LspSnippetAssert.placeholder(1, "", 1),
+                LspSnippetAssert.tabstop(2),
+                LspSnippetAssert.text(" c"),
+                LspSnippetAssert.placeholder(3, "", 1),
+                LspSnippetAssert.choice(4, "x", "y"),
+                LspSnippetAssert.text(" d"));
+    }
+
+    @Test
+    public void placeholderThatStartsWithAVariableKeepsItInItsText() {
+        // The handlers resolve the variable of the text (#1313)
+        LspSnippetNode[] actual = LspSnippetAssert.parse("${1:$TM_FILENAME_BASE} x");
+        assertEquals(actual, LspSnippetAssert.placeholder(1, "$TM_FILENAME_BASE", 1),
+                LspSnippetAssert.text(" x"));
+    }
+
+    @Test
     public void tabstopAndVariableInPlaceholder() {
         LspSnippetNode[] actual = LspSnippetAssert.parse("${1:a $2 $name} b");
         assertEquals(actual, LspSnippetAssert.placeholder(1, "a ", 1),

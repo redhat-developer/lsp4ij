@@ -187,39 +187,7 @@ public class LspSnippetParser {
                     handleTabstop(index);
                 } else if (readChar('{')) {
                     if (isDigit()) {
-                        // - ${1:name} <-- placeholder
-                        // - ${1|one,two,three|} <-- choice
-                        // - ${1} <-- tabstop
-                        int index = readInt();
-                        if (readChar(':')) {
-                            if (readChar('}')) {
-                                // - ${1:} <-- tabstop
-                                handleTabstop(index);
-                            } else {
-                                // - ${1:name} <-- placeholder
-                                String name = readString('}', '$');
-                                nestingLevel++;
-                                handler.startPlaceholder(index, name, nestingLevel);
-                                // placeholder ::= '${' int ':' any '}'
-                                // The rest of the placeholder, as a nested placeholder, ends at its '}'
-                                while (!isEndOfText() && current != '}') {
-                                    readElement();
-                                }
-                                if (current == '}') {
-                                    // read next character
-                                    read();
-                                }
-                                handler.endPlaceholder(nestingLevel);
-                                nestingLevel--;
-                            }
-                        } else if (readChar('|')) {
-                            // - ${1|one,two,three|} <-- choice
-                            handleChoice(null, index);
-                        } else {
-                            // - ${1} <-- tabstop
-                            handleTabstop(index);
-                            readRequiredChar('}');
-                        }
+                        readIndexed();
                     } else {
                         // - ${name} <-- variable
                         String name = readString('}');
@@ -238,6 +206,80 @@ public class LspSnippetParser {
                 handleText();
                 break;
         }
+    }
+
+    /**
+     * Reads a tab stop, a placeholder or a choice from its index, after its {@code ${}.
+     *
+     * @throws IOException
+     */
+    private void readIndexed() throws IOException {
+        // - ${1:name} <-- placeholder
+        // - ${1|one,two,three|} <-- choice
+        // - ${1} <-- tabstop
+        int index = readInt();
+        if (readChar(':')) {
+            if (readChar('}')) {
+                // - ${1:} <-- tabstop
+                handleTabstop(index);
+            } else {
+                // - ${1:name} <-- placeholder
+                nestingLevel++;
+                readPlaceholder(index);
+                nestingLevel--;
+            }
+        } else if (readChar('|')) {
+            // - ${1|one,two,three|} <-- choice
+            handleChoice(null, index);
+        } else {
+            // - ${1} <-- tabstop
+            handleTabstop(index);
+            readRequiredChar('}');
+        }
+    }
+
+    /**
+     * Reads a placeholder after its {@code ${1:}, up to the character after its {@code }}.
+     *
+     * @param index the index of the placeholder.
+     * @throws IOException
+     */
+    private void readPlaceholder(int index) throws IOException {
+        if (current == '$') {
+            startCapture();
+            read();
+            boolean braced = current == '{';
+            if (braced) {
+                read();
+            }
+            if (isDigit()) {
+                // - ${1:$2 ...}, ${1:${2:name} ...}, ${1:${2|one,two|} ...} <-- a placeholder that starts with a tab
+                // stop, a placeholder or a choice has no text before it
+                cancelCapture();
+                handler.startPlaceholder(index, "", nestingLevel);
+                if (braced) {
+                    readIndexed();
+                } else {
+                    handleTabstop(readInt());
+                }
+            } else {
+                // - ${1:$name}, ${1:${name}} <-- the text of the placeholder starts with the variable, which the
+                // handlers resolve (#1313)
+                handler.startPlaceholder(index, continueString('}', '$'), nestingLevel);
+            }
+        } else {
+            handler.startPlaceholder(index, readString('}', '$'), nestingLevel);
+        }
+        // placeholder ::= '${' int ':' any '}'
+        // The rest of the placeholder, as a nested placeholder, ends at its '}'
+        while (!isEndOfText() && current != '}') {
+            readElement();
+        }
+        if (current == '}') {
+            // read next character
+            read();
+        }
+        handler.endPlaceholder(nestingLevel);
     }
 
     private void handleChoice(String name, Integer index) throws IOException {
@@ -286,6 +328,37 @@ public class LspSnippetParser {
 
         } while (!isEndOfText());
         return endCapture();
+    }
+
+    /**
+     * Reads the rest of a string, as {@link #readString(int...)} reads it, once the capture started and its first
+     * character was read.
+     */
+    private String continueString(int... stopOn) throws IOException {
+        while (!isOneOf(stopOn) && !isEndOfText()) {
+            if (current == '\\') {
+                pauseCapture();
+                readEscape();
+                startCapture();
+            } else {
+                read();
+            }
+        }
+        return endCapture();
+    }
+
+    private boolean isOneOf(int... characters) {
+        for (int character : characters) {
+            if (current == character) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private void cancelCapture() {
+        captureStart = -1;
+        captureBuffer.setLength(0);
     }
 
     private void readEscape() throws IOException {

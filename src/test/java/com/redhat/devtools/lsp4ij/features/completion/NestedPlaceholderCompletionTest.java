@@ -17,7 +17,7 @@ import java.util.List;
 
 /**
  * A completion snippet with a nested placeholder inserts the text of both placeholders, without the closing brace of
- * the outer one (#2074).
+ * the outer one, and its first stop selects the whole text of the outer placeholder (#2074).
  */
 public class NestedPlaceholderCompletionTest extends LSPCompletionFixtureTestCase {
 
@@ -25,16 +25,38 @@ public class NestedPlaceholderCompletionTest extends LSPCompletionFixtureTestCas
         super("*.snippet-test");
     }
 
-    public void testANestedPlaceholderInsertsNoClosingBrace() {
+    public void testTheFirstStopOfANestedPlaceholderSelectsItsWholeText() {
+        complete("${1:a ${2:b} c} d$0");
+
+        assertApplyCompletionItem(0, "a b c d");
+        assertNotNull("the snippet must start as a template", TemplateManagerImpl.getTemplateState(myFixture.getEditor()));
+        assertEquals("a b c", myFixture.getEditor().getSelectionModel().getSelectedText());
+        myFixture.type("x");
+        assertEquals("x d", myFixture.getEditor().getDocument().getText());
+    }
+
+    public void testAPlaceholderThatStartsWithANestedPlaceholderSelectsItsWholeText() {
+        complete("${1:${2:b} c} d$0");
+
+        assertApplyCompletionItem(0, "b c d");
+        assertNotNull("the snippet must start as a template", TemplateManagerImpl.getTemplateState(myFixture.getEditor()));
+        assertEquals("b c", myFixture.getEditor().getSelectionModel().getSelectedText());
+    }
+
+    public void testANestedTabStopAndChoiceGiveTheirTextToTheirPlaceholder() {
+        complete("${1:a $2${3|x,y|}} ${4:e} d$0");
+
+        assertApplyCompletionItem(0, "a x e d");
+        assertEquals("a x", myFixture.getEditor().getSelectionModel().getSelectedText());
+    }
+
+    private void complete(String snippet) {
         TemplateManagerImpl.setTemplateTesting(getTestRootDisposable());
         var item = new CompletionItem("block");
-        item.setInsertText("${1:a ${2:b} c} d$0");
+        item.setInsertText(snippet);
         item.setInsertTextFormat(InsertTextFormat.Snippet);
         var other = new CompletionItem("blockOther");
         assertCompletion("test.snippet-test", "blo<caret>",
                 new CompletionList(false, List.of(item, other)), "block", "blockOther");
-
-        assertApplyCompletionItem(0, "a b c d");
-        assertNotNull("the snippet must start as a template", TemplateManagerImpl.getTemplateState(myFixture.getEditor()));
     }
 }
