@@ -3,7 +3,7 @@
   "name": "CSS Language Server",
   "executeOnStartServer": false,
   "properties": {
-    "workingDir" : "$USER_HOME$/.lsp4ij/lsp/vscode-css-language-server/node_modules"
+    "workingDir" : "$USER_HOME$/.lsp4ij/lsp/vscode-langservers-extracted/node_modules"
   },
   "check": {
     "exec": {

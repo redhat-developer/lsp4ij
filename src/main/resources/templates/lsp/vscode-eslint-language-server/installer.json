@@ -3,7 +3,7 @@
   "name": "ESLint Language Server",
   "executeOnStartServer": false,
   "properties": {
-    "workingDir" : "$USER_HOME$/.lsp4ij/lsp/vscode-eslint-language-server/node_modules"
+    "workingDir" : "$USER_HOME$/.lsp4ij/lsp/vscode-langservers-extracted/node_modules"
   },
   "check": {
     "exec": {

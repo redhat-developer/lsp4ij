@@ -13,6 +13,7 @@ package com.redhat.devtools.lsp4ij.installation.definition.tasks;
 import com.intellij.execution.configurations.GeneralCommandLine;
 import com.intellij.execution.process.*;
 import com.intellij.openapi.progress.ProcessCanceledException;
+import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.project.ProjectUtil;
 import com.intellij.openapi.util.Key;
 import com.intellij.util.EnvironmentUtil;
@@ -25,9 +26,15 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.nio.file.Files;
+import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 /**
  * <pre>
@@ -43,6 +50,13 @@ import java.util.List;
  * </pre>
  */
 public class ExecTask extends InstallerTask {
+
+    /**
+     * The locks of the working directories that exec tasks declare, by absolute path: the installers of two language
+     * servers which install into the same directory, as the CSS and ESLint language servers, which share their npm
+     * package, run there one at a time, else two {@code npm install} would break each other's install.
+     */
+    private static final Map<Path, Lock> WORKING_DIR_LOCKS = new ConcurrentHashMap<>();
 
     private final @NotNull List<String> command;
     private final @Nullable Integer timeout;
@@ -79,6 +93,48 @@ public class ExecTask extends InstallerTask {
 
     @Override
     public boolean run(@NotNull InstallerContext context) {
+        @Nullable Lock workingDirLock = lockWorkingDir(context);
+        try {
+            return runCommand(context);
+        } finally {
+            if (workingDirLock != null) {
+                workingDirLock.unlock();
+            }
+        }
+    }
+
+    /**
+     * Waits until no other exec task runs in the working directory that this task declares, and returns the lock of
+     * the directory, which the caller must unlock; or null without a declared working directory. The wait ends with a
+     * {@link ProcessCanceledException} if the installation is cancelled.
+     */
+    private @Nullable Lock lockWorkingDir(@NotNull InstallerContext context) {
+        if (this.workingDir == null) {
+            return null;
+        }
+        Path workingDir;
+        try {
+            workingDir = getWorkingDir(this.workingDir, context);
+        } catch (InvalidPathException e) {
+            // The command reports it
+            return null;
+        }
+        if (workingDir == null) {
+            return null;
+        }
+        Lock lock = WORKING_DIR_LOCKS.computeIfAbsent(workingDir.toAbsolutePath().normalize(), dir -> new ReentrantLock());
+        try {
+            while (!lock.tryLock(100, TimeUnit.MILLISECONDS)) {
+                ProgressManager.checkCanceled();
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new ProcessCanceledException(e);
+        }
+        return lock;
+    }
+
+    private boolean runCommand(@NotNull InstallerContext context) {
         CapturingProcessHandler handler = null;
         try {
             @Nullable var project = context.getProject();

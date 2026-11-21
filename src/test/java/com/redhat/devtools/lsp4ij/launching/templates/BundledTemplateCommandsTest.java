@@ -106,13 +106,15 @@ public class BundledTemplateCommandsTest {
      * there, as the command that the installer gives it once it has downloaded it: when the check finds the language
      * server installed, the download doesn't run, and the language server keeps the command of its template (#2011).
      * Not the templates that start a language server on the PATH, as cpp_ls, nor those whose installer puts it in a
-     * folder named after its version, as clangd.
+     * folder named after its version, as clangd. The CSS and ESLint language servers start from the npm package that
+     * their installers share (#1960).
      */
     @Test
     void aTemplateStartsItsLanguageServerWhereItsInstallerPutsIt() throws IOException, URISyntaxException {
         var files = bundledFiles();
         List<String> problems = new ArrayList<>();
-        for (String server : List.of("clojure-lsp", "harper-ls", "jdtls", "lemminx", "luau-lsp", "perl-lsp")) {
+        for (String server : List.of("clojure-lsp", "harper-ls", "jdtls", "lemminx", "luau-lsp", "perl-lsp",
+                "vscode-css-language-server", "vscode-eslint-language-server")) {
             var template = files.get("lsp/" + server + "/template.json");
             var installer = files.get("lsp/" + server + "/installer.json");
             assertNotNull(template, server);
@@ -129,8 +131,9 @@ public class BundledTemplateCommandsTest {
     }
 
     /**
-     * Returns the command that the download of the given installer gives the language server on the given OS,
-     * {@code windows} or {@code default}, with the directory and the file of the download.
+     * Returns the command that the download or the install command of the given installer gives the language server on
+     * the given OS, {@code windows} or {@code default}, with the directory and the file of the download, or the
+     * properties of the installer, as the working directory of an {@code npm install}.
      */
     private static @NotNull String installedCommand(@NotNull JsonObject installer, @NotNull String os) {
         Map<String, String> properties = new HashMap<>();
@@ -138,7 +141,13 @@ public class BundledTemplateCommandsTest {
         if (declared != null) {
             declared.entrySet().forEach(property -> properties.put(property.getKey(), property.getValue().getAsString()));
         }
-        var download = installer.getAsJsonObject("run").getAsJsonObject("download");
+        var run = installer.getAsJsonObject("run");
+        var exec = run.getAsJsonObject("exec");
+        if (exec != null) {
+            var command = exec.getAsJsonObject("onSuccess").getAsJsonObject("configureServer").get("command");
+            return resolve(byOs(command, os), properties);
+        }
+        var download = run.getAsJsonObject("download");
         var output = download.getAsJsonObject("output");
         properties.put("output.dir", resolve(output.get("dir").getAsString(), properties));
         var file = output.getAsJsonObject("file");
