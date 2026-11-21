@@ -50,6 +50,19 @@ public class NestedPlaceholderCompletionTest extends LSPCompletionFixtureTestCas
         assertEquals("a x", myFixture.getEditor().getSelectionModel().getSelectedText());
     }
 
+    public void testAPlaceholderThatIsABracedVariableInsertsItsValue() {
+        complete("${1:${TM_FILENAME_BASE}} x$0");
+
+        assertApplyCompletionItem(0, "test x");
+    }
+
+    public void testANestedPlaceholderThatIsAVariableGivesItsValueToItsPlaceholder() {
+        complete("${1:hello ${2:$TM_FILENAME_BASE}} x$0");
+
+        assertApplyCompletionItem(0, "hello test x");
+        assertEquals("hello test", myFixture.getEditor().getSelectionModel().getSelectedText());
+    }
+
     private void complete(String snippet) {
         TemplateManagerImpl.setTemplateTesting(getTestRootDisposable());
         var item = new CompletionItem("block");

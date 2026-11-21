@@ -115,6 +115,20 @@ public class SnippetTextEditCodeActionTest extends LSPCodeActionFixtureTestCase 
         assertEquals("name = name, one one world", otherDocument.getText());
     }
 
+    public void testAPlaceholderThatIsAVariableInsertsItsValue() {
+        var other = myFixture.addFileToProject("other.txt", "world");
+        var intention = greetingIntention();
+        resolveTo(other, Either.forRight(new SnippetTextEdit(range(0, 0),
+                new StringValue("snippet", "${1:$TM_FILENAME_BASE} = $1, ${2:${TM_FILENAME}} "))));
+
+        invoke(intention);
+        PlatformTestUtil.dispatchAllEventsInIdeEventQueue();
+
+        Document otherDocument = FileDocumentManager.getInstance().getDocument(other.getVirtualFile());
+        assertNotNull(otherDocument);
+        assertEquals("other = other, other.txt world", otherDocument.getText());
+    }
+
     public void testATabStopRepeatsTheTextOfANestedPlaceholderWithItsIndex() {
         var other = myFixture.addFileToProject("other.txt", "world");
         var intention = greetingIntention();

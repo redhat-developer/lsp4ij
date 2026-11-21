@@ -262,9 +262,16 @@ public class LspSnippetParser {
                 } else {
                     handleTabstop(readInt());
                 }
+            } else if (braced) {
+                // - ${1:${name}} <-- the text of the placeholder starts with the variable, as for ${1:$name}. The '}'
+                // of the variable doesn't end the placeholder
+                cancelCapture();
+                String name = readString('}');
+                readRequiredChar('}');
+                handler.startPlaceholder(index, "$" + name, nestingLevel);
             } else {
-                // - ${1:$name}, ${1:${name}} <-- the text of the placeholder starts with the variable, which the
-                // handlers resolve (#1313)
+                // - ${1:$name} <-- the text of the placeholder starts with the variable, which the handlers resolve
+                // (#1313)
                 handler.startPlaceholder(index, continueString('}', '$'), nestingLevel);
             }
         } else {

@@ -80,6 +80,14 @@ public class PlaceholderTest {
     }
 
     @Test
+    public void placeholderThatStartsWithABracedVariableKeepsItInItsText() {
+        // The '}' of the variable doesn't end the placeholder
+        LspSnippetNode[] actual = LspSnippetAssert.parse("${1:${TM_FILENAME_BASE}} x");
+        assertEquals(actual, LspSnippetAssert.placeholder(1, "$TM_FILENAME_BASE", 1),
+                LspSnippetAssert.text(" x"));
+    }
+
+    @Test
     public void tabstopAndVariableInPlaceholder() {
         LspSnippetNode[] actual = LspSnippetAssert.parse("${1:a $2 $name} b");
         assertEquals(actual, LspSnippetAssert.placeholder(1, "a ", 1),

@@ -216,8 +216,10 @@ public class SnippetTemplateLoader extends AbstractLspSnippetHandler {
     @Override
     public void startPlaceholder(int index, String name, int level) {
         if (placeholderText != null) {
-            // A nested placeholder gives its text to the text of the placeholder that contains it
-            placeholderText.append(name);
+            // A nested placeholder gives its text to the text of the placeholder that contains it, once resolved, as
+            // the text of a placeholder can be a variable, such as $TM_FILENAME_BASE
+            String value = super.resolveVariable(name);
+            placeholderText.append(value != null ? value : name);
             return;
         }
         placeholderIndex = index;

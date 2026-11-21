@@ -199,6 +199,13 @@ final class SnippetTextEdits {
         }
 
         @Override
+        public void startPlaceholder(int index, String name, int level) {
+            // The text of a placeholder can be a variable, as in ${1:$TM_FILENAME_BASE}
+            String value = name.startsWith("$") ? resolveVariable(name) : null;
+            super.startPlaceholder(index, value != null ? value : name, level);
+        }
+
+        @Override
         public void variable(String name) {
             String value = resolveVariable(name);
             super.variable(value != null ? value : name);
