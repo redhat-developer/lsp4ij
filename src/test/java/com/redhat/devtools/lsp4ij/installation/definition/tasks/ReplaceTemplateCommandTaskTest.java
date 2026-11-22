@@ -100,6 +100,18 @@ public class ReplaceTemplateCommandTaskTest {
     }
 
     @Test
+    public void testWithoutACommandForTheOsTheCommandStays() {
+        // As "command": {"windows": "clangd.exe"} gives on another OS
+        List<String> commands = new ArrayList<>(List.of(TEMPLATE_COMMAND));
+        InstallerContext context = createContext(commands);
+        context.putProperty(FileExistsTask.CHECK_FILE_PROPERTY, FOUND);
+
+        assertTrue(createTask(TEMPLATE_COMMAND, "").run(context));
+
+        assertEquals(List.of(TEMPLATE_COMMAND), commands, "The server must keep its command");
+    }
+
+    @Test
     public void testACheckFileThatNoCheckFoundIsAnError() {
         List<String> commands = new ArrayList<>(List.of(TEMPLATE_COMMAND));
         InstallerContext context = createContext(commands);
