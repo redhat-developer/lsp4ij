@@ -10,23 +10,20 @@ package com.redhat.devtools.lsp4ij.console;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.Disposer;
 import com.intellij.testFramework.PlatformTestUtil;
+import com.intellij.testFramework.fixtures.BasePlatformTestCase;
 import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
-import com.redhat.devtools.lsp4ij.fixtures.LSPCodeInsightFixtureTestCase;
 import com.redhat.devtools.lsp4ij.mock.MockLanguageServerDefinition;
 import com.redhat.devtools.lsp4ij.templates.ServerMappingSettings;
 
 import java.util.List;
 
 /**
- * Tests the empty state of the Language Servers view when no language server is configured.
+ * Tests the empty state of the Language Servers view when no language server is configured. It extends
+ * {@link BasePlatformTestCase}, not {@code LSPCodeInsightFixtureTestCase}, whose setUp configures a mock language server.
  */
-public class LSPConsoleEmptyStateTest extends LSPCodeInsightFixtureTestCase {
+public class LSPConsoleEmptyStateTest extends BasePlatformTestCase {
 
     private Project project;
-
-    public LSPConsoleEmptyStateTest() {
-        super("*.ts");
-    }
 
     @Override
     protected void setUp() throws Exception {
@@ -35,6 +32,7 @@ public class LSPConsoleEmptyStateTest extends LSPCodeInsightFixtureTestCase {
     }
 
     public void testEmptyStateShownWhenNoLanguageServerIsConfigured() {
+        assertEmpty("No language server may be configured", LanguageServersRegistry.getInstance().getServerDefinitions());
         var panel = new LSPConsoleToolWindowPanel(project);
         try {
             PlatformTestUtil.waitWithEventsDispatching("The empty state must be shown when no language server is configured",
