@@ -73,6 +73,7 @@ public class LanguageServerExplorer extends SimpleToolWindowPanel implements Dis
             treeModel.reload(root);
             // Select the new language server node
             selectAndExpand((DefaultMutableTreeNode) root.getChildAt(root.getChildCount() - 1));
+            panel.updateEmptyState();
         }
 
         @Override
@@ -95,6 +96,7 @@ public class LanguageServerExplorer extends SimpleToolWindowPanel implements Dis
                 // Select first language server node
                 selectAndExpand((DefaultMutableTreeNode) root.getChildAt(0));
             }
+            panel.updateEmptyState();
         }
 
         @Override
@@ -385,6 +387,9 @@ public class LanguageServerExplorer extends SimpleToolWindowPanel implements Dis
 
             // Hide loading spinner immediately after tree is updated
             loadingDecorator.stopLoading();
+
+            // Show the empty state when no language server is configured
+            panel.updateEmptyState();
 
             // Step 2: The state of the started servers needs the nodes of their definitions
             loadStartedServersAsync();
