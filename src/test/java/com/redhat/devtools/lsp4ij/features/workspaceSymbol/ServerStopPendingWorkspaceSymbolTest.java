@@ -20,6 +20,7 @@ import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
 import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
 import com.redhat.devtools.lsp4ij.fixtures.LSPCodeInsightTestFixture;
 import com.redhat.devtools.lsp4ij.fixtures.LSPTestFixtureFactory;
+import com.redhat.devtools.lsp4ij.internal.CancellationUtil;
 import com.redhat.devtools.lsp4ij.mock.MockConnectionProvider;
 import com.redhat.devtools.lsp4ij.mock.MockLanguageServer;
 import com.redhat.devtools.lsp4ij.mock.MockLanguageServerDefinition;
@@ -39,6 +40,7 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.TimeUnit;
 
@@ -81,7 +83,24 @@ public class ServerStopPendingWorkspaceSymbolTest extends UsefulTestCase {
         silentServer.getServerWrapper().stop();
         silentServer.getServerWrapper().cancelOnStop(silentServer.getServer(), request);
 
-        assertTrue("The request must be cancelled, as no later stop of its server cancels it", request.isCancelled());
+        assertTrue("The request must be cancelled, as no later stop of its server cancels it", endedCancelled(request));
+    }
+
+    /**
+     * Returns whether the given request ended cancelled, by LSP4IJ or by the language server. LSP4J cancels a request
+     * by sending {@code $/cancelRequest} first and cancelling its future after: the language server can answer
+     * RequestCancelled in between, and the request then ends with that error, which LSP4IJ takes as a cancel too.
+     */
+    private static boolean endedCancelled(@NotNull CompletableFuture<?> request) {
+        if (request.isCancelled()) {
+            return true;
+        }
+        try {
+            request.getNow(null);
+            return false;
+        } catch (CompletionException e) {
+            return CancellationUtil.isRequestCancelledException(e);
+        }
     }
 
     private @NotNull LanguageServerItem connect(@NotNull PsiFile file,
