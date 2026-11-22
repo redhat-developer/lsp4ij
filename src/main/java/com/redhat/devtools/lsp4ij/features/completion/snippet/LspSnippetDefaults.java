@@ -28,7 +28,8 @@ import java.util.Set;
  * {@code ${1:x$1}} or {@code ${1:a$2} ${2:b$1}}, repeats nothing. So in a cycle of defaults that repeat each other, the
  * text of each depends on where the cycle is entered: there, 1 gives {@code ab} and 2 gives {@code ba}. Any other
  * default is resolved once, and those in cycles are resolved again {@value #MAX_RESOLUTIONS_AGAIN} times at most in
- * all. Defaults that repeat each other can still double their text at each index, as in
+ * all. The text of an index, which {@link #getText(int)} or a tab stop of the snippet gives, is the same each time,
+ * also once that bound is reached. Defaults that repeat each other can still double their text at each index, as in
  * {@code ${1:$2$2} ${2:$3$3} ... ${30:x}}, so the text that a default repeats from others stops at
  * {@value #MAX_REPEATED_LENGTH} characters.
  */
@@ -43,12 +44,15 @@ public final class LspSnippetDefaults {
      * so each tab stop that repeats it resolves it again. Defaults that repeat each other twice in a cycle, as in
      * {@code ${1:$2$2$1} ${2:$3$3$1} ... ${30:$1}}, would then be resolved about 2^30 times, and the limit of the text
      * that they repeat doesn't bound that, as their text is empty. Only such a snippet reaches this bound: any other
-     * default is resolved once, and doesn't count.
+     * default is resolved once, and doesn't count. A text that the bound stops depends on it, so it isn't kept.
      */
     static final int MAX_RESOLUTIONS_AGAIN = 100_000;
 
     // The depth of a cut, for a text that repeats no default being resolved
     private static final int NO_CUT = Integer.MAX_VALUE;
+    // The depth of a cut below that of any default, for a tab stop that MAX_RESOLUTIONS_AGAIN stopped: no default
+    // that repeats it is kept
+    private static final int BOUND_CUT = -1;
     // The index of the default whose text is resolved, for the text of a snippet
     private static final int NO_INDEX = -1;
 
@@ -80,12 +84,15 @@ public final class LspSnippetDefaults {
     }
 
     private static final Resolved NOTHING = new Resolved("", NO_CUT);
+    private static final Resolved BOUND_REACHED = new Resolved("", BOUND_CUT);
 
     private final Map<Integer, Default> defaults = new HashMap<>();
     // The indices whose default an open placeholder will give
     private final Set<Integer> reserved = new HashSet<>();
     // The text of each default outside a cycle, once resolved, which is the same wherever it is repeated
     private final Map<Integer, String> texts = new HashMap<>();
+    // The text of each index that getText(int) or a tab stop of the snippet gave, which they give again
+    private final Map<Integer, String> rootTexts = new HashMap<>();
     // The defaults being resolved, with their depths, to stop at those that repeat themselves
     private final Map<Integer, Integer> resolving = new HashMap<>();
     // The defaults resolved at least once
@@ -154,13 +161,19 @@ public final class LspSnippetDefaults {
 
     /**
      * Returns the text of the default of the given index, in which a tab stop repeats the default of its index. It's
-     * empty for an index without a default.
+     * empty for an index without a default. It's the same each time, as the text of a tab stop of the snippet with
+     * that index.
      *
      * @param index the index.
      * @return the text of its default.
      */
     public @NotNull String getText(int index) {
-        return resolve(index).text();
+        String text = rootTexts.get(index);
+        if (text == null) {
+            text = resolve(index).text();
+            rootTexts.put(index, text);
+        }
+        return text;
     }
 
     /**
@@ -190,7 +203,7 @@ public final class LspSnippetDefaults {
         if (!resolved.add(index) && !resolving.isEmpty()) {
             // Resolved before but not kept, so in a cycle, which a tab stop in a default repeats again
             if (resolutionsAgain == MAX_RESOLUTIONS_AGAIN) {
-                return NOTHING;
+                return BOUND_REACHED;
             }
             resolutionsAgain++;
         }
@@ -222,7 +235,10 @@ public final class LspSnippetDefaults {
             if (part instanceof Text value) {
                 text.append(value.value());
             } else if (part instanceof TabStop tabStop && tabStop.index() != ownIndex && repeated < maxRepeatedLength) {
-                Resolved value = resolve(tabStop.index());
+                // A tab stop of the snippet has the text of its index, the same each time
+                Resolved value = ownIndex == NO_INDEX
+                        ? new Resolved(getText(tabStop.index()), NO_CUT)
+                        : resolve(tabStop.index());
                 int length = Math.min(value.text().length(), maxRepeatedLength - repeated);
                 text.append(value.text(), 0, length);
                 repeated += length;

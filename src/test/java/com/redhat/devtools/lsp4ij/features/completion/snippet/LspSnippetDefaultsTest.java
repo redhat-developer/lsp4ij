@@ -12,6 +12,7 @@ import com.redhat.devtools.lsp4ij.features.completion.snippet.LspSnippetDefaults
 import com.redhat.devtools.lsp4ij.features.completion.snippet.LspSnippetDefaults.Text;
 import org.junit.Test;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
@@ -160,6 +161,32 @@ public class LspSnippetDefaultsTest {
     }
 
     @Test(timeout = 10_000)
+    public void anIndexHasTheSameTextOnceTheBoundIsReached() {
+        // ${1:a$2} ${2:b$1}, then ${3:$4$4$3} ... ${32:$33$33$3}, which reach the bound, then $1 $2
+        LspSnippetDefaults defaults = cycleThenBound();
+        assertEquals("ab", defaults.getText(1));
+        assertEquals("ba", defaults.getText(2));
+        defaults.getText(3);
+
+        assertEquals("ab", defaults.getText(1));
+        assertEquals("ba", defaults.getText(2));
+    }
+
+    @Test(timeout = 10_000)
+    public void aTabStopOfTheSnippetHasTheSameTextOnceTheBoundIsReached() {
+        // ${1:a$2} ${2:b$1} ${3:$4$4$3} ... ${32:$33$33$3} $1 $2
+        LspSnippetDefaults defaults = cycleThenBound();
+        List<Part> snippet = new ArrayList<>(List.of(new TabStop(1), new Text(" "), new TabStop(2)));
+        for (int index = 3; index <= 32; index++) {
+            snippet.add(new Text(" "));
+            snippet.add(new TabStop(index));
+        }
+        snippet.addAll(List.of(new Text(" "), new TabStop(1), new Text(" "), new TabStop(2)));
+
+        assertEquals("ab ba" + " ".repeat(30) + " ab ba", defaults.getText(snippet));
+    }
+
+    @Test(timeout = 10_000)
     public void aDefaultIsResolvedOnce() {
         // ${1:$2$2} ${2:$3$3} ... ${60:$61$61}, without a default for 61: each tab stop repeats the same chain
         var defaults = new LspSnippetDefaults();
@@ -193,6 +220,18 @@ public class LspSnippetDefaultsTest {
         assertEquals(longText, defaults.getText(1));
         List<Part> snippet = Collections.nCopies(3, new TabStop(1));
         assertEquals(longText.repeat(3), defaults.getText(snippet));
+    }
+
+    /**
+     * Returns the defaults of {@code ${1:a$2} ${2:b$1}}, then {@code ${3:$4$4$3} ... ${32:$33$33$3}}, without a default
+     * for 33: resolving 3 resolves the defaults in its cycle again until the bound.
+     */
+    private static LspSnippetDefaults cycleThenBound() {
+        LspSnippetDefaults defaults = mutualCycle();
+        for (int index = 3; index <= 32; index++) {
+            placeholder(defaults, index, new TabStop(index + 1), new TabStop(index + 1), new TabStop(3));
+        }
+        return defaults;
     }
 
     private static LspSnippetDefaults mutualCycle() {

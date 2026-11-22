@@ -204,6 +204,18 @@ public class SnippetTextEditCodeActionTest extends LSPCodeActionFixtureTestCase 
         assertTextOfSnippet("${1:a$2} ${2:b$1} ", "ab ba world");
     }
 
+    public void testATabStopHasTheSameTextOnceTheBoundOfTheDefaultsInCyclesIsReached() {
+        // ${3:$4$4$3} ... ${32:$33$33$3} resolve the defaults in their cycle again until the bound
+        var snippet = new StringBuilder("${1:a$2} ${2:b$1}");
+        for (int index = 3; index <= 32; index++) {
+            snippet.append(" ${").append(index).append(":$").append(index + 1).append('$').append(index + 1)
+                    .append("$3}");
+        }
+        snippet.append(" $1 $2 ");
+
+        assertTextOfSnippet(snippet.toString(), "ab ba" + " ".repeat(30) + " ab ba world");
+    }
+
     /**
      * Checks the text that the given snippet inserts in a file other than that of the selected editor, before
      * {@code world}.
