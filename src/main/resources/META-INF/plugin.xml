@@ -494,6 +494,9 @@
         <!-- LSP Editor notification used to suggest installation of some language servers according the editing file -->
         <editorNotificationProvider
                 implementation="com.redhat.devtools.lsp4ij.ui.LanguageServerSuggestionEditorNotificationProvider"/>
+        <!-- LSP Editor notification used to warn when IntelliJ's own LSP client also serves the editing file (2026.3 and later) -->
+        <editorNotificationProvider
+                implementation="com.redhat.devtools.lsp4ij.ui.JetBrainsLanguageServerEditorNotificationProvider"/>
 
         <!-- LSP application services -->
         <applicationService
