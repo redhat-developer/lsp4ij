@@ -115,6 +115,65 @@ public class SnippetTextEditCodeActionTest extends LSPCodeActionFixtureTestCase 
         assertEquals("name = name, one one world", otherDocument.getText());
     }
 
+    public void testATabStopInTheDefaultOfAPlaceholderIsRepeatedWithIt() {
+        var other = myFixture.addFileToProject("other.txt", "world");
+        var intention = greetingIntention();
+        resolveTo(other, Either.forRight(new SnippetTextEdit(range(0, 0),
+                // $1 repeats the whole default of placeholder 1, whose $2 repeats x; $3 repeats a later default
+                new StringValue("snippet", "${1:${2:x}-$2}=$1 ${4:$3} ${3:y} "))));
+
+        invoke(intention);
+        PlatformTestUtil.dispatchAllEventsInIdeEventQueue();
+
+        Document otherDocument = FileDocumentManager.getInstance().getDocument(other.getVirtualFile());
+        assertNotNull(otherDocument);
+        assertEquals("x-x=x-x y y world", otherDocument.getText());
+    }
+
+    public void testAPlaceholderThatIsAVariableInsertsItsValue() {
+        var other = myFixture.addFileToProject("other.txt", "world");
+        var intention = greetingIntention();
+        resolveTo(other, Either.forRight(new SnippetTextEdit(range(0, 0),
+                new StringValue("snippet", "${1:$TM_FILENAME_BASE} = $1, ${2:${TM_FILENAME}} "))));
+
+        invoke(intention);
+        PlatformTestUtil.dispatchAllEventsInIdeEventQueue();
+
+        Document otherDocument = FileDocumentManager.getInstance().getDocument(other.getVirtualFile());
+        assertNotNull(otherDocument);
+        assertEquals("other = other, other.txt world", otherDocument.getText());
+    }
+
+    public void testAPlaceholderThatStartsWithAnEscapedDollarInsertsItsText() {
+        var other = myFixture.addFileToProject("other.txt", "world");
+        var intention = greetingIntention();
+        resolveTo(other, Either.forRight(new SnippetTextEdit(range(0, 0),
+                // The escaped $ starts a text, not a variable
+                new StringValue("snippet", "${1:\\$TM_FILENAME_BASE} = $1 "))));
+
+        invoke(intention);
+        PlatformTestUtil.dispatchAllEventsInIdeEventQueue();
+
+        Document otherDocument = FileDocumentManager.getInstance().getDocument(other.getVirtualFile());
+        assertNotNull(otherDocument);
+        assertEquals("$TM_FILENAME_BASE = $TM_FILENAME_BASE world", otherDocument.getText());
+    }
+
+    public void testATabStopRepeatsTheTextOfANestedPlaceholderWithItsIndex() {
+        var other = myFixture.addFileToProject("other.txt", "world");
+        var intention = greetingIntention();
+        resolveTo(other, Either.forRight(new SnippetTextEdit(range(0, 0),
+                new StringValue("snippet", "${1:hello ${2:you}} = $1, $2 "))));
+
+        invoke(intention);
+        PlatformTestUtil.dispatchAllEventsInIdeEventQueue();
+
+        Document otherDocument = FileDocumentManager.getInstance().getDocument(other.getVirtualFile());
+        assertNotNull(otherDocument);
+        // The closing brace of the outer placeholder is no text (#2074)
+        assertEquals("hello you = hello you, you world", otherDocument.getText());
+    }
+
     private IntentionAction greetingIntention() {
         var actions = assertCodeActions("test.greeting", IntentionActionKind.INTENTION_ONLY, "world<caret>",
                 // language=JSON

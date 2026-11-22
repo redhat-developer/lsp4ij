@@ -91,6 +91,17 @@ public class DefaultLspSnippetHandler extends AbstractLspSnippetHandler {
         return templateContent.toString();
     }
 
+    /**
+     * Returns the template content from the given offset, as {@link #getCurrentOffset()} gave it, without copying the
+     * content before it.
+     *
+     * @param offset the offset in the template content.
+     * @return the template content from the given offset.
+     */
+    public String getTemplateContent(int offset) {
+        return templateContent.substring(offset);
+    }
+
     public int getCurrentOffset() {
         return templateContent.length();
     }

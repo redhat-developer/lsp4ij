@@ -49,6 +49,15 @@ public class SnippetTemplateLoader extends AbstractLspSnippetHandler {
     private final List<SnippetTemplateSegment> templateSegments = new LinkedList<>();
     private final List<String> existingVariables = new LinkedList<>();
 
+    // The text of the outermost placeholder being read, with the text of the placeholders nested in it. A variable of
+    // an IntelliJ template can't contain another, so a placeholder is one variable, whose text is its whole text, and
+    // its first stop selects that text, as it does in VS Code (#2074). Its nested placeholders have no stops of their
+    // own
+    private @Nullable StringBuilder placeholderText;
+    private int placeholderIndex;
+    // The leading text of that placeholder, until another text joins it
+    private @Nullable String placeholderLeadingText;
+
     /**
      * Load the given Intellij template from a LSP snippet content by using the given variable resolver.
      *
@@ -170,11 +179,19 @@ public class SnippetTemplateLoader extends AbstractLspSnippetHandler {
 
     @Override
     public void text(String text) {
+        if (placeholderText != null) {
+            appendToPlaceholder(formatText(text));
+            return;
+        }
         templateSegments.add(SnippetTemplateSegment.textSegment(formatText(text)));
     }
 
     @Override
     public void tabstop(int index) {
+        if (placeholderText != null) {
+            // A tab stop in a placeholder has no text, and no stop of its own
+            return;
+        }
         if (index == 0) {
             templateSegments.add(SnippetTemplateSegment.endVariable());
         } else {
@@ -190,21 +207,71 @@ public class SnippetTemplateLoader extends AbstractLspSnippetHandler {
 
     @Override
     public void choice(String name, List<String> choices) {
+        if (placeholderText != null) {
+            // A choice in a placeholder gives its first value to the text of the placeholder
+            appendToPlaceholder(name);
+            return;
+        }
         templateSegments.add(SnippetTemplateSegment.variable(new ConstantNode(name).withLookupStrings(choices), true));
     }
 
     @Override
     public void startPlaceholder(int index, String name, int level) {
-        variable(name);
+        if (placeholderText != null) {
+            // A nested placeholder gives its text to the text of the placeholder that contains it, once resolved, as
+            // the text of a placeholder can be a variable, such as $TM_FILENAME_BASE
+            String value = super.resolveVariable(name);
+            appendToPlaceholder(value != null ? value : name);
+            return;
+        }
+        placeholderIndex = index;
+        placeholderText = new StringBuilder(name);
+        placeholderLeadingText = name;
+    }
+
+    /**
+     * Appends the given text to the text of the placeholder being read. Its leading text, which can be a variable, as
+     * in ${1:${TM_FILENAME_BASE} suffix}, is resolved first: the whole text, as a variable, is not.
+     */
+    private void appendToPlaceholder(@NotNull String text) {
+        if (placeholderText == null) {
+            return;
+        }
+        if (placeholderLeadingText != null) {
+            String value = super.resolveVariable(placeholderLeadingText);
+            if (value != null) {
+                placeholderText.setLength(0);
+                placeholderText.append(value);
+            }
+            placeholderLeadingText = null;
+        }
+        placeholderText.append(text);
     }
 
     @Override
     public void endPlaceholder(int level) {
-
+        if (level != 1 || placeholderText == null) {
+            return;
+        }
+        String text = placeholderText.toString();
+        placeholderText = null;
+        placeholderLeadingText = null;
+        if (text.isEmpty()) {
+            // As ${1:}, a tab stop
+            tabstop(placeholderIndex);
+        } else {
+            variable(text);
+        }
     }
 
     @Override
     public void variable(String name) {
+        if (placeholderText != null) {
+            // A variable in a placeholder gives its value, or its name, to the text of the placeholder
+            String value = super.resolveVariable(name);
+            appendToPlaceholder(value != null ? value : name);
+            return;
+        }
         String resolvedValue = super.resolveVariable(name);
         if (resolvedValue != null) {
             // ex : ${TM_SELECTED_TEXT}
