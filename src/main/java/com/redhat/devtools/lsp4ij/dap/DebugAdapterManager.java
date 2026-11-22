@@ -219,6 +219,8 @@ public class DebugAdapterManager implements DebuggableFile {
         serverDefinition.setFileTypeMappings(request.fileTypeMappings());
 
         serverDefinition.setLaunchConfigurations(request.launchConfigurations());
+        serverDefinition.setAttachAddress(request.attachAddress());
+        serverDefinition.setAttachPort(request.attachPort());
         serverDefinition.setInstallerConfiguration(request.installerConfiguration());
 
         List<ServerMappingSettings> mappings = Stream.concat(request.languageMappings().stream(), request.fileTypeMappings().stream()).toList();
@@ -232,7 +234,7 @@ public class DebugAdapterManager implements DebuggableFile {
         boolean mappingsChanged = !Objects.deepEquals(settings.getMappings(), mappings);
         boolean launchConfigurationChanged = !Objects.equals(settings.getLaunchConfigurations(), request.launchConfigurations());
         boolean attachAddressChanged = !Objects.equals(settings.getAttachAddress(), request.attachAddress());
-        boolean attachPortChanged = !Objects.equals(settings.getAttachAddress(), request.attachPort());
+        boolean attachPortChanged = !Objects.equals(settings.getAttachPort(), request.attachPort());
         boolean installerConfigurationChanged = !Objects.equals(settings.getInstallerConfiguration(), request.installerConfiguration());
 
         // Not checking whether client config changed because that shouldn't result in a LanguageServerChangedEvent
@@ -246,6 +248,8 @@ public class DebugAdapterManager implements DebuggableFile {
         settings.setDebugServerReadyPattern(request.debugServerReadyPattern);
         settings.setMappings(mappings);
         settings.setLaunchConfigurations(request.launchConfigurations());
+        settings.setAttachAddress(request.attachAddress());
+        settings.setAttachPort(request.attachPort());
         settings.setInstallerConfiguration(request.installerConfiguration());
 
         if (nameChanged || userEnvironmentVariablesChanged || includeSystemEnvironmentVariablesChanged ||
