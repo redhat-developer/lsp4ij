@@ -49,7 +49,7 @@ public class LSPGoToImplementationAction extends AbstractLSPGoToAction {
                                                                  int offset) {
         LSPImplementationSupport implementationSupport = LSPFileSupport.getSupport(psiFile).getImplementationSupport();
         var params = new LSPImplementationParams(new TextDocumentIdentifier(), LSPIJUtils.toPosition(offset, document), offset);
-        CompletableFuture<List<LocationData>> implementationsFuture = implementationSupport.getImplementations(params);
+        CompletableFuture<List<LocationData>> implementationsFuture = implementationSupport.getAnsweredImplementations(params);
         try {
             awaitWithCheckCanceled(implementationsFuture);
         } catch (ProcessCanceledException e) {

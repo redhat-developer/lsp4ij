@@ -18,11 +18,14 @@ import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
 import com.redhat.devtools.lsp4ij.internal.CompletableFutures;
 import com.redhat.devtools.lsp4ij.usages.LocationData;
 import org.eclipse.lsp4j.Location;
+import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+
+import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.isDoneNormally;
 
 /**
  * LSP reference support which collect:
@@ -39,6 +42,14 @@ public class LSPReferenceSupport extends AbstractLSPDocumentFeatureSupport<LSPRe
         super(file, true, true);
     }
 
+    /**
+     * Returns the references that the language servers found, as textDocument/references answers them. A language
+     * server which fails, or doesn't answer, adds none: when no language server answers, the future completes with an
+     * empty list.
+     *
+     * @param params the parameters of textDocument/references.
+     * @return the references that the language servers found.
+     */
     public CompletableFuture<List<LocationData>> getReferences(LSPReferenceParams params) {
         int offset = params.getOffset();
         if (previousOffset != null && !previousOffset.equals(offset)) {
@@ -46,6 +57,23 @@ public class LSPReferenceSupport extends AbstractLSPDocumentFeatureSupport<LSPRe
         }
         previousOffset = offset;
         return super.getFeatureData(params);
+    }
+
+    /**
+     * Returns the references that the language servers answered. It shares the request, and its cache, with
+     * {@link #getReferences(LSPReferenceParams)}, but its future fails when no language server answered: a cancelled or
+     * failed request has nothing to show. The next call sends again a request that no language server answered.
+     *
+     * @param params the parameters of textDocument/references.
+     * @return the references that the language servers answered.
+     */
+    @ApiStatus.Internal
+    public synchronized CompletableFuture<List<LocationData>> getAnsweredReferences(LSPReferenceParams params) {
+        if (CompletableFutures.isUnanswered(super.getFuture())) {
+            // Send the request again, instead of the cached result that no language server answered
+            super.cancel();
+        }
+        return CompletableFutures.answersOf(getReferences(params));
     }
 
     @Override
@@ -73,8 +101,9 @@ public class LSPReferenceSupport extends AbstractLSPDocumentFeatureSupport<LSPRe
                             .map(languageServer -> getReferenceFor(params, file, languageServer, cancellationSupport))
                             .toList();
 
-                    // Merge list of textDocument/reference future in one future which return the list of reference ranges
-                    return CompletableFutures.mergeInOneFuture(referencesPerServerFutures, cancellationSupport);
+                    // Merge list of textDocument/reference future in one future which return the list of reference ranges,
+                    // which is a marked empty list when no language server has answered
+                    return CompletableFutures.mergeAnswersInOneFuture(referencesPerServerFutures, cancellationSupport);
                 });
     }
 
@@ -84,10 +113,16 @@ public class LSPReferenceSupport extends AbstractLSPDocumentFeatureSupport<LSPRe
                                                                      @NotNull CancellationSupport cancellationSupport) {
         // Update textDocument Uri with custom file Uri if needed
         updateTextDocumentUri(params.getTextDocument(), file, languageServer);
-        return cancellationSupport.execute(languageServer
-                        .getTextDocumentService()
-                        .references(params), languageServer, LSPRequestConstants.TEXT_DOCUMENT_REFERENCES)
+        var request = languageServer
+                .getTextDocumentService()
+                .references(params);
+        return cancellationSupport.execute(request, languageServer, LSPRequestConstants.TEXT_DOCUMENT_REFERENCES)
                 .thenApplyAsync(locations -> {
+                    if (!isDoneNormally(request)) {
+                        // The language server hasn't answered: CancellationSupport has reported its error, if any,
+                        // and completed with null instead
+                        return null;
+                    }
                     if (locations == null) {
                         // textDocument/reference may return null
                         return Collections.emptyList();

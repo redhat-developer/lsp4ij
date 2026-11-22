@@ -25,6 +25,7 @@ import com.intellij.util.ExceptionUtil;
 import com.redhat.devtools.lsp4ij.server.LanguageServerException;
 import org.eclipse.lsp4j.jsonrpc.CancelChecker;
 import org.eclipse.lsp4j.jsonrpc.CompletableFutures.FutureCancelChecker;
+import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
@@ -32,6 +33,7 @@ import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.*;
 import java.util.function.Function;
 
@@ -94,6 +96,84 @@ public class CompletableFutures {
             }
             return mergedDataList;
         });
+    }
+
+    /**
+     * Merges the given futures of the requests of several language servers in one future, as
+     * {@link #mergeInOneFuture(List, CancellationSupport)} does, and remembers whether a language server answered. A
+     * future completed with null stands for a language server that didn't answer: its request failed, with an error
+     * that {@link CancellationSupport} has reported, or was cancelled.
+     * <p>
+     * The merged future completes as the one of {@link #mergeInOneFuture(List, CancellationSupport)} does: with the
+     * data of the language servers that answered, and with an empty list when none of them answered. That empty list
+     * is marked: {@link #answersOf(CompletableFuture)} tells it from the empty answers of language servers that found
+     * nothing.
+     *
+     * @param futures             the list of futures which return a List<T>, or null for a language server which
+     *                            didn't answer.
+     * @param cancellationSupport the cancellation support.
+     * @param <T>                 the merged futures.
+     * @return the future.
+     */
+    @ApiStatus.Internal
+    public static <T> @NotNull CompletableFuture<List<T>> mergeAnswersInOneFuture(@NotNull List<CompletableFuture<List<T>>> futures,
+                                                                                  @NotNull CancellationSupport cancellationSupport) {
+        CompletableFuture<Void> allFutures = cancellationSupport
+                .execute(CompletableFuture.allOf(futures.toArray(new CompletableFuture<?>[0])));
+        return allFutures.thenApply(ignored -> {
+            List<List<T>> answers = futures.stream()
+                    .map(CompletableFuture::join)
+                    .filter(Objects::nonNull)
+                    .toList();
+            if (answers.isEmpty()) {
+                return new NoAnswers<>();
+            }
+            List<T> mergedDataList = new ArrayList<>(answers.size());
+            answers.forEach(mergedDataList::addAll);
+            return mergedDataList;
+        });
+    }
+
+    /**
+     * Returns the answers of the language servers merged by the given future of
+     * {@link #mergeAnswersInOneFuture(List, CancellationSupport)}: a future which completes as the given one does,
+     * but fails when no language server answered, as there is no answer to show.
+     * {@link #awaitWithCheckCanceled(Future)} logs that failure only at the debug level, as there is nothing more to
+     * report.
+     *
+     * @param merged the future of {@link #mergeAnswersInOneFuture(List, CancellationSupport)}, or null.
+     * @param <T>    the merged data.
+     * @return the future of the answers, or null when the given future is null.
+     */
+    @ApiStatus.Internal
+    public static <T> @Nullable CompletableFuture<List<T>> answersOf(@Nullable CompletableFuture<List<T>> merged) {
+        if (merged == null) {
+            return null;
+        }
+        CompletableFuture<List<T>> answers = new CompletableFuture<>();
+        merged.whenComplete((data, error) -> {
+            if (error != null) {
+                // The same failure, or cancellation, as the merged future
+                answers.completeExceptionally(error);
+            } else if (data instanceof NoAnswers) {
+                answers.completeExceptionally(new NoAnswerException());
+            } else {
+                answers.complete(data);
+            }
+        });
+        return answers;
+    }
+
+    /**
+     * Returns true if the given future of {@link #mergeAnswersInOneFuture(List, CancellationSupport)} has completed
+     * without an answer of any language server, and false otherwise.
+     *
+     * @param merged the future of {@link #mergeAnswersInOneFuture(List, CancellationSupport)}, or null.
+     * @return true if the given future has completed without an answer of any language server, and false otherwise.
+     */
+    @ApiStatus.Internal
+    public static boolean isUnanswered(@Nullable CompletableFuture<?> merged) {
+        return isDoneNormally(merged) && merged.getNow(null) instanceof NoAnswers;
     }
 
     /**
@@ -238,16 +318,39 @@ public class CompletableFutures {
      * Logs the failure of an awaited future, which the wait doesn't throw.
      * <p>
      * A language server which cannot start, or which stopped, has already been reported when it failed, and an LSP
-     * error response is reported by {@link CancellationSupport}, which completes the request with null. Any other
-     * failure is unexpected.
+     * error response is reported by {@link CancellationSupport}, which completes the request with null. A request
+     * that no language server answered, which {@link #answersOf(CompletableFuture)} fails, has nothing more to report.
+     * Any other failure is unexpected.
      *
      * @param failure the failure of the future.
      */
     static void logFailure(@NotNull ExecutionException failure) {
         if (ExceptionUtil.causedBy(failure, LanguageServerException.class)) {
             LOGGER.debug("Skipped a future whose language server is not running", failure);
+        } else if (ExceptionUtil.causedBy(failure, NoAnswerException.class)) {
+            LOGGER.debug("Skipped a future that no language server answered", failure);
         } else {
             LOGGER.warn("Skipped a failed future", failure);
+        }
+    }
+
+    /**
+     * The data of a merged request that none of its language servers answered: an empty list, as
+     * {@link #mergeInOneFuture(List, CancellationSupport)} gives then.
+     */
+    private static final class NoAnswers<T> extends ArrayList<T> {
+    }
+
+    /**
+     * The failure of a merged request that none of its language servers answered. It has nothing to add: the error of
+     * each language server has been reported by {@link CancellationSupport}, as the settings of the language server
+     * ask, or its request was cancelled.
+     */
+    private static final class NoAnswerException extends RuntimeException {
+
+        private NoAnswerException() {
+            // No stack trace: the failure is expected, and only logged at the debug level
+            super("No language server answered", null, false, false);
         }
     }
 
