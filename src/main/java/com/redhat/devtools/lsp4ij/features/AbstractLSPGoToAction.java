@@ -83,26 +83,25 @@ public abstract class AbstractLSPGoToAction extends AnAction {
         ProgressManager.getInstance().run(new Task.Backgroundable(project, getProgressTitle(psiFile, offset), true) {
             @Override
             public void run(@NotNull ProgressIndicator indicator) {
-                List<LocationData> locations = null;
-                try {
-                    CompletableFuture<List<LocationData>> locationsFuture = getLocations(psiFile, document, editor, offset);
-
-                    if (isDoneNormally(locationsFuture)) {
-                        // textDocument/(declaration|implementation|references|typeDefinition) has been collected correctly
-                        locations = locationsFuture.getNow(null);
-                    }
-                } finally {
-                    final List<LocationData> resultLocations = locations != null ? locations : Collections.emptyList();
-                    DataContext dataContext = e.getDataContext();
-                    // Call "Find Usages" in popup mode.
-                    ApplicationManager.getApplication()
-                            .invokeLater(() ->
-                                    LSPUsagesManager.getInstance(project).findShowUsagesInPopup(resultLocations,
-                                            usageType,
-                                            dataContext,
-                                            null)
-                            );
+                // A cancelled progress throws ProcessCanceledException, which shows nothing
+                CompletableFuture<List<LocationData>> locationsFuture = getLocations(psiFile, document, editor, offset);
+                if (!isDoneNormally(locationsFuture)) {
+                    // textDocument/(declaration|implementation|references|typeDefinition) has been cancelled, or has
+                    // failed (getLocations has logged it): there is no answer to show
+                    return;
                 }
+                // textDocument/(declaration|implementation|references|typeDefinition) has been collected correctly
+                List<LocationData> locations = locationsFuture.getNow(null);
+                final List<LocationData> resultLocations = locations != null ? locations : Collections.emptyList();
+                DataContext dataContext = e.getDataContext();
+                // Call "Find Usages" in popup mode.
+                ApplicationManager.getApplication()
+                        .invokeLater(() ->
+                                LSPUsagesManager.getInstance(project).findShowUsagesInPopup(resultLocations,
+                                        usageType,
+                                        dataContext,
+                                        null)
+                        );
             }
         });
     }
