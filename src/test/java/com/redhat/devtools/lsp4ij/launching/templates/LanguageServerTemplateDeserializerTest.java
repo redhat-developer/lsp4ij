@@ -14,6 +14,7 @@ package com.redhat.devtools.lsp4ij.launching.templates;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.intellij.openapi.util.SystemInfo;
+import com.redhat.devtools.lsp4ij.server.definition.launching.UserDefinedTransport;
 import com.redhat.devtools.lsp4ij.templates.ServerMappingSettings;
 import org.junit.Test;
 
@@ -75,5 +76,42 @@ public class LanguageServerTemplateDeserializerTest {
         ServerMappingSettings ftm = fileTypeMappings.get(1);
         assertEquals("java", ftm.getLanguageId());
         assertEquals("JAVA", ftm.getFileType());
+    }
+
+    @Test
+    public void templateWithoutProgramArgsHasNoCommand() {
+        // a language server which runs already, which LSP4IJ doesn't start
+        LanguageServerTemplate template = createGson().fromJson("""
+            { "name": "Running LS",
+                "socket": { "mode": "attach", "port": 6005 }
+            }""", LanguageServerTemplate.class);
+
+        assertNull(template.getProgramArgs());
+        assertEquals(new UserDefinedTransport(UserDefinedTransport.Mode.ATTACH, null, 6005), template.getTransport());
+    }
+
+    @Test
+    public void urlNullGivesNoLink() {
+        assertNull(url("\"url\": null"));
+        // without url, the page of the template in the docs
+        assertEquals("https://github.com/redhat-developer/lsp4ij/tree/main/docs/user-defined-ls/my-ls.md", url(null));
+        assertEquals("https://example.com/my-ls", url("\"url\": \"https://example.com/my-ls\""));
+    }
+
+    private static String url(String urlProperty) {
+        String json = """
+            { "id": "my-ls",
+                "name": "My LS",
+                %s"programArgs": {
+                    "default": "./start.sh"
+                }
+            }""".formatted(urlProperty != null ? urlProperty + ",\n" : "");
+        return createGson().fromJson(json, LanguageServerTemplate.class).getUrl();
+    }
+
+    private static Gson createGson() {
+        return new GsonBuilder()
+                .registerTypeAdapter(LanguageServerTemplate.class, new LanguageServerTemplateDeserializer())
+                .create();
     }
 }

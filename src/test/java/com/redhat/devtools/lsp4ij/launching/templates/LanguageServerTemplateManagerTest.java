@@ -8,6 +8,7 @@ import com.intellij.testFramework.TestApplicationManager;
 import com.redhat.devtools.lsp4ij.templates.ServerMappingSettings;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
 import com.redhat.devtools.lsp4ij.server.definition.launching.UserDefinedLanguageServerDefinition;
+import com.redhat.devtools.lsp4ij.server.definition.launching.UserDefinedTransport;
 import org.junit.Test;
 
 import java.io.File;
@@ -77,6 +78,38 @@ public class LanguageServerTemplateManagerTest {
     @Test
     public void testImportNoFiles() {
         File ioFile = new File("src/test/resources/templates/test_template2");
+        VirtualFile virtualFile = localFileSystem.refreshAndFindFileByIoFile(ioFile);
+        assert virtualFile != null;
+        assertThrows(IOException.class, () -> templateManager.importServerTemplate(virtualFile));
+    }
+
+    @Test
+    public void testImportWithoutProgramArgs() throws IOException {
+        // a language server which runs already, which LSP4IJ doesn't start, needs no command
+        File ioFile = new File("src/test/resources/templates/test_template3");
+        VirtualFile virtualFile = localFileSystem.refreshAndFindFileByIoFile(ioFile);
+        assert virtualFile != null;
+        LanguageServerTemplate template = templateManager.importServerTemplate(virtualFile);
+        assert template != null;
+        assertEquals("Running Language Server", template.getName());
+        assertNull(template.getProgramArgs());
+        assertEquals(new UserDefinedTransport(UserDefinedTransport.Mode.ATTACH, "127.0.0.1", 6005), template.getTransport());
+    }
+
+    @Test
+    public void testImportOfAnInvalidTemplateFailsWithAnIOException() {
+        // fileTypeMappings is an object instead of an array
+        File ioFile = new File("src/test/resources/templates/test_template4");
+        VirtualFile virtualFile = localFileSystem.refreshAndFindFileByIoFile(ioFile);
+        assert virtualFile != null;
+        IOException error = assertThrows(IOException.class, () -> templateManager.importServerTemplate(virtualFile));
+        assertTrue(error.getMessage().startsWith("template.json of test_template4 is invalid"), error.getMessage());
+    }
+
+    @Test
+    public void testImportOfAnEmptyTemplateFailsWithAnIOException() {
+        // template.json is an empty file
+        File ioFile = new File("src/test/resources/templates/test_template5");
         VirtualFile virtualFile = localFileSystem.refreshAndFindFileByIoFile(ioFile);
         assert virtualFile != null;
         assertThrows(IOException.class, () -> templateManager.importServerTemplate(virtualFile));
