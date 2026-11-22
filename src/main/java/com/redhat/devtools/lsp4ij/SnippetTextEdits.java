@@ -156,9 +156,18 @@ final class SnippetTextEdits {
      */
     private static @NotNull String textOf(@NotNull String snippet, @NotNull Function<String, String> variables) {
         // A tab stop in the default of a placeholder repeats a default too, as in ${1:${2:x}-$2}=$1, and the default
-        // that it repeats can come later in the snippet: a second pass expands it with the defaults of the first
+        // that it repeats can come later in the snippet, as can the one that this one repeats, as in
+        // ${1:$2} ${2:$3} ${3:z}. Each pass expands one more of them with the defaults of the pass before, until none
+        // changes, or once for each index, as defaults can repeat each other
         Map<Integer, String> defaults = defaultsOf(snippet, variables, Map.of());
-        Map<Integer, String> expanded = defaultsOf(snippet, variables, defaults);
+        for (int pass = 0; pass < defaults.size(); pass++) {
+            Map<Integer, String> next = defaultsOf(snippet, variables, defaults);
+            if (next.equals(defaults)) {
+                break;
+            }
+            defaults = next;
+        }
+        Map<Integer, String> expanded = defaults;
         var text = new SnippetText(variables) {
             @Override
             public void tabstop(int index) {

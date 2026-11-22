@@ -69,6 +69,22 @@ public class SnippetTextEditCodeActionTest extends LSPCodeActionFixtureTestCase 
         assertEquals("name", myFixture.getEditor().getSelectionModel().getSelectedText());
     }
 
+    public void testATabStopOfTheTemplateIsLinkedToThePlaceholderWithItsIndex() {
+        var intention = greetingIntention();
+        resolveTo(myFixture.getFile(),
+                Either.forRight(new SnippetTextEdit(range(0, 0), new StringValue("snippet", "$1 = ${1:name} "))));
+
+        invoke(intention);
+        PlatformTestUtil.dispatchAllEventsInIdeEventQueue();
+
+        assertEquals("name = name world", document().getText());
+        assertNotNull("the snippet must start as a template", TemplateManagerImpl.getTemplateState(myFixture.getEditor()));
+        assertEquals("name", myFixture.getEditor().getSelectionModel().getSelectedText());
+        // Typing at the first stop updates the placeholder with its index (#2073)
+        myFixture.type("x");
+        assertEquals("x = x world", document().getText());
+    }
+
     public void testATemplateStartsWhereTheSnippetIsOnceTheOtherEditsAreApplied() {
         var intention = greetingIntention();
         resolveTo(myFixture.getFile(),
@@ -128,6 +144,21 @@ public class SnippetTextEditCodeActionTest extends LSPCodeActionFixtureTestCase 
         Document otherDocument = FileDocumentManager.getInstance().getDocument(other.getVirtualFile());
         assertNotNull(otherDocument);
         assertEquals("x-x=x-x y y world", otherDocument.getText());
+    }
+
+    public void testATabStopRepeatsAChainOfDefaultsThatComeLater() {
+        var other = myFixture.addFileToProject("other.txt", "world");
+        var intention = greetingIntention();
+        resolveTo(other, Either.forRight(new SnippetTextEdit(range(0, 0),
+                // $1 repeats the default of placeholder 1, which repeats that of 2, which repeats that of 3
+                new StringValue("snippet", "${1:$2} ${2:$3} ${3:z} $1 "))));
+
+        invoke(intention);
+        PlatformTestUtil.dispatchAllEventsInIdeEventQueue();
+
+        Document otherDocument = FileDocumentManager.getInstance().getDocument(other.getVirtualFile());
+        assertNotNull(otherDocument);
+        assertEquals("z z z z world", otherDocument.getText());
     }
 
     public void testAPlaceholderThatIsAVariableInsertsItsValue() {
