@@ -488,7 +488,7 @@ you need to select `Trace` with `verbose`.
 
 ## DAP settings
 
-You can `create/remove/update` DAP servers with `Debug Adapter Protocol` entry:
+You can `create/remove/update` DAP servers with the `Build, Execution, Deployment | Debugger | Debug Adapter Protocol` settings page:
 
 ![DAP settings](./images/DAP_settings.png)
 
