@@ -146,7 +146,7 @@ public class UserDefinedLanguageServerDefinition extends LanguageServerDefinitio
     @Override
     public @NotNull StreamConnectionProvider createConnectionProvider(@NotNull Project project) {
         // The one language server of the project has the project's directory as root
-        return createConnectionProvider(project, project.getBasePath(), null);
+        return createConnectionProvider(project, project.getBasePath(), null, transport);
     }
 
     @Override
@@ -156,14 +156,14 @@ public class UserDefinedLanguageServerDefinition extends LanguageServerDefinitio
         var root = LSPIJUtils.findResourceFor(instanceRoot.getUri());
         String directory = root != null && root.isInLocalFileSystem() ? root.getPath() : null;
         // A root in an archive is no directory to run in or to name: the project's directory stands for it
-        return createConnectionProvider(project, directory != null ? directory : project.getBasePath(), directory);
+        return createConnectionProvider(project, directory != null ? directory : project.getBasePath(), directory, transport);
     }
 
     private @NotNull StreamConnectionProvider createConnectionProvider(@NotNull Project project,
                                                                        @Nullable String root,
-                                                                       @Nullable String defaultWorkingDir) {
+                                                                       @Nullable String defaultWorkingDir,
+                                                                       @NotNull UserDefinedTransport transport) {
         String resolvedWorkingDir = workingDir != null && !workingDir.isBlank() ? resolve(workingDir, project, root) : defaultWorkingDir;
-        var transport = this.transport;
         return switch (transport.mode()) {
             case STDIO -> new UserDefinedStreamConnectionProvider(resolve(commandLine, project, root),
                     resolvedWorkingDir,
@@ -278,8 +278,13 @@ public class UserDefinedLanguageServerDefinition extends LanguageServerDefinitio
      */
     @Override
     public @NotNull ServerStarter getServerStarter() {
-        return new ServerStarter(getId(), ServerStarter.Protocol.LSP,
-                project -> transport.startsLanguageServer() ? createConnectionProvider(project) : null);
+        return new ServerStarter(getId(), ServerStarter.Protocol.LSP, project -> {
+            // Read once, so that the check and the connection have the same transport, also while the settings change it
+            var transport = this.transport;
+            return transport.startsLanguageServer()
+                    ? createConnectionProvider(project, project.getBasePath(), null, transport)
+                    : null;
+        });
     }
 
     public String getWorkingDir() {
