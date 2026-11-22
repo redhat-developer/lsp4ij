@@ -19,19 +19,38 @@ import java.util.Set;
 
 /**
  * The defaults of the indices of a snippet, which its tab stops, placeholders and choices with those indices repeat
- * (#2073). The default of an index is the text of the first placeholder with that index, or the first value of the
- * first choice with that index, as in VS Code. The text of a placeholder can have tab stops, which repeat the defaults
- * of their indices in turn.
+ * (#2073). As in VS Code, the default of an index is the text of the first placeholder with that index in the order
+ * that the placeholders open, or the first value of the first choice with that index: in {@code ${1:a${1:b}}}, the
+ * outer placeholder gives it. A placeholder or a choice that doesn't give the default of its index repeats it, as a
+ * tab stop does. The text of a placeholder can have tab stops, which repeat the defaults of their indices in turn.
  * <p>
- * The defaults are read once they are all put. Each is resolved once, and a tab stop that repeats a default being
- * resolved, as in {@code ${1:x$1}} or {@code ${1:$2} ${2:$1}}, repeats nothing. Defaults that repeat each other can
- * still double their text at each index, as in {@code ${1:$2$2} ${2:$3$3} ... ${30:x}}, so the text that a default
- * repeats from others stops at {@value #MAX_REPEATED_LENGTH} characters.
+ * The defaults are read once they are all given. A tab stop that repeats a default being resolved, as in
+ * {@code ${1:x$1}} or {@code ${1:a$2} ${2:b$1}}, repeats nothing. So in a cycle of defaults that repeat each other, the
+ * text of each depends on where the cycle is entered: there, 1 gives {@code ab} and 2 gives {@code ba}. Any other
+ * default is resolved once, and those in cycles are resolved again {@value #MAX_RESOLUTIONS_AGAIN} times at most in
+ * all. Defaults that repeat each other can still double their text at each index, as in
+ * {@code ${1:$2$2} ${2:$3$3} ... ${30:x}}, so the text that a default repeats from others stops at
+ * {@value #MAX_REPEATED_LENGTH} characters.
  */
 @ApiStatus.Internal
 public final class LspSnippetDefaults {
 
     static final int MAX_REPEATED_LENGTH = 10_000;
+
+    /**
+     * The number of times that defaults in a cycle are resolved again in all, after which a tab stop in a default
+     * repeats nothing more. The text of a default in a cycle isn't kept, as it depends on where the cycle is entered,
+     * so each tab stop that repeats it resolves it again. Defaults that repeat each other twice in a cycle, as in
+     * {@code ${1:$2$2$1} ${2:$3$3$1} ... ${30:$1}}, would then be resolved about 2^30 times, and the limit of the text
+     * that they repeat doesn't bound that, as their text is empty. Only such a snippet reaches this bound: any other
+     * default is resolved once, and doesn't count.
+     */
+    static final int MAX_RESOLUTIONS_AGAIN = 100_000;
+
+    // The depth of a cut, for a text that repeats no default being resolved
+    private static final int NO_CUT = Integer.MAX_VALUE;
+    // The index of the default whose text is resolved, for the text of a snippet
+    private static final int NO_INDEX = -1;
 
     /**
      * A part of the text of a placeholder, or of a snippet: a text, or a tab stop, which repeats the default of its
@@ -53,35 +72,73 @@ public final class LspSnippetDefaults {
     private record Default(@NotNull List<Part> parts, @Nullable List<String> choices) {
     }
 
+    /**
+     * A resolved text, with its cut: the lowest depth of a default being resolved that it repeats, and so repeats
+     * nothing of, or {@link #NO_CUT}. A text with a cut depends on where its cycle is entered.
+     */
+    private record Resolved(@NotNull String text, int cut) {
+    }
+
+    private static final Resolved NOTHING = new Resolved("", NO_CUT);
+
     private final Map<Integer, Default> defaults = new HashMap<>();
-    // The text of each default, once resolved
+    // The indices whose default an open placeholder will give
+    private final Set<Integer> reserved = new HashSet<>();
+    // The text of each default outside a cycle, once resolved, which is the same wherever it is repeated
     private final Map<Integer, String> texts = new HashMap<>();
-    // The defaults being resolved, to stop at those that repeat themselves
-    private final Set<Integer> resolving = new HashSet<>();
+    // The defaults being resolved, with their depths, to stop at those that repeat themselves
+    private final Map<Integer, Integer> resolving = new HashMap<>();
+    // The defaults resolved at least once
+    private final Set<Integer> resolved = new HashSet<>();
+    // The times that defaults in a cycle were resolved again
+    private int resolutionsAgain;
 
     /**
-     * Makes the given text of a placeholder the default of its index, unless a placeholder or a choice before it gave
-     * one. As in VS Code, a placeholder without a text, as {@code ${1:}}, gives none.
+     * Opens a placeholder with the given index, which gives the default of its index when it closes, unless a
+     * placeholder or a choice before it holds or gave that default. A placeholder that doesn't give it repeats it,
+     * as a tab stop does.
+     *
+     * @param index the index of the placeholder.
+     * @return true if the placeholder gives the default of its index, with {@link #close(int, List)}, and false if a
+     * placeholder or a choice before it holds or gave it.
+     */
+    public boolean open(int index) {
+        return !defaults.containsKey(index) && reserved.add(index);
+    }
+
+    /**
+     * Closes a placeholder whose {@link #open(int)} returned true, which makes its text the default of its index. As
+     * in VS Code, a placeholder without a text, as {@code ${1:}}, gives none: a placeholder or a choice after it can.
      *
      * @param index the index of the placeholder.
      * @param parts the text of the placeholder.
+     * @return true if the text is the default of the index, and false if the placeholder has no text, or didn't hold
+     * the default of its index.
      */
-    public void putPlaceholder(int index, @NotNull List<Part> parts) {
-        if (!parts.isEmpty()) {
-            defaults.putIfAbsent(index, new Default(List.copyOf(parts), null));
+    public boolean close(int index, @NotNull List<Part> parts) {
+        if (!reserved.remove(index) || parts.isEmpty()) {
+            return false;
         }
+        defaults.put(index, new Default(List.copyOf(parts), null));
+        return true;
     }
 
     /**
      * Makes the first value of the given choice the default of its index, unless a placeholder or a choice before it
-     * gave one.
+     * holds or gave one. A choice that doesn't give it repeats it, as a tab stop does.
      *
      * @param index   the index of the choice.
      * @param choices the values of the choice.
+     * @return true if the first value of the choice is the default of the index, and false if a placeholder or a
+     * choice before it holds or gave it.
      */
-    public void putChoice(int index, @NotNull List<String> choices) {
+    public boolean choice(int index, @NotNull List<String> choices) {
+        if (defaults.containsKey(index) || reserved.contains(index)) {
+            return false;
+        }
         String value = choices.isEmpty() ? "" : choices.get(0);
-        defaults.putIfAbsent(index, new Default(List.of(new Text(value)), List.copyOf(choices)));
+        defaults.put(index, new Default(List.of(new Text(value)), List.copyOf(choices)));
+        return true;
     }
 
     /**
@@ -103,22 +160,7 @@ public final class LspSnippetDefaults {
      * @return the text of its default.
      */
     public @NotNull String getText(int index) {
-        String text = texts.get(index);
-        if (text != null) {
-            return text;
-        }
-        Default value = defaults.get(index);
-        if (value == null || !resolving.add(index)) {
-            // No default, or one that repeats itself
-            return "";
-        }
-        try {
-            text = textOf(value.parts(), MAX_REPEATED_LENGTH);
-        } finally {
-            resolving.remove(index);
-        }
-        texts.put(index, text);
-        return text;
+        return resolve(index).text();
     }
 
     /**
@@ -128,22 +170,65 @@ public final class LspSnippetDefaults {
      * @return the text, with the defaults that its tab stops repeat.
      */
     public @NotNull String getText(@NotNull List<Part> parts) {
-        return textOf(parts, Integer.MAX_VALUE);
+        return textOf(parts, Integer.MAX_VALUE, NO_INDEX).text();
     }
 
-    private @NotNull String textOf(@NotNull List<Part> parts, int maxRepeatedLength) {
+    private @NotNull Resolved resolve(int index) {
+        String text = texts.get(index);
+        if (text != null) {
+            return new Resolved(text, NO_CUT);
+        }
+        Integer depth = resolving.get(index);
+        if (depth != null) {
+            // A default being resolved, which repeats nothing here
+            return new Resolved("", depth);
+        }
+        Default value = defaults.get(index);
+        if (value == null) {
+            return NOTHING;
+        }
+        if (!resolved.add(index) && !resolving.isEmpty()) {
+            // Resolved before but not kept, so in a cycle, which a tab stop in a default repeats again
+            if (resolutionsAgain == MAX_RESOLUTIONS_AGAIN) {
+                return NOTHING;
+            }
+            resolutionsAgain++;
+        }
+        int ownDepth = resolving.size();
+        resolving.put(index, ownDepth);
+        Resolved result;
+        try {
+            result = textOf(value.parts(), MAX_REPEATED_LENGTH, index);
+        } finally {
+            resolving.remove(index);
+        }
+        if (result.cut() <= ownDepth) {
+            // In a cycle: a default that it repeats repeats it, or it repeats a default being resolved
+            return result;
+        }
+        texts.put(index, result.text());
+        return new Resolved(result.text(), NO_CUT);
+    }
+
+    /**
+     * Returns the given text of the default of the given index, or of a snippet, in which a tab stop repeats the
+     * default of its index, and nothing for a tab stop of that same index.
+     */
+    private @NotNull Resolved textOf(@NotNull List<Part> parts, int maxRepeatedLength, int ownIndex) {
         var text = new StringBuilder();
         int repeated = 0;
+        int cut = NO_CUT;
         for (Part part : parts) {
             if (part instanceof Text value) {
                 text.append(value.value());
-            } else if (part instanceof TabStop tabStop && repeated < maxRepeatedLength) {
-                String value = getText(tabStop.index());
-                int length = Math.min(value.length(), maxRepeatedLength - repeated);
-                text.append(value, 0, length);
+            } else if (part instanceof TabStop tabStop && tabStop.index() != ownIndex && repeated < maxRepeatedLength) {
+                Resolved value = resolve(tabStop.index());
+                int length = Math.min(value.text().length(), maxRepeatedLength - repeated);
+                text.append(value.text(), 0, length);
                 repeated += length;
+                cut = Math.min(cut, value.cut());
             }
         }
-        return text.toString();
+        return new Resolved(text.toString(), cut);
     }
 }

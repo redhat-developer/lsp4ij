@@ -106,6 +106,35 @@ public class LinkedTabStopCompletionTest extends LSPCompletionFixtureTestCase {
         assertTyped("x = x, you");
     }
 
+    public void testANestedPlaceholderRepeatsTheDefaultOfAnEarlierPlaceholderWithItsIndex() {
+        // As in VS Code: ${2:b} is a repeat of ${2:a}
+        complete("${2:a} ${1:${2:b}-$2} $1$0");
+
+        assertApplyCompletionItem(0, "a a-a a-a");
+    }
+
+    public void testANestedChoiceRepeatsTheDefaultOfAnEarlierPlaceholderWithItsIndex() {
+        complete("${1:a} ${2:<${1|x,y|}>}$0");
+
+        assertApplyCompletionItem(0, "a <a>");
+    }
+
+    public void testAnOuterPlaceholderGivesTheDefaultBeforeOneNestedInItWithItsIndex() {
+        // The outer placeholder opens first, so it gives the default. The nested one repeats that default, which
+        // repeats nothing in itself
+        complete("${1:a${1:b}} $1$0");
+
+        assertApplyCompletionItem(0, "a a");
+        assertTyped("x x");
+    }
+
+    public void testEachDefaultInACycleIsResolvedFromItself() {
+        complete("${1:a$2} ${2:b$1}$0");
+
+        assertApplyCompletionItem(0, "ab ba");
+        assertTyped("x ba");
+    }
+
     private void complete(String snippet) {
         TemplateManagerImpl.setTemplateTesting(getTestRootDisposable());
         var item = new CompletionItem("block");

@@ -188,6 +188,39 @@ public class SnippetTextEditCodeActionTest extends LSPCodeActionFixtureTestCase 
         assertEquals("x x world", otherDocument.getText());
     }
 
+    public void testANestedPlaceholderRepeatsTheDefaultOfAnEarlierPlaceholderWithItsIndex() {
+        assertTextOfSnippet("${2:a} ${1:${2:b}-$2} $1 ", "a a-a a-a world");
+    }
+
+    public void testANestedChoiceRepeatsTheDefaultOfAnEarlierPlaceholderWithItsIndex() {
+        assertTextOfSnippet("${1:a} ${2:<${1|x,y|}>} ", "a <a> world");
+    }
+
+    public void testAnOuterPlaceholderGivesTheDefaultBeforeOneNestedInItWithItsIndex() {
+        assertTextOfSnippet("${1:a${1:b}} $1 ", "a a world");
+    }
+
+    public void testEachDefaultInACycleIsResolvedFromItself() {
+        assertTextOfSnippet("${1:a$2} ${2:b$1} ", "ab ba world");
+    }
+
+    /**
+     * Checks the text that the given snippet inserts in a file other than that of the selected editor, before
+     * {@code world}.
+     */
+    private void assertTextOfSnippet(String snippet, String expected) {
+        var other = myFixture.addFileToProject("other.txt", "world");
+        var intention = greetingIntention();
+        resolveTo(other, Either.forRight(new SnippetTextEdit(range(0, 0), new StringValue("snippet", snippet))));
+
+        invoke(intention);
+        PlatformTestUtil.dispatchAllEventsInIdeEventQueue();
+
+        Document otherDocument = FileDocumentManager.getInstance().getDocument(other.getVirtualFile());
+        assertNotNull(otherDocument);
+        assertEquals(expected, otherDocument.getText());
+    }
+
     public void testAPlaceholderThatIsAVariableInsertsItsValue() {
         var other = myFixture.addFileToProject("other.txt", "world");
         var intention = greetingIntention();

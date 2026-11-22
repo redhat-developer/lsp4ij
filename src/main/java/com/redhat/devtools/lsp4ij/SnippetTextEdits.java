@@ -206,9 +206,12 @@ final class SnippetTextEdits {
 
         @Override
         public void choice(int index, List<String> choices) {
-            defaults.putChoice(index, choices);
-            // A choice in a placeholder gives its first value to the text of the placeholder
-            add(placeholders.isEmpty() ? new TabStop(index) : new Text(choices.isEmpty() ? "" : choices.get(0)));
+            boolean givesDefault = defaults.choice(index, choices);
+            // A choice in a placeholder gives its first value to the text of the placeholder, if it gives the default
+            // of its index. Otherwise it repeats that default, as in VS Code
+            add(placeholders.isEmpty() || !givesDefault
+                    ? new TabStop(index)
+                    : new Text(choices.isEmpty() ? "" : choices.get(0)));
         }
 
         @Override
@@ -218,7 +221,8 @@ final class SnippetTextEdits {
 
         @Override
         public void startPlaceholder(int index, String name, int level) {
-            placeholders.push(new PlaceholderStart(index, parts.size()));
+            // The first placeholder of an index to open gives its default, also before a placeholder nested in it
+            placeholders.push(new PlaceholderStart(index, parts.size(), defaults.open(index)));
             // The text of a placeholder can start with a variable, as in ${1:$TM_FILENAME_BASE}
             String value = name.startsWith("$") ? resolveVariable(name) : null;
             add(new Text(value != null ? value : name));
@@ -229,10 +233,10 @@ final class SnippetTextEdits {
             // The text of the placeholder, with the text of its nested placeholders
             PlaceholderStart start = placeholders.pop();
             List<Part> text = parts.subList(start.offset(), parts.size());
-            defaults.putPlaceholder(start.index(), text);
-            if (placeholders.isEmpty()) {
+            boolean givesDefault = start.givesDefault() && defaults.close(start.index(), text);
+            if (placeholders.isEmpty() || !givesDefault) {
                 // As in the template, the placeholder has the default of its index, which a placeholder or a choice
-                // before it can give
+                // before it can give, and a nested placeholder that doesn't give it repeats it
                 text.clear();
                 parts.add(new TabStop(start.index()));
             }
@@ -253,9 +257,10 @@ final class SnippetTextEdits {
     }
 
     /**
-     * Where the text of a placeholder starts in the parts of its snippet.
+     * Where the text of a placeholder starts in the parts of its snippet, and whether it gives the default of its
+     * index.
      */
-    private record PlaceholderStart(int index, int offset) {
+    private record PlaceholderStart(int index, int offset, boolean givesDefault) {
     }
 
     private static @NotNull Template createTemplate(@NotNull String snippet,

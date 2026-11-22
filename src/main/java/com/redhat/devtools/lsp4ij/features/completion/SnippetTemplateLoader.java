@@ -67,6 +67,8 @@ public class SnippetTemplateLoader extends AbstractLspSnippetHandler {
     // own
     private @Nullable List<Part> placeholderParts;
     private int placeholderIndex;
+    // Whether the outermost placeholder being read gives the default of its index
+    private boolean placeholderGivesDefault;
     // The nested placeholders being read, inside out
     private final Deque<NestedPlaceholder> nestedPlaceholders = new ArrayDeque<>();
 
@@ -249,10 +251,11 @@ public class SnippetTemplateLoader extends AbstractLspSnippetHandler {
 
     @Override
     public void choice(int index, List<String> choices) {
-        defaults.putChoice(index, choices);
+        boolean givesDefault = defaults.choice(index, choices);
         if (placeholderParts != null) {
-            // A choice in a placeholder gives its first value to the text of the placeholder
-            appendToPlaceholder(new Text(choices.isEmpty() ? "" : choices.get(0)));
+            // A choice in a placeholder gives its first value to the text of the placeholder, if it gives the default
+            // of its index. Otherwise it repeats that default, as in VS Code
+            appendToPlaceholder(givesDefault ? new Text(choices.isEmpty() ? "" : choices.get(0)) : new TabStop(index));
             return;
         }
         templateSegments.add(SnippetTemplateSegment.tabStop(index));
@@ -274,13 +277,16 @@ public class SnippetTemplateLoader extends AbstractLspSnippetHandler {
         // text joins it, as in ${1:${TM_FILENAME_BASE} suffix}: the whole text, as a variable, is not
         String value = super.resolveVariable(name);
         Text text = new Text(value != null ? value : name);
+        // The first placeholder of an index to open gives its default, also before a placeholder nested in it
+        boolean givesDefault = defaults.open(index);
         if (placeholderParts != null) {
             // A nested placeholder gives its text to the text of the placeholder that contains it
-            nestedPlaceholders.push(new NestedPlaceholder(index, placeholderParts.size()));
+            nestedPlaceholders.push(new NestedPlaceholder(index, placeholderParts.size(), givesDefault));
             appendToPlaceholder(text);
             return;
         }
         placeholderIndex = index;
+        placeholderGivesDefault = givesDefault;
         placeholderParts = new ArrayList<>();
         appendToPlaceholder(text);
     }
@@ -304,18 +310,25 @@ public class SnippetTemplateLoader extends AbstractLspSnippetHandler {
             // The default of a nested placeholder is its part of the text of the placeholder that contains it
             NestedPlaceholder nested = nestedPlaceholders.poll();
             if (nested != null) {
-                defaults.putPlaceholder(nested.index(), placeholderParts.subList(nested.start(), placeholderParts.size()));
+                List<Part> parts = placeholderParts.subList(nested.start(), placeholderParts.size());
+                if (!(nested.givesDefault() && defaults.close(nested.index(), parts))) {
+                    // A nested placeholder that doesn't give the default of its index repeats it, as in VS Code
+                    parts.clear();
+                    placeholderParts.add(new TabStop(nested.index()));
+                }
             }
             return;
         }
         List<Part> parts = placeholderParts;
         placeholderParts = null;
         nestedPlaceholders.clear();
+        if (placeholderGivesDefault) {
+            defaults.close(placeholderIndex, parts);
+        }
         if (parts.isEmpty()) {
             // As ${1:}, a tab stop
             tabstop(placeholderIndex);
         } else {
-            defaults.putPlaceholder(placeholderIndex, parts);
             templateSegments.add(SnippetTemplateSegment.tabStop(placeholderIndex));
         }
     }
@@ -348,8 +361,9 @@ public class SnippetTemplateLoader extends AbstractLspSnippetHandler {
     }
 
     /**
-     * A nested placeholder being read, whose text starts at the given part of the text of its outermost placeholder.
+     * A nested placeholder being read, whose text starts at the given part of the text of its outermost placeholder,
+     * and which gives the default of its index or not.
      */
-    private record NestedPlaceholder(int index, int start) {
+    private record NestedPlaceholder(int index, int start, boolean givesDefault) {
     }
 }
