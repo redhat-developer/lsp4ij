@@ -10,8 +10,15 @@ on:
 
 jobs:
 
-  build:
+  # Finds the newest IntelliJ IDEA build, which the job build tests, and whether ci.yml is behind the newest release,
+  # which the job newest-release then tests
+  discover:
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.latest.outputs.version }}
+      behind: ${{ steps.latest.outputs.behind }}
+      newest-release: ${{ steps.latest.outputs.newest-release }}
+      ci-release: ${{ steps.latest.outputs.ci-release }}
 
     steps:
       # Check out current repository
@@ -81,14 +88,39 @@ jobs:
           if [ -z "$NEWEST_RELEASE" ] || [ -z "$CI_RELEASE" ]; then
             echo "::warning::Could not compare the IntelliJ IDEA release of ci.yml (${CI_RELEASE:-not found}) with the newest release (${NEWEST_RELEASE:-not found})"
           elif [ "$NEWEST_RELEASE" != "$CI_RELEASE" ] && [ "$(printf '%s\n' "$CI_RELEASE" "$NEWEST_RELEASE" | sort -V | tail -n 1)" = "$NEWEST_RELEASE" ]; then
-            MESSAGE="ci.yml tests IntelliJ IDEA $CI_RELEASE, but the newest release is $NEWEST_RELEASE. Update its matrix entry with platformType IU."
+            MESSAGE="ci.yml tests IntelliJ IDEA $CI_RELEASE, but the newest release is $NEWEST_RELEASE. The job newest-release tests it, and says whether ci.yml can move to it."
             echo "::warning title=ci.yml is behind::$MESSAGE"
-            echo "> [!WARNING]" >> "$GITHUB_STEP_SUMMARY"
-            echo "> $MESSAGE" >> "$GITHUB_STEP_SUMMARY"
+            {
+              echo "> [!WARNING]"
+              echo "> $MESSAGE"
+            } >> "$GITHUB_STEP_SUMMARY"
+            {
+              echo "behind=true"
+              echo "newest-release=$NEWEST_RELEASE"
+              echo "ci-release=$CI_RELEASE"
+            } >> "$GITHUB_OUTPUT"
           fi
 
+  # Tests the newest build, often an EAP
+  build:
+    needs: discover
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Fetch Sources
+        uses: actions/checkout@v7
+
+      - name: Setup Java
+        uses: actions/setup-java@v6
+        with:
+          distribution: 'temurin'
+          java-version: 21
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v5
+
       - name: Build with Gradle
-        run: ./gradlew check -PplatformType=IU -PplatformVersion=${{ steps.latest.outputs.version }}
+        run: ./gradlew check -PplatformType=IU -PplatformVersion=${{ needs.discover.outputs.version }}
 
       - name: Collect Tests Result
         uses: actions/upload-artifact@v7
@@ -98,3 +130,55 @@ jobs:
           path: |
             path: ${{ github.workspace }}/build/reports/tests
             path: ${{ github.workspace }}/build/jacoco/
+
+  # While ci.yml tests an older IntelliJ IDEA (IU) release than the newest, tests the newest release too, and says
+  # whether ci.yml can move to it: if it passes, that's a one-line change of ci.yml, and if it doesn't, the log shows
+  # what fails before a pull request runs into it (#2062)
+  newest-release:
+    needs: discover
+    if: needs.discover.outputs.behind == 'true'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Fetch Sources
+        uses: actions/checkout@v7
+
+      - name: Setup Java
+        uses: actions/setup-java@v6
+        with:
+          distribution: 'temurin'
+          java-version: 21
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v5
+
+      - name: Build with Gradle
+        id: check
+        run: ./gradlew check -PplatformType=IU -PplatformVersion=${{ needs.discover.outputs.newest-release }}
+
+      - name: Say whether ci.yml can move to the newest release
+        if: always()
+        env:
+          OUTCOME: ${{ steps.check.outcome }}
+          NEWEST_RELEASE: ${{ needs.discover.outputs.newest-release }}
+          CI_RELEASE: ${{ needs.discover.outputs.ci-release }}
+        run: |
+          if [ "$OUTCOME" = "success" ]; then
+            MESSAGE="ci.yml tests IntelliJ IDEA $CI_RELEASE, and the newest release, $NEWEST_RELEASE, passes: ci.yml can move to it by changing the platformVersion of its matrix entry with platformType IU."
+            echo "::notice title=ci.yml can move to $NEWEST_RELEASE::$MESSAGE"
+            echo "> [!NOTE]" >> "$GITHUB_STEP_SUMMARY"
+          else
+            MESSAGE="ci.yml tests IntelliJ IDEA $CI_RELEASE, and the newest release, $NEWEST_RELEASE, doesn't pass ./gradlew check: see the log of this job before ci.yml moves to it."
+            echo "::warning title=$NEWEST_RELEASE doesn't pass::$MESSAGE"
+            echo "> [!WARNING]" >> "$GITHUB_STEP_SUMMARY"
+          fi
+          echo "> $MESSAGE" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Collect Tests Result
+        uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: test-reports-newest-release
+          path: |
+            ${{ github.workspace }}/build/reports/tests
+            ${{ github.workspace }}/build/jacoco/
