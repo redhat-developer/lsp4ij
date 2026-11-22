@@ -144,6 +144,21 @@ public class SnippetTextEditCodeActionTest extends LSPCodeActionFixtureTestCase 
         assertEquals("other = other, other.txt world", otherDocument.getText());
     }
 
+    public void testAPlaceholderThatStartsWithAnEscapedDollarInsertsItsText() {
+        var other = myFixture.addFileToProject("other.txt", "world");
+        var intention = greetingIntention();
+        resolveTo(other, Either.forRight(new SnippetTextEdit(range(0, 0),
+                // The escaped $ starts a text, not a variable
+                new StringValue("snippet", "${1:\\$TM_FILENAME_BASE} = $1 "))));
+
+        invoke(intention);
+        PlatformTestUtil.dispatchAllEventsInIdeEventQueue();
+
+        Document otherDocument = FileDocumentManager.getInstance().getDocument(other.getVirtualFile());
+        assertNotNull(otherDocument);
+        assertEquals("$TM_FILENAME_BASE = $TM_FILENAME_BASE world", otherDocument.getText());
+    }
+
     public void testATabStopRepeatsTheTextOfANestedPlaceholderWithItsIndex() {
         var other = myFixture.addFileToProject("other.txt", "world");
         var intention = greetingIntention();

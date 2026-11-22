@@ -278,7 +278,15 @@ public class LspSnippetParser {
                 handler.startPlaceholder(index, endCapture(), nestingLevel);
             }
         } else {
-            handler.startPlaceholder(index, readString('}', '$'), nestingLevel);
+            String text = readString('}', '$');
+            if (text.startsWith("$")) {
+                // - ${1:\$name} <-- an escaped '$' starts a text, not a variable. The handlers resolve a variable that
+                // starts the text of a placeholder, so the text follows the placeholder's start
+                handler.startPlaceholder(index, "", nestingLevel);
+                handler.text(text);
+            } else {
+                handler.startPlaceholder(index, text, nestingLevel);
+            }
         }
         // placeholder ::= '${' int ':' any '}'
         // The rest of the placeholder, as a nested placeholder, ends at its '}'
