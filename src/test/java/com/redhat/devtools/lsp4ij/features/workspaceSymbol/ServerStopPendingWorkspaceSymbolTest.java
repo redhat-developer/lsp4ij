@@ -37,6 +37,7 @@ import org.eclipse.lsp4j.jsonrpc.messages.Either;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -44,8 +45,8 @@ import java.util.concurrent.TimeUnit;
 
 /**
  * The {@code workspace/symbol} request of Search Everywhere, which LSP4IJ sends to each language server of the
- * project and merges, ends when a language server stops before it answers, with the symbols of the other language
- * servers, instead of making the search wait until the user types again (#722).
+ * project and merges, ends when a language server stops before it answers, or doesn't answer in time, with the symbols
+ * of the other language servers, instead of making the search wait until the user types again (#722).
  */
 public class ServerStopPendingWorkspaceSymbolTest extends UsefulTestCase {
 
@@ -68,6 +69,24 @@ public class ServerStopPendingWorkspaceSymbolTest extends UsefulTestCase {
         assertEquals(List.of("main"), symbols.get(1, TimeUnit.SECONDS).stream()
                 .map(WorkspaceSymbolData::getName)
                 .toList());
+    }
+
+    public void testAServerWhichDoesNotAnswerInTimeEndsTheSearchWithTheSymbolsOfTheOthers() throws Exception {
+        var file = myFixture.configureByText("main.foo", "content");
+        connect(file, silent);
+        var workspaceSymbolSupport = LSPWorkspaceSupport.getSupport(myFixture.getProject()).getWorkspaceSymbolSupport();
+        workspaceSymbolSupport.setAnswerTimeout(Duration.ofSeconds(2));
+
+        var symbols = workspaceSymbolSupport.getWorkspaceSymbol(new LSPWorkspaceSymbolParams("main"));
+
+        PlatformTestUtil.waitWithEventsDispatching("The search must end once the time of the silent server is up",
+                symbols::isDone, 10);
+        assertEquals(List.of("main"), symbols.get(1, TimeUnit.SECONDS).stream()
+                .map(WorkspaceSymbolData::getName)
+                .toList());
+        // The silent server gets '$/cancelRequest', for which LSP4J cancels the request that the server hasn't answered
+        PlatformTestUtil.waitWithEventsDispatching("The silent server must be asked to cancel the request",
+                () -> !silent.requests.isEmpty() && silent.requests.stream().allMatch(CompletableFuture::isCancelled), 10);
     }
 
     public void testARequestToAServerWhichStopsBeforeTheRequestIsKeptForTheStopIsCancelled() throws Exception {
