@@ -1,0 +1,14 @@
+{
+  "name": "Broken Language Server",
+  "programArgs": {
+    "default": "server --stdio"
+  },
+  "fileTypeMappings": {
+    "fileType": {
+      "patterns": [
+        "*.broken"
+      ]
+    },
+    "languageId": "broken"
+  }
+}

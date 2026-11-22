@@ -115,6 +115,9 @@ public class LanguageServerPanel implements Disposable {
     private @Nullable String serverUrl;
     private HyperlinkLabel serverUrlHyperlink;
     private WorkspaceFoldersPanel workspaceFoldersPanel;
+    // The workspace folder configuration without the Workspace Folders tab: the one of the template in the New Language
+    // Server dialog, which has no such tab
+    private @Nullable String workspaceFolderStrategyConfiguration;
 
     public LanguageServerPanel(@NotNull FormBuilder builder,
                                @Nullable JComponent description,
@@ -781,9 +784,21 @@ public class LanguageServerPanel implements Disposable {
 
     public void setWorkspaceFolderStrategyConfiguration(@Nullable String workspaceFolderStrategyConfiguration) {
         if (workspaceFoldersPanel == null) {
+            // As the tab would hold it, so that the settings of the language server show it unchanged
+            this.workspaceFolderStrategyConfiguration = WorkspaceFoldersPanel.toJsonConfiguration(workspaceFolderStrategyConfiguration);
             return;
         }
         workspaceFoldersPanel.setJsonConfiguration(workspaceFolderStrategyConfiguration);
+    }
+
+    /**
+     * Returns the workspace folder configuration: the JSON of the Workspace Folders tab, or without the tab, the
+     * configuration which was set, as the tab would hold it.
+     *
+     * @return the workspace folder configuration, or null if there is none.
+     */
+    public @Nullable String getWorkspaceFolderStrategyConfiguration() {
+        return workspaceFoldersPanel != null ? workspaceFoldersPanel.getJsonConfiguration() : workspaceFolderStrategyConfiguration;
     }
 
     /**
@@ -927,7 +942,7 @@ public class LanguageServerPanel implements Disposable {
      * Returns true if the workspace folder configuration asks for several language server instances.
      */
     private boolean hasServerInstances() {
-        var configuration = workspaceFoldersPanel != null ? workspaceFoldersPanel.getJsonConfiguration() : null;
+        var configuration = getWorkspaceFolderStrategyConfiguration();
         if (configuration == null) {
             return false;
         }
