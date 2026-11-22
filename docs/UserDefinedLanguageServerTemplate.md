@@ -146,9 +146,13 @@ does instead:
 
 `transports` is optional. A template can list the transports which its language server supports, in `transports`,
 each with its `mode` (`stdio` or one of the socket modes above) and the `argument` of the
-command for it. The New Language Server dialog then helps with the transport: Socket is disabled for a language server
-which lists only `stdio`, and for one which lists a socket mode, a hint below the socket modes names the mode and the
-argument. Without `transports`, every transport can be chosen.
+command for it. The New Language Server dialog then helps with the transport: for a language server which lists only
+`stdio`, a hint says that it talks LSP only over its standard input and output, and for one which lists a socket mode,
+a hint below the socket modes names the mode and the argument. Every transport can still be chosen, as the template may
+be the starting point of a language server of your own which does talk over a socket: Socket, for a language server
+which lists only `stdio`, gives the warning "The template says this language server talks LSP only over its standard
+input and output", which blocks neither OK nor Apply in the settings of a language server created from the template.
+Without `transports`, no hint shows.
 
 | Field      | Value                                                                 | Required |
 |------------|-----------------------------------------------------------------------|----------|

@@ -45,6 +45,9 @@ public class NewLanguageServerDialogTransportTest extends BasePlatformTestCase {
             new TransportSupport(UserDefinedTransport.Mode.STDIO, "org.eclipse.lemminx.XMLServerLauncher"),
             new TransportSupport(UserDefinedTransport.Mode.START_AND_CONNECT,
                     "org.eclipse.lemminx.XMLServerSocketLauncher --port ${port}"));
+    // The transports of the TypeScript template
+    private static final List<TransportSupport> STDIO_ONLY = List.of(
+            new TransportSupport(UserDefinedTransport.Mode.STDIO, "--stdio"));
 
     public void testTheTransportWhichTheUserChoosesSwapsItsArgumentInTheCommand() {
         var dialog = dialog(template("node css.js --stdio", UserDefinedTransport.STDIO, CSS));
@@ -197,16 +200,70 @@ public class NewLanguageServerDialogTransportTest extends BasePlatformTestCase {
         }
     }
 
-    public void testTheTemplateOfALanguageServerWhichTalksOnlyOverStdioDisablesTheSocket() {
-        var template = template("server --stdio", UserDefinedTransport.STDIO);
-        template.setSupportedTransports(List.of(new TransportSupport(UserDefinedTransport.Mode.STDIO, "--stdio")));
-        var dialog = dialog(template);
+    public void testASocketForATemplateWhichListsOnlyStdioIsAWarningWhichDoesNotBlockOk() {
+        var dialog = dialog(template("server --stdio", UserDefinedTransport.STDIO, STDIO_ONLY));
         try {
-            var socket = form(dialog).stream()
-                    .filter(component -> component instanceof JBRadioButton button
-                            && LanguageServerBundle.message("language.server.transport.socket").equals(button.getText()))
-                    .findFirst().orElseThrow();
-            assertFalse(socket.isEnabled());
+            var socket = radio(dialog, "language.server.transport.socket");
+            assertTrue("the template may be the start of a language server which does talk over a socket",
+                    socket.isEnabled());
+            assertEmpty(dialog.doValidateAll());
+
+            click(dialog, "language.server.transport.socket");
+            String message = LanguageServerBundle.message("language.server.validation.socket.stdio.only");
+            List<ValidationInfo> warnings = dialog.doValidateAll().stream()
+                    .filter(problem -> message.equals(problem.message))
+                    .toList();
+            // On the socket, and listed below the fields, next to the error of the command, which has no ${port}
+            assertEquals(2, warnings.size());
+            assertSame(socket, warnings.get(0).component);
+            assertNull(warnings.get(1).component);
+            assertTrue(warnings.stream().allMatch(problem -> problem.warning && problem.okEnabled));
+
+            commandLine(dialog).setText("server --socket=${port}");
+            List<ValidationInfo> problems = dialog.doValidateAll();
+            assertEquals(List.of(message, message), problems.stream().map(problem -> problem.message).toList());
+            assertTrue("OK stays enabled", problems.stream().allMatch(problem -> problem.warning && problem.okEnabled));
+
+            click(dialog, "language.server.transport.stdio");
+            assertTrue(dialog.doValidateAll().stream().noneMatch(problem -> message.equals(problem.message)));
+        } finally {
+            dialog.close(DialogWrapper.CANCEL_EXIT_CODE);
+        }
+    }
+
+    public void testASocketForATemplateWhichListsASocketModeOrNoTransportsIsNoWarning() {
+        var listsASocket = dialog(template("node css.js --stdio", UserDefinedTransport.STDIO, CSS));
+        try {
+            click(listsASocket, "language.server.transport.socket");
+            assertEmpty(listsASocket.doValidateAll());
+        } finally {
+            listsASocket.close(DialogWrapper.CANCEL_EXIT_CODE);
+        }
+
+        var listsNone = dialog(template("node server.js --socket=${port}", UserDefinedTransport.STDIO));
+        try {
+            click(listsNone, "language.server.transport.socket");
+            assertEmpty(listsNone.doValidateAll());
+        } finally {
+            listsNone.close(DialogWrapper.CANCEL_EXIT_CODE);
+        }
+    }
+
+    public void testTheSocketOfATemplateWhichListsOnlyStdioIsKeptWithAWarning() {
+        // a template whose socket isn't one of its transports, which LSP4IJ reports when it loads the template
+        var dialog = dialog(template("", RUNNING, STDIO_ONLY));
+        try {
+            assertTrue(radio(dialog, "language.server.transport.socket").isSelected());
+            assertTrue(radio(dialog, "language.server.socket.attach").isSelected());
+            String message = LanguageServerBundle.message("language.server.validation.socket.stdio.only");
+            List<ValidationInfo> problems = dialog.doValidateAll();
+            assertEquals(List.of(message, message), problems.stream().map(problem -> problem.message).toList());
+            assertTrue(problems.stream().allMatch(problem -> problem.warning && problem.okEnabled));
+
+            // Socket can be chosen again after stdio
+            click(dialog, "language.server.transport.stdio");
+            click(dialog, "language.server.transport.socket");
+            assertTrue(radio(dialog, "language.server.transport.socket").isSelected());
         } finally {
             dialog.close(DialogWrapper.CANCEL_EXIT_CODE);
         }
@@ -339,8 +396,12 @@ public class NewLanguageServerDialogTransportTest extends BasePlatformTestCase {
     }
 
     private static @NotNull String command(@NotNull NewLanguageServerDialog dialog) {
-        return ((CommandLineWidget) form(dialog).stream().filter(CommandLineWidget.class::isInstance).findFirst()
-                .orElseThrow()).getText();
+        return commandLine(dialog).getText();
+    }
+
+    private static @NotNull CommandLineWidget commandLine(@NotNull NewLanguageServerDialog dialog) {
+        return (CommandLineWidget) form(dialog).stream().filter(CommandLineWidget.class::isInstance).findFirst()
+                .orElseThrow();
     }
 
     private static @NotNull LanguageServerTemplate template(@NotNull String command, @NotNull UserDefinedTransport transport) {

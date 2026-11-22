@@ -817,8 +817,9 @@ public class LanguageServerPanel implements Disposable {
 
     /**
      * Returns every problem of the fields this panel shows, each on its field: an empty server name, no command for a
-     * language server which LSP4IJ starts, a port which can't be used, and content which isn't valid JSON. The New
-     * Language Server dialog and the settings page both check with it.
+     * language server which LSP4IJ starts, a port which can't be used, and content which isn't valid JSON. A socket for
+     * a language server whose template lists only the standard input and output is a warning. The New Language Server
+     * dialog and the settings page both check with it.
      *
      * @return every problem of the shown fields, empty if there is none.
      */
@@ -840,6 +841,11 @@ public class LanguageServerPanel implements Disposable {
         var transportProblem = validateTransport();
         if (transportProblem != null) {
             problems.add(transportProblem);
+        }
+        // Also next to an error of the transport, which it may explain, as when the template's command has no ${port}
+        var templateWarning = transportFields != null ? transportFields.validateForTemplate() : null;
+        if (templateWarning != null) {
+            problems.add(templateWarning);
         }
         problems.addAll(validateJsonFields());
         return problems;
