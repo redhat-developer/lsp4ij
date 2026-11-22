@@ -37,10 +37,8 @@
       "fileType": {
         "name": "Docker File",
         "patterns": [
-          ".dockerfile",
-          ".containerfile",
-          "Dockerfile.*",
-          "Containerfile.*",
+          "*.dockerfile",
+          "*.containerfile",
           "Dockerfile.*",
           "Containerfile.*"
         ]

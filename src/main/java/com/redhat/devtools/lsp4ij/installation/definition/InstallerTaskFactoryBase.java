@@ -15,6 +15,7 @@ import com.google.gson.JsonObject;
 import com.intellij.util.system.CpuArch;
 import com.redhat.devtools.lsp4ij.JSONUtils;
 import com.redhat.devtools.lsp4ij.launching.templates.LanguageServerTemplate;
+import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -30,6 +31,26 @@ public abstract class InstallerTaskFactoryBase implements InstallerTaskFactory {
 
     protected static @Nullable String getStringFromOs(@NotNull JsonObject json,
                                                       @NotNull String name) {
+        return getStringFromOs(json, name, LanguageServerTemplate.OS_KEY, CpuArch.CURRENT, System.getProperty("os.arch"));
+    }
+
+    /**
+     * Returns the value of the given property for the given OS and CPU, as {@link #getStringFromOs(JsonObject, String)}
+     * does for the OS and the CPU of this IDE: the tests of the bundled installers resolve them for each platform.
+     *
+     * @param json    the JSON object which has the property.
+     * @param name    the name of the property.
+     * @param os      the key of the OS, as {@code windows}, {@code mac} or {@code unix}.
+     * @param cpuArch the CPU.
+     * @param osArch  the {@code os.arch} system property of the JVM, as {@code amd64} or {@code aarch64}.
+     * @return the value of the given property for the given OS and CPU, or null.
+     */
+    @ApiStatus.Internal
+    public static @Nullable String getStringFromOs(@NotNull JsonObject json,
+                                                   @NotNull String name,
+                                                   @Nullable String os,
+                                                   @NotNull CpuArch cpuArch,
+                                                   @Nullable String osArch) {
         if (!json.has(name)) {
             return null;
         }
@@ -42,9 +63,9 @@ public abstract class InstallerTaskFactoryBase implements InstallerTaskFactory {
             // }
 
             JsonObject jsonObj = jsonElement.getAsJsonObject();
-            if (jsonObj.has(LanguageServerTemplate.OS_KEY)) {
+            if (jsonObj.has(os)) {
                 // ex: "windows": "",
-                jsonElement = jsonObj.get(LanguageServerTemplate.OS_KEY);
+                jsonElement = jsonObj.get(os);
             } else if (jsonObj.has(LanguageServerTemplate.DEFAULT_KEY)) {
                 // ex: "default": ""
                 jsonElement = jsonObj.get(LanguageServerTemplate.DEFAULT_KEY);
@@ -62,13 +83,13 @@ public abstract class InstallerTaskFactoryBase implements InstallerTaskFactory {
             //   "linux": {
             // ...
             JsonObject platformObj = jsonElement.getAsJsonObject();
-            String arch = CpuArch.CURRENT.name().toLowerCase();
+            String arch = cpuArch.name().toLowerCase();
             if (platformObj.has(arch)) {
                 // ex: "windows": {
                 //        "x86_64":
                 jsonElement = platformObj.get(arch);
             } else {
-                arch = System.getProperty("os.arch");
+                arch = osArch;
                 if (platformObj.has(arch)) {
                     // ex: "windows": {
                     //        "x86_64":

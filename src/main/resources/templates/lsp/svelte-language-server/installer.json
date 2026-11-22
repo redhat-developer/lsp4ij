@@ -23,7 +23,7 @@
       },
       "onSuccess": {
         "configureServer": {
-          "name": "Configure Astro Language Server command",
+          "name": "Configure Svelte Language Server command",
           "command": {
             "windows": "\"${workingDir}/.bin/svelteserver.cmd\" --stdio",
             "default": "\"${workingDir}/.bin/svelteserver\" --stdio"

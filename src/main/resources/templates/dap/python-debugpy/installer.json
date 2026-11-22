@@ -3,9 +3,13 @@
   "name": "Install and verify debugpy DAP Server",
   "check": {
     "exec": {
-      "name": "Trying current command",
-      "command": "${server.command}",
-      "timeout": 2000
+      "name": "Check if debugpy is installed",
+      "command": {
+        "windows": "python -m debugpy --version",
+        "default": "python3 -m debugpy --version"
+      },
+      "ignoreStderr": true,
+      "timeout": 10000
     }
   },
   "run": {
