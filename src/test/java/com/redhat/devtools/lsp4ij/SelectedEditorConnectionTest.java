@@ -135,9 +135,40 @@ public class SelectedEditorConnectionTest extends LSPCodeInsightFixtureTestCase 
 
         // The connection is made now, and its release, on the EDT, disconnects the file. Both are waited for, rather
         // than a time, which a busy machine can exceed between the didOpen and the didClose that the server reads.
+        // The file is the server's last, so the release also stops the server, whose shutdown follows the didClose.
         PlatformTestUtil.waitWithEventsDispatching("the selection's connection must be made", opened::isDone, 10);
-        PlatformTestUtil.waitWithEventsDispatching("the closed file must end disconnected",
-                () -> !isConnected("waiting.ts"), 10);
+        PlatformTestUtil.waitWithEventsDispatching(() -> "the closed file must end disconnected; the server read, of "
+                + "waiting.ts, " + openCloseNotificationsOf("waiting.ts"), () -> !isConnected("waiting.ts"), 10);
+    }
+
+    public void testTheServerReadsTheDidCloseOfItsLastFileBeforeItStops() throws Exception {
+        var last = myFixture.addFileToProject("last.ts", "const last=1;").getVirtualFile();
+        var editors = FileEditorManager.getInstance(myFixture.getProject());
+        var opened = expectDidOpen("last.ts");
+        editors.openFile(last, true);
+        PlatformTestUtil.waitWithEventsDispatching("selecting the tab must send its didOpen", opened::isDone, 10);
+        var wrapper = ContainerUtil.getOnlyItem(LanguageServiceAccessor.getInstance(myFixture.getProject()).getStartedServers());
+
+        // The dispatcher is still busy, as on a slow machine, when the close of the last file queues its didClose and
+        // stops the server at once, as in tests. It is freed 200 ms later: well within the second that the stop waits
+        // for it before the shutdown, and long after a stop that does not wait has closed the connection.
+        var busy = new CompletableFuture<Void>();
+        wrapper.sendNotification(server -> {
+            busy.join();
+            return server;
+        });
+        try {
+            editors.closeFile(last);
+            projectEditorListeners().fileClosed(editors, last);
+            busy.completeAsync(() -> null, CompletableFuture.delayedExecutor(200, TimeUnit.MILLISECONDS));
+            PlatformTestUtil.waitWithEventsDispatching("the server must stop",
+                    () -> wrapper.getServerStatus() == ServerStatus.stopped, 10);
+        } finally {
+            busy.complete(null);
+        }
+
+        assertFalse("the server must read the didClose of its last file before it stops; it read, of last.ts, "
+                + openCloseNotificationsOf("last.ts"), isConnected("last.ts"));
     }
 
     public void testAFeatureThatAsksWhileItsEditorIsOpenDoesNotConnectTheFileAfterTheEditorCloses() throws Exception {
@@ -210,6 +241,14 @@ public class SelectedEditorConnectionTest extends LSPCodeInsightFixtureTestCase 
             }
         }
         return connected;
+    }
+
+    /** The didOpen and didClose notifications of the file that the server read, in the order it read them. */
+    private static List<String> openCloseNotificationsOf(String fileName) {
+        return MockLanguageServer.INSTANCE.getTextDocumentService().getOpenCloseNotifications().stream()
+                .filter(notification -> notification.uri().getPath().endsWith("/" + fileName))
+                .map(notification -> notification.open() ? "didOpen" : "didClose")
+                .toList();
     }
 
     private static CompletableFuture<DidOpenTextDocumentParams> expectDidOpen(String fileName) {
