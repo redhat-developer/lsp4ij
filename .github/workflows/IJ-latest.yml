@@ -128,8 +128,8 @@ jobs:
         with:
           name: test-reports
           path: |
-            path: ${{ github.workspace }}/build/reports/tests
-            path: ${{ github.workspace }}/build/jacoco/
+            ${{ github.workspace }}/build/reports/tests
+            ${{ github.workspace }}/build/jacoco/
 
   # While ci.yml tests an older IntelliJ IDEA (IU) release than the newest, tests the newest release too, and says
   # whether ci.yml can move to it: if it passes, that's a one-line change of ci.yml, and if it doesn't, the log shows
