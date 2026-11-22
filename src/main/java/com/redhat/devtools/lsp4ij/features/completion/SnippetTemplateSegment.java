@@ -104,6 +104,15 @@ class SnippetTemplateSegment {
         return variable;
     }
 
+    /**
+     * Replaces the expression of a named variable declaration, used when a tab stop
+     * declared a variable with an empty default and a later placeholder with the
+     * same index provides the default text.
+     */
+    void setVariable(@NotNull Expression variable) {
+        this.variable = variable;
+    }
+
     boolean isAlwaysStopAt() {
         return alwaysStopAt;
     }
