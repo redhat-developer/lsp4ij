@@ -1050,7 +1050,7 @@
     <extensions defaultExtensionNs="com.intellij">
 
         <projectConfigurable
-                groupId="language"
+                parentId="language"
                 id="LanguageServers"
                 bundle="messages.LanguageServerBundle"
                 nonDefaultProject="true"
@@ -1206,7 +1206,7 @@
         <applicationService
                 serviceImplementation="com.redhat.devtools.lsp4ij.dap.descriptors.templates.DAPTemplateManager"/>
         <projectConfigurable
-                groupId="debugger"
+                parentId="project.propDebugger"
                 id="debugAdapterDescriptorFactories"
                 bundle="messages.DAPBundle"
                 nonDefaultProject="true"
