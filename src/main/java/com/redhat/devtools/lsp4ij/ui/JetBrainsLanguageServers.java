@@ -86,14 +86,17 @@ public final class JetBrainsLanguageServers {
         try {
             ClassLoader loader = getClassLoaderOfPage(project);
             if (loader == null) {
+                // As before 2026.3, or without LSP Connection Manager
                 return List.of();
             }
             Object settings = project.getService(Class.forName(settingsClassName, true, loader));
-            if (!(settings instanceof PersistentStateComponent<?> component)) {
+            Object state = settings instanceof PersistentStateComponent<?> component ? component.getState() : null;
+            if (state == null) {
+                // Unlike a missing page, a missing state means that IntelliJ changed its settings service
+                LOGGER.debug("Cannot read the language servers of IntelliJ's settings: " + settingsClassName + " gives no state");
                 return List.of();
             }
-            Object state = component.getState();
-            return state != null ? parse(XmlSerializer.serialize(state)) : List.of();
+            return parse(XmlSerializer.serialize(state));
         } catch (RuntimeException e) {
             if (e instanceof ControlFlowException || e instanceof CancellationException) {
                 throw e;
