@@ -88,6 +88,15 @@ public class PlaceholderTest {
     }
 
     @Test
+    public void placeholderThatStartsWithAnEscapedDollarHasItInItsText() {
+        // An escaped $ starts a text, which the handlers don't resolve as a variable
+        LspSnippetNode[] actual = LspSnippetAssert.parse("${1:\\$TM_FILENAME_BASE} x");
+        assertEquals(actual, LspSnippetAssert.placeholder(1, "", 1),
+                LspSnippetAssert.text("$TM_FILENAME_BASE"),
+                LspSnippetAssert.text(" x"));
+    }
+
+    @Test
     public void leadingVariableOfAPlaceholderEndsWithItsName() {
         LspSnippetNode[] unbraced = LspSnippetAssert.parse("${1:$TM_FILENAME_BASE suffix} x");
         assertEquals(unbraced, LspSnippetAssert.placeholder(1, "$TM_FILENAME_BASE", 1),
