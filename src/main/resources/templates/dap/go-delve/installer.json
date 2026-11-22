@@ -11,6 +11,7 @@
   "run": {
     "exec": {
       "name": "Install 'go-delve' release",
+      "ignoreStderr": true,
       "command": "go install github.com/go-delve/delve/cmd/dlv@latest",
       "onSuccess": {
         "configureServer": {

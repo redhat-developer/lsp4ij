@@ -37,6 +37,7 @@
   "run": {
     "exec": {
       "name": "Install Go Language Server Globally",
+      "ignoreStderr": true,
       "command": "go install golang.org/x/tools/gopls@latest",
       "onSuccess": {
         "configureServer": {

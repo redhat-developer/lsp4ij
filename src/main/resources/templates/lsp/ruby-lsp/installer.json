@@ -12,6 +12,7 @@
   "run": {
     "exec": {
       "name": "Install Ruby LSP",
+      "ignoreStderr": true,
       "command": {
         "windows": "cmd /C gem install ruby-lsp",
         "default": "gem install ruby-lsp"

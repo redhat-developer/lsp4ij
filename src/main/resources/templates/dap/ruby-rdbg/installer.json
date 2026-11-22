@@ -16,6 +16,7 @@
   "run": {
     "exec": {
       "name": "Install Ruby Debug",
+      "ignoreStderr": true,
       "command": {
         "windows": "cmd /C gem install debug",
         "default": "gem install debug"
