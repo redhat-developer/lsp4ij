@@ -36,6 +36,7 @@ import org.jetbrains.annotations.Nullable;
 
 import java.net.URI;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
@@ -157,7 +158,13 @@ public class LSPClientFeatures implements Disposable, FileUriSupport {
         var serverInstaller = getServerInstaller();
         if (serverInstaller != null) {
             var check = serverInstaller.checkInstallation();
-            var status = check.getNow(null);
+            ServerInstallationStatus status;
+            try {
+                status = check.getNow(null);
+            } catch (CompletionException e) {
+                // The installation failed: the language server stays off until it is installed
+                status = ServerInstallationStatus.NOT_INSTALLED;
+            }
             if (status == ServerInstallationStatus.INSTALLED) {
                 // The language server is correctly installed, enable it
                 return true;

@@ -48,6 +48,9 @@ import java.util.concurrent.CompletableFuture;
  */
 public abstract class DeclarativeLanguageServerInstaller extends LanguageServerInstallerBase {
 
+    // Whether the last run of the installer failed, which doesn't fail the installation
+    private volatile boolean runFailed;
+
     /**
      * Constructs a new declarative language server installer with no initial definition.
      */
@@ -144,11 +147,28 @@ public abstract class DeclarativeLanguageServerInstaller extends LanguageServerI
         if (serverInstallerDescriptor == null) {
             return;
         }
+        runFailed = false;
         var context = createInstallerContext(InstallerContext.InstallerAction.RUN, indicator);
         // Once another installation into the same directory, which it waited for, installed the server, as with the
         // CSS and ESLint language servers, an installation that the check started isn't needed
         context.setCheckAgainAfterWaiting(isInstallingAfterFailedCheck());
-        ServerInstallerManager.getInstance().install(serverInstallerDescriptor, context);
+        if (!ServerInstallerManager.getInstance().install(serverInstallerDescriptor, context)) {
+            // The run failed, as its output and its notification say. The installation ends as before, and the language
+            // server starts: a run can report a failure for a server that it installed, as when a command of an
+            // installer that a user wrote prints a warning on its standard error. See hasRunFailed()
+            runFailed = true;
+        }
+    }
+
+    /**
+     * Returns true if the last run of the installer failed. The installation then ends as one whose run succeeded, and
+     * the language server starts, but it isn't done: a user-defined language server checks its installation again at
+     * its first start in the next IDE session, and runs its installer again if the check fails.
+     *
+     * @return true if the last run of the installer failed.
+     */
+    protected boolean hasRunFailed() {
+        return runFailed;
     }
 
     /**

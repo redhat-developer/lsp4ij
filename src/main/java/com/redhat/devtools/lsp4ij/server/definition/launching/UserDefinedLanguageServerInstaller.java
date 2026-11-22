@@ -24,6 +24,7 @@ import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 
 /**
@@ -70,7 +71,7 @@ public class UserDefinedLanguageServerInstaller extends DeclarativeLanguageServe
 
     /**
      * Registers a one-time completion handler that sets {@code installAlreadyDone = true}
-     * in the user's configuration once the installation check completes.
+     * in the user's configuration once the installation check completes, unless the installation or its run failed.
      *
      * @param checkInstallationFuture the future to attach the handler to
      */
@@ -80,7 +81,10 @@ public class UserDefinedLanguageServerInstaller extends DeclarativeLanguageServe
         }
         checkInstallationFuture.handle((result, error) -> {
             var settings = getSettings();
-            if (settings != null) {
+            // An installation whose run failed, or which failed, isn't done, so that the first start of the language
+            // server in the next IDE session checks it again, and installs the server if the check fails. One that the
+            // user cancelled is done, as before, so that the installer doesn't run again by itself
+            if (settings != null && !hasRunFailed() && (error == null || error instanceof CancellationException)) {
                 settings.setInstallAlreadyDone(true);
             }
             return result;
