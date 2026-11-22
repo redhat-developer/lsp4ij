@@ -353,6 +353,18 @@ public class LanguageServiceAccessor implements Disposable {
     }
 
     /**
+     * Returns the enabled language server definitions which serve the given file, whether their servers are started
+     * or not. A definition whose mapping matches the file only asynchronously isn't included.
+     *
+     * @param file the file.
+     * @return the definitions which serve the file.
+     */
+    @ApiStatus.Internal
+    public @NotNull Set<LanguageServerDefinition> getMatchedLanguageServerDefinitions(@NotNull PsiFile file) {
+        return getMatchedLanguageServerDefinitions(file, false).getMatched();
+    }
+
+    /**
      * Applies the provided processor to all language servers for the specified file.
      *
      * @param file      the file
