@@ -23,6 +23,14 @@ To enable [WGSL](https://www.w3.org/TR/WGSL/) language support in your IDE, you 
 
 5. Once the installation completes, the server should start automatically and provide [WGSL](https://www.w3.org/TR/WGSL/) language support (autocomplete, diagnostics, etc.).
 
+The installer downloads the asset of the latest [wgsl-analyzer release](https://github.com/wgsl-analyzer/wgsl-analyzer/releases)
+for your OS and architecture into `$USER_HOME$/.lsp4ij/lsp/wgsl-analyzer`, and sets the command to the executable,
+as `"$USER_HOME$/.lsp4ij/lsp/wgsl-analyzer/wgsl-analyzer-x86_64-unknown-linux-gnu"` on Linux x64 or
+`"$USER_HOME$/.lsp4ij/lsp/wgsl-analyzer/wgsl-analyzer.exe"` on Windows.
+
+To install the server yourself, download and extract that asset, set the command in the `Server` tab to the
+executable, and empty the `Installer` tab before you click **OK**, so that LSP4IJ doesn't install the server.
+
 ### Troubleshooting Installation
 
 If the installation fails, you can customize the installation settings in the **Installer** tab,  
@@ -42,6 +50,7 @@ Since IntelliJ does not provide native WGSL TextMate support, and the language s
 
   ```bash
   git clone https://github.com/wgsl-analyzer/wgsl-analyzer.git
+  ```
 
 * Open TextMate Bundles settings
 

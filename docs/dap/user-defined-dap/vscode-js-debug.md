@@ -13,10 +13,16 @@ console.log(s);
 
 ## Configure DAP server
 
-1. Download the `js-debug-dap-v*.tar.gz` asset from the [VSCode JS Debug releases](https://github.com/microsoft/vscode-js-debug/releases).  
-   For example, download [js-debug-dap-v1.96.0.tar.gz](https://github.com/microsoft/vscode-js-debug/releases/download/v1.96.0/js-debug-dap-v1.96.0.tar.gz), which is the latest version at the time of writing.
+1. [Install Node.js](https://nodejs.org/en/download), which runs the DAP server.
 
-2. Extract the archive into any folder (e.g., `/home/path/to/dap`). The extracted folder should contain the DAP server at `/js-debug/src/dapDebugServer.js`.
+2. The installer of the template installs the DAP server the first time the DAP server starts: it downloads the
+   `js-debug-dap-v*.tar.gz` asset of the latest [VSCode JS Debug release](https://github.com/microsoft/vscode-js-debug/releases)
+   and extracts it into `$USER_HOME$/.lsp4ij/dap/vscode-js-debug`, so the DAP server is at
+   `$USER_HOME$/.lsp4ij/dap/vscode-js-debug/js-debug/src/dapDebugServer.js`.
+
+   To install it yourself, download that asset, extract the archive into any folder (e.g., `/home/path/to/dap`), and
+   empty the `Installer` tab, so that LSP4IJ doesn't install the DAP server. The extracted folder should contain the
+   DAP server at `/js-debug/src/dapDebugServer.js`.
 
 3. Create a DAP Run/Debug configuration:
 
@@ -42,10 +48,16 @@ This will automatically populate:
 node <<insert base directory>>/js-debug/src/dapDebugServer.js ${port} 127.0.0.1
 ```
 
-Replace `<<insert base directory>>` with the directory  (e.g., `/home/path/to/dap`) where you extracted the DAP server. For example:
+When the installer installs the DAP server, it sets the command to:
 
 ```
-node /home/path/to/dap/js-debug/src/dapDebugServer.js ${port} 127.0.0.1
+node "$USER_HOME$/.lsp4ij/dap/vscode-js-debug/js-debug/src/dapDebugServer.js" ${port} 127.0.0.1
+```
+
+If you installed the DAP server yourself, replace `<<insert base directory>>` with the directory (e.g., `/home/path/to/dap`) where you extracted the DAP server. Keep the path of the script in double quotes, so that a directory with a space, as `/home/Jane Doe/dap`, stays one argument. For example:
+
+```
+node "/home/path/to/dap/js-debug/src/dapDebugServer.js" ${port} 127.0.0.1
 ```
 
 The `${port}` argument will be replaced with a free port when the run configuration starts.

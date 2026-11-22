@@ -8,11 +8,22 @@ To get language support for files from the Docker ecosystem (Dockerfiles, Compos
 
 ## Install the Language Server
 
+The template has an installer. The first time the server starts, it downloads the
+`docker-language-server-$OS-$ARCH-v$VERSION` binary of the latest
+[release](https://github.com/docker/docker-language-server/releases) for your OS and architecture into
+`$USER_HOME$/.lsp4ij/lsp/docker-language-server`, as `docker-language-server` (`docker-language-server.exe` on
+Windows), and sets the command to `"$USER_HOME$/.lsp4ij/lsp/docker-language-server/docker-language-server" start --stdio`.
+
+To install the server yourself instead:
+
 1. Download a language server binary from [GitHub](https://github.com/docker/docker-language-server/releases).
 
 2. Place the binary somewhere that is within your `PATH` variable lookup.
 
 3. Rename it from `docker-language-server-$OS-$ARCH-v$VERSION` to simply `docker-language-server`.
+
+4. Keep the command of the template, `docker-language-server start --stdio`, and empty the `Installer` tab before you
+   click **OK**, so that LSP4IJ doesn't install the server.
 
 ## Configuring your JetBrains IDE
 
@@ -24,7 +35,7 @@ To get language support for files from the Docker ecosystem (Dockerfiles, Compos
 
 4. **Optional**: You may also customize the Configuration section according to your preferences.
 
-    - The Docker Language Server collects telemetry by default. You can configure this behaviour by modifying the Initialization Options. See [here](https://github.com/docker/docker-language-server/blob/main/TELEMETRY.md) for detailed information about what telemetry is collected.
+    - The Docker Language Server collects telemetry by default, and the template sets `"telemetry": "all"` in the Initialization Options. You can configure this behaviour by modifying the Initialization Options. See [here](https://github.com/docker/docker-language-server/blob/main/TELEMETRY.md) for detailed information about what telemetry is collected.
 
 5. **Click OK** to apply the changes. You should now have language support for Dockerfiles, Compose files, and Bake files enabled in your IDE:
 

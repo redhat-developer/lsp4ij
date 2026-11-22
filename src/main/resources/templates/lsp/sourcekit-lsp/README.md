@@ -4,10 +4,11 @@ To enable Swift language support in your IDE, you can integrate [SourceKit-LSP](
    This installation will install the [SourceKit-LSP](https://github.com/swiftlang/sourcekit-lsp) language server.
 
 2. **Open the New Language Server Dialog**. This can usually be found under the IDE settings related to Language Server Protocol (LSP).
-   For more information, refer to the [New Language Server Dialog documentation](../UserDefinedLanguageServer.md#new-language-server-dialog).
+   For more information, refer to the [New Language Server Dialog documentation](https://github.com/redhat-developer/lsp4ij/blob/main/docs/UserDefinedLanguageServer.md#new-language-server-dialog).
 
 3. **Select SourceKit-LSP as the template** from the available options.
-   This will populate the command field with a default command `sourcekit-lsp`
+   This will populate the command field with a default command `sourcekit-lsp`. The template installs nothing: if
+   `sourcekit-lsp` doesn't start and `swift` isn't found, it shows a message with a link to install Swift.
 
 4. **Optional**: You may also customize the mappings section according to your preferences.
 

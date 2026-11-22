@@ -6,22 +6,31 @@ You can use the [TypeScript language server](https://github.com/typescript-langu
 
 ## Install the language server
 
-* [Install Node.js](https://nodejs.org/en/download)
-* [Read the "Installing" section](https://github.com/typescript-language-server/typescript-language-server?tab=readme-ov-file#installing), basically, open a terminal and execute the following command:
+* [Install Node.js](https://nodejs.org/en/download), with `npm`.
+* Create the TypeScript Language Server with the [language server template](../UserDefinedLanguageServer.md#using-template):
 
-**npm install -g typescript-language-server typescript**
+![TypeScript server dialog](../images/user-defined-ls/typescript-language-server/select_template.png)
 
-It will install:
+The first time the server starts, the installer of the template installs, with
+`npm install typescript-language-server typescript --force`, into `$USER_HOME$/.lsp4ij/lsp/typescript-language-server`:
 
 * [TypeScript language server](https://github.com/typescript-language-server/typescript-language-server). This project
   delegates the LSP operations (completion, diagnostics, etc) to the **tsserver** from [TypeScript](https://github.com/microsoft/TypeScript)
   which doesn't support LSP.
 * [TypeScript](https://github.com/microsoft/TypeScript) which hosts the **tsserver**.
-* As the command will add **typescript-language-server** in your OS PATH, you will have to close and reopen your IntelliJ to update this PATH. 
 
-After that you can create the TypeScript Language Server with the [language server template](../UserDefinedLanguageServer.md#using-template):
+It then sets the command to
+`"$USER_HOME$/.lsp4ij/lsp/typescript-language-server/node_modules/.bin/typescript-language-server" --stdio`
+(`typescript-language-server.cmd` on Windows).
 
-![TypeScript server dialog](../images/user-defined-ls/typescript-language-server/select_template.png)
+The server talks LSP over its standard input and output only (`--stdio`), so the template lists only `stdio` in its
+transports.
+
+To install the server yourself, [read the "Installing" section](https://github.com/typescript-language-server/typescript-language-server?tab=readme-ov-file#installing),
+basically, open a terminal and execute **npm install -g typescript-language-server typescript**. As the command adds
+**typescript-language-server** to your OS PATH, close and reopen your IDE to update this PATH. Keep the command of the
+template, `typescript-language-server --stdio` (`cmd /C typescript-language-server.cmd --stdio` on Windows), and empty
+the `Installer` tab before you click **OK**, so that LSP4IJ doesn't install the server.
 
 ## Debugging
 
