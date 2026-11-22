@@ -11,6 +11,7 @@
 package com.redhat.devtools.lsp4ij.features;
 
 import com.intellij.codeInsight.TargetElementUtil;
+import com.intellij.codeInsight.hint.EditorHintListener;
 import com.intellij.notification.Notification;
 import com.intellij.notification.Notifications;
 import com.intellij.openapi.actionSystem.CommonDataKeys;
@@ -29,6 +30,8 @@ import com.intellij.openapi.ui.TestDialogManager;
 import com.intellij.psi.PsiFile;
 import com.intellij.testFramework.PlatformTestUtil;
 import com.intellij.testFramework.fixtures.EditorHintFixture;
+import com.intellij.ui.HintHint;
+import com.intellij.ui.LightweightHint;
 import com.intellij.util.concurrency.AppExecutorUtil;
 import com.redhat.devtools.lsp4ij.LSPFileSupport;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
@@ -101,6 +104,8 @@ public class GoToActionReportTest extends LSPCodeInsightFixtureTestCase {
     private final AtomicInteger locationRequests = new AtomicInteger();
     private TestDialog previousDialog;
     private EditorHintFixture hints;
+    // The hints shown in an editor, also the ones hidden since
+    private final List<String> shownHints = new CopyOnWriteArrayList<>();
     private OtherServerDefinition otherServer;
     private volatile int languageServers;
     private volatile PsiFile file;
@@ -114,6 +119,12 @@ public class GoToActionReportTest extends LSPCodeInsightFixtureTestCase {
     protected void setUp() throws Exception {
         super.setUp();
         hints = new EditorHintFixture(getTestRootDisposable());
+        ApplicationManager.getApplication().getMessageBus().connect(getTestRootDisposable()).subscribe(EditorHintListener.TOPIC, new EditorHintListener() {
+            @Override
+            public void hintShown(@NotNull Editor editor, @NotNull LightweightHint hint, int flags, @NotNull HintHint hintInfo) {
+                shownHints.add(String.valueOf(hint.getComponent()));
+            }
+        });
         previousDialog = TestDialogManager.setTestDialog(message -> {
             dialogs.add(message);
             return Messages.OK;
@@ -316,6 +327,10 @@ public class GoToActionReportTest extends LSPCodeInsightFixtureTestCase {
                 .getLanguageServers(file, null, null)
                 .get(30, TimeUnit.SECONDS)
                 .size();
+        // Let the new editor take its size, as an editor has before the user can act in it. On 2025.3 and 2026.3, its
+        // first change of visible area comes in a later event, and would hide a hint that the action showed before it:
+        // HintManager.showErrorHint hides the hint on scrolling (HIDE_BY_SCROLLING)
+        PlatformTestUtil.dispatchAllEventsInIdeEventQueue();
     }
 
     /**
@@ -453,7 +468,8 @@ public class GoToActionReportTest extends LSPCodeInsightFixtureTestCase {
 
     private void assertNothingShown() {
         assertEquals("dialogs", List.of(), dialogs);
-        assertNull("the hint", hints.getCurrentHintText());
+        // No hint has been shown at all, so none can have been hidden before this check
+        assertEquals("hints", List.of(), shownHints);
     }
 
     /**
