@@ -80,6 +80,7 @@ import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.function.UnaryOperator;
@@ -167,6 +168,11 @@ public class LanguageServerWrapper implements Disposable {
     Map<String, Runnable> dynamicRegistrations = new HashMap<>();
     private final LSPFileListener fileListener;
     private final AtomicInteger keepAliveCounter = new AtomicInteger();
+    // The starts that connect the open documents again, as a restart does: until then the language server has none,
+    // so a stop for idleness asked for meanwhile, as by the end of a lease, is decided once they are connected
+    private final Object reconnectionLock = new Object();
+    private int reconnections;
+    private boolean idleStopAskedWhileReconnecting;
     protected StreamConnectionProvider lspStreamProvider;
     private volatile MessageBusConnection messageBusConnection;
     private Future<?> launcherFuture;
@@ -456,32 +462,42 @@ public class LanguageServerWrapper implements Disposable {
     }
 
     private synchronized void restart(boolean onItsOwn) {
-        restartNanos.clear();
-        numberOfRestartAttempts = 0;
-        serverError = null;
-        setEnabled(true);
-        if (serverStatus != ServerStatus.installed && serverStatus != ServerStatus.installing) {
-            stop();
-        }
-        // start the language server
-        getInitializedServer()
-                .thenAccept(unused -> {
-                    // The language server is started.
-                    // For all opened files of the project:
-                    // 1. send a textDocument/didOpen notification
-                    // 2. refresh code vision, inlay hints, folding for all opened editors
-                    // which edit the files associated to the language server.
-                    Project p = getProject();
-                    if (p.isDefault() || p.isDisposed()) {
-                        return;
-                    }
-                    if (onItsOwn) {
-                        LanguageServiceAccessor.getInstance(p).sendDidOpenAndRefreshEditorFeatureForOpenedFiles(this);
-                    } else {
-                        LanguageServiceAccessor.getInstance(p).
+        // From before the stop, which disconnects the open documents, until they are connected again or the start ends
+        // without that
+        var reconnected = holdIdleStopsUntilReconnected();
+        try {
+            restartNanos.clear();
+            numberOfRestartAttempts = 0;
+            serverError = null;
+            setEnabled(true);
+            if (serverStatus != ServerStatus.installed && serverStatus != ServerStatus.installing) {
+                stop();
+            }
+            // start the language server
+            getInitializedServer()
+                    .thenCompose(unused -> {
+                        // The language server is started.
+                        // For all opened files of the project:
+                        // 1. send a textDocument/didOpen notification
+                        // 2. refresh code vision, inlay hints, folding for all opened editors
+                        // which edit the files associated to the language server.
+                        Project p = getProject();
+                        if (p.isDefault() || p.isDisposed()) {
+                            return CompletableFuture.completedFuture(null);
+                        }
+                        if (onItsOwn) {
+                            return LanguageServiceAccessor.getInstance(p).sendDidOpenAndRefreshEditorFeatureForOpenedFiles(this);
+                        }
+                        return LanguageServiceAccessor.getInstance(p).
                                 sendDidOpenAndRefreshEditorFeatureForOpenedFiles(serverDefinition, p);
-                    }
-                });
+                    })
+                    // Off the thread that completes the start: a failed start completes it in its failure handler, which
+                    // a stop for idleness asked for meanwhile must not come in the middle of
+                    .whenCompleteAsync((unused, error) -> reconnected.run(), AppExecutorUtil.getAppExecutorService());
+        } catch (RuntimeException | Error e) {
+            reconnected.run();
+            throw e;
+        }
     }
 
     public boolean isEnabled() {
@@ -510,6 +526,20 @@ public class LanguageServerWrapper implements Disposable {
      * @throws LanguageServerException thrown when the language server cannot be started
      */
     public synchronized void start() throws LanguageServerException {
+        // The end of the hold of a start that connects the open documents again, which a start that fails at once ends
+        var reconnection = new AtomicReference<Runnable>();
+        try {
+            start(reconnection);
+        } catch (RuntimeException | Error e) {
+            var reconnected = reconnection.get();
+            if (reconnected != null) {
+                reconnected.run();
+            }
+            throw e;
+        }
+    }
+
+    private void start(@NotNull AtomicReference<Runnable> reconnection) {
         if (!isEnabled()) {
             // A language server that is switched off, as by stopAndDisable(), by a stop of its definition or by too
             // many failed starts, starts again only once it is switched on, as restart() does. A feature can still
@@ -584,13 +614,19 @@ public class LanguageServerWrapper implements Disposable {
         if (this.languageServer != null) {
             if (isActive()) {
                 return;
-            } else {
-                for (Map.Entry<URI /* file Uri */, OpenedDocument> entry : this.openedDocuments.entrySet()) {
-                    filesToReconnect.add(entry.getValue().getFile());
-                }
-                stop();
+            }
+            for (Map.Entry<URI /* file Uri */, OpenedDocument> entry : this.openedDocuments.entrySet()) {
+                filesToReconnect.add(entry.getValue().getFile());
             }
         }
+        // As for a restart: from before the stop, which disconnects the documents, until they are connected again or
+        // the start ends without that
+        final Runnable reconnected = filesToReconnect.isEmpty() ? null : holdIdleStopsUntilReconnected();
+        reconnection.set(reconnected);
+        if (this.languageServer != null) {
+            stop();
+        }
+        boolean submitted = false;
 
         if (this.initializeFuture == null) {
             final VirtualFile rootURI = getRootURI();
@@ -792,36 +828,56 @@ public class LanguageServerWrapper implements Disposable {
                         return initializingContext;
                     })
                     .thenAccept(initializingContext -> {
-                        for (VirtualFile fileToReconnect : filesToReconnect) {
-                            synchronized (this) {
-                                // A stop after the install must not have the reconnection start the server again. The
-                                // stop takes this monitor too, so it comes before the check or after the connect call,
-                                // which takes documentsLock after this monitor, as the stop does
-                                if (currentInitializingContext != initializingContext) {
-                                    return;
+                        List<CompletableFuture<?>> reconnections = new ArrayList<>(filesToReconnect.size());
+                        try {
+                            for (VirtualFile fileToReconnect : filesToReconnect) {
+                                synchronized (this) {
+                                    // A stop after the install must not have the reconnection start the server again.
+                                    // The stop takes this monitor too, so it comes before the check or after the
+                                    // connect call, which takes documentsLock after this monitor, as the stop does
+                                    if (currentInitializingContext != initializingContext) {
+                                        return;
+                                    }
+                                    reconnections.add(connect(fileToReconnect, new LSPFileConnectionInfo(null, null, null, true)));
                                 }
-                                connect(fileToReconnect, new LSPFileConnectionInfo(null, null, null, true));
+                            }
+                        } finally {
+                            if (reconnected != null) {
+                                CompletableFuture.allOf(reconnections.toArray(CompletableFuture[]::new))
+                                        .whenComplete((unused, error) -> reconnected.run());
                             }
                         }
                     })
                     .exceptionally(e -> {
-                        if (e instanceof CompletionException) {
-                            e = e.getCause();
+                        try {
+                            if (e instanceof CompletionException) {
+                                e = e.getCause();
+                            }
+                            if (e instanceof CannotStartProcessException) {
+                                serverError = (CannotStartProcessException) e;
+                            } else {
+                                serverError = new CannotStartServerException("Error while starting language server '" + serverDefinition.getId() + "' (pid=" + getCurrentProcessId() + ")", e);
+                            }
+                            showNotificationStartServerError();
+                            initializeFuture.completeExceptionally(serverError);
+                            getLanguageServerLifecycleManager().onError(this, e);
+                            stop(context);
+                            return null;
+                        } finally {
+                            // Once the failed start is stopped: a stop for idleness asked for meanwhile would otherwise
+                            // come in the middle of this handler
+                            if (reconnected != null) {
+                                reconnected.run();
+                            }
                         }
-                        if (e instanceof CannotStartProcessException) {
-                            serverError = (CannotStartProcessException) e;
-                        } else {
-                            serverError = new CannotStartServerException("Error while starting language server '" + serverDefinition.getId() + "' (pid=" + getCurrentProcessId() + ")", e);
-                        }
-                        showNotificationStartServerError();
-                        initializeFuture.completeExceptionally(serverError);
-                        getLanguageServerLifecycleManager().onError(this, e);
-                        stop(context);
-                        return null;
                     });
             // Submitted only now that initializeFuture is set: a start which fails at once runs the failure handler
             // above, which fails initializeFuture and then stops the server, clearing it
             ApplicationManager.getApplication().executeOnPooledThread(startTask);
+            submitted = true;
+        }
+        if (!submitted && reconnected != null) {
+            reconnected.run();
         }
     }
 
@@ -1034,7 +1090,11 @@ public class LanguageServerWrapper implements Disposable {
             return;
         }
         try {
-            stop();
+            synchronized (this) {
+                if (!deferIdleStopWhileReconnecting()) {
+                    stop();
+                }
+            }
         } catch (Throwable t) {
             LOGGER.error("Failed to stop language server {}", serverDefinition.getId(), t);
         }
@@ -1578,22 +1638,13 @@ public class LanguageServerWrapper implements Disposable {
      * takes this wrapper's monitor before it.
      */
     void maybeShutdown() {
-        maybeShutdown(currentInitializingContext);
-    }
-
-    /**
-     * Stops this language server as {@link #maybeShutdown()} does, unless the given connection to it has been replaced
-     * since, as by a restart. The restarted language server connects the open documents only once it has initialized,
-     * so until then it has none, and would be stopped as it starts.
-     */
-    private void maybeShutdown(@Nullable InitializingContext connection) {
         if (keepAlive()) {
             return;
         }
-        // A restart replaces the connection under this monitor: it comes before the check, or after the stop or its
+        // A restart starts its reconnection under this monitor, so it comes before the check or after the stop or its
         // scheduling, which the stop of the restart cancels
         synchronized (this) {
-            if (currentInitializingContext != connection) {
+            if (deferIdleStopWhileReconnecting()) {
                 return;
             }
             if (this.serverDefinition.getLastDocumentDisconnectedTimeout() != 0 && !ApplicationManager.getApplication().isUnitTestMode()) {
@@ -1605,27 +1656,63 @@ public class LanguageServerWrapper implements Disposable {
         }
     }
 
+    /**
+     * Holds off the stops for idleness while a start connects the open documents of this language server again, as a
+     * restart does: until then it has none. A stop asked for meanwhile is decided once the returned end runs, when the
+     * documents are connected again, or the start has ended without that. A language server that no stop was asked
+     * for keeps running, as it did before.
+     *
+     * @return the end of the reconnection, which runs once, however often it is called.
+     */
+    private @NotNull Runnable holdIdleStopsUntilReconnected() {
+        synchronized (reconnectionLock) {
+            reconnections++;
+        }
+        var ended = new AtomicBoolean();
+        return () -> {
+            if (!ended.compareAndSet(false, true)) {
+                return;
+            }
+            boolean asked;
+            synchronized (reconnectionLock) {
+                asked = --reconnections == 0 && idleStopAskedWhileReconnecting;
+                if (reconnections == 0) {
+                    idleStopAskedWhileReconnecting = false;
+                }
+            }
+            if (asked && !isDisposed()) {
+                maybeShutdown();
+            }
+        };
+    }
+
+    /**
+     * Returns true if a start connects the open documents again, and notes the stop for idleness asked for, which is
+     * decided once they are connected.
+     */
+    private boolean deferIdleStopWhileReconnecting() {
+        synchronized (reconnectionLock) {
+            if (reconnections == 0) {
+                return false;
+            }
+            idleStopAskedWhileReconnecting = true;
+            return true;
+        }
+    }
+
     private boolean keepAlive() {
         return getClientFeatures().keepServerAlive() || !this.openedDocuments.isEmpty() || this.keepAliveCounter.get() > 0;
     }
 
-    /**
-     * Keeps this language server running until the returned release runs, for a lease. The release lets the language
-     * server stop if nothing else keeps it alive, unless it has stopped or restarted since the lease was taken: a lease
-     * on the stopped language server must not stop the one that replaced it.
-     *
-     * @return the release, which the caller runs once.
-     */
-    @NotNull
-    Runnable incrementKeepAlive() {
-        var connection = currentInitializingContext;
+    void incrementKeepAlive() {
         keepAliveCounter.incrementAndGet();
         // A lease taken while the last document's stop is pending keeps the server, as a document that connects does
         removeStopTimer();
-        return () -> {
-            keepAliveCounter.decrementAndGet();
-            maybeShutdown(connection);
-        };
+    }
+
+    void decrementKeepAlive() {
+        keepAliveCounter.decrementAndGet();
+        maybeShutdown();
     }
 
     /**

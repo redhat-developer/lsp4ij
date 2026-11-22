@@ -273,10 +273,11 @@ public class LanguageServiceAccessor implements Disposable {
      *
      * @param serverDefinition the language server definition.
      * @param project          the project.
+     * @return a future that completes once each open file is connected, or its connection has ended without it.
      */
-    void sendDidOpenAndRefreshEditorFeatureForOpenedFiles(@NotNull LanguageServerDefinition serverDefinition,
-                                                          @NotNull Project project) {
-        sendDidOpenAndRefreshEditorFeatureForOpenedFiles(serverDefinition, project, null);
+    CompletableFuture<Void> sendDidOpenAndRefreshEditorFeatureForOpenedFiles(@NotNull LanguageServerDefinition serverDefinition,
+                                                                             @NotNull Project project) {
+        return sendDidOpenAndRefreshEditorFeatureForOpenedFiles(serverDefinition, project, null);
     }
 
     /**
@@ -284,45 +285,51 @@ public class LanguageServiceAccessor implements Disposable {
      * files that the given language server instance serves: the other instances of its definition don't start.
      *
      * @param instance the language server instance.
+     * @return a future that completes once each open file is connected, or its connection has ended without it.
      */
-    void sendDidOpenAndRefreshEditorFeatureForOpenedFiles(@NotNull LanguageServerWrapper instance) {
-        sendDidOpenAndRefreshEditorFeatureForOpenedFiles(instance.getServerDefinition(), instance.getProject(),
+    CompletableFuture<Void> sendDidOpenAndRefreshEditorFeatureForOpenedFiles(@NotNull LanguageServerWrapper instance) {
+        return sendDidOpenAndRefreshEditorFeatureForOpenedFiles(instance.getServerDefinition(), instance.getProject(),
                 clientFeatures -> clientFeatures.getServerWrapper() == instance);
     }
 
-    private void sendDidOpenAndRefreshEditorFeatureForOpenedFiles(@NotNull LanguageServerDefinition serverDefinition,
-                                                                  @NotNull Project project,
-                                                                  @Nullable Predicate<LSPClientFeatures> beforeStartingServerFilter) {
+    private CompletableFuture<Void> sendDidOpenAndRefreshEditorFeatureForOpenedFiles(@NotNull LanguageServerDefinition serverDefinition,
+                                                                                     @NotNull Project project,
+                                                                                     @Nullable Predicate<LSPClientFeatures> beforeStartingServerFilter) {
         VirtualFile[] files = FileEditorManager.getInstance(project).getOpenFiles();
+        List<CompletableFuture<Void>> connections = new ArrayList<>(files.length);
         for (VirtualFile file : files) {
             // TODO : revisit that
             PsiFile psiFile = LSPIJUtils.getPsiFile(file, project);
             if (psiFile != null) {
-                sendDidOpenAndRefreshEditorFeatureFor(psiFile, serverDefinition, beforeStartingServerFilter);
+                connections.add(sendDidOpenAndRefreshEditorFeatureFor(psiFile, serverDefinition, beforeStartingServerFilter));
             }
         }
+        return CompletableFuture.allOf(connections.toArray(CompletableFuture[]::new));
     }
 
-    private void sendDidOpenAndRefreshEditorFeatureFor(@NotNull PsiFile file,
-                                                       @NotNull LanguageServerDefinition serverDefinition,
-                                                       @Nullable Predicate<LSPClientFeatures> beforeStartingServerFilter) {
-        ReadAction.nonBlocking(() -> {
-                    // Try to send a textDocument/didOpen notification if the file is associated to the language server definition
-                    LanguageServiceAccessor.getInstance(project)
-                            .getLanguageServers(file, beforeStartingServerFilter, null, serverDefinition)
-                            .thenAccept(servers -> {
-                                // textDocument/didOpen notification has been sent
-                                if (servers.isEmpty()) {
-                                    return;
-                                }
-                                // refresh IJ code visions, inlay hints, folding features, color, structure view
-                                EditorFeatureManager.getInstance(project)
-                                        .refreshEditorFeature(file, EditorFeatureType.ALL, true, new PsiFileCancelChecker(file));
-                            });
-                    return null;
-                })
+    private CompletableFuture<Void> sendDidOpenAndRefreshEditorFeatureFor(@NotNull PsiFile file,
+                                                                          @NotNull LanguageServerDefinition serverDefinition,
+                                                                          @Nullable Predicate<LSPClientFeatures> beforeStartingServerFilter) {
+        // Completes also when the connection fails or is cancelled, as by a later one for the same file
+        var connected = new CompletableFuture<Void>();
+        ReadAction.nonBlocking(() ->
+                        // Try to send a textDocument/didOpen notification if the file is associated to the language server definition
+                        LanguageServiceAccessor.getInstance(project)
+                                .getLanguageServers(file, beforeStartingServerFilter, null, serverDefinition)
+                                .thenAccept(servers -> {
+                                    // textDocument/didOpen notification has been sent
+                                    if (servers.isEmpty()) {
+                                        return;
+                                    }
+                                    // refresh IJ code visions, inlay hints, folding features, color, structure view
+                                    EditorFeatureManager.getInstance(project)
+                                            .refreshEditorFeature(file, EditorFeatureType.ALL, true, new PsiFileCancelChecker(file));
+                                }))
                 .coalesceBy(this, file)
-                .submit(AppExecutorUtil.getAppExecutorService());
+                .submit(AppExecutorUtil.getAppExecutorService())
+                .onSuccess(sent -> sent.whenComplete((unused, error) -> connected.complete(null)))
+                .onError(error -> connected.complete(null));
+        return connected;
     }
 
     /**
