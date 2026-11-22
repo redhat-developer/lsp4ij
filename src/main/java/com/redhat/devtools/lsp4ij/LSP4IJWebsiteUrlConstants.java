@@ -18,4 +18,6 @@ package com.redhat.devtools.lsp4ij;
 public class LSP4IJWebsiteUrlConstants {
 
     public static final String FEEDBACK_URL = "https://github.com/redhat-developer/lsp4ij#feedback";
+
+    public static final String GETTING_STARTED_URL = "https://github.com/redhat-developer/lsp4ij/blob/main/docs/UserGuide.md";
 }

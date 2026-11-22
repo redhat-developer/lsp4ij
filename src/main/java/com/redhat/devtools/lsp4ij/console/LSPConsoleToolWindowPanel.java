@@ -15,6 +15,7 @@ package com.redhat.devtools.lsp4ij.console;
 
 import com.intellij.execution.ui.ConsoleView;
 import com.intellij.execution.ui.ConsoleViewContentType;
+import com.intellij.ide.BrowserUtil;
 import com.intellij.openapi.Disposable;
 import com.intellij.openapi.actionSystem.ActionManager;
 import com.intellij.openapi.actionSystem.ActionToolbar;
@@ -22,6 +23,7 @@ import com.intellij.openapi.actionSystem.DefaultActionGroup;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.ModalityState;
 import com.intellij.openapi.application.ReadAction;
+import com.intellij.openapi.options.ShowSettingsUtil;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.OnePixelDivider;
 import com.intellij.openapi.ui.SimpleToolWindowPanel;
@@ -29,11 +31,15 @@ import com.intellij.openapi.util.Disposer;
 import com.intellij.openapi.wm.ToolWindowManager;
 import com.intellij.openapi.ui.LoadingDecorator;
 import com.intellij.ui.CardLayoutPanel;
+import com.intellij.ui.HyperlinkLabel;
 import com.intellij.ui.OnePixelSplitter;
+import com.intellij.ui.components.JBLabel;
+import com.intellij.ui.components.JBPanel;
 import com.intellij.ui.components.JBScrollPane;
 import com.intellij.ui.components.JBTabbedPane;
 import com.intellij.util.concurrency.AppExecutorUtil;
 import com.intellij.util.ui.JBUI;
+import com.redhat.devtools.lsp4ij.LSP4IJWebsiteUrlConstants;
 import com.redhat.devtools.lsp4ij.LanguageServerBundle;
 import com.redhat.devtools.lsp4ij.LanguageServerWrapper;
 import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
@@ -46,6 +52,7 @@ import com.redhat.devtools.lsp4ij.installation.ConsoleProvider;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinitionListener;
 import com.redhat.devtools.lsp4ij.settings.GlobalLanguageServerSettings;
+import com.redhat.devtools.lsp4ij.settings.LanguageServerListConfigurable;
 import com.redhat.devtools.lsp4ij.settings.ProjectLanguageServerSettings;
 import com.redhat.devtools.lsp4ij.settings.LanguageServerView;
 import com.redhat.devtools.lsp4ij.settings.LanguageServerSettingsListener;
@@ -79,7 +86,13 @@ public class LSPConsoleToolWindowPanel extends SimpleToolWindowPanel implements 
 
     private ConsolesPanel consoles;
     private LoadingDecorator loadingDecorator;
+    private JPanel rightPanel;
+    private JPanel emptyStatePanel;
+    private boolean emptyStateVisible;
     private boolean disposed;
+
+    private static final String NAME_VIEW_CONSOLES = "consoles";
+    private static final String NAME_VIEW_EMPTY = "empty";
 
     public LSPConsoleToolWindowPanel(@NotNull Project project) {
         super(false, true);
@@ -280,13 +293,68 @@ public class LSPConsoleToolWindowPanel extends SimpleToolWindowPanel implements 
         // Wrap consoles with a loading decorator to show spinner during panel construction
         this.loadingDecorator = new LoadingDecorator(consoles, this, 0);
 
-        var splitPane = createSplitPanel(scrollPane, loadingDecorator.getComponent());
+        // The right side shows the consoles, or an empty state when no language server is configured
+        this.rightPanel = new JPanel(new CardLayout());
+        this.rightPanel.add(loadingDecorator.getComponent(), NAME_VIEW_CONSOLES);
+        this.emptyStatePanel = createEmptyStatePanel();
+        this.rightPanel.add(emptyStatePanel, NAME_VIEW_EMPTY);
+
+        var splitPane = createSplitPanel(scrollPane, rightPanel);
         super.setContent(splitPane);
         super.revalidate();
         super.repaint();
 
         // Load language server definitions and started servers asynchronously
         explorer.loadAsync();
+    }
+
+    /**
+     * Creates the panel shown on the right side when no language server is configured, with a
+     * link to the Getting Started documentation and a link to open the Language Servers
+     * settings so a language server can be added.
+     *
+     * @return the empty state panel.
+     */
+    private @NotNull JPanel createEmptyStatePanel() {
+        var panel = new JBPanel<>();
+        panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
+        panel.setBorder(JBUI.Borders.empty(10));
+
+        panel.add(new JBLabel(LanguageServerBundle.message("lsp.console.empty.title")));
+
+        var gettingStartedLink = new HyperlinkLabel(LanguageServerBundle.message("lsp.console.empty.getting.started.text"));
+        gettingStartedLink.addHyperlinkListener(e -> BrowserUtil.browse(LSP4IJWebsiteUrlConstants.GETTING_STARTED_URL));
+        panel.add(gettingStartedLink);
+
+        var addServerLink = new HyperlinkLabel(LanguageServerBundle.message("lsp.console.empty.add.server.text"));
+        addServerLink.addHyperlinkListener(e -> ShowSettingsUtil.getInstance().showSettingsDialog(project, LanguageServerListConfigurable.class));
+        panel.add(addServerLink);
+
+        return panel;
+    }
+
+    /**
+     * Shows the empty state on the right side when no language server is configured, and the
+     * consoles otherwise. Called once the language server definitions have loaded and whenever
+     * a language server definition is added or removed.
+     */
+    public void updateEmptyState() {
+        if (isDisposed() || explorer == null || rightPanel == null) {
+            return;
+        }
+        var root = (DefaultMutableTreeNode) explorer.getTreeModel().getRoot();
+        emptyStateVisible = root.getChildCount() == 0;
+        ((CardLayout) rightPanel.getLayout()).show(rightPanel, emptyStateVisible ? NAME_VIEW_EMPTY : NAME_VIEW_CONSOLES);
+    }
+
+    @TestOnly
+    boolean isEmptyStateVisible() {
+        return emptyStateVisible;
+    }
+
+    @TestOnly
+    JPanel getEmptyStatePanel() {
+        return emptyStatePanel;
     }
 
     /**
