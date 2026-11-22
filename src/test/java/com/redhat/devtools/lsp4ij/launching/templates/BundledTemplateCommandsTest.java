@@ -183,6 +183,55 @@ public class BundledTemplateCommandsTest {
     }
 
     /**
+     * An {@code npm install} of an installer runs in the {@code node_modules} folder of its server, as
+     * {@code ~/.lsp4ij/lsp/typescript-language-server/node_modules}. npm installs into the first folder, from its
+     * working directory up, that has a {@code package.json} or a {@code node_modules} folder: from a
+     * {@code node_modules} folder, that's the folder of the server. From the folder of the server itself, a
+     * {@code package.json} in the home directory takes the install, and the command that the installer gives the
+     * language server doesn't find it (#1960).
+     */
+    @Test
+    void anNpmInstallRunsInTheNodeModulesFolderOfItsServer() throws IOException, URISyntaxException {
+        List<String> installs = new ArrayList<>();
+        List<String> problems = new ArrayList<>();
+        bundledFiles().forEach((file, json) -> {
+            if (!file.endsWith("/installer.json")) {
+                return;
+            }
+            Map<String, String> properties = new HashMap<>();
+            var declared = json.getAsJsonObject("properties");
+            if (declared != null) {
+                declared.entrySet().forEach(property -> properties.put(property.getKey(),
+                        property.getValue().getAsString()));
+            }
+            collectNpmInstalls(json, file, properties, installs, problems);
+        });
+        assertTrue(installs.size() > 5, "the npm installs of the installers: " + installs);
+        assertEquals(List.of(), problems, "run npm install in the node_modules folder of the server");
+    }
+
+    private static void collectNpmInstalls(@NotNull JsonElement json, @NotNull String file,
+                                           @NotNull Map<String, String> properties, @NotNull List<String> installs,
+                                           @NotNull List<String> problems) {
+        if (!json.isJsonObject()) {
+            return;
+        }
+        JsonObject object = json.getAsJsonObject();
+        if (object.has("command") && object.has("workingDir")) {
+            List<String> commands = new ArrayList<>();
+            collectByOs(object.get("command"), commands);
+            if (commands.stream().anyMatch(command -> command.matches("npm(\\.cmd)? install .*"))) {
+                String workingDir = resolve(object.get("workingDir").getAsString(), properties);
+                installs.add(file + ": " + workingDir);
+                if (!workingDir.endsWith("/node_modules")) {
+                    problems.add(file + ": " + workingDir);
+                }
+            }
+        }
+        object.entrySet().forEach(entry -> collectNpmInstalls(entry.getValue(), file, properties, installs, problems));
+    }
+
+    /**
      * Returns the command that the download or the install command of the given installer gives the language server on
      * the given OS, {@code windows} or {@code default}, with the directory and the file of the download, or the
      * properties of the installer, as the working directory of an {@code npm install}.
