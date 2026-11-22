@@ -409,6 +409,9 @@ You should edit the variable:
 the edit apply will consume the
 [SetVariable request](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_SetVariable):
 
+`Set Value...` isn't available for the result of an expression, as `Evaluate Expression` shows it: the SetVariable
+request names the variable's container, and such a result has none. The variables inside the result can be set.
+
 ## Loaded sources and modules
 
 When the DAP server reports the sources it has loaded (`supportsLoadedSourcesRequest`), the debug tab gets a
