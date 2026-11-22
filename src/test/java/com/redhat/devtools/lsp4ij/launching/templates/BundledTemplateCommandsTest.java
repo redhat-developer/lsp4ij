@@ -346,6 +346,49 @@ public class BundledTemplateCommandsTest {
     }
 
     /**
+     * An install step that runs a package manager, as {@code go install}, {@code gem install}, {@code pip install},
+     * {@code npm install} or {@code cs install}, ignores its standard error. Package managers write their progress
+     * there, as {@code go: downloading …}, and an {@code exec} that writes to it fails unless it ignores it: the
+     * installation would fail although the server was installed. The exit code of the package manager says whether it
+     * installed the server.
+     */
+    @Test
+    void anInstallStepOfAPackageManagerIgnoresItsStandardError() throws IOException, URISyntaxException {
+        Pattern install = Pattern.compile("\\b(go|gem|pip3?|npm(\\.cmd)?|cs) install\\b");
+        List<String> installs = new ArrayList<>();
+        List<String> problems = new ArrayList<>();
+        bundledFiles().forEach((file, json) -> {
+            if (file.endsWith("/installer.json") && json.has("run")) {
+                collectPackageManagerInstalls(json.get("run"), file, install, installs, problems);
+            }
+        });
+        assertTrue(installs.size() > 10, "the installs of a package manager in the installers: " + installs);
+        assertEquals(List.of(), problems, "set \"ignoreStderr\": true on the exec of the install of a package manager");
+    }
+
+    private static void collectPackageManagerInstalls(@NotNull JsonElement json, @NotNull String file,
+                                                      @NotNull Pattern install, @NotNull List<String> installs,
+                                                      @NotNull List<String> problems) {
+        if (!json.isJsonObject()) {
+            return;
+        }
+        JsonObject object = json.getAsJsonObject();
+        if (object.has("command")) {
+            List<String> commands = new ArrayList<>();
+            collectByOs(object.get("command"), commands);
+            if (commands.stream().anyMatch(command -> install.matcher(command).find())) {
+                installs.add(file + ": " + commands);
+                JsonElement ignoreStderr = object.get("ignoreStderr");
+                if (ignoreStderr == null || !ignoreStderr.getAsBoolean()) {
+                    problems.add(file + ": " + commands);
+                }
+            }
+        }
+        object.entrySet().forEach(entry -> collectPackageManagerInstalls(entry.getValue(), file, install, installs,
+                problems));
+    }
+
+    /**
      * Returns the command that the download or the install command of the given installer gives the language server on
      * the given OS, {@code windows} or {@code default}, with the directory and the file of the download, or the
      * properties of the installer, as the working directory of an {@code npm install}.

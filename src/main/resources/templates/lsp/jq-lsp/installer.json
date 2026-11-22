@@ -47,6 +47,7 @@
   "run": {
     "exec": {
       "name": "Install JQ Language Server Globally",
+      "ignoreStderr": true,
       "command": "go install github.com/wader/jq-lsp@latest",
       "onSuccess": {
         "configureServer": {

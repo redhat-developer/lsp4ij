@@ -15,6 +15,7 @@
   "run": {
     "exec": {
       "name": "Install 'debugpy'",
+      "ignoreStderr": true,
       "command": "pip install debugpy"
     }
   }
