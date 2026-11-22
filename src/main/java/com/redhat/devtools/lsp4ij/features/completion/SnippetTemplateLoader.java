@@ -19,6 +19,10 @@ import com.intellij.codeInsight.template.Template;
 import com.intellij.codeInsight.template.impl.ConstantNode;
 import com.intellij.openapi.util.text.StringUtil;
 import com.redhat.devtools.lsp4ij.features.completion.snippet.AbstractLspSnippetHandler;
+import com.redhat.devtools.lsp4ij.features.completion.snippet.LspSnippetDefaults;
+import com.redhat.devtools.lsp4ij.features.completion.snippet.LspSnippetDefaults.Part;
+import com.redhat.devtools.lsp4ij.features.completion.snippet.LspSnippetDefaults.TabStop;
+import com.redhat.devtools.lsp4ij.features.completion.snippet.LspSnippetDefaults.Text;
 import com.redhat.devtools.lsp4ij.features.completion.snippet.LspSnippetHandler;
 import com.redhat.devtools.lsp4ij.features.completion.snippet.LspSnippetIndentOptions;
 import org.jetbrains.annotations.NotNull;
@@ -27,12 +31,10 @@ import org.jetbrains.annotations.Nullable;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.ListIterator;
-import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
 
@@ -56,8 +58,8 @@ public class SnippetTemplateLoader extends AbstractLspSnippetHandler {
 
     private final List<SnippetTemplateSegment> templateSegments = new LinkedList<>();
     private final List<String> existingVariables = new LinkedList<>();
-    // The default of each index, which its tab stops and placeholders repeat (#2073)
-    private final Map<Integer, Default> defaults = new HashMap<>();
+    // The default of each index, which its tab stops, placeholders and choices repeat (#2073)
+    private final LspSnippetDefaults defaults = new LspSnippetDefaults();
 
     // The text of the outermost placeholder being read, with the text of the placeholders nested in it. A variable of
     // an IntelliJ template can't contain another, so a placeholder is one variable, whose text is its whole text, and
@@ -211,36 +213,12 @@ public class SnippetTemplateLoader extends AbstractLspSnippetHandler {
     }
 
     /**
-     * Returns the default of the given index: the text of the first placeholder with that index, or the first value of
-     * the first choice with that index, with its values. As in VS Code, it's empty for an index with neither.
+     * Returns the default of the given index, with the values of the choice that gave it.
      */
     private @NotNull Expression defaultOf(int index) {
-        Default value = defaults.get(index);
-        if (value == null) {
-            return new ConstantNode("");
-        }
-        var node = new ConstantNode(textOf(value.parts(), new HashSet<>(Set.of(index))));
-        return value.choices() != null ? node.withLookupStrings(value.choices()) : node;
-    }
-
-    /**
-     * Returns the given text of a placeholder, in which a tab stop repeats the default of its index. A default that
-     * repeats itself, as in ${1:$1}, repeats nothing.
-     */
-    private @NotNull String textOf(@NotNull List<Part> parts, @NotNull Set<Integer> repeating) {
-        var text = new StringBuilder();
-        for (Part part : parts) {
-            if (part instanceof Text value) {
-                text.append(value.value());
-            } else if (part instanceof Repeat repeat) {
-                Default value = defaults.get(repeat.index());
-                if (value != null && repeating.add(repeat.index())) {
-                    text.append(textOf(value.parts(), repeating));
-                    repeating.remove(repeat.index());
-                }
-            }
-        }
-        return text.toString();
+        var node = new ConstantNode(defaults.getText(index));
+        List<String> choices = defaults.getChoices(index);
+        return choices != null ? node.withLookupStrings(choices) : node;
     }
 
     @Override
@@ -258,7 +236,7 @@ public class SnippetTemplateLoader extends AbstractLspSnippetHandler {
             // A tab stop in a placeholder has no stop of its own: it repeats the default of its index in the text of
             // the placeholder. As in VS Code, $0 repeats none
             if (index != 0) {
-                appendToPlaceholder(new Repeat(index));
+                appendToPlaceholder(new TabStop(index));
             }
             return;
         }
@@ -271,11 +249,10 @@ public class SnippetTemplateLoader extends AbstractLspSnippetHandler {
 
     @Override
     public void choice(int index, List<String> choices) {
-        String value = choices.isEmpty() ? "" : choices.get(0);
-        defaults.putIfAbsent(index, new Default(List.of(new Text(value)), choices));
+        defaults.putChoice(index, choices);
         if (placeholderParts != null) {
             // A choice in a placeholder gives its first value to the text of the placeholder
-            appendToPlaceholder(new Text(value));
+            appendToPlaceholder(new Text(choices.isEmpty() ? "" : choices.get(0)));
             return;
         }
         templateSegments.add(SnippetTemplateSegment.tabStop(index));
@@ -327,7 +304,7 @@ public class SnippetTemplateLoader extends AbstractLspSnippetHandler {
             // The default of a nested placeholder is its part of the text of the placeholder that contains it
             NestedPlaceholder nested = nestedPlaceholders.poll();
             if (nested != null) {
-                definePlaceholder(nested.index(), List.copyOf(placeholderParts.subList(nested.start(), placeholderParts.size())));
+                defaults.putPlaceholder(nested.index(), placeholderParts.subList(nested.start(), placeholderParts.size()));
             }
             return;
         }
@@ -338,18 +315,8 @@ public class SnippetTemplateLoader extends AbstractLspSnippetHandler {
             // As ${1:}, a tab stop
             tabstop(placeholderIndex);
         } else {
-            definePlaceholder(placeholderIndex, parts);
+            defaults.putPlaceholder(placeholderIndex, parts);
             templateSegments.add(SnippetTemplateSegment.tabStop(placeholderIndex));
-        }
-    }
-
-    /**
-     * Makes the given text of a placeholder the default of its index, unless a placeholder or a choice before it
-     * gave one. As in VS Code, a placeholder without a text, as ${1:}, gives none.
-     */
-    private void definePlaceholder(int index, @NotNull List<Part> parts) {
-        if (!parts.isEmpty()) {
-            defaults.putIfAbsent(index, new Default(parts, null));
         }
     }
 
@@ -378,25 +345,6 @@ public class SnippetTemplateLoader extends AbstractLspSnippetHandler {
                 templateSegments.add(SnippetTemplateSegment.namedVariable(name, new ConstantNode(name), null, true, false));
             }
         }
-    }
-
-    /**
-     * A part of the text of a placeholder: a text, or a tab stop, which repeats the default of its index.
-     */
-    private sealed interface Part permits Text, Repeat {
-    }
-
-    private record Text(@NotNull String value) implements Part {
-    }
-
-    private record Repeat(int index) implements Part {
-    }
-
-    /**
-     * The default of an index: the text of its first placeholder, or the first value of its first choice, with the
-     * values of that choice.
-     */
-    private record Default(@NotNull List<Part> parts, @Nullable List<String> choices) {
     }
 
     /**

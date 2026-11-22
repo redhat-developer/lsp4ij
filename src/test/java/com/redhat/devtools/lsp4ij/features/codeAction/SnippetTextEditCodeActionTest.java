@@ -161,6 +161,33 @@ public class SnippetTextEditCodeActionTest extends LSPCodeActionFixtureTestCase 
         assertEquals("z z z z world", otherDocument.getText());
     }
 
+    public void testPlaceholdersWithTheSameIndexHaveTheTextOfTheFirst() {
+        var other = myFixture.addFileToProject("other.txt", "world");
+        var intention = greetingIntention();
+        resolveTo(other, Either.forRight(new SnippetTextEdit(range(0, 0), new StringValue("snippet", "${1:a} ${1:b} "))));
+
+        invoke(intention);
+        PlatformTestUtil.dispatchAllEventsInIdeEventQueue();
+
+        Document otherDocument = FileDocumentManager.getInstance().getDocument(other.getVirtualFile());
+        assertNotNull(otherDocument);
+        // As the template in the selected editor gives it
+        assertEquals("a a world", otherDocument.getText());
+    }
+
+    public void testADefaultThatRepeatsItselfRepeatsNothing() {
+        var other = myFixture.addFileToProject("other.txt", "world");
+        var intention = greetingIntention();
+        resolveTo(other, Either.forRight(new SnippetTextEdit(range(0, 0), new StringValue("snippet", "${1:x$1$1} $1 "))));
+
+        invoke(intention);
+        PlatformTestUtil.dispatchAllEventsInIdeEventQueue();
+
+        Document otherDocument = FileDocumentManager.getInstance().getDocument(other.getVirtualFile());
+        assertNotNull(otherDocument);
+        assertEquals("x x world", otherDocument.getText());
+    }
+
     public void testAPlaceholderThatIsAVariableInsertsItsValue() {
         var other = myFixture.addFileToProject("other.txt", "world");
         var intention = greetingIntention();

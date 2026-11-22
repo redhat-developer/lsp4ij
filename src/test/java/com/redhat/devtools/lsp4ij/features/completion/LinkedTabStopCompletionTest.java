@@ -92,6 +92,13 @@ public class LinkedTabStopCompletionTest extends LSPCompletionFixtureTestCase {
         assertTyped("x y");
     }
 
+    public void testADefaultThatRepeatsItselfRepeatsNothing() {
+        complete("${1:a$1} = $1$0");
+
+        assertApplyCompletionItem(0, "a = a");
+        assertTyped("x = x");
+    }
+
     public void testATabStopRepeatsTheTextOfTheOuterPlaceholderWithItsIndex() {
         complete("${1:hello ${2:you}} = $1, $2$0");
 
