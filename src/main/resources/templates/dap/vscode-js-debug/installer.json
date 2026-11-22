@@ -7,7 +7,14 @@
   "check": {
     "fileExists": {
       "name": "Check if vscode-js-debug is installed",
-      "file": "${serverDist}/js-debug/src/dapDebugServer.js"
+      "file": "${serverDist}/js-debug/src/dapDebugServer.js",
+      "onSuccess": {
+        "replaceTemplateCommand": {
+          "name": "Configure VSCode JS Debug server command",
+          "templateCommand": "node <<insert base directory>>/js-debug/src/dapDebugServer.js ${port} 127.0.0.1",
+          "command": "node \"${check.file}\" ${port} 127.0.0.1"
+        }
+      }
     }
   },
   "run": {

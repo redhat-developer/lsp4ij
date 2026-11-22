@@ -146,6 +146,17 @@ public class InstallerContext implements Reporter {
     }
 
     /**
+     * Removes a property from this context, if it is there, and logs it to the console.
+     *
+     * @param key the property name.
+     */
+    public void removeProperty(@NotNull String key) {
+        if (properties.remove(key) != null) {
+            print("${" + key + "} removed");
+        }
+    }
+
+    /**
      * Retrieves a property value by key.
      *
      * @param key the property name.

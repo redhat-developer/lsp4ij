@@ -10,6 +10,16 @@
       "file": {
         "windows": "${serverDist}/perl-dap.exe",
         "default": "${serverDist}/perl-dap"
+      },
+      "onSuccess": {
+        "replaceTemplateCommand": {
+          "name": "Configure Perl DAP server command",
+          "templateCommand": {
+            "windows": "<<insert base directory>>/perl-dap.exe",
+            "default": "<<insert base directory>>/perl-dap"
+          },
+          "command": "\"${check.file}\""
+        }
       }
     }
   },
