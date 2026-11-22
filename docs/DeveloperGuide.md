@@ -127,6 +127,15 @@ which wraps a process and allows to track the process state via a
 In addition, OSProcessStreamConnectionProvider allows to log errors from the language server in the `Log tab` of the 
 [LSP console](https://github.com/redhat-developer/lsp4ij/blob/main/docs/UserGuide.md#lsp-console).
 
+Since IntelliJ 2025.1, a plugin can set up the environment of a process for its working directory (the
+`commandLineEnvCustomizer` extension point), as the [mise](https://mise.jdx.dev/) plugin does. A command line with a
+working directory (`withWorkDirectory`) gets that environment when it starts, and `start()` looks its command up in
+the `PATH` of that environment, as for a
+[user-defined language server](./UserDefinedLanguageServer.md#directory-specific-environment-variables). A command
+which is a path, or a command line without a working directory, is left as it is.
+[ProcessStreamConnectionProvider](#processstreamconnectionprovider) starts its process with a `ProcessBuilder`, which
+gets neither.
+
 Here is a basic sample which starts the `path/to/my/language/server/main.js` language server written in JavaScript, with
 the Node.js runtime found in "path/to/nodejs/node.exe":
 
@@ -217,8 +226,11 @@ SocketStreamConnectionProvider.startAndAccept(0, port ->
         new GeneralCommandLine("path/to/nodejs/node.exe", "path/to/my/language/server/main.js", "--socket=" + port));
 ```
 
-A port of 0 lets LSP4IJ choose a free port, for which the command line is made. LSP4IJ listens on the loopback address
-only. The output of a language server which LSP4IJ starts goes to the `Log tab` of the
+A port of 0 lets LSP4IJ choose a free port, for which the command line is made. LSP4IJ listens on the loopback addresses
+only: on `127.0.0.1` and `::1`, on the same port, so that a language server which connects to `localhost` reaches it
+on either, and on the first one alone when the port isn't free on the other, or without IPv6. `startAndConnect`
+connects to the loopback address of the JVM and then to the other one. The output of a language server which LSP4IJ
+starts goes to the `Log tab` of the
 [LSP console](https://github.com/redhat-developer/lsp4ij/blob/main/docs/UserGuide.md#lsp-console), since the socket
 carries the protocol: its standard output as information, and its standard error as errors. A language server which ends, or closes the connection, is reported as stopped unexpectedly, as
 a language server process is. Stopping the language server closes the connection, and ends the process only if LSP4IJ
@@ -651,16 +663,27 @@ Installs the language server using the given [`ServerInstallationContext`](https
 
 #### Behavior
 
-When invoked, this method:
+When invoked, this method returns at once. For each started language server of the definition in the project, or for
+a new one if none was started, it:
 
 1. Checks whether a [`Language server installer`](./LSPApi.md#language-server-installer) is configured for the current language server.
 2. If a `ServerInstaller` is present:
   - Stops the language server if it is currently starting or already started.
   - Resets the installer's internal state.
-  - Executes the installation via `checkInstallation(context)`.
+  - Executes the installation via `checkInstallation(context)`, in the background.
   - If the server was previously running, it restarts it once the installation completes.
 3. If no `ServerInstaller` is configured:
-  - The server is assumed to be already installed, and the method completes immediately with `ServerInstallationStatus.INSTALLED`.
+  - The server is assumed to be already installed, and nothing runs.
+
+A definition with [several instances](#several-language-server-instances) runs the installer once for all of them.
+
+The `ServerInstallationContext` says how:
+
+- `setForceInstall(true)` skips the check of the installation and installs, as the `Reinstall` action of the LSP
+  console does. By default (`false`), the server is installed only if the check fails, as `Install if Needed` does.
+- `setStartServerAfterInstallation(false)` keeps the installer from starting the language server once it is installed,
+  as the actions of the LSP console do; a language server which ran before the installation still starts again. By
+  default (`true`), the installer starts it.
 
 #### Example
 
@@ -668,14 +691,7 @@ When invoked, this method:
 ServerInstallationContext context = new ServerInstallationContext()
         .setForceInstall(true); 
 LanguageServerManager.getInstance(project)
-    .install("myLanguageServerId", context)
-    .thenAccept(status -> {
-        if (status == ServerInstallationStatus.INSTALLED) {
-        // installation succeeded
-        } else {
-        // handle other status (e.g., FAILED or CANCELLED)
-        }
-    });
+    .install("myLanguageServerId", context);
 ```
 
 ## Keep a Language Server alive with a Lease
@@ -1374,7 +1390,9 @@ The methods that only take the id mean the instance created first, so use the on
 
 ## User-Defined Language Server Configuration
 
-For user-defined language servers, workspace folder configuration can be specified in the `workspaceFolderSettings.json` template file or configured in the UI:
+For user-defined language servers, workspace folder configuration is configured in the `Workspace Folders` tab of the
+settings of the language server. A template can have it as a `workspaceFolderSettings.json` file, which an export
+writes, but the New Language Server dialog doesn't apply it yet:
 
 ![Workspace Folders Configuration](./images/WorkspaceFoldersConfiguration.png)
 
