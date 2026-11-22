@@ -49,7 +49,7 @@ public class LSPGoToTypeDefinitionAction extends AbstractLSPGoToAction {
                                                                  int offset) {
         LSPTypeDefinitionSupport typeDefinitionSupport = LSPFileSupport.getSupport(psiFile).getTypeDefinitionSupport();
         var params = new LSPTypeDefinitionParams(new TextDocumentIdentifier(), LSPIJUtils.toPosition(offset, document), offset);
-        CompletableFuture<List<LocationData>> typeDefinitionsFuture = typeDefinitionSupport.getTypeDefinitions(params);
+        CompletableFuture<List<LocationData>> typeDefinitionsFuture = typeDefinitionSupport.getAnsweredTypeDefinitions(params);
         try {
             awaitWithCheckCanceled(typeDefinitionsFuture);
         } catch (ProcessCanceledException e) {

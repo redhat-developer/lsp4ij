@@ -86,7 +86,8 @@ public abstract class AbstractLSPGoToAction extends AnAction {
                 // A cancelled progress throws ProcessCanceledException, which shows nothing
                 CompletableFuture<List<LocationData>> locationsFuture = getLocations(psiFile, document, editor, offset);
                 if (!isDoneNormally(locationsFuture)) {
-                    // textDocument/(declaration|implementation|references|typeDefinition) has been cancelled, or has
+                    // textDocument/(declaration|implementation|references|typeDefinition) has been cancelled, or no
+                    // language server has answered it (CancellationSupport has reported their errors), or it has
                     // failed (getLocations has logged it): there is no answer to show
                     return;
                 }

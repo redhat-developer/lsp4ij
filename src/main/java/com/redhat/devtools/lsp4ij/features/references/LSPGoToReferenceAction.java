@@ -49,7 +49,7 @@ public class LSPGoToReferenceAction extends AbstractLSPGoToAction {
                                                                  int offset) {
         LSPReferenceSupport referenceSupport = LSPFileSupport.getSupport(psiFile).getReferenceSupport();
         var params = new LSPReferenceParams(new TextDocumentIdentifier(), LSPIJUtils.toPosition(offset, document), offset);
-        CompletableFuture<List<LocationData>> referencesFuture = referenceSupport.getReferences(params);
+        CompletableFuture<List<LocationData>> referencesFuture = referenceSupport.getAnsweredReferences(params);
         try {
             awaitWithCheckCanceled(referencesFuture);
         } catch (ProcessCanceledException e) {

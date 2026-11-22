@@ -89,7 +89,7 @@ public class LSPWorkspaceTypeDeclarationProvider implements TypeDeclarationPlace
 
         LSPTypeDefinitionSupport typeDefinitionSupport = LSPFileSupport.getSupport(file).getTypeDefinitionSupport();
         var params = new LSPTypeDefinitionParams(new TextDocumentIdentifier(), LSPIJUtils.toPosition(offset, document), offset);
-        CompletableFuture<List<LocationData>> typeDefinitionsFuture = typeDefinitionSupport.getTypeDefinitions(params);
+        CompletableFuture<List<LocationData>> typeDefinitionsFuture = typeDefinitionSupport.getAnsweredTypeDefinitions(params);
         try {
             awaitWithCheckCanceled(typeDefinitionsFuture);
         } catch (ProcessCanceledException e) {
