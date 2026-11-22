@@ -107,6 +107,31 @@ public class FileDocumentMoveTest extends LSPCodeInsightFixtureTestCase {
         reconnectAfter(context, () -> write(() -> context.file().move(this, destination)), false);
     }
 
+    public void testALanguageServerKeepsRunningUntilTheMoveOfItsLastDocumentConnectsItAgain() throws Exception {
+        MockLanguageServer.reset();
+        var context = openDocument();
+        var wrapper = context.wrapper();
+        var destination = myFixture.getTempDirFixture().findOrCreateDir("destination");
+        // A lease, as the one that the move holds until it has told the language server of itself
+        var lease = new LanguageServerItem(null, wrapper).keepAlive();
+        Queue<Runnable> waiting = new ConcurrentLinkedQueue<>();
+        wrapper.setConnectionExecutor(waiting::add);
+        try {
+            reconnectAfter(context, () -> {
+                write(() -> context.file().move(this, destination));
+                PlatformTestUtil.waitWithEventsDispatching("The move must connect the file again",
+                        () -> !waiting.isEmpty(), 10);
+                // The lease ends as the connection of the moved document waits, and the language server has no document
+                lease.dispose();
+                wrapper.setConnectionExecutor(AppExecutorUtil.getAppExecutorService());
+                waiting.forEach(AppExecutorUtil.getAppExecutorService()::execute);
+            }, false);
+        } finally {
+            lease.dispose();
+            wrapper.setConnectionExecutor(AppExecutorUtil.getAppExecutorService());
+        }
+    }
+
     public void testRenameTwiceBeforeReconnectOpensOnlyTheFinalUri() throws Exception {
         var context = openDocument();
         var reopened = new CompletableFuture<DidOpenTextDocumentParams>();
@@ -630,9 +655,14 @@ public class FileDocumentMoveTest extends LSPCodeInsightFixtureTestCase {
         MockLanguageServer.INSTANCE.getTextDocumentService().setDidCloseCallback(closed);
         expectDidOpenOfAnotherUri(opened, oldUri);
         MockLanguageServer.INSTANCE.getWorkspaceService().setDidRenameCallback(renamed);
+        var server = context.wrapper().getLanguageServer();
         operation.run();
-        PlatformTestUtil.waitWithEventsDispatching("rename must deliver close, open and workspace notification",
+        PlatformTestUtil.waitWithEventsDispatching(
+                () -> "rename must deliver close, open and workspace notification, missing:"
+                        + (closed.isDone() ? "" : " didClose") + (opened.isDone() ? "" : " didOpen")
+                        + (renamed.isDone() || !didRenameFiles ? "" : " didRenameFiles"),
                 () -> closed.isDone() && opened.isDone() && (renamed.isDone() || !didRenameFiles) && closedBeforeOpen.isDone(), 10);
+        assertSame("The move must not stop the language server", server, context.wrapper().getLanguageServer());
         URI newUri = context.wrapper().toUri(context.file());
         assertTrue("didClose must precede didOpen", closedBeforeOpen.join());
         assertEquals(oldUri, URI.create(closed.join().getTextDocument().getUri()));
