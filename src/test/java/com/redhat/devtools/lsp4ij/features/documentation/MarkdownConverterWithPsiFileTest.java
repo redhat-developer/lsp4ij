@@ -101,6 +101,50 @@ public class MarkdownConverterWithPsiFileTest extends LSPCodeInsightFixtureTestC
         assertMarkdownConverter("bar.txt", markdown, "<p><a href=\"file://$FILE_BASE_DIR$/lsp/foo.txt\">foo</a></p>\n");
     }
 
+    /**
+     * A code block of a language other than that of the file whose documentation it is, as {@code ```python} in the
+     * documentation of a Rust file, is colored by the TextMate grammar of its own language, as in a file of its
+     * language, and not by that of the file (#557).
+     */
+    public void testACodeBlockIsColoredByTheTextMateGrammarOfItsLanguage() {
+        String python = """
+                ```python
+                # a comment
+                def f(): pass
+                ```
+                """;
+        String inAPythonFile = toHtml("test.py", python);
+        assertTrue("a grammar colors the code block: " + inAPythonFile, inAPythonFile.contains("<span"));
+        assertEquals("in the documentation of a Rust file", inAPythonFile, toHtml("test.rs", python));
+        assertEquals("in the documentation of a file without a grammar", inAPythonFile, toHtml("test.txt", python));
+
+        // rust is no file extension: its grammar is that of .rs
+        String rust = """
+                ```rust
+                // a comment
+                fn main() {}
+                ```
+                """;
+        String inARustFile = toHtml("test.rs", rust);
+        assertTrue("a grammar colors the code block: " + inARustFile, inARustFile.contains("<span"));
+        assertEquals("in the documentation of a file without a grammar", inARustFile, toHtml("test.txt", rust));
+    }
+
+    /**
+     * A code block of a language without a TextMate grammar is colored by the grammar of the file whose documentation
+     * it is, as a code block without a language is.
+     */
+    public void testACodeBlockOfALanguageWithoutAGrammarIsColoredByTheGrammarOfTheFile() {
+        String withoutLanguage = toHtml("test.rs", "```\nfn main() {}\n```\n");
+        assertTrue("the grammar of the file colors the code block: " + withoutLanguage, withoutLanguage.contains("<span"));
+        assertEquals(withoutLanguage, toHtml("test.rs", "```nosuchlanguage\nfn main() {}\n```\n"));
+    }
+
+    private @NotNull String toHtml(@NotNull String fileName, @NotNull String markdown) {
+        myFixture.configureByText(fileName, "");
+        return MarkdownConverter.getInstance(myFixture.getProject()).toHtml(markdown, myFixture.getFile());
+    }
+
     private void assertMarkdownConverter(String fileName, String markdown, String html) {
         myFixture.configureByText(fileName, "");
         var file = myFixture.getFile();
