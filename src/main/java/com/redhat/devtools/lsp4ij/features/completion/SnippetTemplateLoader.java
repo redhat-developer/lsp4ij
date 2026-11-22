@@ -24,8 +24,12 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.function.Function;
 
 /**
@@ -48,6 +52,14 @@ public class SnippetTemplateLoader extends AbstractLspSnippetHandler {
 
     private final List<SnippetTemplateSegment> templateSegments = new LinkedList<>();
     private final List<String> existingVariables = new LinkedList<>();
+
+    // Template variable name declared for a tab stop / placeholder index, so that
+    // occurrences with the same index are linked and updated in sync (see #2073).
+    // A tab stop met before its placeholder declares the variable with an empty
+    // default; the placeholder fills the default in afterwards.
+    private final Map<Integer, String> variableNameByIndex = new HashMap<>();
+    private final Map<Integer, SnippetTemplateSegment> declarationSegmentByIndex = new HashMap<>();
+    private final Set<Integer> fillableIndices = new HashSet<>();
 
     /**
      * Load the given Intellij template from a LSP snippet content by using the given variable resolver.
@@ -177,9 +189,26 @@ public class SnippetTemplateLoader extends AbstractLspSnippetHandler {
     public void tabstop(int index) {
         if (index == 0) {
             templateSegments.add(SnippetTemplateSegment.endVariable());
+        } else if (variableNameByIndex.containsKey(index)) {
+            // A placeholder (or an earlier tab stop) with this index already declared
+            // the variable: reference it so typing in one updates the other.
+            templateSegments.add(SnippetTemplateSegment.variableSegment(variableNameByIndex.get(index)));
         } else {
-            templateSegments.add(SnippetTemplateSegment.variable(new ConstantNode(""), true));
+            // The placeholder with this index may come later ($1 = ${1:name}): declare
+            // the variable now under a synthetic name, so the later placeholder can
+            // reuse it (and fill in its default) instead of declaring a second one.
+            String variableName = tabstopVariableName(index);
+            SnippetTemplateSegment declaration = SnippetTemplateSegment.namedVariable(
+                    variableName, new ConstantNode(""), null, true, false);
+            variableNameByIndex.put(index, variableName);
+            declarationSegmentByIndex.put(index, declaration);
+            fillableIndices.add(index);
+            templateSegments.add(declaration);
         }
+    }
+
+    private static @NotNull String tabstopVariableName(int index) {
+        return "__lsp_tabstop_" + index;
     }
 
     @Override
@@ -195,7 +224,23 @@ public class SnippetTemplateLoader extends AbstractLspSnippetHandler {
 
     @Override
     public void startPlaceholder(int index, String name, int level) {
-        variable(name);
+        if (variableNameByIndex.containsKey(index)) {
+            // A tab stop or placeholder with this index already declared the variable:
+            // reference it so the occurrences stay linked.
+            if (fillableIndices.remove(index)) {
+                // The declaration came from an earlier tab stop with an empty default;
+                // the placeholder's text is the default both occurrences render.
+                declarationSegmentByIndex.get(index).setVariable(new ConstantNode(name));
+            }
+            templateSegments.add(SnippetTemplateSegment.variableSegment(variableNameByIndex.get(index)));
+        } else {
+            variable(name);
+            if (existingVariables.contains(name)) {
+                // The placeholder declared (or reused) the variable under its text:
+                // remember it so a later tab stop with the same index links to it.
+                variableNameByIndex.put(index, name);
+            }
+        }
     }
 
     @Override
