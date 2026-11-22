@@ -42,7 +42,8 @@ command. See [Transport](../UserDefinedLanguageServer.md#transport).
 ## Step 2: Configure ESLint
 
 * Execute `npm install eslint` in your project root
-* Create an `eslint.config.js` file on your root project like this:
+* Create an `eslint.config.mjs` file on your root project like this. The `.mjs` extension makes Node load it as an ES
+  module, also in a project whose `package.json` has `"type": "commonjs"`:
 
  ```js
  export default [

@@ -30,7 +30,10 @@ You need [Node.js](https://nodejs.org/en/download), with `npm`, on your PATH.
 
 To install the server yourself, run `npm install -g @astrojs/language-server prettier-plugin-astro typescript`, keep
 the command of the template, `astro-ls --stdio` (`astro-ls.cmd --stdio` on Windows), and empty the `Installer` tab
-before you click **OK**, so that LSP4IJ doesn't install the server.
+before you click **OK**, so that LSP4IJ doesn't install the server. Then set `typescript.tsdk` in the
+`Initialization Options` to `typescript/lib` in the directory that `npm root -g` prints, such as
+`/usr/local/lib/node_modules/typescript/lib`. The template sets it to
+`$USER_HOME$/.lsp4ij/lsp/astro-ls/node_modules/typescript/lib`, which only the installer creates.
 
 ### Troubleshooting Installation
 

@@ -10,5 +10,5 @@ following these instructions:
 * Eclipse JDT.LS stores workspace specific information in its data directory, `$PROJECT_DIR$/jdtls-data`, which is
   unique per project.
 
-⚠️Eclipse JDT.LS requires Java 17 or higher to run, so make sure JAVA_HOME is set to a proper JDK before launching your
+⚠️Eclipse JDT.LS requires Java 25 or higher to run, so make sure JAVA_HOME is set to a proper JDK before launching your
 IDE.

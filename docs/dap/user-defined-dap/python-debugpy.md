@@ -20,8 +20,10 @@ if __name__ == "__main__":
 1. [install Python](https://www.python.org/downloads/). After that open a terminal and type `python`:
    ![Python command](../images/python-debugpy/python_command.png)
 
-2. Use `pip install debugpy` to install the required `debugpy package`. The installer of the template can run this
-   command for you when the DAP server starts, so it needs `pip` on the PATH of your IDE.
+2. Use `pip install debugpy` to install the required `debugpy package`, before you start your program with debugpy as
+   [below](#configure-the-python-file-to-rundebug-with-attach). The installer of the template runs this command too
+   when debugpy is missing, but only when a debug session starts, which is after you started your program with debugpy.
+   It needs `pip` on the PATH of your IDE.
 
 3. Create a test file named `test.py` with a simple Python script that includes a `main()` function printing `"hello world"`
 

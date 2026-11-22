@@ -25,9 +25,10 @@ func main() {
    You can also [install Delve](https://github.com/go-delve/delve/tree/master/Documentation/installation#installation)
    yourself.
 
-2. After the installation, you should have the `dlv` command available (make sure to close and reopen your IDE to ensure the `dlv` command is properly recognized).  
+2. Once Delve is installed, by you or by the installer at the first debug run, you should have the `dlv` command
+   available (close and reopen your IDE to make sure that it finds the `dlv` command).
 
-If you open a terminal and run the following command:
+If you open a terminal and run the following command once Delve is installed:
 
 ```
 dlv dap

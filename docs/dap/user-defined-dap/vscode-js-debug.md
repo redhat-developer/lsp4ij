@@ -54,10 +54,10 @@ When the installer installs the DAP server, it sets the command to:
 node "$USER_HOME$/.lsp4ij/dap/vscode-js-debug/js-debug/src/dapDebugServer.js" ${port} 127.0.0.1
 ```
 
-If you installed the DAP server yourself, replace `<<insert base directory>>` with the directory  (e.g., `/home/path/to/dap`) where you extracted the DAP server. For example:
+If you installed the DAP server yourself, replace `<<insert base directory>>` with the directory (e.g., `/home/path/to/dap`) where you extracted the DAP server. Keep the path of the script in double quotes, so that a directory with a space, as `/home/Jane Doe/dap`, stays one argument. For example:
 
 ```
-node /home/path/to/dap/js-debug/src/dapDebugServer.js ${port} 127.0.0.1
+node "/home/path/to/dap/js-debug/src/dapDebugServer.js" ${port} 127.0.0.1
 ```
 
 The `${port}` argument will be replaced with a free port when the run configuration starts.

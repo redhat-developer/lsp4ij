@@ -20,8 +20,10 @@ end
 1. [install Ruby](https://www.ruby-lang.org/en/documentation/installation/). 
 After that open a terminal and type `ruby -v` to check Ruby is installed correctly. 
 
-2. Use `gem install debug` to install the required `debug gem`. The installer of the template can run this command
-   for you when the DAP server starts, so it needs `gem` on the PATH of your IDE.
+2. Use `gem install debug` to install the required `debug gem`, before you start your program with `rdbg` as
+   [below](#configure-the-ruby-file-to-rundebug-with-attach). The installer of the template runs this command too when
+   `rdbg` is missing, but only when a debug session starts, which is after you started your program with `rdbg`. It
+   needs `gem` on the PATH of your IDE.
 
 3. Create a test file named `hello.rb` with a simple Ruby script that includes a `main()` function printing `"hello world"`
 
