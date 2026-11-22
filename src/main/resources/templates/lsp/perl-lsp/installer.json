@@ -34,14 +34,14 @@
         }
       },
       "url": {
-        "windows": "https://github.com/EffortlessMetrics/perl-lsp/releases/download/v0.15.0/perllsp-0.15.0-x86_64-pc-windows-msvc.zip",
+        "windows": "https://github.com/EffortlessMetrics/perl-lsp/releases/download/v0.17.0/perllsp-0.17.0-x86_64-pc-windows-msvc.zip",
         "unix": {
-          "x86_64": "https://github.com/EffortlessMetrics/perl-lsp/releases/download/v0.15.0/perllsp-0.15.0-x86_64-unknown-linux-gnu.tar.gz",
-          "arm64": "https://github.com/EffortlessMetrics/perl-lsp/releases/download/v0.15.0/perllsp-0.15.0-aarch64-unknown-linux-gnu.tar.gz"
+          "x86_64": "https://github.com/EffortlessMetrics/perl-lsp/releases/download/v0.17.0/perllsp-0.17.0-x86_64-unknown-linux-gnu.tar.gz",
+          "arm64": "https://github.com/EffortlessMetrics/perl-lsp/releases/download/v0.17.0/perllsp-0.17.0-aarch64-unknown-linux-gnu.tar.gz"
         },
         "mac": {
-          "x86_64": "https://github.com/EffortlessMetrics/perl-lsp/releases/download/v0.15.0/perllsp-0.15.0-x86_64-apple-darwin.tar.gz",
-          "arm64": "https://github.com/EffortlessMetrics/perl-lsp/releases/download/v0.15.0/perllsp-0.15.0-aarch64-apple-darwin.tar.gz"
+          "x86_64": "https://github.com/EffortlessMetrics/perl-lsp/releases/download/v0.17.0/perllsp-0.17.0-x86_64-apple-darwin.tar.gz",
+          "arm64": "https://github.com/EffortlessMetrics/perl-lsp/releases/download/v0.17.0/perllsp-0.17.0-aarch64-apple-darwin.tar.gz"
         }
       },
       "output": {
