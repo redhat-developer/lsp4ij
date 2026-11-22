@@ -21,6 +21,8 @@ import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
+import java.nio.charset.StandardCharsets;
+import java.util.HexFormat;
 import java.util.Objects;
 
 /**
@@ -58,6 +60,11 @@ class JarUriConverter implements UriConverter {
     /** URI scheme prefix for JRT resources */
     private static final String JRT_SCHEME = JRT_PROTOCOL + ":";
 
+    /** The characters other than ASCII letters and digits that {@link URI} allows unencoded in some part of a URI */
+    private static final String URI_PUNCTUATION = "-_.!~*'();/?:@&=+$,[]";
+
+    private static final HexFormat HEX = HexFormat.of().withUpperCase();
+
     /**
      * Resolves a {@link VirtualFile} from a {@code jar:} or {@code jrt:} URI string.
      *
@@ -76,13 +83,86 @@ class JarUriConverter implements UriConverter {
     public @Nullable VirtualFile findResourceFor(@NotNull String uri) {
         if (uri.startsWith(JAR_SCHEME) || uri.startsWith(JRT_SCHEME)) {
             try {
-                return VfsUtil.findFileByURL(new URL(uri));
-            } catch (MalformedURLException e) {
+                return VfsUtil.findFileByURL(toURL(uri));
+            } catch (URISyntaxException | MalformedURLException e) {
                 // Invalid URI format → resource cannot be resolved
                 return null;
             }
         }
         return null;
+    }
+
+    /**
+     * Returns the {@link URL} of a {@code jar:} or {@code jrt:} URI string, the one that
+     * {@code new URL(uri)}, deprecated since Java 20, gave.
+     *
+     * <p>
+     * {@link URI} rejects characters that {@code new URL(String)} accepted, such as spaces: a URI with
+     * such characters is percent-encoded first, and {@link VfsUtil#findFileByURL(URL)} decodes them again,
+     * so it finds the same file.
+     * </p>
+     *
+     * @param uri the {@code jar:} or {@code jrt:} URI string
+     * @return the URL of the URI
+     * @throws URISyntaxException if the URI is invalid even once encoded
+     * @throws MalformedURLException if the URI has no URL, such as a {@code jar:} URI without {@code !/}
+     */
+    static @NotNull URL toURL(@NotNull String uri) throws URISyntaxException, MalformedURLException {
+        URI parsed;
+        try {
+            parsed = new URI(uri);
+        } catch (URISyntaxException e) {
+            parsed = new URI(encodeIllegalCharacters(uri));
+        }
+        return parsed.toURL();
+    }
+
+    /**
+     * Percent-encodes the characters of a URI string that {@link URI} rejects: those it allows nowhere,
+     * a {@code %} that starts no escape, a {@code #} after the first, and the {@code [} and {@code ]} of
+     * a {@code jrt:} URI, whose path can't hold them. Like {@code new URL(String)}, it drops the whitespace
+     * and control characters at the ends.
+     */
+    private static @NotNull String encodeIllegalCharacters(@NotNull String uri) {
+        String spec = uri.trim();
+        boolean jrt = spec.startsWith(JRT_SCHEME);
+        if (!jrt && File.separatorChar == '\\') {
+            // As the file: URL inside a jar: URL did on Windows, where it reads a backslash as a slash
+            spec = spec.replace('\\', '/');
+        }
+        var encoded = new StringBuilder(spec.length());
+        boolean fragment = false;
+        for (int i = 0; i < spec.length(); i++) {
+            char c = spec.charAt(i);
+            if (c == '#' && !fragment) {
+                fragment = true;
+                encoded.append(c);
+            } else if (isAllowedInUri(c, jrt) || c == '%' && isEscape(spec, i)) {
+                encoded.append(c);
+            } else {
+                for (byte b : String.valueOf(c).getBytes(StandardCharsets.UTF_8)) {
+                    encoded.append('%').append(HEX.toHexDigits(b));
+                }
+            }
+        }
+        return encoded.toString();
+    }
+
+    private static boolean isAllowedInUri(char c, boolean jrt) {
+        if (c > 127) {
+            // URI allows the characters beyond ASCII that are neither spaces nor control characters
+            return !Character.isSpaceChar(c) && !Character.isISOControl(c);
+        }
+        if (jrt && (c == '[' || c == ']')) {
+            return false;
+        }
+        return Character.isLetterOrDigit(c) || URI_PUNCTUATION.indexOf(c) >= 0;
+    }
+
+    private static boolean isEscape(@NotNull String uri, int percentIndex) {
+        return percentIndex + 2 < uri.length()
+                && HexFormat.isHexDigit(uri.charAt(percentIndex + 1))
+                && HexFormat.isHexDigit(uri.charAt(percentIndex + 2));
     }
 
     /**
