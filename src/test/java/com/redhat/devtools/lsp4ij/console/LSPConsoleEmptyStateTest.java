@@ -17,6 +17,8 @@ import com.redhat.devtools.lsp4ij.templates.ServerMappingSettings;
 
 import java.util.List;
 
+import javax.swing.tree.DefaultMutableTreeNode;
+
 /**
  * Tests the empty state of the Language Servers view when no language server is configured. It extends
  * {@link BasePlatformTestCase}, not {@code LSPCodeInsightFixtureTestCase}, whose setUp configures a mock language server.
@@ -51,9 +53,13 @@ public class LSPConsoleEmptyStateTest extends BasePlatformTestCase {
         try {
             var panel = new LSPConsoleToolWindowPanel(project);
             try {
-                PlatformTestUtil.waitWithEventsDispatching("The empty state must be hidden when a language server is configured",
-                        () -> !panel.isEmptyStateVisible(), 10);
-                assertFalse(panel.isEmptyStateVisible());
+                // The empty state starts hidden: wait until the explorer shows the configured language server, which
+                // it adds with the update of the empty state
+                var root = (DefaultMutableTreeNode) panel.getExplorer().getTreeModel().getRoot();
+                PlatformTestUtil.waitWithEventsDispatching("The explorer must show the configured language server",
+                        () -> root.getChildCount() > 0, 10);
+                assertFalse("The empty state must be hidden when a language server is configured",
+                        panel.isEmptyStateVisible());
             } finally {
                 Disposer.dispose(panel);
             }
