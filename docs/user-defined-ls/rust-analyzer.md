@@ -6,13 +6,9 @@ You can use [Rust Analyzer](https://rust-analyzer.github.io/) to benefit from `R
 
 ## Install the language server
 
-1. **Install Rust Language Server**, by following these instructions:
+1. **Open the New Language Server Dialog**. This can usually be found under the IDE settings related to Language Server Protocol (LSP). For more information, refer to the [New Language Server Dialog documentation](../UserDefinedLanguageServer.md#new-language-server-dialog).
 
-* [Download the rust-analyzer language server binary](https://rust-analyzer.github.io/manual.html#rust-analyzer-language-server-binary)
-
-2. **Open the New Language Server Dialog**. This can usually be found under the IDE settings related to Language Server Protocol (LSP). For more information, refer to the [New Language Server Dialog documentation](../UserDefinedLanguageServer.md#new-language-server-dialog).
-
-3. **Select Rust Language Server as the template** from the available options.
+2. **Select Rust Language Server as the template** from the available options.
    This will populate the command field with a default command:
 
     * `${BASE_DIR}/rust-analyzer.exe` for Windows OS.
@@ -20,9 +16,17 @@ You can use [Rust Analyzer](https://rust-analyzer.github.io/) to benefit from `R
 
    ![Rust Analyzer template](../images/user-defined-ls/rust-analyzer/select_template.png)
 
-You need to adjust this command to point to the location of the extracted Rust Analyzer LSP asset.
+   The first time the server starts, the installer of the template downloads the asset of the latest
+   [rust-analyzer release](https://github.com/rust-lang/rust-analyzer/releases) for your OS and architecture into
+   `$USER_HOME$/.lsp4ij/lsp/rust-analyzer`, and sets the command to the executable, as
+   `"$USER_HOME$/.lsp4ij/lsp/rust-analyzer/rust-analyzer-x86_64-unknown-linux-gnu"` on Linux x64 or
+   `"$USER_HOME$/.lsp4ij/lsp/rust-analyzer/rust-analyzer.exe"` on Windows.
 
-5. **Optional**: You may also customize the mappings section:
+   To install rust-analyzer yourself, [download the rust-analyzer language server binary](https://rust-analyzer.github.io/manual.html#rust-analyzer-language-server-binary),
+   set the command to it, and empty the `Installer` tab before you click **OK**, so that LSP4IJ doesn't install the
+   server.
+
+3. **Optional**: You may also customize the mappings section:
 
    ![Rust Analyzer template mappings](../images/user-defined-ls/rust-analyzer/configure_file_mappings.png)
 
@@ -30,7 +34,7 @@ You need to adjust this command to point to the location of the extracted Rust A
 
    ![Rust Analyzer template configuration](../images/user-defined-ls/rust-analyzer/RustAnalyzerTemplateConfiguration.png)
 
-6. **Click OK** to apply the changes. You should now have Rust language support enabled in your IDE, with the [Rust language server](https://rust-analyzer.github.io/) integrated,
+4. **Click OK** to apply the changes. You should now have Rust language support enabled in your IDE, with the [Rust language server](https://rust-analyzer.github.io/) integrated,
    and you should see the language server in the [LSP console](../UserGuide.md#lsp-console):
 
    ![Rust Analyzer in LSP Console](../images/user-defined-ls/rust-analyzer/RustAnalyzerInLSPConsole.png)

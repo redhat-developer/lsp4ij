@@ -4,6 +4,8 @@ You can use the [LemMinX XML language server](https://github.com/eclipse/lemminx
 
 When you create a new language server from the LemMinX template, the installer automatically downloads the LemMinX uber jar
 from the [Eclipse download site](https://download.eclipse.org/justj/?file=lemminx/releases) and configures the start command.
+It downloads LemMinX 0.31.2 into `$USER_HOME$/.lsp4ij/lsp/lemminx/org.eclipse.lemminx-uber.jar`, where the command of
+the template starts it. You need Java, with `java` on your PATH.
 
 ## Transport Modes
 
@@ -19,8 +21,9 @@ java -classpath "path/to/org.eclipse.lemminx-uber.jar" org.eclipse.lemminx.XMLSe
 
 ### Socket (startAndConnect)
 
-LemMinX can also run as a socket server. To use socket mode, change the launcher class
-to `XMLServerSocketLauncher` and add the `--port` argument:
+LemMinX can also run as a socket server. To use socket mode, set **Transport** to **Socket** with
+**Start the language server, LSP4IJ connects to it**: LSP4IJ then changes the launcher class to
+`XMLServerSocketLauncher` and adds the `--port` argument in the command:
 
 ```
 java -classpath "path/to/org.eclipse.lemminx-uber.jar" org.eclipse.lemminx.XMLServerSocketLauncher --port ${port}

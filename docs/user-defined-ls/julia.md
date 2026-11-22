@@ -9,12 +9,13 @@ To enable [Julia](https://julialang.org/) language support in your IDE, you can 
 1. [install Julia](https://julialang.org/downloads/). After that open a terminal and type `julia`:
    ![Julia command](../images/user-defined-ls/julia/julia_command.png)
 
-2. switch to Julia’s REPL by typing `]` to install the DAP server with the command `add LanguageServer`
+2. switch to Julia’s package mode by typing `]` to install the language server with the command `add LanguageServer`
    ![Install Julia language server](../images/user-defined-ls/julia/julia_ls_install.png)
 
 3. **Open the New Language Server Dialog**. This can usually be found under the IDE settings related to Language Server Protocol (LSP). For more information, refer to the [New Language Server Dialog documentation](../UserDefinedLanguageServer.md#new-language-server-dialog).
 
 4. **Select Julia Language Server as the template** from the available options.
+   This will populate the command field with `julia -e "using LanguageServer; runserver()"`.
    
    ![Julia template](../images/user-defined-ls/julia/select_template.png)
 

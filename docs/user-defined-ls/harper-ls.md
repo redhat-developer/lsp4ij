@@ -26,6 +26,15 @@ you can integrate the [Harper Language Server](https://writewithharper.com/docs/
 
    ![Installing Language Server](../images/user-defined-ls/harper-ls/language_server_diagnostics.png)
 
+The installer downloads the `harper-ls-<target>` archive of the latest
+[Harper release](https://github.com/Automattic/harper/releases) for your OS and architecture, extracts it into
+`$USER_HOME$/.lsp4ij/lsp/harper-ls`, and sets the command to `"$USER_HOME$/.lsp4ij/lsp/harper-ls/harper-ls" --stdio`
+(`harper-ls.exe` on Windows). This is also the command of the template.
+
+To install the server yourself, see [Installation](https://writewithharper.com/docs/integrations/language-server),
+set the command in the `Server` tab to `"path/to/harper-ls" --stdio`, and empty the `Installer` tab before you click
+**OK**, so that LSP4IJ doesn't install the server.
+
 ### Troubleshooting Installation
 
 If the installation fails, you can customize the installation settings in the **Installer** tab,  

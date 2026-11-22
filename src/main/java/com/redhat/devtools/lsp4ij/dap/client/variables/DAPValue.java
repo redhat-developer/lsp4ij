@@ -97,7 +97,9 @@ public class DAPValue extends XNamedValue {
     @Nullable
     @Override
     public XValueModifier getModifier() {
-        if (!canSetValue(getClient().isSupportsSetVariable(), variable)) {
+        // 'setVariable' names the container of the variable by its 'variablesReference': a value without one, such as
+        // an Evaluate result, can't be set with it
+        if (parentVariablesReference == null || !canSetValue(getClient().isSupportsSetVariable(), variable)) {
             // Disable the 'Set Value...' menu and F2.
             return null;
         }

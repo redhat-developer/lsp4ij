@@ -41,10 +41,14 @@ extracted `cpp_ls` executable.
 Useful options: `--log-level` (`error`, `warn`, `info`, `debug`, `trace`) and `--log-path` (the file to log to;
 `none`, the default, disables file logging).
 
+`--communication tcp --port ${port}` makes `cpp_ls` listen on a TCP port instead: add it to the command, and set
+`Transport` to `Socket` with `Start the language server, LSP4IJ connects to it`.
+
 ## Settings
 
-The server reads its `exclude` setting from the `cppls` section, which LSP4IJ answers from the template
-`settings.json`:
+The server reads its `exclude` setting from the `cppls` section, which LSP4IJ answers from the settings of the
+`Configuration` tab (`Server` sub-tab). The template sets an empty `exclude` list there; add the patterns you need,
+for instance:
 
 ```json
 {

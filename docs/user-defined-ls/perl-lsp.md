@@ -23,6 +23,15 @@ To enable [Perl](https://www.perl.org/) language support in your IDE, you can in
 
 5. Once the installation completes, the server should start automatically and provide [Perl](https://www.perl.org/) language support (autocomplete, diagnostics, etc.).
 
+The installer downloads the `perllsp-*-<target>` archive of the latest
+[perl-lsp release](https://github.com/EffortlessMetrics/perl-lsp/releases) for your OS and architecture, extracts its
+content into `$USER_HOME$/.lsp4ij/lsp/perl-lsp`, and sets the command to
+`"$USER_HOME$/.lsp4ij/lsp/perl-lsp/perllsp" --stdio` (`perllsp.exe` on Windows).
+
+To install the server yourself, extract that archive into a folder of your choice, set the command in the `Server` tab
+to `"path/to/perllsp" --stdio`, and empty the `Installer` tab before you click **OK**, so that LSP4IJ doesn't install
+the server.
+
 ## Step 2: Configure the server
 
 You can also configure the server with the same settings as VSCode:
