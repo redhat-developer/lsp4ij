@@ -16,10 +16,12 @@ import com.redhat.devtools.lsp4ij.fixtures.LSPCodeInsightTestFixture;
 import com.redhat.devtools.lsp4ij.fixtures.LSPTestFixtureFactory;
 import com.redhat.devtools.lsp4ij.mock.MockLanguageServerDefinition;
 import com.redhat.devtools.lsp4ij.templates.ServerMappingSettings;
+import org.eclipse.lsp4j.services.LanguageServer;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.TimeUnit;
 
@@ -27,7 +29,8 @@ import java.util.concurrent.TimeUnit;
  * Once its last document has disconnected, a language server is stopped after lastDocumentDisconnectedTimeout,
  * unless something keeps it alive by then: a lease taken while the stop is pending cancels it, and a stop that comes
  * due while keepServerAlive() says so, or fails to answer, leaves the server running. Until the stop runs, the server
- * stays started, and neither the pending stop nor its cancellation changes the status of an explicit stop.
+ * stays started, and neither the pending stop nor its cancellation changes the status of an explicit stop. A lease
+ * taken before a restart doesn't stop the restarted server when it ends.
  */
 public class KeepAliveDuringPendingStopTest extends UsefulTestCase {
     private LSPCodeInsightTestFixture fixture;
@@ -101,6 +104,41 @@ public class KeepAliveDuringPendingStopTest extends UsefulTestCase {
         } finally {
             lease.dispose();
         }
+    }
+
+    public void testALeaseTakenBeforeARestartDoesNotStopTheRestartedServerWhenItEnds() throws Exception {
+        var item = start();
+        var wrapper = item.getServerWrapper();
+        // As a file operation just before the restart takes one, which ends once the stopped server is told of it
+        var lease = item.keepAlive();
+        var initialize = definition.getServer().holdInitialize();
+        CompletableFuture<LanguageServer> restarted;
+        try {
+            wrapper.restart();
+            // A feature asks for the restarted server, which has no document until it has initialized
+            restarted = wrapper.getInitializedServer();
+
+            lease.dispose();
+            assertFalse("the end of the lease must not stop the restarted server", restarted.isDone());
+        } finally {
+            initialize.complete(null);
+        }
+        var server = restarted.get(10, TimeUnit.SECONDS);
+        assertNotNull(server);
+        assertSame(server, wrapper.getLanguageServer());
+        assertEquals(ServerStatus.started, wrapper.getServerStatus());
+    }
+
+    public void testALeaseTakenAfterARestartStopsTheServerWithoutDocumentWhenItEnds() throws Exception {
+        var wrapper = start().getServerWrapper();
+        wrapper.restart();
+        var item = new LanguageServerItem(wrapper.getInitializedServer().get(10, TimeUnit.SECONDS), wrapper);
+        definition.statusChanges.clear();
+
+        item.keepAlive().dispose();
+        // In unit-test mode, the stop comes at once
+        assertTrue("the end of the lease must stop the server, which has no document",
+                definition.statusChanges.contains(ServerStatus.stopping));
     }
 
     public void testAStopThatComesDueWhileTheClientKeepsTheServerAliveLeavesItRunning() throws Exception {

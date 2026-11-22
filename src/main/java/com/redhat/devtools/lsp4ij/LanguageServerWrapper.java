@@ -1578,7 +1578,24 @@ public class LanguageServerWrapper implements Disposable {
      * takes this wrapper's monitor before it.
      */
     void maybeShutdown() {
-        if (!keepAlive()) {
+        maybeShutdown(currentInitializingContext);
+    }
+
+    /**
+     * Stops this language server as {@link #maybeShutdown()} does, unless the given connection to it has been replaced
+     * since, as by a restart. The restarted language server connects the open documents only once it has initialized,
+     * so until then it has none, and would be stopped as it starts.
+     */
+    private void maybeShutdown(@Nullable InitializingContext connection) {
+        if (keepAlive()) {
+            return;
+        }
+        // A restart replaces the connection under this monitor: it comes before the check, or after the stop or its
+        // scheduling, which the stop of the restart cancels
+        synchronized (this) {
+            if (currentInitializingContext != connection) {
+                return;
+            }
             if (this.serverDefinition.getLastDocumentDisconnectedTimeout() != 0 && !ApplicationManager.getApplication().isUnitTestMode()) {
                 removeStopTimer();
                 startStopTimer();
@@ -1592,15 +1609,23 @@ public class LanguageServerWrapper implements Disposable {
         return getClientFeatures().keepServerAlive() || !this.openedDocuments.isEmpty() || this.keepAliveCounter.get() > 0;
     }
 
-    void incrementKeepAlive() {
+    /**
+     * Keeps this language server running until the returned release runs, for a lease. The release lets the language
+     * server stop if nothing else keeps it alive, unless it has stopped or restarted since the lease was taken: a lease
+     * on the stopped language server must not stop the one that replaced it.
+     *
+     * @return the release, which the caller runs once.
+     */
+    @NotNull
+    Runnable incrementKeepAlive() {
+        var connection = currentInitializingContext;
         keepAliveCounter.incrementAndGet();
         // A lease taken while the last document's stop is pending keeps the server, as a document that connects does
         removeStopTimer();
-    }
-
-    void decrementKeepAlive() {
-        keepAliveCounter.decrementAndGet();
-        maybeShutdown();
+        return () -> {
+            keepAliveCounter.decrementAndGet();
+            maybeShutdown(connection);
+        };
     }
 
     /**

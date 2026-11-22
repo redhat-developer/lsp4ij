@@ -66,7 +66,7 @@ public class LanguageServerItem {
      * server's lifecycle as would opening a document in an editor.
      */
     public Lease<LanguageServerItem> keepAlive() {
-        serverWrapper.incrementKeepAlive();
+        var release = serverWrapper.incrementKeepAlive();
         return new Lease<>() {
             final AtomicBoolean isDisposed = new AtomicBoolean();
 
@@ -87,7 +87,7 @@ public class LanguageServerItem {
             @Override
             public void dispose() {
                  if (!isDisposed.getAndSet(true)) {
-                     serverWrapper.decrementKeepAlive();
+                     release.run();
                  }
             }
         };
