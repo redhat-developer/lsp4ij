@@ -161,6 +161,34 @@ public class LspSnippetDefaultsTest {
     }
 
     @Test(timeout = 10_000)
+    public void twoDefaultsThatRepeatEachOtherManyTimesEnd() {
+        // ${1:$2$2...} ${2:$1$1...} $1 $2, 20,000 times each: each resolves the other again 20,000 times, each going
+        // through its 20,000 parts again, 4 * 10^8 parts in all without a bound on that work
+        List<Part> snippet = List.of(new TabStop(1), new Text(" "), new TabStop(2), new Text(" "), new TabStop(1),
+                new Text(" "), new TabStop(2));
+        assertEquals("   ", repeatEachOther(20_000).getText(snippet));
+
+        LspSnippetDefaults defaults = repeatEachOther(20_000);
+        assertEquals("", defaults.getText(1));
+        assertEquals("", defaults.getText(2));
+    }
+
+    @Test(timeout = 10_000)
+    public void defaultsOutsideACycleDoNotCountTowardsTheBound() {
+        // ${12:$10} ${10:$11$11...} ${11:x}, where 10 has more parts than the bound, then ${1:a$2} ${2:b$1}, which
+        // resolves 1 again
+        LspSnippetDefaults defaults = mutualCycle();
+        placeholder(defaults, 12, new TabStop(10));
+        placeholder(defaults, 10, Collections.nCopies(LspSnippetDefaults.MAX_CYCLE_WORK + 1, new TabStop(11))
+                .toArray(new Part[0]));
+        placeholder(defaults, 11, new Text("x"));
+
+        assertEquals("x".repeat(LspSnippetDefaults.MAX_REPEATED_LENGTH), defaults.getText(12));
+        assertEquals("ab", defaults.getText(1));
+        assertEquals("ba", defaults.getText(2));
+    }
+
+    @Test(timeout = 10_000)
     public void anIndexHasTheSameTextOnceTheBoundIsReached() {
         // ${1:a$2} ${2:b$1}, then ${3:$4$4$3} ... ${32:$33$33$3}, which reach the bound, then $1 $2
         LspSnippetDefaults defaults = cycleThenBound();
@@ -231,6 +259,17 @@ public class LspSnippetDefaultsTest {
         for (int index = 3; index <= 32; index++) {
             placeholder(defaults, index, new TabStop(index + 1), new TabStop(index + 1), new TabStop(3));
         }
+        return defaults;
+    }
+
+    /**
+     * Returns the defaults of {@code ${1:$2$2...} ${2:$1$1...}}, where each repeats the other the given number of
+     * times.
+     */
+    private static LspSnippetDefaults repeatEachOther(int times) {
+        var defaults = new LspSnippetDefaults();
+        placeholder(defaults, 1, Collections.nCopies(times, new TabStop(2)).toArray(new Part[0]));
+        placeholder(defaults, 2, Collections.nCopies(times, new TabStop(1)).toArray(new Part[0]));
         return defaults;
     }
 

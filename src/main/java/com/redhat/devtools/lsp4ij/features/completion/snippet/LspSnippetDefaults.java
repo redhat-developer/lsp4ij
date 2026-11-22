@@ -27,11 +27,11 @@ import java.util.Set;
  * The defaults are read once they are all given. A tab stop that repeats a default being resolved, as in
  * {@code ${1:x$1}} or {@code ${1:a$2} ${2:b$1}}, repeats nothing. So in a cycle of defaults that repeat each other, the
  * text of each depends on where the cycle is entered: there, 1 gives {@code ab} and 2 gives {@code ba}. Any other
- * default is resolved once, and those in cycles are resolved again {@value #MAX_RESOLUTIONS_AGAIN} times at most in
- * all. The text of an index, which {@link #getText(int)} or a tab stop of the snippet gives, is the same each time,
- * also once that bound is reached. Defaults that repeat each other can still double their text at each index, as in
- * {@code ${1:$2$2} ${2:$3$3} ... ${30:x}}, so the text that a default repeats from others stops at
- * {@value #MAX_REPEATED_LENGTH} characters.
+ * default is resolved once, and resolving those in cycles again stops once it has gone through
+ * {@value #MAX_CYCLE_WORK} parts and characters in all. The text of an index, which {@link #getText(int)} or a tab
+ * stop of the snippet gives, is the same each time, also once that bound is reached. Defaults that repeat each other
+ * can still double their text at each index, as in {@code ${1:$2$2} ${2:$3$3} ... ${30:x}}, so the text that a
+ * default repeats from others stops at {@value #MAX_REPEATED_LENGTH} characters.
  */
 @ApiStatus.Internal
 public final class LspSnippetDefaults {
@@ -39,19 +39,23 @@ public final class LspSnippetDefaults {
     static final int MAX_REPEATED_LENGTH = 10_000;
 
     /**
-     * The number of times that defaults in a cycle are resolved again in all, after which a tab stop in a default
-     * repeats nothing more. The text of a default in a cycle isn't kept, as it depends on where the cycle is entered,
-     * so each tab stop that repeats it resolves it again. Defaults that repeat each other twice in a cycle, as in
+     * The work that resolving defaults in cycles again can take in all, as the parts of their texts that it goes
+     * through and the characters that it gives, after which a tab stop in a default repeats nothing more. The text of
+     * a default in a cycle isn't kept, as it depends on where the cycle is entered, so each tab stop that repeats it
+     * resolves it again. Defaults that repeat each other twice in a cycle, as in
      * {@code ${1:$2$2$1} ${2:$3$3$1} ... ${30:$1}}, would then be resolved about 2^30 times, and the limit of the text
-     * that they repeat doesn't bound that, as their text is empty. Only such a snippet reaches this bound: any other
-     * default is resolved once, and doesn't count. A text that the bound stops depends on it, so it isn't kept.
+     * that they repeat doesn't bound that, as their text is empty. Two defaults that repeat each other K times, as in
+     * {@code ${1:$2$2...} ${2:$1$1...}}, are each resolved again K times, each going through its K parts again: so the
+     * bound counts the work, as a bound on the resolutions would still let K^2 parts through. A million parts and
+     * characters take tens of milliseconds. Only such cycles reach the bound: any other default is resolved once, and
+     * doesn't count. A text that the bound stops depends on it, so it isn't kept.
      */
-    static final int MAX_RESOLUTIONS_AGAIN = 100_000;
+    static final int MAX_CYCLE_WORK = 1_000_000;
 
     // The depth of a cut, for a text that repeats no default being resolved
     private static final int NO_CUT = Integer.MAX_VALUE;
-    // The depth of a cut below that of any default, for a tab stop that MAX_RESOLUTIONS_AGAIN stopped: no default
-    // that repeats it is kept
+    // The depth of a cut below that of any default, for a tab stop that MAX_CYCLE_WORK stopped: no default that
+    // repeats it is kept
     private static final int BOUND_CUT = -1;
     // The index of the default whose text is resolved, for the text of a snippet
     private static final int NO_INDEX = -1;
@@ -97,8 +101,8 @@ public final class LspSnippetDefaults {
     private final Map<Integer, Integer> resolving = new HashMap<>();
     // The defaults resolved at least once
     private final Set<Integer> resolved = new HashSet<>();
-    // The times that defaults in a cycle were resolved again
-    private int resolutionsAgain;
+    // The work that resolving defaults in cycles again took, in parts and characters
+    private long cycleWork;
 
     /**
      * Opens a placeholder with the given index, which gives the default of its index when it closes, unless a
@@ -200,12 +204,10 @@ public final class LspSnippetDefaults {
         if (value == null) {
             return NOTHING;
         }
-        if (!resolved.add(index) && !resolving.isEmpty()) {
-            // Resolved before but not kept, so in a cycle, which a tab stop in a default repeats again
-            if (resolutionsAgain == MAX_RESOLUTIONS_AGAIN) {
-                return BOUND_REACHED;
-            }
-            resolutionsAgain++;
+        // Resolved before but not kept, so in a cycle, which a tab stop in a default repeats again
+        boolean again = !resolved.add(index) && !resolving.isEmpty();
+        if (again && cycleWork >= MAX_CYCLE_WORK) {
+            return BOUND_REACHED;
         }
         int ownDepth = resolving.size();
         resolving.put(index, ownDepth);
@@ -214,6 +216,10 @@ public final class LspSnippetDefaults {
             result = textOf(value.parts(), MAX_REPEATED_LENGTH, index);
         } finally {
             resolving.remove(index);
+        }
+        if (again) {
+            // The parts that it went through, and the characters that it gave
+            cycleWork += value.parts().size() + result.text().length();
         }
         if (result.cut() <= ownDepth) {
             // In a cycle: a default that it repeats repeats it, or it repeats a default being resolved
