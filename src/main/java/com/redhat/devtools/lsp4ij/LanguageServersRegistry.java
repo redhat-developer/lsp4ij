@@ -42,6 +42,9 @@ import com.redhat.devtools.lsp4ij.settings.GlobalLanguageServerSettings;
 import com.redhat.devtools.lsp4ij.settings.LanguageServerSettings;
 import com.redhat.devtools.lsp4ij.templates.ServerMappingSettings;
 import com.redhat.devtools.lsp4ij.usages.LSPFindUsagesProvider;
+import kotlinx.coroutines.CoroutineScope;
+import kotlinx.coroutines.CoroutineScopeKt;
+import kotlinx.coroutines.JobKt;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -89,6 +92,11 @@ public class LanguageServersRegistry implements Disposable {
     // them; otherwise the platform retains a hard ref to the contributing plugin's Language.
     private final Map<Language, LSPFindUsagesProvider> registeredFindUsagesProviders = new ConcurrentHashMap<>();
 
+    // The scope of the extension point listeners, which dispose() cancels, so that they end with this service, as with
+    // it as their parent Disposable. The CoroutineScope that a service can get in its constructor ends earlier: when
+    // LSP4IJ is unloaded, before the extensions of the plugins unloaded with it are removed.
+    private final CoroutineScope extensionPointListenersScope = CoroutineScopeKt.CoroutineScope(JobKt.Job(null));
+
     private LanguageServersRegistry() {
         initialize();
         registerExtensionPointListeners();
@@ -124,7 +132,7 @@ public class LanguageServersRegistry implements Disposable {
     private <T> void registerEpListener(@NotNull ExtensionPointName<T> epName,
                                         @NotNull java.util.function.Consumer<T> onAdded,
                                         @NotNull java.util.function.Consumer<T> onRemoved) {
-        epName.getPoint().addExtensionPointListener(new ExtensionPointListener<T>() {
+        epName.addExtensionPointListener(extensionPointListenersScope, new ExtensionPointListener<T>() {
             @Override
             public void extensionAdded(@NotNull T extension, @NotNull PluginDescriptor pluginDescriptor) {
                 try {
@@ -142,11 +150,13 @@ public class LanguageServersRegistry implements Disposable {
                     LOGGER.error("Error while handling extensionRemoved for {}", epName.getName(), e);
                 }
             }
-        }, /* invokeForLoadedExtensions */ false, /* parentDisposable */ this);
+        });
     }
 
     @Override
     public void dispose() {
+        // Removes the extension point listeners
+        CoroutineScopeKt.cancel(extensionPointListenersScope, null);
         // Undo platform-side LanguageFindUsages registrations: on lsp4ij's own unload, no
         // updateLanguages() call would otherwise prune them.
         for (var entry : registeredFindUsagesProviders.entrySet()) {
