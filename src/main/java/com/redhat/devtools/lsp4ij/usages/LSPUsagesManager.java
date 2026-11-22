@@ -10,7 +10,6 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.usages;
 
-import com.intellij.CommonBundle;
 import com.intellij.codeInsight.hint.HintManager;
 import com.intellij.codeInsight.navigation.actions.GotoDeclarationAction;
 import com.intellij.openapi.actionSystem.CommonDataKeys;
@@ -18,7 +17,6 @@ import com.intellij.openapi.actionSystem.DataContext;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.project.Project;
-import com.intellij.openapi.ui.Messages;
 import com.intellij.ui.awt.RelativePoint;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LanguageServerBundle;
@@ -145,13 +143,14 @@ public class LSPUsagesManager {
 
     private void showNoUsage(@NotNull LSPUsageType usageType, DataContext dataContext) {
         @Nullable Editor editor = dataContext.getData(CommonDataKeys.EDITOR);
+        if (editor == null || editor.isDisposed()) {
+            // No editor, or a closed one: the user has left the place they asked about, so show nothing, and no
+            // modal dialog
+            return;
+        }
         @NotNull String key = getNoUsageMessageKey(usageType);
         String message = LanguageServerBundle.message(key);
-        if (editor == null) {
-            Messages.showMessageDialog(project, message, CommonBundle.getErrorTitle(), Messages.getErrorIcon());
-        } else {
-            HintManager.getInstance().showErrorHint(editor, message);
-        }
+        HintManager.getInstance().showErrorHint(editor, message);
     }
 
     private String getNoUsageMessageKey(LSPUsageType usageType) {
