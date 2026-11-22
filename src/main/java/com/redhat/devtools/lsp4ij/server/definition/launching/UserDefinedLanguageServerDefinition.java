@@ -21,6 +21,7 @@ import com.redhat.devtools.lsp4ij.client.LanguageClientImpl;
 import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
 import com.redhat.devtools.lsp4ij.installation.CommandLineUpdater;
 import com.redhat.devtools.lsp4ij.installation.ServerInstaller;
+import com.redhat.devtools.lsp4ij.installation.ServerStarter;
 import com.redhat.devtools.lsp4ij.installation.definition.ServerInstallerDescriptor;
 import com.redhat.devtools.lsp4ij.installation.definition.ServerInstallerManager;
 import com.redhat.devtools.lsp4ij.server.SocketStreamConnectionProvider;
@@ -266,6 +267,19 @@ public class UserDefinedLanguageServerDefinition extends LanguageServerDefinitio
     @Override
     public void setCommandLine(String commandLine) {
         this.commandLine = commandLine;
+    }
+
+    /**
+     * Returns how LSP4IJ starts the language server, with the command line, working directory, environment and
+     * transport it has when the {@code initialize} task of its installer runs. A language server which runs already,
+     * which LSP4IJ attaches to, is neither started nor ended by the task.
+     *
+     * @return how LSP4IJ starts the language server.
+     */
+    @Override
+    public @NotNull ServerStarter getServerStarter() {
+        return new ServerStarter(getId(), ServerStarter.Protocol.LSP,
+                project -> transport.startsLanguageServer() ? createConnectionProvider(project) : null);
     }
 
     public String getWorkingDir() {

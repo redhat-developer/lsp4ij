@@ -423,6 +423,9 @@
         <installerTaskFactory
                 type="fileExists"
                 factoryClass="com.redhat.devtools.lsp4ij.installation.definition.tasks.FileExistsTaskFactory"/>
+        <installerTaskFactory
+                type="initialize"
+                factoryClass="com.redhat.devtools.lsp4ij.installation.definition.tasks.InitializeTaskFactory"/>
     </extensions>
 
     <extensions defaultExtensionNs="com.intellij">
