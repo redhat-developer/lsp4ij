@@ -19,7 +19,11 @@ func main() {
  
 ## Configure DAP server
 
-1. [Install Delve](https://github.com/go-delve/delve/tree/master/Documentation/installation#installation).
+1. [Install Go](https://go.dev/doc/install). The installer of the template installs Delve when the DAP server starts
+   and `dlv` can't be run, with `go install github.com/go-delve/delve/cmd/dlv@latest`. `go install` puts `dlv` in the
+   `bin` folder of your Go path (`go env GOPATH`, `$HOME/go` by default), which must be on the PATH of your IDE.
+   You can also [install Delve](https://github.com/go-delve/delve/tree/master/Documentation/installation#installation)
+   yourself.
 
 2. After the installation, you should have the `dlv` command available (make sure to close and reopen your IDE to ensure the `dlv` command is properly recognized).  
 

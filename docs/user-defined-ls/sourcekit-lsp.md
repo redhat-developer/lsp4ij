@@ -11,7 +11,8 @@ To enable Swift language support in your IDE, you can integrate [SourceKit-LSP](
    For more information, refer to the [New Language Server Dialog documentation](../UserDefinedLanguageServer.md#new-language-server-dialog).
 
 3. **Select SourceKit-LSP as the template** from the available options.
-   This will populate the command field with a default command `sourcekit-lsp`
+   This will populate the command field with a default command `sourcekit-lsp`. The template installs nothing: if
+   `sourcekit-lsp` doesn't start and `swift` isn't found, it shows a message with a link to install Swift.
 
 ![SourceKit-LSP template](../images/user-defined-ls/sourcekit-lsp/select_template.png)
 
@@ -25,6 +26,6 @@ To enable Swift language support in your IDE, you can integrate [SourceKit-LSP](
 
 ## Debugging
 
-If you need to Run/Debug Go program, you can [configure the Swift LLDB DAP server](../dap/user-defined-dap/swift-lldb.md).
+If you need to Run/Debug Swift program, you can [configure the Swift LLDB DAP server](../dap/user-defined-dap/swift-lldb.md).
 
 ![Debugging / Threads](../dap/images/swift-lldb/debug_threads_tab.png)

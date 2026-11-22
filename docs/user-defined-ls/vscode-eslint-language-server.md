@@ -23,10 +23,26 @@ To enable [ESLint](https://eslint.org/) language support in your IDE, you can in
 
 5. Once the installation completes, the server should start automatically and provide ESLint language support (autocomplete, diagnostics, etc.).
 
+The installer installs [vscode-langservers-extracted](https://github.com/hrsh7th/vscode-langservers-extracted), which
+has the ESLint language server, into `$USER_HOME$/.lsp4ij/lsp/vscode-langservers-extracted` with
+`npm install vscode-langservers-extracted --force`. The [CSS Language Server](./vscode-css-language-server.md) template
+installs the same package into the same folder. You need [Node.js](https://nodejs.org/en/download), with `npm`, on
+your PATH. The command starts the ESLint language server where the installer puts it:
+
+```
+node "$USER_HOME$/.lsp4ij/lsp/vscode-langservers-extracted/node_modules/vscode-langservers-extracted/lib/eslint-language-server/eslintServer.js" --stdio
+```
+
+If you installed vscode-langservers-extracted somewhere else, change the path of `eslintServer.js` in the command.
+
+The server talks LSP over its standard input and output (`--stdio`), or over a socket: set `Transport` to `Socket`
+with `Start the language server, it connects to LSP4IJ`, and LSP4IJ replaces `--stdio` with `--socket=${port}` in the
+command. See [Transport](../UserDefinedLanguageServer.md#transport).
+
 ## Step 2: Configure ESLint
 
 * Execute `npm install eslint` in your project root
-* Create an `eslint-config.js` file on your root project like this:
+* Create an `eslint.config.js` file on your root project like this:
 
  ```js
  export default [

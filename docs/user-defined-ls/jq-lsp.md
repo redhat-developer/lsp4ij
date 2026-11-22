@@ -23,6 +23,14 @@ To enable [JQ](https://github.com/jqlang/jq) language support in your IDE, you c
 
 5. Once the installation completes, the server should start automatically and provide JQ language support (autocomplete, diagnostics, etc.).
 
+The installer runs `go install github.com/wader/jq-lsp@latest`, so you need [Go](https://go.dev/doc/install), with `go`
+on your PATH. If `go` isn't found, the installer shows a message with a link to install Go. The command of the
+template is `jq-lsp`: `go install` puts `jq-lsp` in the `bin` folder of your Go path (`go env GOPATH`, `$HOME/go` by
+default), which must be on the PATH of your IDE. Otherwise, set the command in the `Server` tab to the full path of
+`jq-lsp`.
+
+To install the server yourself, run the same `go install` command in a terminal.
+
 ### Troubleshooting Installation
 
 If the installation fails, you can customize the installation settings in the **Installer** tab,  
@@ -42,6 +50,7 @@ Since IntelliJ does not provide native JQ TextMate support, and the language ser
 
   ```bash
   git clone https://github.com/wader/vscode-jq.git
+  ```
 
 * Open TextMate Bundles settings
 

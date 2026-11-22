@@ -6,14 +6,19 @@ You can use the [Go language server](https://pkg.go.dev/golang.org/x/tools/gopls
 
 ## Install the language server
 
-1. **Install Go Language Server**, by following these instructions:
+1. **Install Go**: [Download and install Go](https://go.dev/doc/install), and close and reopen your IDE so that it
+   finds `go` in the updated PATH.
 
-* [Download and install Go](https://go.dev/doc/install)
-* [Read the "Installation" section](https://pkg.go.dev/golang.org/x/tools/gopls#section-readme) to install the Go language server **gopls**, basically, open a terminal and execute the following command:
+   The installer of the template installs the Go language server **gopls** the first time the server starts, with:
 
    **go install golang.org/x/tools/gopls@latest**
 
-   As the command will add **go** in your OS PATH, you will have to close and reopen your IDE to update this PATH.
+   If `go` isn't found, it shows a message with a link to install Go. `go install` puts `gopls` in the `bin` folder of
+   your Go path (`go env GOPATH`, `$HOME/go` by default), which must be on the PATH of your IDE. Otherwise, set the
+   command to the full path of `gopls`.
+
+   To install gopls yourself, [read the "Installation" section](https://pkg.go.dev/golang.org/x/tools/gopls#section-readme),
+   or run the same `go install` command in a terminal.
 
 2. **Open the New Language Server Dialog**. This can usually be found under the IDE settings related to Language Server Protocol (LSP). For more information, refer to the [New Language Server Dialog documentation](../UserDefinedLanguageServer.md#new-language-server-dialog).
 
