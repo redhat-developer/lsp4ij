@@ -570,7 +570,8 @@ public class DAPSetExpressionSessionTest extends HeavyPlatformTestCase {
     }
 
     /**
-     * Returns a node of a debugger tree which shows the given value, as the Variables or Watches view does.
+     * Returns a node of a debugger tree which shows the given value, as the Variables view and Evaluate Expression do:
+     * not a node of the Watches view, for which IntelliJ offers no "Set Value…" (XSetValueAction).
      */
     private @NotNull XValueNodeImpl node(@NotNull DAPValue value) {
         var tree = new XDebuggerTree(getProject(), new DAPDebuggerEditorsProvider(null, null), null,

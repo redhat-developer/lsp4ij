@@ -436,8 +436,22 @@ isn't available for the result. The variables inside the result are set as any o
 
 When the debug adapter supports the SetExpression request but not the SetVariable request, a variable is set with the
 SetExpression request, which assigns the new value to the expression that the debug adapter gives for the variable
-(`evaluateName`). When the debug adapter supports both requests, variables are set with the SetVariable request, as in
-VS Code.
+(`evaluateName`); a variable without one doesn't offer `Set Value...`. A [lazy variable](#lazy-variables) is assigned to
+the `evaluateName` of its value once it is shown, if that has one. When the debug adapter supports both requests,
+variables are set with the SetVariable request, as in VS Code.
+
+A variable or the result of an expression which the debug adapter marks as read-only (the `readOnly` attribute of its
+[presentationHint](https://microsoft.github.io/debug-adapter-protocol//specification.html#Types_VariablePresentationHint))
+doesn't offer `Set Value...`. Neither does the result of an expression which the debug adapter marks as lazy (`lazy`),
+as VS Code treats a lazy value as read-only: the result is shown with the placeholder value which the debug adapter
+gives, and the variable inside it, which gives the value, can be set.
+
+`Set Value...` says why it doesn't set a value which it offers when:
+* the program has stopped again since the value was shown, as a result in `Evaluate Expression` after a step: the
+  value belongs to a stack frame whose id the debug adapter may give to another frame since. Evaluate the expression
+  again to set it.
+* the debug adapter marked the value as read-only since it was shown, as the value of a lazy variable once it is shown,
+  or no longer supports setting it.
 
 The Watches view doesn't offer `Set Value...`: there, editing a watch changes its expression.
 
