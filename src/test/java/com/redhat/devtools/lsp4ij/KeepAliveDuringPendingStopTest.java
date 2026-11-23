@@ -133,10 +133,15 @@ public class KeepAliveDuringPendingStopTest extends UsefulTestCase {
         } finally {
             initialize.complete(null);
         }
-        assertNotNull("the feature must get the restarted server", restarted.get(10, TimeUnit.SECONDS));
+        // The request isn't ended by the end of the lease: it gets the restarted server, or none if the stop below
+        // came first. In unit-test mode that stop comes at once, as nothing keeps the server running
+        restarted.get(10, TimeUnit.SECONDS);
         // Then the end of the lease is decided: nothing keeps the server, which has no document, running
         PlatformTestUtil.waitWithEventsDispatching("the restarted server must stop once it has started",
                 () -> definition.statusChanges.contains(ServerStatus.stopping), 10);
+        var started = definition.statusChanges.indexOf(ServerStatus.started);
+        assertTrue("the restarted server must start before the end of the lease stops it: " + definition.statusChanges,
+                started >= 0 && started < definition.statusChanges.indexOf(ServerStatus.stopping));
     }
 
     public void testALeaseHeldAcrossARestartKeepsTheRestartedServerRunningUntilItEnds() throws Exception {
