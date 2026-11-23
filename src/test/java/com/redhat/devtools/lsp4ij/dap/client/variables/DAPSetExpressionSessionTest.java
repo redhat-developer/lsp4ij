@@ -64,6 +64,7 @@ import org.eclipse.lsp4j.debug.Thread;
 import org.eclipse.lsp4j.debug.ThreadsResponse;
 import org.eclipse.lsp4j.debug.Variable;
 import org.eclipse.lsp4j.debug.VariablePresentationHint;
+import org.eclipse.lsp4j.debug.VariablePresentationHintAttributes;
 import org.eclipse.lsp4j.debug.VariablePresentationHintKind;
 import org.eclipse.lsp4j.debug.VariablesArguments;
 import org.eclipse.lsp4j.debug.VariablesResponse;
@@ -192,6 +193,46 @@ public class DAPSetExpressionSessionTest extends HeavyPlatformTestCase {
         assertNotNull("The DAP server receives 'setExpression'", args);
         assertNotNull("The value is asked for in hexadecimal", args.getFormat());
         assertEquals(Boolean.TRUE, args.getFormat().getHex());
+    }
+
+    public void testSetValueIsNotOfferedForAnEvaluateResultWhichTheDAPServerMarksReadOnly() throws Exception {
+        debug(new AnswerServer(true, true));
+        var readOnly = new VariablePresentationHint();
+        readOnly.setAttributes(new String[]{VariablePresentationHintAttributes.READ_ONLY});
+        server.evaluateHint = readOnly;
+        var result = evaluate("answer");
+
+        assertNull("\"Set Value…\" isn't offered for a read-only Evaluate result", result.getModifier());
+        assertFalse("\"Set Value…\" is disabled for a read-only Evaluate result", isSetValueEnabled(node(result)));
+    }
+
+    public void testALazyEvaluateResultIsShownWithTheVariableOfItsValueWhichCanBeSetAndItselfCant() throws Exception {
+        debug(new AnswerServer(true, true));
+        var lazy = new VariablePresentationHint();
+        lazy.setLazy(true);
+        server.evaluateHint = lazy;
+        server.evaluateVariablesReference = LAZY_REFERENCE;
+        var result = evaluate("size");
+
+        // shown as before: its placeholder value, and the one variable which gives its value
+        var node = node(result);
+        assertNull("A lazy Evaluate result has no \"Show value\" link", node.getFullValueEvaluator());
+        assertFalse("A lazy Evaluate result can be expanded", node.isLeaf());
+        assertEquals("41", result.getShownVariable().getValue());
+        assertNull("\"Set Value…\" isn't offered for a lazy Evaluate result", result.getModifier());
+        assertFalse("\"Set Value…\" is disabled for a lazy Evaluate result", isSetValueEnabled(node));
+
+        var children = children(result);
+        assertEquals(1, children.size());
+        var value = (DAPValue) children.getValue(0);
+        assertEquals("3", value.getShownVariable().getValue());
+        assertTrue("\"Set Value…\" is offered for the variable which gives the value", isSetValueEnabled(node(value)));
+        assertNull("The value is set", setValue(value, "4"));
+        var args = server.setVariables.poll(BOUND_SECONDS, TimeUnit.SECONDS);
+        assertNotNull("The DAP server receives 'setVariable'", args);
+        assertEquals("size", args.getName());
+        assertEquals(LAZY_REFERENCE, args.getVariablesReference());
+        assertEquals("The DAP server receives no 'setExpression'", List.of(), List.copyOf(server.setExpressions));
     }
 
     public void testTheErrorOfTheDAPServerIsReported() throws Exception {
@@ -439,7 +480,8 @@ public class DAPSetExpressionSessionTest extends HeavyPlatformTestCase {
     /**
      * A DAP server of a program stopped in the frame 7, whose locals are 'answer' = 41, with the 'evaluateName'
      * 'frame.answer', and the lazy 'size', whose value 3 has the 'evaluateName' 'this.size'. It evaluates any
-     * expression to 41, and answers 'setExpression' with the assigned value unless a test answers otherwise.
+     * expression to 41, with the presentation hint and the 'variablesReference' which a test sets, and answers
+     * 'setExpression' with the assigned value unless a test answers otherwise.
      */
     private static class AnswerServer implements IDebugProtocolServer {
 
@@ -456,6 +498,8 @@ public class DAPSetExpressionSessionTest extends HeavyPlatformTestCase {
             return CompletableFuture.completedFuture(response);
         };
         private volatile IDebugProtocolClient client;
+        private volatile @Nullable VariablePresentationHint evaluateHint;
+        private volatile int evaluateVariablesReference;
 
         AnswerServer(boolean supportsSetVariable, boolean supportsSetExpression) throws IOException {
             this.supportsSetVariable = supportsSetVariable;
@@ -578,7 +622,8 @@ public class DAPSetExpressionSessionTest extends HeavyPlatformTestCase {
             evaluations.add(args);
             var response = new EvaluateResponse();
             response.setResult("41");
-            response.setVariablesReference(0);
+            response.setVariablesReference(evaluateVariablesReference);
+            response.setPresentationHint(evaluateHint);
             return CompletableFuture.completedFuture(response);
         }
 
