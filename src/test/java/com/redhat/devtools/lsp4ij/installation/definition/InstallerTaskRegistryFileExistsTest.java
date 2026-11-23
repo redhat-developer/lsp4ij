@@ -12,11 +12,14 @@ package com.redhat.devtools.lsp4ij.installation.definition;
 
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import com.intellij.openapi.util.SystemInfo;
 import com.intellij.openapi.util.io.FileUtil;
 import com.intellij.testFramework.TestApplicationManager;
 import com.redhat.devtools.lsp4ij.installation.CommandLineUpdater;
 import com.redhat.devtools.lsp4ij.installation.definition.tasks.*;
 import com.redhat.devtools.lsp4ij.launching.templates.LanguageServerTemplate;
+import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
+import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
@@ -28,6 +31,7 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Pattern;
+import java.util.zip.GZIPOutputStream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
@@ -358,6 +362,11 @@ public class InstallerTaskRegistryFileExistsTest {
     }
 
     @Test
+    public void testErlangElpInstallerJson() throws IOException {
+        assertTemplateInstaller("lsp/erlang-elp", FileExistsTask.class, DownloadTask.class);
+    }
+
+    @Test
     public void testErlangLsInstallerJsonKeepsExecCheck() throws IOException {
         assertTemplateInstaller("lsp/erlang-ls", ExecTask.class, DownloadTask.class);
     }
@@ -440,6 +449,14 @@ public class InstallerTaskRegistryFileExistsTest {
     }
 
     @Test
+    public void testErlangElpGetsFromItsCheckTheCommandThatItsDownloadGivesIt() throws Exception {
+        // The template has the command of an elp on the PATH; the archive of ELP has only the program, at its root
+        assertTheCheckGivesTheCommandThatTheDownloadGives("lsp/erlang-elp",
+                "elp-macos-aarch64-apple-darwin-otp-27.3.tar.gz", List.of(SystemInfo.isWindows ? "elp.exe" : "elp"),
+                List.of(), null, null);
+    }
+
+    @Test
     public void testAllDapTemplatesParseWithoutError() throws IOException {
         assertAllTemplatesInDirectoryParse("dap");
     }
@@ -497,11 +514,12 @@ public class InstallerTaskRegistryFileExistsTest {
     }
 
     /**
-     * Runs the download of the given bundled installer, from an asset which is a zip of the given entries, or a file
-     * without them, into a folder with the given files of an earlier installation; then its check, for a server created
-     * from the template once the server is installed, which has the command of the template: the check must give the
-     * server the command that the download gave it, and leave a command that the user changed, or that an earlier
-     * download gave, of the given earlier version instead of the given version, as it is (#2011).
+     * Runs the download of the given bundled installer, from an asset which is a zip of the given entries, or a
+     * {@code .tar.gz} of them for an asset of that name, or a file without them, into a folder with the given files of
+     * an earlier installation; then its check, for a server created from the template once the server is installed,
+     * which has the command of the template: the check must give the server the command that the download gave it, and
+     * leave a command that the user changed, or that an earlier download gave, of the given earlier version instead of
+     * the given version, as it is (#2011).
      */
     private void assertTheCheckGivesTheCommandThatTheDownloadGives(String templatePath,
                                                                    String asset,
@@ -520,6 +538,8 @@ public class InstallerTaskRegistryFileExistsTest {
             Path archive = downloads.resolve(asset);
             if (entries.isEmpty()) {
                 Files.writeString(archive, asset);
+            } else if (asset.endsWith(".tar.gz")) {
+                writeTarGz(archive, entries);
             } else {
                 try (var zip = new ZipOutputStream(Files.newOutputStream(archive))) {
                     for (String entry : entries) {
@@ -565,6 +585,22 @@ public class InstallerTaskRegistryFileExistsTest {
         } finally {
             FileUtil.delete(serverDist);
             FileUtil.delete(downloads);
+        }
+    }
+
+    /**
+     * Writes a {@code .tar.gz} of the given entries, each with its name as its content.
+     */
+    private static void writeTarGz(Path archive, List<String> entries) throws IOException {
+        try (var tar = new TarArchiveOutputStream(new GZIPOutputStream(Files.newOutputStream(archive)))) {
+            for (String name : entries) {
+                byte[] content = name.getBytes(StandardCharsets.UTF_8);
+                var entry = new TarArchiveEntry(name);
+                entry.setSize(content.length);
+                tar.putArchiveEntry(entry);
+                tar.write(content);
+                tar.closeArchiveEntry();
+            }
         }
     }
 

@@ -1,6 +1,6 @@
 {
   "id": "erlang-ls",
-  "name": "Erlang Language Server",
+  "name": "Erlang Language Server (erlang_ls, discontinued October 2024)",
   "programArgs": {
     "default": "escript \"$USER_HOME$/.lsp4ij/lsp/erlang-ls/erlang_ls\""
   },

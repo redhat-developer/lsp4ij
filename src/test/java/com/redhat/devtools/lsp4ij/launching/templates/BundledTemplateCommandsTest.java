@@ -84,6 +84,7 @@ public class BundledTemplateCommandsTest {
             Map.entry("lsp/cpp_ls", ""),
             Map.entry("lsp/docker-language-server", ""),
             Map.entry("lsp/terraform-ls", ""),
+            Map.entry("lsp/erlang-elp", ""),
             Map.entry("dap/codelldb", ""),
             Map.entry("dap/perl-dap", ""),
             Map.entry("dap/vscode-js-debug", "js-debug"));

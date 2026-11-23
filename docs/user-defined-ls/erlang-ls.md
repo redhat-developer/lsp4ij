@@ -1,4 +1,10 @@
-# Erlang Language Server
+# Erlang Language Server (erlang_ls, discontinued October 2024)
+
+> [Erlang LS](https://github.com/erlang-ls/erlang_ls) is discontinued: its last release, 1.1.0, and its last change of
+> code are from October 2024, and its repository is archived. Its README recommends the
+> [Erlang Language Platform (ELP)](./erlang-elp.md), which has a template of its own. The template of Erlang LS is
+> still there, for instance for an Erlang/OTP version that ELP doesn't support, and a language server created from it
+> keeps working.
 
 To enable [Erlang](https://www.erlang.org/) language support in your IDE, you can integrate [Erlang Language Server](https://github.com/erlang-ls/erlang_ls) by following these steps:
 
@@ -21,7 +27,7 @@ If you use an `erlang_ls` built for another Erlang/OTP version, or put it somewh
 
 3. **Open the New Language Server Dialog**. This can usually be found under the IDE settings related to Language Server Protocol (LSP). For more information, refer to the [New Language Server Dialog documentation](../UserDefinedLanguageServer.md#new-language-server-dialog).
 
-4. **Select Erlang Language Server as the template** from the available options.
+4. **Select Erlang Language Server (erlang_ls, discontinued October 2024) as the template** from the available options.
    
    ![Erlang template](../images/user-defined-ls/erlang-ls/select_template.png)
 

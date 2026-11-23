@@ -1,0 +1,127 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "LSP4IJ/erlang-elp/settings.schema.json",
+  "title": "LSP4IJ Erlang Language Platform (ELP) settings JSON schema",
+  "description": "JSON schema for the settings of the Erlang Language Platform (ELP), which it reads from the elp section.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "elp.diagnostics.disabled": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true,
+      "default": [],
+      "description": "List of ELP diagnostics to disable."
+    },
+    "elp.diagnostics.enableExperimental": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether to show experimental ELP diagnostics that might have more false positives than usual."
+    },
+    "elp.diagnostics.enableOtp": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether to report diagnostics for OTP files."
+    },
+    "elp.diagnostics.onSave.enable": {
+      "type": "boolean",
+      "default": false,
+      "description": "Update native diagnostics only when the file is saved."
+    },
+    "elp.highlightDisabledCode.enable": {
+      "type": "boolean",
+      "default": true,
+      "description": "Whether to highlight disabled code branches."
+    },
+    "elp.highlightDynamic.enable": {
+      "type": "boolean",
+      "default": false,
+      "description": "If enabled, highlight variables with type `dynamic()` when Eqwalizer results are available."
+    },
+    "elp.hoverActions.docLinks.enable": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether to show Hover Actions of type `docs`. Only applies when `elp.hoverActions.enable` is set."
+    },
+    "elp.hoverActions.enable": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether to show Hover Actions."
+    },
+    "elp.inlayHints.parameterHints.enable": {
+      "type": "boolean",
+      "default": true,
+      "description": "Whether to show function parameter name inlay hints at the call site."
+    },
+    "elp.lens.buck2.mode": {
+      "type": [
+        "null",
+        "string"
+      ],
+      "default": null,
+      "description": "The buck2 mode to use for running tests via the code lenses."
+    },
+    "elp.lens.debug.enable": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether to show the `Debug` lenses. Only applies when `elp.lens.enable` is set."
+    },
+    "elp.lens.enable": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether to show Code Lenses in Erlang files."
+    },
+    "elp.lens.links.enable": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether to show the `Link` lenses. Only applies when `elp.lens.enable` is set."
+    },
+    "elp.lens.logview.links": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether to enable LogView lens links."
+    },
+    "elp.lens.run.coverage.enable": {
+      "type": "boolean",
+      "default": true,
+      "description": "Display code coverage information when running tests via the Code Lenses. Only applies when `elp.lens.enable` and `elp.lens.run.enable` are set."
+    },
+    "elp.lens.run.enable": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether to show the `Run` lenses. Only applies when `elp.lens.enable` is set."
+    },
+    "elp.lens.run.interactive.enable": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether to show the `Run Interactive` lenses. Only applies when `elp.lens.enable` is set."
+    },
+    "elp.lens.scuba.links": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether to enable Scuba lens links."
+    },
+    "elp.lens.wam.links": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether to enable WAM lens links."
+    },
+    "elp.log": {
+      "type": "string",
+      "default": "error",
+      "description": "Configure LSP-based logging using env_logger syntax."
+    },
+    "elp.signatureHelp.enable": {
+      "type": "boolean",
+      "default": true,
+      "description": "Whether to show Signature Help."
+    },
+    "elp.typesOnHover.enable": {
+      "type": "boolean",
+      "default": false,
+      "description": "Display types when hovering over expressions."
+    }
+  }
+}
