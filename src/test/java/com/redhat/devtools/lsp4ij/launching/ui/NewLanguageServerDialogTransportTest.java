@@ -389,6 +389,25 @@ public class NewLanguageServerDialogTransportTest extends BasePlatformTestCase {
         }
     }
 
+    public void testEverySocketModeOfTheTemplateHasAHint() {
+        var dialog = dialog(template("server --port ${port}", UserDefinedTransport.STDIO, SOCKET_ONLY));
+        try {
+            List<String> hints = form(dialog).stream()
+                    .filter(component -> component instanceof JBLabel label && label.isVisible()
+                            && label.getText().startsWith("This language server takes"))
+                    .map(component -> ((JBLabel) component).getText())
+                    .toList();
+            assertEquals(List.of(
+                            LanguageServerBundle.message("language.server.socket.template.hint", "--port ${port}",
+                                    LanguageServerBundle.message("language.server.socket.startAndConnect")),
+                            LanguageServerBundle.message("language.server.socket.template.hint", "--socket=${port}",
+                                    LanguageServerBundle.message("language.server.socket.startAndAccept"))),
+                    hints);
+        } finally {
+            dialog.close(DialogWrapper.CANCEL_EXIT_CODE);
+        }
+    }
+
     public void testAStdioCommandWhichTakesThePortIsAWarningWhichDoesNotBlockOk() {
         var dialog = dialog(template("node server.js --socket=${port}", UserDefinedTransport.STDIO));
         try {

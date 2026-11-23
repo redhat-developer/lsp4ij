@@ -207,7 +207,7 @@ does instead:
 each with its `mode` (`stdio` or one of the socket modes above) and the `argument` of the
 command for it. The New Language Server dialog then helps with the transport: for a language server which lists only
 `stdio`, a hint says that it talks LSP only over its standard input and output, for one which lists only socket modes, a
-hint says that it talks LSP only over a socket, and for one which lists a socket mode, a hint below the socket modes
+hint says that it talks LSP only over a socket, and for each socket mode which it lists, a hint below the socket modes
 names the mode and the argument. Every transport can still be chosen, as the template may be the starting point of a
 language server of your own which does talk over a socket: Socket, for a language server which lists only `stdio`,
 gives the warning "The template says this language server talks LSP only over its standard input and output", which
@@ -227,8 +227,9 @@ talk at all; with an `Auto` port, a warning then says that its command needs `${
 | `argument` | the argument of the command for this mode, such as `--socket=${port}` | no       |
 
 An entry with a missing or unknown `mode` is skipped, and shown as a warning in the New Language Server dialog. Without
-an `argument`, the hint names only the mode. The hint shows the first socket mode of the list. The CSS language server,
-for instance, is started over its standard input and output, and also talks over a socket it connects to:
+an `argument`, the hint names only the mode. The hints follow the order of the list, and Socket starts in the first
+socket mode of the list. The CSS language server, for instance, is started over its standard input and output, and also
+talks over a socket it connects to:
 
 ```json
 {

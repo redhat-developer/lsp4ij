@@ -198,6 +198,35 @@ public class TransportFieldsTest extends LightPlatformTestCase {
         assertNull("the template lists the socket", fields.validateForTemplate());
     }
 
+    public void testEverySocketModeWhichTheTemplateListsHasAHint() {
+        fields.setSupportedTransports(List.of(
+                new TransportSupport(UserDefinedTransport.Mode.STDIO, "--stdio"),
+                new TransportSupport(UserDefinedTransport.Mode.START_AND_CONNECT, "--port ${port}"),
+                new TransportSupport(UserDefinedTransport.Mode.START_AND_ACCEPT, "--socket=${port}"),
+                new TransportSupport(UserDefinedTransport.Mode.ATTACH, null)));
+        String connect = message("language.server.socket.template.hint", "--port ${port}",
+                message("language.server.socket.startAndConnect"));
+        String accept = message("language.server.socket.template.hint", "--socket=${port}",
+                message("language.server.socket.startAndAccept"));
+        String attach = message("language.server.socket.template.mode.hint", message("language.server.socket.attach"));
+        assertEmpty("only a socket has the hints", templateSocketHints());
+
+        radio("language.server.transport.socket").doClick();
+
+        // in the order of the list, whichever mode is chosen
+        assertTrue("the first socket mode of the list", radio("language.server.socket.startAndConnect").isSelected());
+        assertEquals(List.of(connect, accept, attach), templateSocketHints());
+        radio("language.server.socket.startAndAccept").doClick();
+        assertEquals(List.of(connect, accept, attach), templateSocketHints());
+
+        // A mode listed twice has the hint of its first entry, whose argument the command gets, and the hints of the
+        // modes which another template doesn't list go
+        fields.setSupportedTransports(List.of(
+                new TransportSupport(UserDefinedTransport.Mode.START_AND_ACCEPT, "--socket=${port}"),
+                new TransportSupport(UserDefinedTransport.Mode.START_AND_ACCEPT, "--listen=${port}")));
+        assertEquals(List.of(accept), templateSocketHints());
+    }
+
     public void testATemplateWhichListsOnlyASocketGivesNoWarningForTheSocket() {
         fields.setSupportedTransports(List.of(new TransportSupport(UserDefinedTransport.Mode.START_AND_CONNECT, null)));
 
@@ -336,6 +365,17 @@ public class TransportFieldsTest extends LightPlatformTestCase {
                 .filter(label -> text.equals(label.getText()))
                 .findFirst()
                 .orElseThrow(() -> new AssertionError("No label " + text));
+    }
+
+    /**
+     * Returns the texts of the hints which show for the socket modes of the template, in the order of the form.
+     */
+    private @NotNull List<String> templateSocketHints() {
+        return UIUtil.findComponentsOfType(form, JBLabel.class).stream()
+                .filter(label -> label.isVisible() && (label.getText().startsWith("This language server takes")
+                        || label.getText().startsWith("This language server supports")))
+                .map(JBLabel::getText)
+                .toList();
     }
 
     private @NotNull JBTextField host() {
