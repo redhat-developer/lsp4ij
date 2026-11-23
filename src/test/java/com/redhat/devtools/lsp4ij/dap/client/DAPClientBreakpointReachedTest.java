@@ -46,18 +46,21 @@ public class DAPClientBreakpointReachedTest {
     private final List<Integer> continued = new ArrayList<>();
     private final List<Boolean> continuedSingleThread = new ArrayList<>();
     private final List<String> logged = new ArrayList<>();
+    // How many 'continue' requests were sent when the client was told that the program resumes
+    private final List<Integer> resumings = new ArrayList<>();
 
     @Test
     void logsTheExpressionAndResumesWhenTheBreakpointDoesNotSuspend() {
         var server = server(CompletableFuture.completedFuture(result("21")));
 
         DAPClient.breakpointReached(session(false), server, breakpoint("n"), new XSuspendContext() {
-        }, 3, 7, null).join();
+        }, 3, 7, null, this::resuming).join();
 
         assertEquals(List.of("n in frame 3"), evaluated);
         assertEquals(List.of("21"), logged);
         assertEquals(List.of(7), continued);
         assertEquals(Collections.singletonList(null), continuedSingleThread, "every thread resumes");
+        assertEquals(List.of(0), resumings, "the client is told that the program resumes before 'continue' is sent");
     }
 
     @Test
@@ -65,7 +68,7 @@ public class DAPClientBreakpointReachedTest {
         var server = server(CompletableFuture.completedFuture(result("21")));
 
         DAPClient.breakpointReached(session(false), server, breakpoint("n"), new XSuspendContext() {
-        }, 3, 7, Boolean.TRUE).join();
+        }, 3, 7, Boolean.TRUE, this::resuming).join();
 
         // the threads that the step kept stopped stay stopped
         assertEquals(List.of(7), continued);
@@ -77,10 +80,11 @@ public class DAPClientBreakpointReachedTest {
         var server = server(CompletableFuture.completedFuture(result("21")));
 
         DAPClient.breakpointReached(session(true), server, breakpoint("n"), new XSuspendContext() {
-        }, 3, 7, null).join();
+        }, 3, 7, null, this::resuming).join();
 
         assertEquals(List.of("21"), logged);
         assertTrue(continued.isEmpty(), continued.toString());
+        assertTrue(resumings.isEmpty(), "the program doesn't resume");
     }
 
     @Test
@@ -89,7 +93,7 @@ public class DAPClientBreakpointReachedTest {
         var server = server(CompletableFuture.failedFuture(error));
 
         DAPClient.breakpointReached(session(false), server, breakpoint("nope"), new XSuspendContext() {
-        }, 3, 7, null).join();
+        }, 3, 7, null, this::resuming).join();
 
         assertEquals(List.of("Cannot evaluate 'nope': There is no variable \"nope\""), logged);
         assertEquals(List.of(7), continued);
@@ -100,7 +104,7 @@ public class DAPClientBreakpointReachedTest {
         var server = server(CompletableFuture.completedFuture(result("21")), CompletableFuture.failedFuture(new IllegalStateException("not stopped")));
 
         var reached = DAPClient.breakpointReached(session(false), server, breakpoint("n"), new XSuspendContext() {
-        }, 3, 7, null);
+        }, 3, 7, null, this::resuming);
 
         // the caller reports the failure, rather than leaving the program stopped without a word
         var error = assertThrows(CompletionException.class, reached::join);
@@ -112,11 +116,15 @@ public class DAPClientBreakpointReachedTest {
         var server = server(CompletableFuture.completedFuture(result("21")));
 
         DAPClient.breakpointReached(session(true), server, breakpoint(null), new XSuspendContext() {
-        }, 3, 7, null).join();
+        }, 3, 7, null, this::resuming).join();
 
         assertTrue(evaluated.isEmpty(), evaluated.toString());
         assertEquals(1, logged.size());
         assertNull(logged.get(0));
+    }
+
+    private void resuming() {
+        resumings.add(continued.size());
     }
 
     private XDebugSession session(boolean suspends) {

@@ -1,0 +1,140 @@
+/*******************************************************************************
+ * Copyright (c) 2026 Red Hat, Inc.
+ * Distributed under license by Red Hat, Inc. All rights reserved.
+ * This program is made available under the terms of the
+ * Eclipse Public License v2.0 which accompanies this distribution,
+ * and is available at https://www.eclipse.org/legal/epl-v20.html
+ *
+ * Contributors:
+ * Red Hat, Inc. - initial API and implementation
+ ******************************************************************************/
+package com.redhat.devtools.lsp4ij.dap.client;
+
+import org.junit.jupiter.api.Test;
+
+import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+/**
+ * A request which names references of an execution epoch, such as Set Value's, is sent only while the epoch is the
+ * current one, and before a request which resumes the program, or not at all.
+ */
+public class DAPExecutionEpochTest {
+
+    private static final long BOUND_MILLIS = TimeUnit.SECONDS.toMillis(30);
+
+    private final DAPExecutionEpoch epoch = new DAPExecutionEpoch();
+    // What was written to the debug adapter, in order
+    private final List<String> written = new CopyOnWriteArrayList<>();
+
+    @Test
+    void aRequestOfTheCurrentEpochIsSent() {
+        int current = epoch.end();
+
+        assertNotNull(epoch.send(current, this::setVariable));
+        assertEquals(List.of("setVariable"), written);
+    }
+
+    @Test
+    void aRequestOfAnEpochWhichAStopOrAContinuedEventEndedIsNotSent() {
+        int stop = epoch.end();
+        epoch.end();
+
+        assertNull(epoch.send(stop, this::setVariable));
+        assertEquals(List.of(), written);
+    }
+
+    @Test
+    void aRequestOfAnEpochWhichAResumeEndedIsNotSent() {
+        int stop = epoch.end();
+        assertEquals(stop, epoch.endBeforeResuming());
+
+        assertNull(epoch.send(stop, this::setVariable));
+        assertEquals(List.of(), written);
+    }
+
+    @Test
+    void anEpochIsCurrentAgainWhenTheDebugAdapterRefusesToResume() {
+        int stop = epoch.end();
+        int ended = epoch.endBeforeResuming();
+
+        epoch.resumeRefused(ended);
+        assertNotNull(epoch.send(stop, this::setVariable));
+    }
+
+    @Test
+    void anEpochIsNotCurrentAgainWhenTheProgramStoppedSince() {
+        int stop = epoch.end();
+        int ended = epoch.endBeforeResuming();
+        epoch.end();
+
+        epoch.resumeRefused(ended);
+        assertNull(epoch.send(stop, this::setVariable));
+    }
+
+    @Test
+    void aResumeWaitsUntilTheRequestOfTheEpochIsWritten() throws Exception {
+        int stop = epoch.end();
+        var writing = new CountDownLatch(1);
+        var mayWrite = new CountDownLatch(1);
+        // Set Value checks the epoch and writes its request...
+        var setValue = new Thread(() -> epoch.send(stop, () -> {
+            writing.countDown();
+            await(mayWrite);
+            return setVariable();
+        }), "Set Value");
+        setValue.start();
+        assertTrue(writing.await(BOUND_MILLIS, TimeUnit.MILLISECONDS));
+        // ... while Step Over ends the epoch to resume the program
+        var step = new Thread(() -> {
+            epoch.endBeforeResuming();
+            written.add("next");
+        }, "Step Over");
+        step.start();
+
+        assertEquals(Thread.State.BLOCKED, waitUntilBlockedOrEnded(step), "the resume waits for the request");
+        assertEquals(stop, epoch.get(), "the epoch doesn't end while its request is written");
+        mayWrite.countDown();
+        setValue.join(BOUND_MILLIS);
+        step.join(BOUND_MILLIS);
+        assertEquals(List.of("setVariable", "next"), written, "the request is written before the resume");
+        assertNull(epoch.send(stop, this::setVariable), "the request of the epoch isn't sent after the resume");
+    }
+
+    private CompletableFuture<String> setVariable() {
+        written.add("setVariable");
+        return CompletableFuture.completedFuture("42");
+    }
+
+    private static void await(CountDownLatch latch) {
+        try {
+            assertTrue(latch.await(BOUND_MILLIS, TimeUnit.MILLISECONDS));
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new AssertionError(e);
+        }
+    }
+
+    /**
+     * Waits until the given thread is blocked on a lock or has ended, and returns its state then.
+     */
+    private static Thread.State waitUntilBlockedOrEnded(Thread thread) throws InterruptedException {
+        long end = System.currentTimeMillis() + BOUND_MILLIS;
+        while (System.currentTimeMillis() < end) {
+            var state = thread.getState();
+            if (state == Thread.State.BLOCKED || state == Thread.State.TERMINATED) {
+                return state;
+            }
+            Thread.sleep(1);
+        }
+        return thread.getState();
+    }
+}

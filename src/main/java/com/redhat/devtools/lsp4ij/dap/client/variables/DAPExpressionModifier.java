@@ -12,7 +12,6 @@ package com.redhat.devtools.lsp4ij.dap.client.variables;
 
 import com.intellij.xdebugger.XExpression;
 import com.intellij.xdebugger.frame.XValueModifier;
-import com.redhat.devtools.lsp4ij.dap.DAPBundle;
 import com.redhat.devtools.lsp4ij.dap.evaluation.DAPDebuggerEvaluator;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import org.eclipse.lsp4j.debug.SetExpressionResponse;
@@ -42,18 +41,19 @@ public class DAPExpressionModifier extends XValueModifier {
 
     @Override
     public void setValue(@NotNull XExpression expression, @NotNull XModificationCallback callback) {
-        if (!value.getStackFrame().isOfTheLastStop()) {
-            // The id of the frame, in which the expression is assigned to, may name another frame since
-            DAPValue.reportWhyItCantBeSet(callback, DAPBundle.message("dap.variables.setValue.stale"));
-            return;
-        }
         String whyItCantBeSet = value.getWhyItCantBeSet(value.getClient().isSupportsSetExpression());
         if (whyItCantBeSet != null) {
             DAPValue.reportWhyItCantBeSet(callback, whyItCantBeSet);
             return;
         }
-        value.getClient()
-                .setExpression(getAssignedExpression(), value.getStackFrame().getFrameId(), expression.getExpression())
+        var client = value.getClient();
+        var frame = value.getStackFrame();
+        String assignedExpression = getAssignedExpression();
+        int frameId = frame.getFrameId();
+        String newValue = expression.getExpression();
+        // The id of the frame, in which the expression is assigned to, is valid only until the program resumes
+        client.sendInExecutionEpoch(frame.getExecutionEpoch(),
+                        () -> client.setExpression(assignedExpression, frameId, newValue))
                 .thenAccept(setExpressionResponse -> {
                     if (setExpressionResponse == null) {
                         callback.errorOccurred("response null");
