@@ -25,13 +25,18 @@ import com.redhat.devtools.lsp4ij.console.explorer.actions.EditServerAction;
 import com.redhat.devtools.lsp4ij.installation.CommandLineUpdater;
 import com.redhat.devtools.lsp4ij.installation.ServerStarter;
 import com.redhat.devtools.lsp4ij.launching.UserDefinedLanguageServerSettings;
+import com.redhat.devtools.lsp4ij.launching.templates.LanguageServerTemplate;
+import com.redhat.devtools.lsp4ij.launching.templates.LanguageServerTemplateManager;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinitionListener;
+import com.redhat.devtools.lsp4ij.server.definition.launching.TransportSupport;
 import com.redhat.devtools.lsp4ij.server.definition.launching.UserDefinedLanguageServerDefinition;
 import com.redhat.devtools.lsp4ij.server.definition.launching.UserDefinedTransport;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 
 /**
  * UI command line updater.
@@ -60,9 +65,10 @@ public class UICommandLineUpdater implements CommandLineUpdater {
 
     @Override
     public void setCommandLine(String commandLine) {
-        // The installer's command is written for the standard input and output, unless it takes the port
+        // The installer's command is written for the standard input and output, unless it takes the port, or the
+        // template says that the language server talks LSP only over a socket
         var previousTransport = definition.getTransport();
-        var transport = previousTransport.forInstalledCommand(commandLine);
+        var transport = previousTransport.forInstalledCommand(commandLine, getSupportedTransports());
         if (Objects.equals(commandLine, getCommandLine()) && transport.equals(previousTransport)) {
             return;
         }
@@ -88,7 +94,21 @@ public class UICommandLineUpdater implements CommandLineUpdater {
         }
         if (previousTransport.mode() != UserDefinedTransport.Mode.STDIO && transport.mode() == UserDefinedTransport.Mode.STDIO) {
             warnOfTheSwitchToStandardInputAndOutput();
+        } else if (transport.mode() != UserDefinedTransport.Mode.STDIO && transport.startsLanguageServer()
+                && transport.port() == 0 && (commandLine == null || !commandLine.contains(UserDefinedTransport.PORT_MACRO))) {
+            warnOfTheMissingPort();
         }
+    }
+
+    /**
+     * Returns the transports which the template of the language server lists: a template which LSP4IJ bundles, as the
+     * settings of the language server find it by its id, and none for a language server without one.
+     */
+    private @NotNull List<TransportSupport> getSupportedTransports() {
+        return Optional.ofNullable(definition.getTemplateId())
+                .map(templateId -> LanguageServerTemplateManager.getInstance().findTemplateById(templateId))
+                .map(LanguageServerTemplate::getSupportedTransports)
+                .orElse(List.of());
     }
 
     /**
@@ -96,9 +116,25 @@ public class UICommandLineUpdater implements CommandLineUpdater {
      * standard input and output instead of the socket it had.
      */
     private void warnOfTheSwitchToStandardInputAndOutput() {
+        warn(LanguageServerBundle.message("language.server.installer.transport.stdio"));
+    }
+
+    /**
+     * Tells the user that the installer's command doesn't take the port, which LSP4IJ chooses, of a language server
+     * which keeps its socket, as its template says that it talks LSP only over a socket: it can't start until its
+     * command takes the port.
+     */
+    private void warnOfTheMissingPort() {
+        warn(LanguageServerBundle.message("language.server.installer.transport.socket.only"));
+    }
+
+    /**
+     * Shows the given warning of the transport, with an action which opens the settings of the language server.
+     */
+    private void warn(@NotNull String message) {
         var notification = new Notification(LSPNotificationConstants.LSP4IJ_GENERAL_NOTIFICATIONS_ID,
                 definition.getDisplayName(),
-                LanguageServerBundle.message("language.server.installer.transport.stdio"),
+                message,
                 NotificationType.WARNING);
         notification.addAction(new EditServerAction(definition));
         Notifications.Bus.notify(notification, project);

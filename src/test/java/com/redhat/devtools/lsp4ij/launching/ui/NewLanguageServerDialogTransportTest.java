@@ -360,6 +360,35 @@ public class NewLanguageServerDialogTransportTest extends BasePlatformTestCase {
         }
     }
 
+    public void testAnInstallerCommandWithoutThePortKeepsTheSocketOfATemplateWhichListsOnlySocketModes() {
+        var dialog = dialog(template("server --port ${port}", UserDefinedTransport.STDIO, SOCKET_ONLY));
+        try {
+            dialog.setInstalledCommandLine("/opt/server/bin/server");
+
+            assertEquals("/opt/server/bin/server", command(dialog));
+            // over its standard input and output, it couldn't talk at all
+            assertTrue(radio(dialog, "language.server.transport.socket").isSelected());
+            assertTrue(radio(dialog, "language.server.socket.startAndConnect").isSelected());
+            // and OK waits for a command which takes the port
+            assertEquals(List.of(LanguageServerBundle.message("language.server.validation.socket.port.macro",
+                            UserDefinedTransport.PORT_MACRO)),
+                    fieldProblems(dialog).stream().map(problem -> problem.message).toList());
+        } finally {
+            dialog.close(DialogWrapper.CANCEL_EXIT_CODE);
+        }
+
+        // A template which lists stdio too switches to it, as before
+        var alsoStdio = dialog(template("node css.js --stdio", UserDefinedTransport.STDIO, CSS));
+        try {
+            click(alsoStdio, "language.server.transport.socket");
+            alsoStdio.setInstalledCommandLine("node /opt/css.js --stdio");
+
+            assertTrue(radio(alsoStdio, "language.server.transport.stdio").isSelected());
+        } finally {
+            alsoStdio.close(DialogWrapper.CANCEL_EXIT_CODE);
+        }
+    }
+
     public void testAStdioCommandWhichTakesThePortIsAWarningWhichDoesNotBlockOk() {
         var dialog = dialog(template("node server.js --socket=${port}", UserDefinedTransport.STDIO));
         try {

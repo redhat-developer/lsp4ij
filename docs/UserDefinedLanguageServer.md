@@ -157,7 +157,9 @@ An [installer](#installer-tab) which sets the `Command` writes the command of it
 input and output unless it takes the port as `${port}`. A language server which LSP4IJ starts over a socket is then
 switched back to the standard input and output, and a warning says so, with an action which opens its settings; set
 the socket again with a command that takes the port. A language server which runs already, and to which LSP4IJ
-attaches, keeps its socket, since LSP4IJ doesn't use its command.
+attaches, keeps its socket, since LSP4IJ doesn't use its command. So does a language server whose template lists only
+socket modes in its [`transports`](./UserDefinedLanguageServerTemplate.md#transports), since it can't talk over its
+standard input and output: with an `Auto` port, a warning says that its command needs `${port}`, with the same action.
 
 A [template](./UserDefinedLanguageServerTemplate.md#template-descriptor) sets the transport in its
 [`socket`](./UserDefinedLanguageServerTemplate.md#socket), and lists the transports which its language server supports

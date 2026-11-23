@@ -217,7 +217,9 @@ Without `transports`, no hint shows.
 A language server which lists only socket modes is the other way round: `Standard input and output (stdio)` gives the
 warning "The template says this language server talks LSP only over a socket", which blocks neither OK nor Apply
 either. Without a `socket`, the New Language Server dialog selects `Socket` for it, in the first mode of the list, with
-an `Auto` port, or, for `attach`, no port yet.
+an `Auto` port, or, for `attach`, no port yet. An [installer](./UserDefinedLanguageServer.md#transport) whose command
+has no `${port}` leaves it on its socket, rather than switching it to its standard input and output, where it couldn't
+talk at all; with an `Auto` port, a warning then says that its command needs `${port}`.
 
 | Field      | Value                                                                 | Required |
 |------------|-----------------------------------------------------------------------|----------|
@@ -251,7 +253,8 @@ When the user changes the transport, in the New Language Server dialog or in the
 from the template, the argument of the chosen transport replaces that of another listed transport in the command. The
 arguments are matched as whole words, and the one which comes last in the command is replaced. A command with none of
 the listed arguments stays as it is, and so does the command when LSP4IJ loads a template or saved settings. The
-settings find the template by its `id` among the bundled templates, so a language server created from a
+settings, and the installer of a language server created from the template, find the template by its `id` among the
+bundled templates, so a language server created from a
 [custom template](./UserDefinedLanguageServer.md#custom-template) gets this in the New Language Server dialog only.
 The [export](./UserDefinedLanguageServer.md#exporting-templates) of a language server finds its template in the same
 way, and writes the `transports` of the template: the New Language Server dialog gives an import of the export the
