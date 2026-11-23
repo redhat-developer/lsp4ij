@@ -17,7 +17,8 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Debug Adapter Protocol (DAP) value modifier to modify a value with the standard "Set Value" menu .
+ * Debug Adapter Protocol (DAP) value modifier to modify a value with the standard "Set Value" menu, with the
+ * 'setVariable' request.
  */
 public class DAPValueModifier extends XValueModifier {
 

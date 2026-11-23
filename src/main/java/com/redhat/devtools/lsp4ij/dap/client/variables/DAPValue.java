@@ -17,6 +17,7 @@ import com.intellij.xdebugger.frame.*;
 import com.intellij.xdebugger.frame.presentation.XValuePresentation;
 import com.redhat.devtools.lsp4ij.dap.client.DAPClient;
 import com.redhat.devtools.lsp4ij.dap.client.DAPStackFrame;
+import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import org.eclipse.lsp4j.debug.Variable;
 import org.eclipse.lsp4j.debug.VariablePresentationHintAttributes;
 import org.jetbrains.annotations.NotNull;
@@ -97,25 +98,75 @@ public class DAPValue extends XNamedValue {
     @Nullable
     @Override
     public XValueModifier getModifier() {
-        // 'setVariable' names the container of the variable by its 'variablesReference': a value without one, such as
-        // an Evaluate result, can't be set with it
-        if (parentVariablesReference == null || !canSetValue(getClient().isSupportsSetVariable(), variable)) {
-            // Disable the 'Set Value...' menu and F2.
-            return null;
+        var client = getClient();
+        var request = getSetValueRequest(client.isSupportsSetVariable(), client.isSupportsSetExpression(),
+                parentVariablesReference, variable, getShownVariable());
+        if (request instanceof SetValueRequest.SetVariable) {
+            return new DAPValueModifier(this);
         }
-        return new DAPValueModifier(this);
+        if (request instanceof SetValueRequest.SetExpression setExpression) {
+            return new DAPExpressionModifier(this, setExpression.expression());
+        }
+        // Disable the 'Set Value...' menu and F2.
+        return null;
     }
 
     /**
-     * Returns true if the user can set the value of the given variable, and false otherwise: the DAP server must
-     * support setting a variable, and must not mark this variable as read-only.
-     *
-     * @param supportsSetVariable true if the DAP server supports the 'setVariable' request.
-     * @param variable            the DAP variable.
-     * @return true if the user can set the value of the given variable, and false otherwise.
+     * The DAP request which sets a value.
      */
-    static boolean canSetValue(boolean supportsSetVariable, @NotNull Variable variable) {
-        return supportsSetVariable && !isReadOnly(variable);
+    sealed interface SetValueRequest {
+
+        /**
+         * The 'setVariable' request, which names the variable in the container of its parent 'variablesReference'.
+         */
+        record SetVariable() implements SetValueRequest {
+        }
+
+        /**
+         * The 'setExpression' request, which assigns the value to an expression.
+         *
+         * @param expression the expression which the value is assigned to.
+         */
+        record SetExpression(@NotNull String expression) implements SetValueRequest {
+        }
+    }
+
+    /**
+     * Returns the DAP request which sets the value of the given variable, or null if it can't be set, as when the DAP
+     * server marks the variable, or the variable which it shows, as read-only:
+     * <ul>
+     *     <li>a variable with the 'variablesReference' of its parent is set with 'setVariable'. As in VS Code, it is
+     *     set with 'setExpression' only when the DAP server can't set variables, by assigning to its 'evaluateName',
+     *     if it has one.</li>
+     *     <li>a value without a parent 'variablesReference', such as an Evaluate result, can't be named in
+     *     'setVariable': it is set with 'setExpression', by assigning to the evaluated expression, which is its
+     *     name.</li>
+     * </ul>
+     *
+     * @param supportsSetVariable      true if the DAP server supports the 'setVariable' request.
+     * @param supportsSetExpression    true if the DAP server supports the 'setExpression' request.
+     * @param parentVariablesReference the 'variablesReference' of the variable's parent, or null if it has none.
+     * @param variable                 the DAP variable.
+     * @param shown                    the variable which the value shows: the variable with the value of a lazy
+     *                                 variable once the user asked for it, and the variable itself otherwise.
+     * @return the DAP request which sets the value of the given variable, or null if it can't be set.
+     */
+    static @Nullable SetValueRequest getSetValueRequest(boolean supportsSetVariable,
+                                                        boolean supportsSetExpression,
+                                                        @Nullable Integer parentVariablesReference,
+                                                        @NotNull Variable variable,
+                                                        @NotNull Variable shown) {
+        if (isReadOnly(variable) || isReadOnly(shown)) {
+            return null;
+        }
+        if (parentVariablesReference != null && supportsSetVariable) {
+            return new SetValueRequest.SetVariable();
+        }
+        String expression = parentVariablesReference == null ? variable.getName() : shown.getEvaluateName();
+        if (supportsSetExpression && StringUtils.isNotBlank(expression)) {
+            return new SetValueRequest.SetExpression(expression);
+        }
+        return null;
     }
 
     /**

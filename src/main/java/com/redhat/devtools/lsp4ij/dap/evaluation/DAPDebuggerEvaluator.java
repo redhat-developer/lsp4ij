@@ -122,7 +122,9 @@ public class DAPDebuggerEvaluator extends XDebuggerEvaluator {
         client.evaluate(expression, frameId, context)
                 .thenAccept(evaluateResponse -> {
                     Variable variable = new Variable();
-                    variable.setName(expression); // DAPValue which extends XNamedValue requires a non-null name
+                    // DAPValue which extends XNamedValue requires a non-null name, and "Set Value..." assigns to
+                    // the expression with 'setExpression'
+                    variable.setName(expression);
                     variable.setValue(evaluateResponse.getResult());
                     variable.setType(evaluateResponse.getType());
                     variable.setVariablesReference(evaluateResponse.getVariablesReference());

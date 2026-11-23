@@ -38,17 +38,25 @@ public class DAPValueReadOnlyTest extends TestCase {
     }
 
     public void testSetValueOfAWritableVariable() {
-        assertTrue(DAPValue.canSetValue(true, new Variable()));
-        assertTrue(DAPValue.canSetValue(true, variable(hint("static"))));
+        assertTrue(canSetValue(true, new Variable()));
+        assertTrue(canSetValue(true, variable(hint("static"))));
     }
 
     public void testNoSetValueOfAReadOnlyVariable() {
-        assertFalse(DAPValue.canSetValue(true, variable(hint("readOnly"))));
+        assertFalse(canSetValue(true, variable(hint("readOnly"))));
     }
 
     public void testNoSetValueWithoutSetVariable() {
-        assertFalse(DAPValue.canSetValue(false, new Variable()));
-        assertFalse(DAPValue.canSetValue(false, variable(hint("readOnly"))));
+        assertFalse(canSetValue(false, new Variable()));
+        assertFalse(canSetValue(false, variable(hint("readOnly"))));
+    }
+
+    /**
+     * As DAPValue.getModifier() for a variable of the Variables view, which has the 'variablesReference' of its parent,
+     * with a DAP server which doesn't support 'setExpression'.
+     */
+    private static boolean canSetValue(boolean supportsSetVariable, Variable variable) {
+        return DAPValue.getSetValueRequest(supportsSetVariable, false, 1, variable, variable) != null;
     }
 
     private static VariablePresentationHint hint(String... attributes) {
