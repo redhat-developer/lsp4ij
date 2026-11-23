@@ -9,6 +9,8 @@ package com.redhat.devtools.lsp4ij.features;
 
 import com.intellij.codeInsight.hints.InlayHintsSink;
 import com.intellij.codeInsight.hints.NoSettings;
+import com.intellij.notification.Notification;
+import com.intellij.notification.Notifications;
 import com.intellij.openapi.editor.EditorFactory;
 import com.intellij.openapi.editor.ScrollingModel;
 import com.intellij.openapi.editor.event.EditorFactoryEvent;
@@ -22,6 +24,8 @@ import com.intellij.testFramework.UsefulTestCase;
 import com.intellij.testFramework.fixtures.IdeaProjectTestFixture;
 import com.intellij.testFramework.fixtures.IdeaTestFixtureFactory;
 import com.intellij.testFramework.fixtures.TestFixtureBuilder;
+import com.intellij.util.ThrowableRunnable;
+import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import com.redhat.devtools.lsp4ij.LanguageServerWrapper;
 import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
 import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
@@ -37,6 +41,7 @@ import com.redhat.devtools.lsp4ij.mock.MockConnectionProvider;
 import com.redhat.devtools.lsp4ij.mock.MockLanguageServerDefinition;
 import com.redhat.devtools.lsp4ij.server.CannotStartProcessException;
 import com.redhat.devtools.lsp4ij.server.StreamConnectionProvider;
+import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
 import com.redhat.devtools.lsp4ij.templates.ServerMappingSettings;
 import org.eclipse.lsp4j.CodeLensParams;
 import org.eclipse.lsp4j.TextDocumentIdentifier;
@@ -51,18 +56,26 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.logging.Handler;
+import java.util.logging.Level;
+import java.util.logging.LogRecord;
+import java.util.logging.Logger;
 
 /**
  * A feature which waits for a language server which cannot start, as when its command is wrong, gets nothing. It
  * doesn't throw the start failure, which IntelliJ would report as an IDE error, as LSP4IJ already reports it with a
- * "Cannot start server" notification.
+ * "Cannot start server" notification. The other language servers of the file still serve it.
  */
 public class ServerStartFailureTest extends UsefulTestCase {
 
     private LSPCodeInsightTestFixture myFixture;
     private CannotStartServerDefinition serverDefinition;
+    // The language servers that a test adds for the files of the language server which cannot start
+    private final List<MockLanguageServerDefinition> otherServers = new ArrayList<>();
 
     public void testNoColorIsCollected() {
         PsiFile file = myFixture.configureByText("main.foo", "color: #ff0000");
@@ -88,6 +101,98 @@ public class ServerStartFailureTest extends UsefulTestCase {
 
         assertEmpty(LSPFoldingRangeBuilder.getFoldingRanges(file));
         assertServerCannotStart(file.getProject());
+    }
+
+    public void testTheOtherLanguageServersOfAFileServeItWhenOneCannotStart() throws Exception {
+        PsiFile file = myFixture.addFileToProject("main.foo", "a\n");
+        // Without another language server, the request fails with the start failure, so that a feature keeps no result
+        try {
+            waitFor(getAccessor().getLanguageServers(file, null, null));
+            fail("the request must fail with the start failure");
+        } catch (ExecutionException e) {
+            assertInstanceOf(e.getCause(), CannotStartProcessException.class);
+        }
+        var other = addServer("other-server");
+
+        var servers = waitFor(getAccessor().getLanguageServers(file, null, null));
+
+        assertEquals(List.of(other), definitionsOf(servers));
+        assertServerCannotStart(file.getProject());
+    }
+
+    public void testTheOtherLanguageServersServeAWorkspaceRequestWhenOneCannotStart() throws Exception {
+        var other = addServer("other-server");
+
+        var servers = waitFor(getAccessor().getLanguageServers(features -> features.getServerDefinition() == other
+                || features.getServerDefinition() == serverDefinition, null));
+
+        assertEquals(List.of(other), definitionsOf(servers));
+        assertServerCannotStart(myFixture.getProject());
+    }
+
+    public void testALanguageServerLeftOutAsItCannotStartIsReportedAsBefore() throws Exception {
+        var notifications = new CopyOnWriteArrayList<Notification>();
+        var connection = myFixture.getProject().getMessageBus().connect(getTestRootDisposable());
+        connection.subscribe(Notifications.TOPIC, new Notifications() {
+            @Override
+            public void notify(@NotNull Notification notification) {
+                notifications.add(notification);
+            }
+        });
+        var other = addServer("other-server");
+        PsiFile file = myFixture.addFileToProject("main.foo", "a\n");
+
+        var logged = logRecordsOf(() -> assertEquals(List.of(other),
+                definitionsOf(waitFor(getAccessor().getLanguageServers(file, null, null)))));
+
+        PlatformTestUtil.waitWithEventsDispatching("the start failure must be reported with a notification",
+                () -> notifications.stream().anyMatch(notification ->
+                        "Cannot start server".equals(notification.getSubtitle())
+                                && "Cannot run program \"missing\"".equals(notification.getContent())), 60);
+        assertServerCannotStart(file.getProject());
+        assertEquals("the start failure, which is reported, must not be logged again", List.of(), warnings(logged));
+    }
+
+    public void testAnUnexpectedFailureOfALanguageServerIsLoggedAndLeavesItOut() throws Exception {
+        var other = addServer("other-server");
+        var failing = addServer("failing-server");
+        PsiFile file = myFixture.addFileToProject("main.foo", "a\n");
+        var unexpected = new IllegalStateException("The filter fails");
+
+        var logged = logRecordsOf(() -> assertEquals(List.of(other),
+                definitionsOf(waitFor(getAccessor().getLanguageServers(file, null, features -> {
+                    if (features.getServerDefinition() == failing) {
+                        throw unexpected;
+                    }
+                    return true;
+                })))));
+
+        var warnings = warnings(logged);
+        assertEquals("only the unexpected failure must be logged", 1, warnings.size());
+        assertSame(unexpected, warnings.get(0).getThrown());
+        assertTrue(warnings.get(0).getMessage(), warnings.get(0).getMessage().contains(file.getVirtualFile().getUrl()));
+    }
+
+    public void testALanguageServerStoppedWhileARequestWaitsForItIsLeftOutWithoutAFailure() throws Exception {
+        var other = addServer("other-server");
+        var stopped = new MockLanguageServerDefinition("stopped-server", false);
+        var initialize = stopped.getServer().holdInitialize();
+        addServer(stopped);
+        PsiFile file = myFixture.addFileToProject("main.foo", "a\n");
+        try {
+            var logged = logRecordsOf(() -> {
+                var request = getAccessor().getLanguageServers(file, null, null);
+                PlatformTestUtil.waitWithEventsDispatching("the request must wait for the initialize of the server",
+                        () -> stopped.getServer().getInitializeParams() != null, 60);
+                Objects.requireNonNull(findStartedServer(myFixture.getProject(), stopped)).stop();
+
+                assertEquals(List.of(other), definitionsOf(waitFor(request)));
+            });
+
+            assertEquals("the stop, which cancels the start, must not be logged", List.of(), warnings(logged));
+        } finally {
+            initialize.complete(null);
+        }
     }
 
     public void testAFeatureAsksAgainAfterAFailedResultForAnUnchangedFileButKeepsAnEmptyOne() {
@@ -208,16 +313,79 @@ public class ServerStartFailureTest extends UsefulTestCase {
     private @NotNull LanguageServerWrapper startedServer(@NotNull Project project) {
         // A feature of the open file starts the language server in the background
         PlatformTestUtil.waitWithEventsDispatching("a feature of the open file starts the language server",
-                () -> findStartedServer(project) != null, 60);
-        return Objects.requireNonNull(findStartedServer(project));
+                () -> findStartedServer(project, serverDefinition) != null, 60);
+        return Objects.requireNonNull(findStartedServer(project, serverDefinition));
     }
 
-    private @Nullable LanguageServerWrapper findStartedServer(@NotNull Project project) {
+    private static @Nullable LanguageServerWrapper findStartedServer(@NotNull Project project,
+                                                                     @NotNull LanguageServerDefinition definition) {
         return LanguageServiceAccessor.getInstance(project).getStartedServers()
                 .stream()
-                .filter(server -> server.getServerDefinition() == serverDefinition)
+                .filter(server -> server.getServerDefinition() == definition)
                 .findFirst()
                 .orElse(null);
+    }
+
+    private @NotNull LanguageServiceAccessor getAccessor() {
+        return LanguageServiceAccessor.getInstance(myFixture.getProject());
+    }
+
+    /**
+     * Adds a language server which starts, for the files of the language server which cannot start.
+     */
+    private @NotNull MockLanguageServerDefinition addServer(@NotNull String id) {
+        return addServer(new MockLanguageServerDefinition(id, false));
+    }
+
+    private @NotNull MockLanguageServerDefinition addServer(@NotNull MockLanguageServerDefinition definition) {
+        otherServers.add(definition);
+        LanguageServersRegistry.getInstance().addServerDefinition(myFixture.getProject(), definition,
+                List.of(ServerMappingSettings.createFileNamePatternsMappingSettings(List.of("*.foo"), null)));
+        return definition;
+    }
+
+    private static @NotNull List<LanguageServerDefinition> definitionsOf(@NotNull List<LanguageServerItem> servers) {
+        return servers.stream().map(LanguageServerItem::getServerDefinition).toList();
+    }
+
+    private static <T> T waitFor(@NotNull CompletableFuture<T> future) throws Exception {
+        // The bound only ends a hang
+        PlatformTestUtil.waitWithEventsDispatching("the language servers must answer", future::isDone, 60);
+        return future.get();
+    }
+
+    /**
+     * Runs the given code, and returns what LanguageServiceAccessor logs meanwhile, on any thread. LSP4IJ logs with
+     * SLF4J, which IntelliJ binds to java.util.logging.
+     */
+    private static @NotNull List<LogRecord> logRecordsOf(@NotNull ThrowableRunnable<Exception> code) throws Exception {
+        List<LogRecord> records = new CopyOnWriteArrayList<>();
+        var handler = new Handler() {
+            @Override
+            public void publish(LogRecord record) {
+                records.add(record);
+            }
+
+            @Override
+            public void flush() {
+            }
+
+            @Override
+            public void close() {
+            }
+        };
+        var logger = Logger.getLogger(LanguageServiceAccessor.class.getName());
+        logger.addHandler(handler);
+        try {
+            code.run();
+        } finally {
+            logger.removeHandler(handler);
+        }
+        return records;
+    }
+
+    private static @NotNull List<LogRecord> warnings(@NotNull List<LogRecord> records) {
+        return records.stream().filter(record -> record.getLevel().intValue() >= Level.WARNING.intValue()).toList();
     }
 
     /**
@@ -256,6 +424,10 @@ public class ServerStartFailureTest extends UsefulTestCase {
 
     @Override
     protected void tearDown() throws Exception {
+        for (var otherServer : otherServers) {
+            otherServer.getServer().waitBeforeTearDown();
+            LanguageServersRegistry.getInstance().removeServerDefinition(myFixture.getProject(), otherServer);
+        }
         serverDefinition.getServer().waitBeforeTearDown();
         LanguageServersRegistry.getInstance().removeServerDefinition(myFixture.getProject(), serverDefinition);
         try {

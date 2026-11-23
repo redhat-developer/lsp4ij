@@ -34,12 +34,14 @@ import com.intellij.psi.PsiFile;
 import com.intellij.psi.PsiManager;
 import com.intellij.psi.util.CachedValueProvider;
 import com.intellij.psi.util.CachedValuesManager;
+import com.intellij.util.ExceptionUtil;
 import com.intellij.util.concurrency.AppExecutorUtil;
 import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
 import com.redhat.devtools.lsp4ij.console.explorer.actions.EditServerAction;
 import com.redhat.devtools.lsp4ij.internal.PsiFileCancelChecker;
 import com.redhat.devtools.lsp4ij.internal.editor.EditorFeatureManager;
 import com.redhat.devtools.lsp4ij.internal.editor.EditorFeatureType;
+import com.redhat.devtools.lsp4ij.server.LanguageServerException;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinitionListener;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerFileAssociation;
@@ -57,6 +59,7 @@ import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
@@ -184,6 +187,86 @@ public class LanguageServiceAccessor implements Disposable {
         throw ex instanceof CompletionException
                 ? (CompletionException) ex
                 : new CompletionException(ex);
+    }
+
+    /**
+     * A language server that a request for the language servers of a file, or of definitions, left out, as it failed
+     * to start or to connect the file, with its failure.
+     */
+    private record LeftOutServer(@NotNull LanguageServerWrapper server, @NotNull Throwable failure) {
+    }
+
+    /**
+     * Leaves the given language server out of a request for the language servers of a file, or of definitions, when it
+     * fails to start or to connect the file. Each language server of the request starts and connects on its own, and
+     * the failure of one must not take the others away.
+     * <ul>
+     * <li>A cancellation, as when the language server is stopped or restarted while the request waits for it, is no
+     * failure: the language server is left out without one, as before.</li>
+     * <li>An {@link Error} is not the failure of one language server, but of the JVM or of LSP4IJ: it still fails the
+     * request.</li>
+     * <li>Any other failure is kept in the given queue, for {@link #serversOrFailure(List, Queue, String)}.</li>
+     * </ul>
+     *
+     * @param server  the language server.
+     * @param error   the failure of its start, or of its connection of the file.
+     * @param leftOut the language servers that the request left out so far, in the order in which they failed.
+     * @return null, as the language server serves nothing.
+     */
+    private static <T> @Nullable T leaveOut(@NotNull LanguageServerWrapper server,
+                                            @NotNull Throwable error,
+                                            @NotNull Queue<LeftOutServer> leftOut) {
+        Throwable cause = error instanceof CompletionException && error.getCause() != null ? error.getCause() : error;
+        if (cause instanceof CancellationException || cause instanceof ProcessCanceledException) {
+            return null;
+        }
+        if (cause instanceof Error) {
+            throw error instanceof CompletionException completion ? completion : new CompletionException(error);
+        }
+        leftOut.add(new LeftOutServer(server, cause));
+        return null;
+    }
+
+    /**
+     * Returns the language servers that a request for the language servers of a file, or of definitions, got, once
+     * each one has started and connected the file, or has been left out by
+     * {@link #leaveOut(LanguageServerWrapper, Throwable, Queue)}. When it left out all of them, the request fails with
+     * the failure of the first one, as it did before: a feature keeps no failed result, and asks again, as once the
+     * pause after a failed restart is over, while it keeps an empty one until the file changes.
+     * <p>
+     * The failure of every other language server left out is logged, as nothing passes it on. A language server that
+     * cannot start, or that stopped, fails with a {@link LanguageServerException}, which it has reported already, with
+     * its "Cannot start server" notification, and with its status and error in the Language Servers view: it is logged
+     * at the debug level only. Any other failure is unexpected, and nothing else reports it: it is logged as a warning,
+     * since IntelliJ would show an error as an IDE error, at each request.
+     *
+     * @param servers the language servers that the request got.
+     * @param leftOut the language servers that the request left out, in the order in which they failed.
+     * @param fileUrl the URL of the file of the request, or null for a request for definitions.
+     * @return the language servers that the request got.
+     */
+    private static @NotNull List<LanguageServerItem> serversOrFailure(@NotNull List<LanguageServerItem> servers,
+                                                                      @NotNull Queue<LeftOutServer> leftOut,
+                                                                      @Nullable String fileUrl) {
+        var passedOn = servers.isEmpty() ? leftOut.peek() : null;
+        String request = fileUrl != null ? fileUrl : "the project";
+        for (var leftOutServer : leftOut) {
+            if (leftOutServer == passedOn) {
+                continue;
+            }
+            String name = leftOutServer.server().getServerDefinition().getDisplayName();
+            if (ExceptionUtil.causedBy(leftOutServer.failure(), LanguageServerException.class)) {
+                LOGGER.debug("Left out the language server '{}' of the language servers of {}, as it is not running",
+                        name, request, leftOutServer.failure());
+            } else {
+                LOGGER.warn("Left out the language server '{}' of the language servers of {}, as it failed",
+                        name, request, leftOutServer.failure());
+            }
+        }
+        if (passedOn != null) {
+            throw new CompletionException(passedOn.failure());
+        }
+        return servers;
     }
 
     @Nullable
@@ -423,6 +506,7 @@ public class LanguageServiceAccessor implements Disposable {
         Set<LanguageServerWrapper> matchedServers = new LinkedHashSet<>();
         collectLanguageServersFromDefinition(null, serverDefinitions, matchedServers, beforeStartingServerFilter);
         final List<LanguageServerItem> servers = Collections.synchronizedList(new ArrayList<>());
+        final Queue<LeftOutServer> leftOut = new ConcurrentLinkedQueue<>();
         try {
             return CompletableFuture.allOf(matchedServers
                             .stream()
@@ -436,11 +520,11 @@ public class LanguageServiceAccessor implements Disposable {
                                                 }
                                                 return CompletableFuture.completedFuture(null);
                                             })
-                                            // A cancellation here means the server was stopped/restarted mid-flight;
-                                            // silently skip this wrapper instead of surfacing an error to the user.
-                                            .exceptionally(LanguageServiceAccessor::handleFutureException))
+                                            // A server that fails to start, or that is stopped or restarted
+                                            // mid-flight, is left out, so that the others still serve the request
+                                            .exceptionally(error -> leaveOut(wrapper, error, leftOut)))
                             .toArray(CompletableFuture[]::new))
-                    .thenApply(theVoid -> servers);
+                    .thenApply(theVoid -> serversOrFailure(servers, leftOut, null));
         } catch (ProcessCanceledException cancellation) {
             throw cancellation;
         } catch (Exception e) {
@@ -521,6 +605,7 @@ public class LanguageServiceAccessor implements Disposable {
 
         // Returns the language servers which match the given file, start them and connect the file to each matched language server
         final List<LanguageServerItem> servers = Collections.synchronizedList(new ArrayList<>());
+        final Queue<LeftOutServer> leftOut = new ConcurrentLinkedQueue<>();
         try {
             return matchedServers
                     .thenComposeAsync(result -> CompletableFuture.allOf(result
@@ -550,12 +635,13 @@ public class LanguageServiceAccessor implements Disposable {
                                                         servers.add(new LanguageServerItem(server, wrapper));
                                                     }
                                                 })
-                                                // A cancellation here means the server was stopped/restarted mid-flight;
-                                                // silently skip this wrapper instead of surfacing an error to the user.
-                                                .exceptionally(LanguageServiceAccessor::handleFutureException);
+                                                // A server that fails to start or to connect the file, or that is
+                                                // stopped or restarted mid-flight, is left out, so that the others
+                                                // still serve the file
+                                                .exceptionally(error -> leaveOut(wrapper, error, leftOut));
                                     }
                             ).toArray(CompletableFuture[]::new)))
-                    .thenApply(theVoid -> servers);
+                    .thenApply(theVoid -> serversOrFailure(servers, leftOut, url));
         } catch (final ProcessCanceledException cancellation) {
             throw cancellation;
         } catch (final Exception e) {
