@@ -61,10 +61,11 @@ You can find more documentation in:
 
 ## Who is using LSP4IJ?
 
-Here are some projects that use LSP4IJ:
+Here are some projects that use LSP4IJ, grouped by the protocol they use it for. A project that uses both is in both lists.
+
+### Language Server Protocol (LSP)
 
  * [Adamantium AUML](https://github.com/AdamantiumStudio/AdamantiumUI/tree/main/editors/rider-auml)
- * [aer Local Apex Debugger](https://www.octoberswimmer.com/tools/aer/docs/intellij-debugging/)
  * [agentic-security](https://github.com/Clear-Capabilities/agentic-security/tree/main/ide/jetbrains)
  * [agnix](https://github.com/agent-sh/agnix)
  * [Aktion](https://github.com/asfand-dev/aktion/tree/main/editors/jetbrains)
@@ -173,7 +174,6 @@ Here are some projects that use LSP4IJ:
  * [Lua Pro](https://plugins.jetbrains.com/plugin/35721-lua-pro)
  * [Ludic](https://github.com/workshopsoft/ludic/tree/main/tools/editors/jetbrains)
  * [Lumen UI](https://github.com/lumen-fx/lumen/tree/main/tools/jetbrains-lumen)
- * [MC Studio Helper](https://github.com/TartaricAcid/MCStudioHelper)
  * [Metal Shader Language Support](https://github.com/Yif1999/MSL-Rider-Plugin)
  * [MetaScript](https://github.com/metascriptlang/metascript-jetbrains)
  * [MinML](https://github.com/dedis/matchertext/tree/main/dev/jetbrains)
@@ -264,7 +264,6 @@ Here are some projects that use LSP4IJ:
  * [Trainz Language](https://github.com/Cethric/trainz-language-server/tree/develop/extensions/trainz-idea)
  * [TTR Modeler](https://github.com/Collite/ttr-core/tree/master/intellij-plugin)
  * [TypeScript ART](https://plugins.jetbrains.com/plugin/35975-typescript-art)
- * [UWVM Host Debugger](https://github.com/UlteSoft/uwvm2-ros/tree/main/tools/debug/jetbrains)
  * [Vala Language](https://github.com/vala-lang/vala-jetbrains)
  * [Vespa Schema Language Support](https://github.com/vespa-engine/vespa/tree/master/integration/schema-language-server/clients/intellij)
  * [Wasp Language Support](https://github.com/pannous/wasp-jetbrains-plugin)
@@ -276,6 +275,36 @@ Here are some projects that use LSP4IJ:
  * [Zig Pro](https://plugins.jetbrains.com/plugin/35677-zig-pro)
  * [ZigBrains](https://codeberg.org/FalsePattern/ZigBrains)
  * [Zowe™ COBOL Language Support](https://github.com/zowe/zowe-cobol-language-support-intellij)
+
+### Debug Adapter Protocol (DAP)
+
+ * [aer Local Apex Debugger](https://www.octoberswimmer.com/tools/aer/docs/intellij-debugging/)
+ * [C/C++ Project (LSP)](https://github.com/Ant-ON/intellij-c-cpp-lsp)
+ * [Flint](https://github.com/Mission-Platform/composable-mission-ready-platform/tree/main/extensions/flint-ij)
+ * [Gleam Pro](https://plugins.jetbrains.com/plugin/33935-gleam-pro)
+ * [Go (gopls)](https://github.com/Xefise/jetbrains-go-plugin)
+ * [Illuminated Cloud 2](https://plugins.jetbrains.com/plugin/10253-illuminated-cloud-2)
+ * [IntelliJ EmmyLua2](https://github.com/EmmyLua/Intellij-EmmyLua2)
+ * [Localcord](https://github.com/KaenguruuDev/Localcord-Rider)
+ * [Lua Pro](https://plugins.jetbrains.com/plugin/35721-lua-pro)
+ * [MC Studio Helper](https://github.com/TartaricAcid/MCStudioHelper)
+ * [Monkey C](https://github.com/dtretyakov/idea-monkeyc)
+ * [MOS](https://github.com/datatrash/mos/tree/master/intellij)
+ * [mq](https://github.com/harehare/mq/tree/main/editors/jetbrains)
+ * [NetRexx](https://github.com/remesm/lsp4nrx)
+ * [Nim Pro](https://plugins.jetbrains.com/plugin/35539-nim-pro)
+ * [OPA IDEA Plugin](https://github.com/open-policy-agent/opa-idea-plugin)
+ * [PMC (Post machine toolchain)](https://github.com/mellonis/machine-toolchains/tree/master/editors/jetbrains-pm)
+ * [Quarkus Tools for IntelliJ](https://github.com/redhat-developer/intellij-quarkus)
+ * [Renmy Runtime](https://plugins.jetbrains.com/plugin/32360-renmy-runtime--salesforce-ide)
+ * [Rider Unreal Angelscript](https://github.com/scriptacus/rider-unreal-angelscript)
+ * [Rust Pro](https://plugins.jetbrains.com/plugin/35722-rust-pro)
+ * [Scribe Pro](https://plugins.jetbrains.com/plugin/30231-scribe-pro)
+ * [Sema](https://github.com/sema-lisp/intellij-sema)
+ * [Solidity Pro](https://plugins.jetbrains.com/plugin/32553-solidity-pro)
+ * [Spec](https://github.com/OmniImpact/spec-lang/tree/main/jetbrains)
+ * [UWVM Host Debugger](https://github.com/UlteSoft/uwvm2-ros/tree/main/tools/debug/jetbrains)
+ * [Zig Pro](https://plugins.jetbrains.com/plugin/35677-zig-pro)
 
 ## Requirements
 
