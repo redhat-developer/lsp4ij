@@ -89,8 +89,8 @@ public class DAPExpressionModifier extends XValueModifier {
     static void update(@NotNull Variable variable, @NotNull SetExpressionResponse response) {
         variable.setValue(response.getValue());
         variable.setType(response.getType());
-        // Unlike a 'setVariable' response, which can leave out the 'variablesReference' of a variable which keeps its
-        // children, a 'setExpression' response describes the new value: without a 'variablesReference', it has none
+        // A response without 'variablesReference' describes a new value without children, as VS Code reads the
+        // responses of 'setExpression' and 'setVariable' alike
         Integer variablesReference = response.getVariablesReference();
         variable.setVariablesReference(variablesReference != null ? variablesReference : 0);
         variable.setNamedVariables(response.getNamedVariables());
