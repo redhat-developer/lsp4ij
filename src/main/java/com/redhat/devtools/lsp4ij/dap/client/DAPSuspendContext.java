@@ -26,11 +26,21 @@ import java.util.List;
 public class DAPSuspendContext extends XSuspendContext {
 
     private final @NotNull DAPClient client;
+    private final int stopNumber;
     private final List<DAPExecutionStack> myExecutionStacks = new LinkedList<>();
     private @Nullable DAPExecutionStack myActiveStack;
 
     public DAPSuspendContext(@NotNull DAPClient client) {
+        this(client, client.getLastStopNumber());
+    }
+
+    /**
+     * @param client     the client of the debug adapter.
+     * @param stopNumber the number of the stop of the program which this context describes.
+     */
+    public DAPSuspendContext(@NotNull DAPClient client, int stopNumber) {
         this.client = client;
+        this.stopNumber = stopNumber;
     }
 
     public void addToExecutionStack(@NotNull Thread thread, @Nullable StackFrame[] stackFrames) {
@@ -60,6 +70,15 @@ public class DAPSuspendContext extends XSuspendContext {
 
     public @NotNull DAPClient getClient() {
         return client;
+    }
+
+    /**
+     * Returns the number of the stop of the program which this context describes.
+     *
+     * @return the number of the stop of the program which this context describes.
+     */
+    public int getStopNumber() {
+        return stopNumber;
     }
 
     public Integer getThreadId() {

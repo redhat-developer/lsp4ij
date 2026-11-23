@@ -138,7 +138,7 @@ public class DAPExecutionStack extends XExecutionStack {
     
     private @NotNull List<DAPStackFrame> toDAPStackFrames(@NotNull StackFrame[] stackFrames) {
         return Arrays.stream(stackFrames)
-                .map(stackFrame -> new DAPStackFrame(client, stackFrame))
+                .map(stackFrame -> new DAPStackFrame(client, stackFrame, suspendContext.getStopNumber()))
                 .toList();
     }
 }

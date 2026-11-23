@@ -75,6 +75,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.function.UnaryOperator;
@@ -159,6 +160,9 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
     // Whether the loaded sources and modules were asked for. They are asked for at the first stop, and then follow the
     // 'loadedSource' and 'module' events: asking at each stop would get all of them again at each step.
     private final AtomicBoolean loadedSourcesAndModulesAsked = new AtomicBoolean();
+    // The number of the last stop of the program: the frames of each stop have its number (DAPStackFrame), as a debug
+    // adapter may give the id of a frame to another frame at a later stop
+    private final AtomicInteger lastStopNumber = new AtomicInteger();
     // Whether the last request that resumed the program was a step that resumed only its thread. A breakpoint which
     // doesn't suspend then resumes only the stopped thread, so the threads the step kept stopped stay stopped.
     private volatile boolean singleThreadResumed;
@@ -629,6 +633,7 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
 
     @Override
     public void stopped(StoppedEventArguments args) {
+        int stopNumber = lastStopNumber.incrementAndGet();
         // "Run to Cursor" ends at this stop, at its temporary breakpoint or anywhere else
         debugProcess.getRunToCursorBreakpoint().stopped();
         var server = getDebugProtocolServer();
@@ -645,7 +650,7 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
                     .findFirst();
             // A thread which the debug adapter doesn't report doesn't suspend the session
             stoppedThread.ifPresent(thread -> getStackFrames(server, threadId)
-                    .thenAcceptAsync(frames -> suspend(server, args, threads, thread, frames)));
+                    .thenAcceptAsync(frames -> suspend(server, args, stopNumber, threads, thread, frames)));
         });
     }
 
@@ -671,12 +676,14 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
      *
      * @param server        the debug adapter.
      * @param args          the stopped event.
+     * @param stopNumber    the number of the stop.
      * @param threads       the threads the debug adapter reports.
      * @param stoppedThread the thread which stopped.
      * @param frames        the stack frames of the stopped thread, innermost first.
      */
     private void suspend(@NotNull IDebugProtocolServer server,
                          @NotNull StoppedEventArguments args,
+                         int stopNumber,
                          org.eclipse.lsp4j.debug.Thread[] threads,
                          org.eclipse.lsp4j.debug.Thread stoppedThread,
                          StackFrame[] frames) {
@@ -684,7 +691,7 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
             return;
         }
         StackFrame topFrame = frames[0];
-        DAPSuspendContext context = createSuspendContext(threads, stoppedThread, frames);
+        DAPSuspendContext context = createSuspendContext(stopNumber, threads, stoppedThread, frames);
         var breakpointHandler = debugProcess.getBreakpointHandler();
         XBreakpoint<?> breakpoint = getStopBreakpoint(args, id -> debugProcess.findBreakpointById(server, id), () -> breakpointHandler.findBreakpoint(server, topFrame));
         if (breakpoint != null) {
@@ -814,10 +821,11 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
      * context too, which replaces the session's: the threads are read again at each stop, and the sessions of a tree
      * ('startDebugging') share the debug session, so the context of another stop may be another client's.
      */
-    private @NotNull DAPSuspendContext createSuspendContext(org.eclipse.lsp4j.debug.Thread[] threads,
+    private @NotNull DAPSuspendContext createSuspendContext(int stopNumber,
+                                                           org.eclipse.lsp4j.debug.Thread[] threads,
                                                            org.eclipse.lsp4j.debug.Thread stoppedThread,
                                                            StackFrame[] frames) {
-        var context = new DAPSuspendContext(this);
+        var context = new DAPSuspendContext(this, stopNumber);
         for (var thread : threads) {
             context.addToExecutionStack(thread, thread.equals(stoppedThread) ? frames : null);
         }
@@ -1743,6 +1751,16 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
      */
     public boolean isSupportsCompletionsRequest() {
         return Boolean.TRUE.equals(getCapabilities().getSupportsCompletionsRequest());
+    }
+
+    /**
+     * Returns the number of the last stop of the program, which the frames of that stop have: each 'stopped' event
+     * gets the next number.
+     *
+     * @return the number of the last stop of the program, or 0 before the first one.
+     */
+    public int getLastStopNumber() {
+        return lastStopNumber.get();
     }
 
     /**

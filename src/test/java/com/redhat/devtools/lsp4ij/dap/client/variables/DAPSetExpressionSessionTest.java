@@ -241,6 +241,23 @@ public class DAPSetExpressionSessionTest extends HeavyPlatformTestCase {
         assertEquals("The DAP server receives no 'setExpression'", List.of(), List.copyOf(server.setExpressions));
     }
 
+    public void testSetValueOfAnEvaluateResultOfAnEarlierStopReportsItAndSendsNothing() throws Exception {
+        debug(new AnswerServer(true, true));
+        var result = evaluate("answer");
+        assertNotNull(modifierWhenShown(result));
+
+        // the program runs and stops again, where the DAP server gives the id 7 to the frame again
+        stopAgain();
+        assertEquals(DAPBundle.message("dap.variables.setValue.stale"), setValue(result, "42"));
+        assertEquals("The DAP server receives no 'setExpression'", List.of(), List.copyOf(server.setExpressions));
+
+        // the result of an evaluation at this stop can be set
+        assertNull("The value is set", setValue(evaluate("answer"), "42"));
+        var args = server.setExpressions.poll(BOUND_SECONDS, TimeUnit.SECONDS);
+        assertNotNull("The DAP server receives 'setExpression'", args);
+        assertEquals(Integer.valueOf(FRAME_ID), args.getFrameId());
+    }
+
     public void testTheErrorOfTheDAPServerIsReported() throws Exception {
         debug(new AnswerServer(true, true));
         server.setExpressionAnswer = args -> CompletableFuture.failedFuture(new ResponseErrorException(
@@ -398,6 +415,17 @@ public class DAPSetExpressionSessionTest extends HeavyPlatformTestCase {
             session = sessions.length == 1 ? sessions[0] : null;
             return session != null && session.isSuspended() && session.getCurrentStackFrame() instanceof DAPStackFrame;
         }, BOUND_SECONDS);
+    }
+
+    /**
+     * Makes the program stop again, as after a step, and waits for the debugger to show the new stop.
+     */
+    private void stopAgain() {
+        var stopped = session.getSuspendContext();
+        server.stop();
+        PlatformTestUtil.waitWithEventsDispatching("the program stops again", () ->
+                session.getSuspendContext() != stopped && session.getCurrentStackFrame() instanceof DAPStackFrame,
+                BOUND_SECONDS);
     }
 
     /**
@@ -653,13 +681,18 @@ public class DAPSetExpressionSessionTest extends HeavyPlatformTestCase {
 
         @Override
         public CompletableFuture<Void> configurationDone(ConfigurationDoneArguments args) {
-            return CompletableFuture.completedFuture(null).thenRun(() -> {
-                var stopped = new StoppedEventArguments();
-                stopped.setReason(StoppedEventArgumentsReason.PAUSE);
-                stopped.setThreadId(1);
-                stopped.setAllThreadsStopped(true);
-                client.stopped(stopped);
-            });
+            return CompletableFuture.completedFuture(null).thenRun(this::stop);
+        }
+
+        /**
+         * Sends the 'stopped' event of the program, which stops in the frame 7, as after a step.
+         */
+        void stop() {
+            var stopped = new StoppedEventArguments();
+            stopped.setReason(StoppedEventArgumentsReason.PAUSE);
+            stopped.setThreadId(1);
+            stopped.setAllThreadsStopped(true);
+            client.stopped(stopped);
         }
 
         @Override
