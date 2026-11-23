@@ -6,12 +6,18 @@
     "exec": {
       "name": "Trying current command",
       "command": "${server.command}",
-      "timeout": 2000
+      "timeout": 2000,
+      "onSuccess": {
+        "initialize": {
+          "name": "Check that ruby-lsp starts"
+        }
+      }
     }
   },
   "run": {
     "exec": {
       "name": "Install Ruby LSP",
+      "ignoreStderr": true,
       "command": {
         "windows": "cmd /C gem install ruby-lsp",
         "default": "gem install ruby-lsp"

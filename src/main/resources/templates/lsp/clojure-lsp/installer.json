@@ -29,7 +29,7 @@
           },
           "mac": {
             "aarch64": "clojure-lsp-native-macos-aarch64.zip",
-            "amd64": "clojure-lsp-native-macos-amd64.zip"
+            "x86_64": "clojure-lsp-native-macos-amd64.zip"
           }
         }
       },

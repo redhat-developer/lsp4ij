@@ -267,6 +267,7 @@ public class NewLanguageServerDialog extends DialogWrapper {
         // Update command
         String command = getCommandLine(template);
         languageServerPanel.setCommandLine(command);
+        languageServerPanel.setWorkingDir(template.getWorkingDir());
         languageServerPanel.setEnvData(template.getEnvData());
         languageServerPanel.setTransport(template.getTransport());
         languageServerPanel.setSupportedTransports(template.getSupportedTransports());
@@ -350,7 +351,7 @@ public class NewLanguageServerDialog extends DialogWrapper {
         String experimental = this.languageServerPanel.getExperimentalContent();
         String clientConfiguration = this.languageServerPanel.getClientConfigurationContent();
         String installerConfiguration = this.languageServerPanel.getInstallerConfigurationContent();
-        String workspaceFolderStrategyConfiguration = "";
+        String workspaceFolderStrategyConfiguration = this.languageServerPanel.getWorkspaceFolderStrategyConfiguration();
         String workingDir = this.languageServerPanel.getWorkingDir();
 
         UserDefinedLanguageServerDefinition definition = new UserDefinedLanguageServerDefinition(serverId,
@@ -369,7 +370,7 @@ public class NewLanguageServerDialog extends DialogWrapper {
                 experimental,
                 clientConfiguration,
                 installerConfiguration,
-                workspaceFolderStrategyConfiguration);
+                workspaceFolderStrategyConfiguration != null ? workspaceFolderStrategyConfiguration : "");
         definition.setUrl(this.languageServerPanel.getServerUrl());
         definition.setTransport(this.languageServerPanel.getTransport());
         LanguageServersRegistry.getInstance().addServerDefinition(project, definition, mappingSettings);

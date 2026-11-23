@@ -110,13 +110,12 @@ public abstract class ServerTemplateJsonDeserializer<T extends ServerTemplate>  
                                     @Nullable String id) {
         if (jsonObject.has(URL_JSON_PROPERTY)) {
             JsonElement url = jsonObject.get(URL_JSON_PROPERTY);
-            if (url.isJsonPrimitive()) {
-                if (url.getAsJsonPrimitive().isJsonNull()) {
-                    return null;
-                }
-                if (url.getAsJsonPrimitive().isString()) {
-                    return url.getAsJsonPrimitive().getAsString();
-                }
+            // "url": null gives no link. JsonNull isn't a JsonPrimitive
+            if (url.isJsonNull()) {
+                return null;
+            }
+            if (url.isJsonPrimitive() && url.getAsJsonPrimitive().isString()) {
+                return url.getAsJsonPrimitive().getAsString();
             }
         }
         if (id != null && StringUtils.isNotBlank(id)) {

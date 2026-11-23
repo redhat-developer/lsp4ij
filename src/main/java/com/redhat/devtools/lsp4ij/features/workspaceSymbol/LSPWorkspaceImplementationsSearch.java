@@ -105,7 +105,7 @@ public class LSPWorkspaceImplementationsSearch extends QueryExecutorBase<PsiElem
                 offset
         );
         LSPImplementationSupport implementationSupport = LSPFileSupport.getSupport(file).getImplementationSupport();
-        CompletableFuture<List<LocationData>> implementationsFuture = implementationSupport.getImplementations(params);
+        CompletableFuture<List<LocationData>> implementationsFuture = implementationSupport.getAnsweredImplementations(params);
         try {
             awaitWithCheckCanceled(implementationsFuture);
         } catch (ProcessCanceledException e) {

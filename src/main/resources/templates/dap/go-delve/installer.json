@@ -5,12 +5,18 @@
     "exec": {
       "name": "Trying current command",
       "command": "${server.command}",
-      "timeout": 2000
+      "timeout": 2000,
+      "onSuccess": {
+        "initialize": {
+          "name": "Check that Delve starts"
+        }
+      }
     }
   },
   "run": {
     "exec": {
       "name": "Install 'go-delve' release",
+      "ignoreStderr": true,
       "command": "go install github.com/go-delve/delve/cmd/dlv@latest",
       "onSuccess": {
         "configureServer": {

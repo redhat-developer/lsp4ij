@@ -161,9 +161,9 @@ public class DocumentContentSynchronizer implements DocumentListener, Disposable
         TextDocumentItem textDocument = new TextDocumentItem();
         textDocument.setUri(this.fileUri);
         long modificationStamp;
-        if (documentText != null) {
-            // Reuse the captured text and stamp: rereading the document here can deadlock
-            // when a VFS rename holds the write lock while waiting for reconnection.
+        if (documentText != null && !changedSinceCapture()) {
+            // Reuse the captured text and stamp while the document still has them: rereading the document
+            // here can deadlock when a VFS rename holds the write lock while waiting for reconnection.
             textDocument.setText(documentText);
             modificationStamp = documentModificationStamp;
         } else {
@@ -231,6 +231,18 @@ public class DocumentContentSynchronizer implements DocumentListener, Disposable
                 );
         processPullDiagnosticIfNeeded(didOpenFuture, version);
         return didOpenFuture;
+    }
+
+    /**
+     * Returns whether the document changed since its text was captured for the didOpen. This listener is added only
+     * when the document connects, after the capture, so it did not hear the changes made in between: the captured text
+     * is then out of date, and the didOpen reads the current one. A change heard since this listener was added makes
+     * the didOpen read it too, which is the text that the queued changes lead to anyway. The read waits for a running
+     * write action, so a write action that changed the document since the capture must not wait for this didOpen; the
+     * move of a document connects it without waiting.
+     */
+    private boolean changedSinceCapture() {
+        return documentModificationStamp != -1 && document.getModificationStamp() != documentModificationStamp;
     }
 
     @Override

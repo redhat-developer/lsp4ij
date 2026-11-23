@@ -10,19 +10,33 @@
       "name": "Trying current command",
       "command": "${server.command}",
       "timeout": 2000,
+      "onSuccess": {
+        "initialize": {
+          "name": "Check that Metals starts"
+        }
+      },
       "onFail": {
         "exec": {
           "name": "Checking coursier",
           "command": {
-            "windows": "where coursier",
-            "default": "which coursier"
+            "windows": "where cs",
+            "default": "which cs"
+          },
+          "onSuccess": {
+            "fileExists": {
+              "name": "Check if Scala Language Server is installed",
+              "file": {
+                "windows": "${workingDir}/metals.bat",
+                "default": "${workingDir}/metals"
+              }
+            }
           },
           "onFail": {
             "showMessage": {
               "name": "Scala Language Server install problem",
               "content": [
                 "<a href=\"https://get-coursier.io/docs/cli-overview\">Coursier</a> is required to install Scala Language Server (Metals).",
-                "Please <a href=\"https://get-coursier.io/docs/cli-installation\" >install it </a> and ensure <code>coursier</code> is in your system PATH. Restart your IDE if needed."
+                "Please <a href=\"https://get-coursier.io/docs/cli-installation\" >install it </a> and ensure <code>cs</code> is in your system PATH. Restart your IDE if needed."
               ]
             }
           }

@@ -29,7 +29,7 @@
       "fileType": {
         "name": "ESLint Jsonc",
         "patterns": [
-          "eslintrc.json"
+          ".eslintrc.json"
         ]
       },
       "languageId": "jsonc"

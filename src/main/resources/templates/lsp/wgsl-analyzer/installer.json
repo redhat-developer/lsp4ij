@@ -14,11 +14,14 @@
           "x86_64": "${serverDist}/wgsl-analyzer-x86_64-unknown-linux-gnu",
           "arm64": "${serverDist}/wgsl-analyzer-aarch64-unknown-linux-gnu"
         },
-        "mac": "${serverDist}/wgsl-analyzer-aarch64-apple-darwin"
+        "mac": {
+          "x86_64": "${serverDist}/wgsl-analyzer-x86_64-apple-darwin",
+          "arm64": "${serverDist}/wgsl-analyzer-aarch64-apple-darwin"
+        }
       },
       "onSuccess": {
         "replaceTemplateCommand": {
-          "name": "Configure WSGL Language server command",
+          "name": "Configure WGSL Language server command",
           "templateCommand": {
             "windows": "${BASE_DIR}/wgsl-analyzer.exe",
             "default": "${BASE_DIR}/wgsl-analyzer"
@@ -45,7 +48,10 @@
             "x86_64": "wgsl-analyzer-x86_64-unknown-linux-gnu.gz",
             "arm64": "wgsl-analyzer-aarch64-unknown-linux-gnu.gz"
           },
-          "mac": "wgsl-analyzer-aarch64-apple-darwin.gz"
+          "mac": {
+            "x86_64": "wgsl-analyzer-x86_64-apple-darwin.gz",
+            "arm64": "wgsl-analyzer-aarch64-apple-darwin.gz"
+          }
         }
       },
       "output": {
@@ -57,14 +63,17 @@
               "x86_64": "wgsl-analyzer-x86_64-unknown-linux-gnu",
               "arm64": "wgsl-analyzer-aarch64-unknown-linux-gnu"
             },
-            "mac": "wgsl-analyzer-aarch64-apple-darwin"
+            "mac": {
+              "x86_64": "wgsl-analyzer-x86_64-apple-darwin",
+              "arm64": "wgsl-analyzer-aarch64-apple-darwin"
+            }
           },
           "executable": true
         }
       },
       "onSuccess": {
         "configureServer": {
-          "name": "Configure WSGL Language server command",
+          "name": "Configure WGSL Language server command",
           "command": "\"${output.dir}/${output.file.name}\"",
           "update": true
         }

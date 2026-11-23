@@ -23,6 +23,7 @@ import com.redhat.devtools.lsp4ij.LanguageServerBundle;
 import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
 import com.redhat.devtools.lsp4ij.console.explorer.actions.EditServerAction;
 import com.redhat.devtools.lsp4ij.installation.CommandLineUpdater;
+import com.redhat.devtools.lsp4ij.installation.ServerStarter;
 import com.redhat.devtools.lsp4ij.launching.UserDefinedLanguageServerSettings;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinitionListener;
 import com.redhat.devtools.lsp4ij.server.definition.launching.UserDefinedLanguageServerDefinition;
@@ -50,6 +51,11 @@ public class UICommandLineUpdater implements CommandLineUpdater {
     @Override
     public String getCommandLine() {
         return definition.getCommandLine();
+    }
+
+    @Override
+    public @NotNull ServerStarter getServerStarter() {
+        return definition.getServerStarter();
     }
 
     @Override

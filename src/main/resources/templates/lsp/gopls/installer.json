@@ -7,6 +7,11 @@
       "name": "Trying current command",
       "command": "${server.command}",
       "timeout": 2000,
+      "onSuccess": {
+        "initialize": {
+          "name": "Check that gopls starts"
+        }
+      },
       "onFail": {
         "exec": {
           "name": "Check Go runtime",
@@ -18,7 +23,12 @@
             "exec": {
               "name": "Trying current command",
               "command": "${server.command}",
-              "timeout": 2000
+              "timeout": 2000,
+              "onSuccess": {
+                "initialize": {
+                  "name": "Check that gopls starts"
+                }
+              }
             }
           },
           "onFail": {
@@ -37,13 +47,14 @@
   "run": {
     "exec": {
       "name": "Install Go Language Server Globally",
-      "command": "go install golang.org/x/tools/gopls@latest"
-    },
-    "onSuccess": {
-      "configureServer": {
-        "name": "Configure Go Language Server command",
-        "command": "gopls -mode=stdio",
-        "update": true
+      "ignoreStderr": true,
+      "command": "go install golang.org/x/tools/gopls@latest",
+      "onSuccess": {
+        "configureServer": {
+          "name": "Configure Go Language Server command",
+          "command": "gopls -mode=stdio",
+          "update": true
+        }
       }
     }
   }

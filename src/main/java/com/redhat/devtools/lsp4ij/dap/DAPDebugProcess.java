@@ -65,16 +65,19 @@ import com.redhat.devtools.lsp4ij.dap.client.files.DAPSourceReferencePosition;
 import com.redhat.devtools.lsp4ij.dap.client.variables.DAPValueFormat;
 import com.redhat.devtools.lsp4ij.dap.configurations.DAPCommandLineState;
 import com.redhat.devtools.lsp4ij.dap.console.DAPConsoleView;
+import com.redhat.devtools.lsp4ij.dap.definitions.userdefined.UserDefinedDebugAdapterServerDefinition;
 import com.redhat.devtools.lsp4ij.dap.descriptors.DebugAdapterDescriptor;
 import com.redhat.devtools.lsp4ij.dap.disassembly.DAPAlternativeSourceHandler;
 import com.redhat.devtools.lsp4ij.dap.disassembly.DisassemblyFile;
 import com.redhat.devtools.lsp4ij.dap.disassembly.breakpoints.DisassemblyBreakpointHandlerBase;
+import com.redhat.devtools.lsp4ij.dap.settings.ui.DebugSessionCommandLineUpdater;
 import com.redhat.devtools.lsp4ij.dap.sources.LoadedSourcesPanel;
 import com.redhat.devtools.lsp4ij.dap.sources.ModulesPanel;
 import com.redhat.devtools.lsp4ij.dap.stepping.DAPSmartStepIntoHandler;
 import com.redhat.devtools.lsp4ij.dap.stepping.DAPStepIntoVariant;
 import com.redhat.devtools.lsp4ij.dap.stepping.DAPStepOnlyCurrentThreadAction;
 import com.redhat.devtools.lsp4ij.dap.threads.ThreadsPanel;
+import com.redhat.devtools.lsp4ij.installation.CommandLineUpdater;
 import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
 import com.redhat.devtools.lsp4ij.internal.CompletableFutures;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
@@ -774,16 +777,32 @@ public class DAPDebugProcess extends XDebugProcess implements Disposable {
                 });
     }
 
+    /**
+     * Returns the command line updater of the installer of the "Installer" tab of the given debug session, which gets
+     * the command of its debug adapter with {@code ${server.command}} and updates it with {@code configureServer}.
+     *
+     * @param dapState the state of the debug session.
+     * @return the command line updater of the installer of the "Installer" tab of the given debug session.
+     */
+    static @NotNull CommandLineUpdater createInstallerCommandLineUpdater(@NotNull DAPCommandLineState dapState) {
+        if (dapState.getServerDescriptor().getServerDefinition() instanceof UserDefinedDebugAdapterServerDefinition server) {
+            return new DebugSessionCommandLineUpdater(server, dapState);
+        }
+        // Else, as for a debug adapter of an extension, the command of the run configuration
+        return dapState;
+    }
+
     @Override
     public @NotNull XDebugTabLayouter createTabLayouter() {
         return new XDebugTabLayouter() {
 
             private static void resisterInstallerTab(@NotNull RunnerLayoutUi ui,
                                                      @Nullable String installerConfiguration,
+                                                     @NotNull CommandLineUpdater commandLineUpdater,
                                                      @NotNull Project project) {
                 Content customTab = ui.createContent(
                         "dap-installer-tab",
-                        createInstallerPanel(installerConfiguration, project),
+                        createInstallerPanel(installerConfiguration, commandLineUpdater, project),
                         DAPBundle.message("dap.settings.editor.installer.tab"),
                         AllIcons.Actions.Install,
                         null
@@ -792,9 +811,11 @@ public class DAPDebugProcess extends XDebugProcess implements Disposable {
             }
 
             private static JComponent createInstallerPanel(@Nullable String installerConfiguration,
+                                                           @NotNull CommandLineUpdater commandLineUpdater,
                                                            @NotNull Project project) {
                 FormBuilder builder = FormBuilder.createFormBuilder();
                 var installerPanel = new InstallerPanel(builder, true, project);
+                installerPanel.setCommandLineUpdater(commandLineUpdater);
                 if (installerConfiguration != null) {
                     ApplicationManager.getApplication()
                             .invokeLater(() -> installerPanel.getInstallerConfigurationWidget().setText(installerConfiguration));
@@ -824,7 +845,8 @@ public class DAPDebugProcess extends XDebugProcess implements Disposable {
                     // Register the "Installer" tab
                     String installerConfiguration = DAPDebugProcess.this.dapState.getInstallerConfiguration();
                     var project = DAPDebugProcess.this.getProject();
-                    resisterInstallerTab(ui, installerConfiguration, project);
+                    var commandLineUpdater = createInstallerCommandLineUpdater(DAPDebugProcess.this.dapState);
+                    resisterInstallerTab(ui, installerConfiguration, commandLineUpdater, project);
                 }
             }
 

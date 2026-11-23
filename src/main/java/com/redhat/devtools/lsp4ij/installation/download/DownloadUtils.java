@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.HashSet;
 import java.util.Locale;
 import java.util.Set;
@@ -161,7 +162,8 @@ public class DownloadUtils {
              BufferedInputStream bis = new BufferedInputStream(fis);
              GZIPInputStream gzipInputStream = new GZIPInputStream(bis)) {
             Path outputFile = targetDir.resolve(stripExtension(filePath));
-            Files.copy(gzipInputStream, outputFile);
+            // Replaces the file of an earlier install, as when the server is installed again
+            Files.copy(gzipInputStream, outputFile, StandardCopyOption.REPLACE_EXISTING);
             return outputFile;
         }
     }
@@ -180,7 +182,7 @@ public class DownloadUtils {
              XZInputStream xzInputStream = new XZInputStream(bis)) {
             Path tarFilePath = filePath.getParent().resolve(stripExtension(filePath));
             Files.copy(xzInputStream, tarFilePath);
-            var targetFile = decompressTar(filePath, targetDir);
+            var targetFile = decompressTar(tarFilePath, targetDir);
             Files.deleteIfExists(tarFilePath);
             return targetFile;
         }

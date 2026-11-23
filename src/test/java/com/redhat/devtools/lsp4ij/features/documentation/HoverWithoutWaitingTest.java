@@ -7,13 +7,19 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.features.documentation;
 
+import com.intellij.lang.Language;
+import com.intellij.lang.LanguageDocumentation;
+import com.intellij.lang.LanguageExtensionPoint;
+import com.intellij.lang.documentation.DocumentationProvider;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.command.WriteCommandAction;
+import com.intellij.openapi.extensions.ExtensionPointName;
 import com.intellij.platform.backend.documentation.DocumentationData;
 import com.intellij.platform.backend.documentation.DocumentationResult;
 import com.intellij.platform.backend.documentation.DocumentationTarget;
 import com.intellij.psi.PsiFile;
+import com.intellij.testFramework.ExtensionTestUtil;
 import com.intellij.util.concurrency.AppExecutorUtil;
 import com.intellij.util.containers.ContainerUtil;
 import com.redhat.devtools.lsp4ij.LSPIJEditorUtils;
@@ -99,9 +105,26 @@ public class HoverWithoutWaitingTest extends LSPCodeInsightFixtureTestCase {
         assertNull("no documentation of a reply to the earlier text", computeDocumentationBlocking(target.createPointer()));
     }
 
+    public void testAFileWhoseLanguageRegistersNoDocumentationProviderGetsATargetWhichWaitsInTheBackground() throws Exception {
+        PsiFile file = open("undocumented.properties", "key=word");
+        assertFalse("not a plain text file", LSPIJEditorUtils.isPlainTextFile(file));
+        withoutTheDocumentationProvidersOf(file.getLanguage());
+
+        List<? extends DocumentationTarget> targets = targetsWhileTheReplyIsHeld(file);
+
+        var target = assertInstanceOf(ContainerUtil.getOnlyItem(targets), LSPPendingHoverDocumentationTarget.class);
+        reply.complete(hover());
+        DocumentationData documentation = computeDocumentationBlocking(target.createPointer());
+        assertNotNull("the documentation of the reply", documentation);
+        assertTrue(documentation.getHtml(), documentation.getHtml().contains(DOCUMENTATION));
+        assertEquals(1, hoverRequests.get());
+    }
+
     public void testAFileWithDocumentationOfItsOwnWaitsBrieflyAndUsesTheReplyNextTime() throws Exception {
         PsiFile file = open("main.properties", "key=word");
         assertFalse("not a plain text file", LSPIJEditorUtils.isPlainTextFile(file));
+        assertFalse("the file's language has documentation providers",
+                LanguageDocumentation.INSTANCE.allForLanguage(file.getLanguage()).isEmpty());
 
         List<? extends DocumentationTarget> targets = targetsWhileTheReplyIsHeld(file);
 
@@ -113,6 +136,19 @@ public class HoverWithoutWaitingTest extends LSPCodeInsightFixtureTestCase {
         var target = assertInstanceOf(next.get(0), LSPDocumentationTarget.class);
         assertTrue(target.getHtml(), target.getHtml().contains(DOCUMENTATION));
         assertEquals(1, hoverRequests.get());
+    }
+
+    /**
+     * Leaves out the documentation providers registered for the given language until the test ends, as for a language
+     * whose plugin leaves its documentation to a language server.
+     */
+    private void withoutTheDocumentationProvidersOf(Language language) {
+        ExtensionPointName<LanguageExtensionPoint<DocumentationProvider>> providers =
+                new ExtensionPointName<>(LanguageDocumentation.INSTANCE.getName());
+        ExtensionTestUtil.maskExtensions(providers, providers.getExtensionList().stream()
+                .filter(provider -> !language.getID().equals(provider.language))
+                .toList(), getTestRootDisposable());
+        assertEmpty(LanguageDocumentation.INSTANCE.allForLanguage(language));
     }
 
     private PsiFile open(String fileName, String text) throws Exception {

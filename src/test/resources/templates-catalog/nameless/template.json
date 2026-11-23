@@ -1,0 +1,15 @@
+{
+  "programArgs": {
+    "default": "nameless-language-server --stdio"
+  },
+  "fileTypeMappings": [
+    {
+      "fileType": {
+        "patterns": [
+          "*.nameless"
+        ]
+      },
+      "languageId": "nameless"
+    }
+  ]
+}

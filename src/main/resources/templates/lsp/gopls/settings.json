@@ -8,7 +8,10 @@
     "build.standaloneTags": [
       "ignore"
     ],
-    "build.templateExtensions": [],
+    "build.templateExtensions": [
+      "tmpl",
+      "gotmpl"
+    ],
     "build.workspaceFiles": [],
     "formatting.gofumpt": false,
     "formatting.local": "",
