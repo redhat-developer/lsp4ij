@@ -833,8 +833,9 @@ public class LanguageServerPanel implements Disposable {
     /**
      * Returns every problem of the fields this panel shows, each on its field: an empty server name, no command for a
      * language server which LSP4IJ starts, a port which can't be used, and content which isn't valid JSON. A socket for
-     * a language server whose template lists only the standard input and output is a warning. The New Language Server
-     * dialog and the settings page both check with it.
+     * a language server whose template lists only the standard input and output is a warning, and so is the standard
+     * input and output for one whose template lists only socket modes. The New Language Server dialog and the settings
+     * page both check with it.
      *
      * @return every problem of the shown fields, empty if there is none.
      */

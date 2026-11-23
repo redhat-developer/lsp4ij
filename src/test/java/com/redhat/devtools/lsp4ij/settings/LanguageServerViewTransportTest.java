@@ -18,8 +18,10 @@ import com.intellij.util.ui.UIUtil;
 import com.redhat.devtools.lsp4ij.LanguageServerBundle;
 import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
 import com.redhat.devtools.lsp4ij.launching.UserDefinedLanguageServerSettings;
+import com.redhat.devtools.lsp4ij.launching.templates.LanguageServerTemplate;
 import com.redhat.devtools.lsp4ij.launching.templates.LanguageServerTemplateManager;
 import com.redhat.devtools.lsp4ij.mock.MockLanguageServerDefinition;
+import com.redhat.devtools.lsp4ij.server.definition.launching.TransportSupport;
 import com.redhat.devtools.lsp4ij.server.definition.launching.UserDefinedLanguageServerDefinition;
 import com.redhat.devtools.lsp4ij.server.definition.launching.UserDefinedTransport;
 import org.jetbrains.annotations.NotNull;
@@ -37,6 +39,8 @@ public class LanguageServerViewTransportTest extends BasePlatformTestCase {
     private static final UserDefinedTransport ACCEPT = new UserDefinedTransport(UserDefinedTransport.Mode.START_AND_ACCEPT, null, 0);
     // typescript-language-server talks only over stdio
     private static final String TYPESCRIPT_TEMPLATE = "typescript-language-server";
+    // No bundled template lists only socket modes, so the tests add one
+    private static final String SOCKET_ONLY_TEMPLATE = "socket-only-test-server";
 
     private UserDefinedLanguageServerDefinition definition;
     private LanguageServerView view;
@@ -256,6 +260,43 @@ public class LanguageServerViewTransportTest extends BasePlatformTestCase {
         }
     }
 
+    public void testASavedStdioOfALanguageServerWhoseTemplateListsOnlySocketModesIsShownWithAWarningAndSaved()
+            throws ConfigurationException {
+        var fromTemplate = fromSocketOnlyTemplate("node my-server.js --stdio", UserDefinedTransport.STDIO);
+        var page = new LanguageServerView(fromTemplate, null, false, getProject());
+        try {
+            page.reset();
+
+            assertSame(UserDefinedTransport.STDIO, page.getTransport());
+            assertFalse(page.isModified());
+            var stdio = radio(page, "language.server.transport.stdio");
+            assertTrue(stdio.isSelected());
+            assertTrue(label(page, "language.server.transport.socket.only").isVisible());
+            var problems = page.validateFields();
+            assertEquals(1, problems.size());
+            assertEquals(LanguageServerBundle.message("language.server.validation.stdio.socket.only"),
+                    problems.get(0).message);
+            assertSame(stdio, problems.get(0).component);
+            assertTrue(problems.get(0).warning);
+
+            // a warning, which doesn't block Apply
+            page.setCommandLine("node my-server.js --stdio --log");
+            page.apply();
+
+            assertSame(UserDefinedTransport.STDIO, settings(fromTemplate).getTransport());
+            assertEquals("node my-server.js --stdio --log", settings(fromTemplate).getCommandLine());
+
+            // Socket, in the mode which the template lists, gives none
+            radio(page, "language.server.transport.socket").doClick();
+            assertEquals(new UserDefinedTransport(UserDefinedTransport.Mode.START_AND_CONNECT, null, 0), page.getTransport());
+            page.setCommandLine("node my-server.js --port ${port}");
+            assertEmpty(page.validateFields());
+        } finally {
+            Disposer.dispose(page);
+            LanguageServersRegistry.getInstance().removeServerDefinition(getProject(), fromTemplate);
+        }
+    }
+
     public void testASocketOfALanguageServerWithoutATemplateIsNoWarning() {
         assertEquals(ACCEPT, view.getTransport());
         assertEmpty(view.validateFields());
@@ -267,12 +308,7 @@ public class LanguageServerViewTransportTest extends BasePlatformTestCase {
      */
     private @NotNull UserDefinedLanguageServerDefinition fromStdioOnlyTemplate(
             @NotNull String command, @NotNull UserDefinedTransport transport) {
-        // The bundled templates are read from the jar of LSP4IJ in the test sandbox, which is outside the roots that a
-        // test may read when the checkout isn't in the user's home directory
-        String templates = PathManager.getResourceRoot(LanguageServerTemplateManager.class, "/templates/lsp");
-        assertNotNull(templates);
-        VfsRootAccess.allowRootAccess(getTestRootDisposable(), templates);
-        var template = LanguageServerTemplateManager.getInstance().findTemplateById(TYPESCRIPT_TEMPLATE);
+        var template = templateManager().findTemplateById(TYPESCRIPT_TEMPLATE);
         assertNotNull(template);
         assertTrue("the template lists only stdio", template.getSupportedTransports().stream()
                 .allMatch(support -> support.mode() == UserDefinedTransport.Mode.STDIO));
@@ -282,6 +318,41 @@ public class LanguageServerViewTransportTest extends BasePlatformTestCase {
         fromTemplate.setTransport(transport);
         LanguageServersRegistry.getInstance().addServerDefinition(getProject(), fromTemplate, List.of());
         return fromTemplate;
+    }
+
+    /**
+     * Adds a language server created from a template which lists only socket modes, with the given command and
+     * transport, and returns it. The template is one of the bundled ones, among which the settings find it, until the
+     * test ends.
+     */
+    private @NotNull UserDefinedLanguageServerDefinition fromSocketOnlyTemplate(
+            @NotNull String command, @NotNull UserDefinedTransport transport) {
+        var template = new LanguageServerTemplate();
+        template.setId(SOCKET_ONLY_TEMPLATE);
+        template.setName("Socket-only server");
+        template.setSupportedTransports(List.of(
+                new TransportSupport(UserDefinedTransport.Mode.START_AND_CONNECT, "--port ${port}")));
+        var bundled = templateManager().getTemplates();
+        bundled.add(template);
+        Disposer.register(getTestRootDisposable(), () -> bundled.remove(template));
+        var fromTemplate = new UserDefinedLanguageServerDefinition(UUID.randomUUID().toString(), SOCKET_ONLY_TEMPLATE,
+                "My socket server", null, null, command, null, Map.of(), false, null, false, null, null, null, null,
+                null, null);
+        fromTemplate.setTransport(transport);
+        LanguageServersRegistry.getInstance().addServerDefinition(getProject(), fromTemplate, List.of());
+        return fromTemplate;
+    }
+
+    /**
+     * Returns the manager of the bundled templates.
+     */
+    private @NotNull LanguageServerTemplateManager templateManager() {
+        // The bundled templates are read from the jar of LSP4IJ in the test sandbox, which is outside the roots that a
+        // test may read when the checkout isn't in the user's home directory
+        String templates = PathManager.getResourceRoot(LanguageServerTemplateManager.class, "/templates/lsp");
+        assertNotNull(templates);
+        VfsRootAccess.allowRootAccess(getTestRootDisposable(), templates);
+        return LanguageServerTemplateManager.getInstance();
     }
 
     private static @NotNull JBRadioButton radio(@NotNull LanguageServerView page, @NotNull String key) {

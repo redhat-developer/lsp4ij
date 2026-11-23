@@ -33,7 +33,9 @@ import com.redhat.devtools.lsp4ij.settings.UIConfiguration;
 import com.redhat.devtools.lsp4ij.templates.ServerMappingSettings;
 import com.redhat.devtools.lsp4ij.launching.templates.LanguageServerTemplate;
 import com.redhat.devtools.lsp4ij.launching.templates.LanguageServerTemplateManager;
+import com.redhat.devtools.lsp4ij.server.definition.launching.TransportSupport;
 import com.redhat.devtools.lsp4ij.server.definition.launching.UserDefinedLanguageServerDefinition;
+import com.redhat.devtools.lsp4ij.server.definition.launching.UserDefinedTransport;
 import com.redhat.devtools.lsp4ij.settings.ui.LanguageServerPanel;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -269,7 +271,7 @@ public class NewLanguageServerDialog extends DialogWrapper {
         languageServerPanel.setCommandLine(command);
         languageServerPanel.setWorkingDir(template.getWorkingDir());
         languageServerPanel.setEnvData(template.getEnvData());
-        languageServerPanel.setTransport(template.getTransport());
+        languageServerPanel.setTransport(getTransport(template));
         languageServerPanel.setSupportedTransports(template.getSupportedTransports());
         templateProblems = template.getProblems();
 
@@ -300,6 +302,21 @@ public class NewLanguageServerDialog extends DialogWrapper {
         this.languageServerPanel.setWorkspaceFolderStrategyConfiguration(template.getWorkspaceFolderConfiguration());
 
         updateHelpButton();
+    }
+
+    /**
+     * Returns the transport which a language server created from the template starts with: the template's socket, and
+     * without one, for a language server which the template says talks LSP only over a socket, the first socket mode
+     * which it lists, on a port which LSP4IJ chooses, or which the user gives for a language server which runs already.
+     */
+    private static @NotNull UserDefinedTransport getTransport(@NotNull LanguageServerTemplate template) {
+        var transport = template.getTransport();
+        var supportedTransports = template.getSupportedTransports();
+        if (transport.mode() != UserDefinedTransport.Mode.STDIO
+                || !TransportSupport.talksOnlyOverASocket(supportedTransports)) {
+            return transport;
+        }
+        return new UserDefinedTransport(supportedTransports.get(0).mode(), null, 0);
     }
 
     @Override

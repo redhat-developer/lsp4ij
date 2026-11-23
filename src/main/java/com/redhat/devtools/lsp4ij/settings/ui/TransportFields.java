@@ -66,6 +66,7 @@ final class TransportFields {
     private final JBLabel portHint = new JBLabel(message("language.server.socket.port.hint", UserDefinedTransport.PORT_MACRO));
     private final JBLabel attachPortHint = new JBLabel(message("language.server.socket.port.attach.hint"));
     private final JBLabel stdioOnlyHint = new JBLabel(message("language.server.transport.stdio.only"));
+    private final JBLabel socketOnlyHint = new JBLabel(message("language.server.transport.socket.only"));
     private final JBLabel templateSocketHint = new JBLabel();
     private final JPanel transportRow = row(GAP, stdio, socket);
     // Auto and Fixed have a row of their own, whose gaps hide with them, so the port lines up with the host without them
@@ -84,6 +85,7 @@ final class TransportFields {
         portHint.setForeground(JBUI.CurrentTheme.ContextHelp.FOREGROUND);
         attachPortHint.setForeground(JBUI.CurrentTheme.ContextHelp.FOREGROUND);
         stdioOnlyHint.setForeground(JBUI.CurrentTheme.ContextHelp.FOREGROUND);
+        socketOnlyHint.setForeground(JBUI.CurrentTheme.ContextHelp.FOREGROUND);
         templateSocketHint.setForeground(JBUI.CurrentTheme.ContextHelp.FOREGROUND);
         typedPortCommits();
         setTransport(UserDefinedTransport.STDIO);
@@ -106,6 +108,7 @@ final class TransportFields {
     void addTo(@NotNull FormBuilder builder) {
         builder.addLabeledComponent(message("language.server.transport"), transportRow);
         builder.addComponent(stdioOnlyHint, 0);
+        builder.addComponent(socketOnlyHint, 0);
         builder.addLabeledComponent(socketLabel, attach);
         builder.addLabeledComponent(startAndConnectLabel, startAndConnect);
         builder.addLabeledComponent(startAndAcceptLabel, startAndAccept);
@@ -127,9 +130,10 @@ final class TransportFields {
 
     /**
      * Shows what the template of the language server says of its transports: a hint says that a language server talks
-     * only over its standard input and output, and another names the mode, and the argument, of a socket which it
-     * supports. Every transport can still be chosen, as a template is also the starting point of a language server of
-     * one's own; a socket for a language server which talks only over its standard input and output is a warning of
+     * only over its standard input and output, or only over a socket, and another names the mode, and the argument, of
+     * a socket which it supports. Every transport can still be chosen, as a template is also the starting point of a
+     * language server of one's own; a socket for a language server which talks only over its standard input and output,
+     * and the standard input and output for one which talks only over a socket, are warnings of
      * {@link #validateForTemplate()}. Without a word from the template, no hint shows.
      *
      * @param supportedTransports the transports which the template lists, empty if it lists none.
@@ -249,19 +253,26 @@ final class TransportFields {
 
     /**
      * Returns a warning when a socket is chosen for a language server whose template lists only the standard input and
-     * output. It is a warning, which doesn't block OK or Apply: the template may be the starting point of a language
-     * server of one's own, which does talk over a socket, and saved settings with a socket keep working.
+     * output, or the standard input and output for one whose template lists only socket modes. It is a warning, which
+     * doesn't block OK or Apply: the template may be the starting point of a language server of one's own, which does
+     * talk over the other transport, and saved settings with it keep working.
      *
-     * @return the warning, or null for stdio, or for a template which lists a socket mode or no transports.
+     * @return the warning, or null for a transport which the template lists, or for a template which lists both stdio
+     * and a socket mode, or no transports.
      */
     @Nullable
     ValidationInfo validateForTemplate() {
-        if (!socket.isSelected() || !listsOnlyStdio()) {
-            return null;
+        if (socket.isSelected() && listsOnlyStdio()) {
+            return new ValidationInfo(message("language.server.validation.socket.stdio.only"), socket)
+                    .asWarning()
+                    .withOKEnabled();
         }
-        return new ValidationInfo(message("language.server.validation.socket.stdio.only"), socket)
-                .asWarning()
-                .withOKEnabled();
+        if (stdio.isSelected() && TransportSupport.talksOnlyOverASocket(supportedTransports)) {
+            return new ValidationInfo(message("language.server.validation.stdio.socket.only"), stdio)
+                    .asWarning()
+                    .withOKEnabled();
+        }
+        return null;
     }
 
     /**
@@ -295,6 +306,7 @@ final class TransportFields {
                 .filter(transport -> transport.mode() != UserDefinedTransport.Mode.STDIO)
                 .findFirst();
         stdioOnlyHint.setVisible(listsOnlyStdio());
+        socketOnlyHint.setVisible(TransportSupport.talksOnlyOverASocket(supportedTransports));
         socketSupport.ifPresent(transport -> templateSocketHint.setText(transport.argument() != null
                 ? message("language.server.socket.template.hint", transport.argument(), modeButton(transport.mode()).getText())
                 : message("language.server.socket.template.mode.hint", modeButton(transport.mode()).getText())));

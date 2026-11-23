@@ -62,6 +62,10 @@ public class NewLanguageServerDialogTransportTest extends BasePlatformTestCase {
     // The transports of the TypeScript template
     private static final List<TransportSupport> STDIO_ONLY = List.of(
             new TransportSupport(UserDefinedTransport.Mode.STDIO, "--stdio"));
+    // The transports of a language server which talks only over a socket, which it listens on or connects to
+    private static final List<TransportSupport> SOCKET_ONLY = List.of(
+            new TransportSupport(UserDefinedTransport.Mode.START_AND_CONNECT, "--port ${port}"),
+            new TransportSupport(UserDefinedTransport.Mode.START_AND_ACCEPT, "--socket=${port}"));
 
     public void testTheTransportWhichTheUserChoosesSwapsItsArgumentInTheCommand() {
         var dialog = dialog(template("node css.js --stdio", UserDefinedTransport.STDIO, CSS));
@@ -278,6 +282,79 @@ public class NewLanguageServerDialogTransportTest extends BasePlatformTestCase {
             click(dialog, "language.server.transport.stdio");
             click(dialog, "language.server.transport.socket");
             assertTrue(radio(dialog, "language.server.transport.socket").isSelected());
+        } finally {
+            dialog.close(DialogWrapper.CANCEL_EXIT_CODE);
+        }
+    }
+
+    public void testATemplateWhichListsOnlySocketModesStartsInTheFirstOfThem() {
+        var dialog = dialog(template("server --port ${port}", UserDefinedTransport.STDIO, SOCKET_ONLY));
+        try {
+            assertTrue(radio(dialog, "language.server.transport.socket").isSelected());
+            assertTrue(radio(dialog, "language.server.socket.startAndConnect").isSelected());
+            assertTrue("LSP4IJ chooses the port", radio(dialog, "language.server.socket.port.auto").isSelected());
+            assertEquals("the command is the template's", "server --port ${port}", command(dialog));
+            assertEmpty(dialog.doValidateAll());
+        } finally {
+            dialog.close(DialogWrapper.CANCEL_EXIT_CODE);
+        }
+
+        // The template's own socket stays, and a template which lists stdio too starts with it, as before
+        var withASocket = dialog(template("", RUNNING, List.of(
+                new TransportSupport(UserDefinedTransport.Mode.START_AND_CONNECT, "--port ${port}"),
+                new TransportSupport(UserDefinedTransport.Mode.ATTACH, null))));
+        try {
+            assertTrue(radio(withASocket, "language.server.socket.attach").isSelected());
+        } finally {
+            withASocket.close(DialogWrapper.CANCEL_EXIT_CODE);
+        }
+        var alsoStdio = dialog(template("node css.js --stdio", UserDefinedTransport.STDIO, CSS));
+        try {
+            assertTrue(radio(alsoStdio, "language.server.transport.stdio").isSelected());
+        } finally {
+            alsoStdio.close(DialogWrapper.CANCEL_EXIT_CODE);
+        }
+    }
+
+    public void testTheLanguageServerAddedFromATemplateWhichListsOnlySocketModesHasTheSocket() {
+        var dialog = dialog(template("server --port ${port}", UserDefinedTransport.STDIO, SOCKET_ONLY));
+        dialog.doOKAction();
+
+        var added = LanguageServersRegistry.getInstance().getServerDefinitions().stream()
+                .filter(definition -> definition instanceof UserDefinedLanguageServerDefinition
+                        && "Socket server".equals(definition.getDisplayName()))
+                .map(UserDefinedLanguageServerDefinition.class::cast)
+                .findFirst()
+                .orElseThrow();
+        try {
+            assertEquals(new UserDefinedTransport(UserDefinedTransport.Mode.START_AND_CONNECT, null, 0), added.getTransport());
+        } finally {
+            LanguageServersRegistry.getInstance().removeServerDefinition(getProject(), added);
+        }
+    }
+
+    public void testStdioForATemplateWhichListsOnlySocketModesIsAWarningWhichDoesNotBlockOk() {
+        var dialog = dialog(template("server --port ${port}", UserDefinedTransport.STDIO, SOCKET_ONLY));
+        try {
+            var stdio = radio(dialog, "language.server.transport.stdio");
+            assertTrue("the template may be the start of a language server which does talk over stdio",
+                    stdio.isEnabled());
+
+            click(dialog, "language.server.transport.stdio");
+            String message = LanguageServerBundle.message("language.server.validation.stdio.socket.only");
+            List<ValidationInfo> problems = dialog.doValidateAll();
+            // On stdio, and listed below the fields, next to the warning of the command, which still takes ${port}, as
+            // the template has no argument for stdio to swap in
+            String portWarning = LanguageServerBundle.message("language.server.validation.stdio.port.macro",
+                    UserDefinedTransport.PORT_MACRO);
+            assertEquals(List.of(portWarning, message, portWarning, message),
+                    problems.stream().map(problem -> problem.message).toList());
+            assertSame(stdio, problems.get(1).component);
+            assertNull(problems.get(3).component);
+            assertTrue("OK stays enabled", problems.stream().allMatch(problem -> problem.warning && problem.okEnabled));
+
+            click(dialog, "language.server.transport.socket");
+            assertEmpty(dialog.doValidateAll());
         } finally {
             dialog.close(DialogWrapper.CANCEL_EXIT_CODE);
         }
