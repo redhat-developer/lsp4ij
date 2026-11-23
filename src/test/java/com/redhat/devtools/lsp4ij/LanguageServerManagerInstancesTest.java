@@ -8,6 +8,7 @@
 package com.redhat.devtools.lsp4ij;
 
 import com.intellij.codeHighlighting.TextEditorHighlightingPassRegistrar;
+import com.intellij.codeInsight.codeVision.settings.CodeVisionSettings;
 import com.intellij.codeInsight.daemon.impl.DaemonCodeAnalyzerImpl;
 import com.intellij.codeInsight.daemon.impl.HighlightInfo;
 import com.intellij.notification.Notification;
@@ -75,7 +76,8 @@ import java.util.function.Supplier;
 /**
  * Tests the {@link LanguageServerManager} with a language server definition whose workspace folder strategy spreads
  * the files over several instances: a directory named "a" to "e" is the root of the instance of its files, and a file
- * in any other directory has none.
+ * in any other directory has none. Code vision is disabled: it asks for the language servers of a file whose editor
+ * opens, which would start an instance that a test has stopped since.
  */
 public class LanguageServerManagerInstancesTest extends LSPCodeInsightFixtureTestCase {
 
@@ -86,6 +88,7 @@ public class LanguageServerManagerInstancesTest extends LSPCodeInsightFixtureTes
 
     private InstancesDefinition definition;
     private LanguageServerManager manager;
+    private boolean codeVisionEnabled;
 
     public LanguageServerManagerInstancesTest() {
         super("*.ts");
@@ -94,6 +97,8 @@ public class LanguageServerManagerInstancesTest extends LSPCodeInsightFixtureTes
     @Override
     protected void setUp() throws Exception {
         super.setUp();
+        codeVisionEnabled = CodeVisionSettings.getInstance().getCodeVisionEnabled();
+        CodeVisionSettings.getInstance().setCodeVisionEnabled(false);
         var project = myFixture.getProject();
         definition = new InstancesDefinition();
         LanguageServersRegistry.getInstance().addServerDefinition(project, definition,
@@ -109,7 +114,11 @@ public class LanguageServerManagerInstancesTest extends LSPCodeInsightFixtureTes
             }
             LanguageServersRegistry.getInstance().removeServerDefinition(myFixture.getProject(), definition);
         } finally {
-            super.tearDown();
+            try {
+                CodeVisionSettings.getInstance().setCodeVisionEnabled(codeVisionEnabled);
+            } finally {
+                super.tearDown();
+            }
         }
     }
 
@@ -847,8 +856,15 @@ public class LanguageServerManagerInstancesTest extends LSPCodeInsightFixtureTes
         return server.getServerWrapper();
     }
 
+    /**
+     * Opens the file in an editor and returns the instance that it is connected to. Selecting its tab connects the file
+     * in the background, which can end after a request of the test: it would then start the instance again, if the test
+     * stopped it since. So the tab connects the file first, and the request of the test then finds it connected.
+     */
     private @NotNull LanguageServerWrapper openAndConnect(@NotNull VirtualFile file) throws Exception {
         myFixture.openFileInEditor(file);
+        PlatformTestUtil.waitWithEventsDispatching("The tab of the file must connect it",
+                () -> instanceConnectedTo(file) != null, TIMEOUT);
         var psiFile = myFixture.getPsiManager().findFile(file);
         assertNotNull(psiFile);
         var servers = waitFor(LanguageServiceAccessor.getInstance(myFixture.getProject()).getLanguageServers(psiFile, null, null));
