@@ -13,6 +13,7 @@ package com.redhat.devtools.lsp4ij.installation.definition;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import com.intellij.openapi.util.SystemInfo;
 import com.intellij.openapi.util.io.FileUtil;
 import com.intellij.testFramework.TestApplicationManager;
 import com.intellij.util.system.CpuArch;
@@ -52,6 +53,8 @@ public class MetalsInstallerTest {
     private static final String TEMPLATE_COMMAND = "\"$USER_HOME$/.lsp4ij/lsp/metals/metals\"";
     // The command that the run gives the server
     private static final String LAUNCHER = "\"${workingDir}/metals\"";
+    // The configureServer task is LSP4IJ's own, which gives the command for the OS that the test runs on
+    private static final String HOST_LAUNCHER = SystemInfo.isWindows ? "\"${workingDir}/metals.bat\"" : LAUNCHER;
 
     private final List<String> ran = new ArrayList<>();
     private final List<String> messages = new ArrayList<>();
@@ -101,14 +104,14 @@ public class MetalsInstallerTest {
     public void testTheRunInstallsMetalsWithCoursierWithoutCs() throws IOException {
         assertTrue(run("mac", Set.of("coursier")), "The run should install Metals with coursier: " + ran);
         assertEquals(List.of("which cs", "coursier install metals --install-dir ."), ran);
-        assertEquals(List.of(LAUNCHER), commands);
+        assertEquals(List.of(HOST_LAUNCHER), commands);
     }
 
     @Test
     public void testTheRunInstallsMetalsWithCsWhenItIsThere() throws IOException {
         assertTrue(run("mac", Set.of("cs", "coursier")), "The run should install Metals with cs: " + ran);
         assertEquals(List.of("which cs", "cs install metals --install-dir ."), ran);
-        assertEquals(List.of(LAUNCHER), commands);
+        assertEquals(List.of(HOST_LAUNCHER), commands);
     }
 
     @Test
