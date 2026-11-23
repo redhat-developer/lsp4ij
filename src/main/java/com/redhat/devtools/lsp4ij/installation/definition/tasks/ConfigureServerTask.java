@@ -24,9 +24,13 @@ import org.jetbrains.annotations.Nullable;
  *   "update": true
  * }
  * </pre>
- *
+ * <p>
+ * A command with {@code ${check.file}} that no {@code fileExists} task found a file for is an error, and leaves the
+ * command of the server as it is.
  */
 public class ConfigureServerTask extends InstallerTask {
+
+    private static final String CHECK_FILE = "${" + FileExistsTask.CHECK_FILE_PROPERTY + "}";
 
     private final @NotNull String command;
 
@@ -44,6 +48,11 @@ public class ConfigureServerTask extends InstallerTask {
     public boolean run(@NotNull InstallerContext context) {
         try {
             String resolvedCommand = context.resolveValues(command);
+            if (resolvedCommand.contains(CHECK_FILE)) {
+                context.printError("The server command '" + command + "' has " + CHECK_FILE
+                        + ", but no fileExists task found a file for it", true);
+                return false;
+            }
             context.print("Start server command=" + resolvedCommand);
             var commandLineUpdater = context.getCommandLineUpdater();
             if (commandLineUpdater != null) {

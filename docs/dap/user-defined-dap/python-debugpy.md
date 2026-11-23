@@ -20,7 +20,10 @@ if __name__ == "__main__":
 1. [install Python](https://www.python.org/downloads/). After that open a terminal and type `python`:
    ![Python command](../images/python-debugpy/python_command.png)
 
-2. Use `pip install debugpy` to install the required `debugpy package`.
+2. Use `pip install debugpy` to install the required `debugpy package`, before you start your program with debugpy as
+   [below](#configure-the-python-file-to-rundebug-with-attach). The installer of the template runs this command too
+   when debugpy is missing, but only when a debug session starts, which is after you started your program with debugpy.
+   It needs `pip` on the PATH of your IDE.
 
 3. Create a test file named `test.py` with a simple Python script that includes a `main()` function printing `"hello world"`
 
@@ -41,7 +44,7 @@ if __name__ == "__main__":
 
    ![Create a new server](../images/DAP_server_create_link.png)
 
-6. It opens a new dialog to create DAP server, select `Python- Debugpy` template:
+6. It opens a new dialog to create DAP server, select `Python - Debugpy` template:
    ![Select Template](../images/python-debugpy/select_template.png)
 
 7. After clicking on `OK` button, it will select the new server and pre-fill configurations:
@@ -64,13 +67,13 @@ you need to select `Trace` with `verbose`.
 ## Configure file mappings
 
 To allows settings breakpoints to Python files, you need configure mappings in the `Mappings` tab.
-As you have selected `Python- Debugpy` server, it will automatically populate the file mappings like this:
+As you have selected `Python - Debugpy` server, it will automatically populate the file mappings like this:
 
 ![File mappings](../images/python-debugpy/file_mappings.png)
 
 ## Configure the Python file to run/debug with attach
 
-As you have selected `Python- Debugpy` server, it will automatically populate the `Attach` configuration like this:
+As you have selected `Python - Debugpy` server, it will automatically populate the `Attach` configuration like this:
 
 ![DAP Configuration/Configuration](../images/python-debugpy/configuration_tab.png)
 

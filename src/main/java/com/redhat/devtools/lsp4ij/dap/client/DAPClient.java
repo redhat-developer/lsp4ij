@@ -46,7 +46,6 @@ import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import com.redhat.devtools.lsp4ij.settings.ServerTrace;
 import org.eclipse.lsp4j.debug.*;
 import org.eclipse.lsp4j.debug.Module;
-import org.eclipse.lsp4j.debug.launch.DSPLauncher;
 import org.eclipse.lsp4j.debug.services.IDebugProtocolClient;
 import org.eclipse.lsp4j.debug.services.IDebugProtocolServer;
 import org.eclipse.lsp4j.jsonrpc.Launcher;
@@ -480,7 +479,7 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
     protected Launcher<? extends IDebugProtocolServer> createLauncher(UnaryOperator<MessageConsumer> wrapper,
                                                                       InputStream in, OutputStream out,
                                                                       ExecutorService threadPool) {
-        return DSPLauncher.createClientLauncher(this, in, out, threadPool, wrapper);
+        return DAPClientLauncher.create(this, in, out, threadPool, wrapper, this::getCapabilities);
     }
 
     @Override
@@ -622,7 +621,7 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
             return;
         }
         StackFrame topFrame = frames[0];
-        DAPSuspendContext context = getSuspendContext(threads, stoppedThread, frames);
+        DAPSuspendContext context = createSuspendContext(threads, stoppedThread, frames);
         var breakpointHandler = debugProcess.getBreakpointHandler();
         XBreakpoint<?> breakpoint = getStopBreakpoint(args, id -> debugProcess.findBreakpointById(server, id), () -> breakpointHandler.findBreakpoint(server, topFrame));
         if (breakpoint != null) {
@@ -747,13 +746,15 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
     }
 
     /**
-     * Returns the session's suspend context, or a new one if the session is not suspended, with an execution stack
-     * per thread: the stopped thread's has the frames it stopped in, and the others' are computed when shown.
+     * Returns a new suspend context of this client, with an execution stack per thread: the stopped thread's has the
+     * frames it stopped in, and the others' are computed when shown. A stop while the session is suspended gets a new
+     * context too, which replaces the session's: the threads are read again at each stop, and the sessions of a tree
+     * ('startDebugging') share the debug session, so the context of another stop may be another client's.
      */
-    private @NotNull DAPSuspendContext getSuspendContext(org.eclipse.lsp4j.debug.Thread[] threads,
-                                                        org.eclipse.lsp4j.debug.Thread stoppedThread,
-                                                        StackFrame[] frames) {
-        var context = getSession().getSuspendContext() instanceof DAPSuspendContext suspended ? suspended : new DAPSuspendContext(this);
+    private @NotNull DAPSuspendContext createSuspendContext(org.eclipse.lsp4j.debug.Thread[] threads,
+                                                           org.eclipse.lsp4j.debug.Thread stoppedThread,
+                                                           StackFrame[] frames) {
+        var context = new DAPSuspendContext(this);
         for (var thread : threads) {
             context.addToExecutionStack(thread, thread.equals(stoppedThread) ? frames : null);
         }

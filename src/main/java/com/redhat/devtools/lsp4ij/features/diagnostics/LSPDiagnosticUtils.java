@@ -24,10 +24,13 @@ import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
 import org.eclipse.lsp4j.Diagnostic;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.jetbrains.concurrency.CancellablePromise;
 
 import java.net.URI;
 import java.util.Collection;
 import java.util.HashSet;
+import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.Callable;
 
@@ -67,7 +70,17 @@ public class LSPDiagnosticUtils {
     public static void reportProblem(@NotNull VirtualFile file,
                                      @Nullable LSPDocumentBase document,
                                      @NotNull Project project) {
-        ReadAction.nonBlocking((Callable<Void>) () -> {
+        submitProblemReport(file, document, project);
+    }
+
+    /**
+     * Submits the report of the problem of the given file, as
+     * {@link #reportProblem(VirtualFile, LSPDocumentBase, Project)} does, and returns it.
+     */
+    private static @NotNull CancellablePromise<Void> submitProblemReport(@NotNull VirtualFile file,
+                                                                         @Nullable LSPDocumentBase document,
+                                                                         @NotNull Project project) {
+        return ReadAction.nonBlocking((Callable<Void>) () -> {
                     boolean hasErrors = isHasErrors(file, document, project);
                     reportProblem(file, project, hasErrors);
                     return null;
@@ -161,6 +174,9 @@ public class LSPDiagnosticUtils {
      * run after the report of errors published since, such as for the document of a file that just closed, and leave
      * the file with errors unmarked. Reports of a file share their coalescing key, so they run one after another and
      * the last one submitted runs last.
+     * <p>
+     * The clear reports its files one after another, so that a language server which stops with many closed documents
+     * never has a read action submitted for each of them at once, which IntelliJ logs as an error.
      *
      * @param fileUris       the URIs of the files.
      * @param clientFeatures the client features of the language server which held their documents.
@@ -170,17 +186,43 @@ public class LSPDiagnosticUtils {
                                     @NotNull LSPClientFeatures clientFeatures,
                                     @NotNull Project project) {
         ReadAction.nonBlocking((Callable<Void>) () -> {
-                    for (URI fileUri : fileUris) {
-                        VirtualFile file = FileUriSupport.findFileByUri(fileUri.toASCIIString(), clientFeatures);
-                        if (file != null && clientFeatures.getDiagnosticFeature().canReportProblem(file)) {
-                            reportProblem(file, null, project);
-                        }
-                    }
+                    List<VirtualFile> files = fileUris.stream()
+                            .map(fileUri -> FileUriSupport.findFileByUri(fileUri.toASCIIString(), clientFeatures))
+                            .filter(Objects::nonNull)
+                            .filter(file -> clientFeatures.getDiagnosticFeature().canReportProblem(file))
+                            .toList();
+                    reportProblemsOneAfterAnother(files, 0, project);
                     return null;
                 })
                 .coalesceBy(fileUris, clientFeatures, project)
                 // As the reports it submits, the clear never runs once the project is disposed
                 .expireWhen(project::isDisposed)
                 .submit(AppExecutorUtil.getAppExecutorService());
+    }
+
+    /**
+     * Reports the problem of the given files, from the one at the given index, one after another: the report of a file
+     * is submitted once the report of the file before it is processed, whether it ran, was replaced by a later report
+     * of its file, or expired. The reports stop once the project is disposed.
+     *
+     * @param files   the files.
+     * @param index   the index of the file to report first.
+     * @param project the project.
+     */
+    private static void reportProblemsOneAfterAnother(@NotNull List<VirtualFile> files,
+                                                      int index,
+                                                      @NotNull Project project) {
+        if (index >= files.size() || project.isDisposed()) {
+            return;
+        }
+        CancellablePromise<Void> report = submitProblemReport(files.get(index), null, project);
+        if (index + 1 < files.size()) {
+            // The callback runs on the thread that processes the report: the one it ran on, the one that submitted a
+            // later report of its file, or the EDT, where a report that waited for a write action expires; or at once
+            // on this thread, if the report is already processed. The next report is submitted from a pooled thread,
+            // so that the EDT never submits it and the reports never nest on one stack
+            report.onProcessed(ignored -> AppExecutorUtil.getAppExecutorService()
+                    .execute(() -> reportProblemsOneAfterAnother(files, index + 1, project)));
+        }
     }
 }

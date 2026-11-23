@@ -3,14 +3,27 @@
 LSP4IJ provides a [default user-defined language server template](./UserDefinedLanguageServer.md#default-template),
 stored in the [templates folder](https://github.com/redhat-developer/lsp4ij/tree/main/src/main/resources/templates).
 
-This section explains how to structure a user-defined template for your language server.
+This section explains how to structure a user-defined template for your language server. A template is a folder with
+these files, of which only `template.json` is required. LSP4IJ ignores any other file in the folder.
 
-* [`template.json`](#template-descriptor): describes the language server and file types.
-* `clientSettings.json`: contains the client capabilities and options.
-* `initializationOptions.json`: custom options passed during initialization.
+* [`template.json`](#template-descriptor): describes the language server, the command that starts it and its file
+  mappings.
+* `settings.json`: the `Configuration` of the `Server` tab of the `Configuration` tab, which LSP4IJ sends to the
+  language server. `{}` without the file.
+* `settings.schema.json`: the JSON Schema of `settings.json`, which the `Configuration` field uses.
+* `initializationOptions.json`: the `Initialization Options`, which LSP4IJ sends in the `initialize` request. `{}`
+  without the file.
+* `experimental.json`: the `Experimental` field, the `experimental` client capabilities of the `initialize` request.
+  `{}` without the file.
+* `clientSettings.json`: the configuration of the `Client` tab of the `Configuration` tab, which sets how LSP4IJ
+  itself handles the language server. `{}` without the file.
 * [`installer.json`](#installer-descriptor): defines how to check, install, and configure the server.
-* `settings.json`: user-defined settings for the server.
-* `settings.schema.json`: JSON Schema for validating `settings.json`.
+* `workspaceFolderSettings.json`: the JSON of the
+  [`Workspace Folders` tab](./UserDefinedLanguageServer.md#workspace-folders-tab). LSP4IJ reads it with the template,
+  but the New Language Server dialog doesn't apply it yet: set the workspace folders in the settings of the language
+  server once it is created.
+* `README.md`: the instructions of the template, which the help button of the New Language Server dialog opens. The
+  dialog shows that button only for a template with a `README.md`.
 
 ## How to Contribute a User-Defined Language Server Template
 
@@ -53,6 +66,8 @@ The template descriptor (`template.json`) is a JSON file used to define:
 * the socket of a language server which doesn't talk LSP over its standard input and output (optional)
 * the transports which the language server supports (optional)
 * the file type mappings
+
+All its fields are listed in [Fields](#fields).
 
 #### Example `template.json`
 
@@ -105,6 +120,50 @@ The template descriptor (`template.json`) is a JSON file used to define:
 This language server talks LSP over its standard input and output only, so the template lists `stdio` in its
 `transports` and has no `socket`. See [Socket](#socket) for a template with one.
 
+#### Fields
+
+| Field                 | Value                                                                                                                                                                                                                                                                  | Default                                                                                                        |
+|-----------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------|
+| `id`                  | the id of the template. A language server created from the template keeps it: the banner which suggests the template for a file it supports stays away while such a language server exists, and the settings of the language server take the `transports` of the bundled template with this id. | none                                                                                                           |
+| `name`                | the name of the language server                                                                                                                                                                                                                                        | none                                                                                                           |
+| `url`                 | the page of the instructions, which the `Server` tab links as `Read the instructions`                                                                                                                                                                                  | `https://github.com/redhat-developer/lsp4ij/tree/main/docs/user-defined-ls/<id>.md`                            |
+| `dev`                 | `true` lists the template only when the IDE runs with `idea.plugin.in.sandbox.mode`, as `runIde` does                                                                                                                                                                  | `false`                                                                                                        |
+| `programArgs`         | the command which starts the language server, by OS, see [Command](#command). Required.                                                                                                                                                                                | none                                                                                                           |
+| `workingDir`          | the working directory. An [exported](./UserDefinedLanguageServer.md#exporting-templates) language server writes it, but the New Language Server dialog doesn't apply it yet.                                                                                           | none                                                                                                           |
+| `env`                 | the environment variables of the `Server` tab: `variables`, an object of names and values, and `includeSystemEnvironmentVariables`, `true` to pass the IDE's environment variables too                                                                                 | without `env`, no variables, and the IDE's are passed; `includeSystemEnvironmentVariables` is `false` when `env` doesn't set it |
+| `fileTypeMappings`    | the files of the language server: each entry has a `fileType`, with the `name` of an IntelliJ file type, file name `patterns`, or both, and the `languageId` of the files                                                                                              | none                                                                                                           |
+| `languageMappings`    | the files of the language server by IntelliJ language: each entry has the `language`, an IntelliJ language id, and the `languageId` of the files                                                                                                                       | none                                                                                                           |
+| `socket`              | how LSP4IJ talks to a language server over a TCP socket, see [Socket](#socket)                                                                                                                                                                                         | the standard input and output                                                                                  |
+| `transports`          | the transports which the language server supports, see [Transports](#transports)                                                                                                                                                                                       | none                                                                                                           |
+| `expandConfiguration` | `true` checks `Expand JSON when configuration is sent to the server`: a name with dots in the `Configuration`, as `"css.validate": true`, is sent as nested objects, `{"css": {"validate": true}}`                                                                      | `false`                                                                                                        |
+| `disablePromotionFor` | plugin ids: while one of these plugins is installed, the banner which suggests the template for a file it supports doesn't show, as the Clojure LSP template does for `com.github.clojure-lsp`                                                                         | none                                                                                                           |
+
+A `fileType` with both a `name` and `patterns` gives two mappings, one for the file type and one for the patterns,
+with the same `languageId`. The banner shows only in a file which IntelliJ opens as plain text, with TextMate, or with a
+file type of your own from the `File Types` settings.
+
+#### Command
+
+`programArgs` holds the command by OS. LSP4IJ takes the value of the OS it runs on, `windows`, `mac` or `unix` (Linux
+and other Unix systems), and `default` when there is none for it. The New Language Server dialog puts it in the
+`Command` field.
+
+LSP4IJ starts the command without a shell: it expands the macros, such as `$USER_HOME$`, and then splits the command at
+its spaces. A part in double quotes stays one argument, so put a path in quotes, as the CSS template does, for a home
+directory with a space:
+
+```json
+{
+  "programArgs": {
+    "default": "node \"$USER_HOME$/.lsp4ij/lsp/vscode-langservers-extracted/node_modules/vscode-langservers-extracted/lib/css-language-server/node/cssServerMain.js\" --stdio"
+  }
+}
+```
+
+Don't start the command with `sh -c` or `cmd /c` unless it needs shell syntax, see
+[Environment variables](./UserDefinedLanguageServer.md#environment-variables). The command can also take the
+placeholders `${instanceRoot}` and `${port}`, see [Macro syntax](./UserDefinedLanguageServer.md#macro-syntax).
+
 #### Socket
 
 `socket` is optional: without it, LSP4IJ talks to the language server over its standard input and output. A language
@@ -146,9 +205,13 @@ does instead:
 
 `transports` is optional. A template can list the transports which its language server supports, in `transports`,
 each with its `mode` (`stdio` or one of the socket modes above) and the `argument` of the
-command for it. The New Language Server dialog then helps with the transport: Socket is disabled for a language server
-which lists only `stdio`, and for one which lists a socket mode, a hint below the socket modes names the mode and the
-argument. Without `transports`, every transport can be chosen.
+command for it. The New Language Server dialog then helps with the transport: for a language server which lists only
+`stdio`, a hint says that it talks LSP only over its standard input and output, and for one which lists a socket mode,
+a hint below the socket modes names the mode and the argument. Every transport can still be chosen, as the template may
+be the starting point of a language server of your own which does talk over a socket: Socket, for a language server
+which lists only `stdio`, gives the warning "The template says this language server talks LSP only over its standard
+input and output", which blocks neither OK nor Apply in the settings of a language server created from the template.
+Without `transports`, no hint shows.
 
 | Field      | Value                                                                 | Required |
 |------------|-----------------------------------------------------------------------|----------|
@@ -179,17 +242,20 @@ for instance, is started over its standard input and output, and also talks over
 ```
 
 When the user changes the transport, in the New Language Server dialog or in the settings of a language server created
-from the template, the argument of the chosen transport replaces that of another listed transport in the command. A
-command with none of the listed arguments stays as it is.
+from the template, the argument of the chosen transport replaces that of another listed transport in the command. The
+arguments are matched as whole words, and the one which comes last in the command is replaced. A command with none of
+the listed arguments stays as it is, and so does the command when LSP4IJ loads a template or saved settings. The
+settings find the template by its `id` among the bundled templates, so a language server created from a
+[custom template](./UserDefinedLanguageServer.md#custom-template) gets this in the New Language Server dialog only.
 
 #### Socket and transports
 
 `socket` and `transports` answer two questions. `socket` is the transport which the New Language Server dialog
 preselects, and which an [exported](./UserDefinedLanguageServer.md#exporting-templates) language server keeps.
 `transports` lists what the language server supports: it changes what the dialog offers and hints, and the argument
-that a change of the transport swaps in the command. LSP4IJ doesn't check one against the other: a `socket` whose
-`mode` isn't in `transports` is still preselected, without a warning. Keep them in line, for instance with the
-`socket` mode as the socket mode of `transports`.
+that a change of the transport swaps in the command. A `socket` whose `mode` isn't one of the `transports` is still
+preselected, and the New Language Server dialog warns: "The socket mode ... of the template isn't one of its
+transports". Keep them in line, for instance with the `socket` mode as the socket mode of `transports`.
 
 ## Installer descriptor
 
@@ -199,10 +265,13 @@ The installer descriptor (`installer.json`) is a JSON file used to:
 * `run` the installation of the LSP/DAP server,
 * and optionally `configure` the start command once installation is complete.
 
-It is used when:
+It is used:
 
-* a user-defined language server must be installed (at creation time),
-* or when the user decides to re-install it.
+* at the first start of a language server created with it, and before the first debug session of a debug adapter
+  created with it in each IDE session: LSP4IJ runs the `check`, and the `run` if the check fails,
+* when the user installs or reinstalls the server, or runs the installer from its `Installer` tab.
+
+See [When the installer runs](#when-the-installer-runs).
 
 You can find a sample in the ![rust-analyzer installer tab](./images/user-defined-ls/rust-analyzer/installation_tab.png).
 
@@ -212,6 +281,10 @@ It should follow this structure:
 {
   "id": "...",
   "name": "...",
+  "executeOnStartServer": false,
+  "properties": {
+    // Declare values that the tasks take as ${name}...
+  },
   "check": {
     // Declare tasks to check the installation...
   },
@@ -221,13 +294,26 @@ It should follow this structure:
 }
 ```
 
+| Key                    | Value                                                                                                                                                           | Default                                                     |
+|------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------------------------------------------------|
+| `id`                   | not read by LSP4IJ                                                                                                                                              | none                                                        |
+| `name`                 | the name of the installation, in its console and its notifications, as "Installation of `name` completed successfully."                                         | `Untitled`                                                  |
+| `executeOnStartServer` | `true` checks the installation at the first start of the language server in each IDE session, not only at its first start ever                                  | `false`                                                     |
+| `properties`           | strings, numbers or booleans, which the tasks take as `${name}`, see [Properties](#properties)                                                                  | none                                                        |
+| `check`                | the task which checks that the server is installed                                                                                                              | none: the server counts as installed when it starts         |
+| `run`                  | the task which installs the server                                                                                                                              | none                                                        |
+
 `check` and `run` define starting [tasks](#task-descriptor), which can trigger other tasks using the `onFail` or `onSuccess` keys.
 
 LSP4IJ provides built-in tasks:
 
 * [exec](#task-exec) to execute a command (e.g., `npm install typescript-language-server`),
+* [initialize](#task-initialize) to check that the server starts and answers the `initialize` request,
+* [fileExists](#task-fileexists) to check that a file, as the installed server, exists,
 * [download](#task-download) to retrieve a server from a given URL,
-* [configureServer](#task-configureServer) to set the launch command based on the downloaded files.
+* [configureServer](#task-configureServer) to set the launch command based on the downloaded files,
+* [replaceTemplateCommand](#task-replacetemplatecommand) to set the launch command while the server still has the
+  command of its template.
 
 To define custom tasks, you can contribute to the extension point `com.redhat.devtools.lsp4ij.installerTaskFactory`.
 
@@ -249,7 +335,137 @@ Typical task structure:
 }
 ```
 
+These keys go inside the type of the task: a task is an object with one key, its type, such as `exec`, whose value
+holds the keys of the task, as in this step of the check of the Go language server:
+
+```json
+{
+  "exec": {
+    "name": "Check Go runtime",
+    "command": {
+      "windows": "where go",
+      "default": "which go"
+    }
+  }
+}
+```
+
+LSP4IJ takes the first key of the object as the type of the task, and ignores the other keys next to it, so `onFail`
+and `onSuccess` go inside the task, next to its `name`. A task of a type which no task factory registers is ignored, as
+if the installer didn't have it.
+
+* `name`: the name of the step, which the console of the installation shows as `- Step: <name>`.
+* `id`: not used by the tasks of LSP4IJ.
+* `onSuccess`: the task which runs when this one succeeds. This task then succeeds or fails as that one does.
+* `onFail`: the task which runs when this one fails. This task then succeeds or fails as that one does, so an `onFail`
+  can make up for what failed: the check of the Go language server tries the current command, and when it fails,
+  checks that `go` is installed and tries the command again, or [shows a message](#task-showmessage) if `go` is missing.
+
+To add a type of task, register an `InstallerTaskFactory`, such as a subclass of `InstallerTaskFactoryBase`, which
+reads `id`, `name`, `onFail` and `onSuccess` for it. Its `type` is the key of the task in `installer.json`:
+
+```xml
+<extensions defaultExtensionNs="com.redhat.devtools.lsp4ij">
+  <installerTaskFactory type="myTask"
+                        factoryClass="my.plugin.MyTaskFactory"/>
+</extensions>
+```
+
+### Properties
+
+The tasks take these values as `${name}`:
+
+| Property                                  | Value                                                                                                                                  |
+|-------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------|
+| `${server.command}`                       | the command of the language server or debug adapter when the installation starts, but not in the `Installer` tab of a debug session   |
+| the `properties` of the installer         | each value as written, such as `${serverDist}` for `"serverDist": "$USER_HOME$/.lsp4ij/lsp/clojure-lsp"` in the clojure-lsp installer |
+| `${output.dir}` and `${output.file.name}` | where a [download](#task-download) put the server, for the tasks that run after it                                                    |
+
+LSP4IJ replaces them in the `workingDir` of an `exec`, the `output.dir` of a `download` and the `command` of a
+`configureServer`. In the `command` of an `exec`, it replaces only `${server.command}`, and only when it is the whole
+command, as in `"command": "${server.command}"`. A property is replaced with its value as written: its macros, such as
+`$USER_HOME$`, are expanded where the value is used.
+
+### When the installer runs
+
+A language server created with an installer, from a template or with the JSON of its `Installer` tab, checks its
+installation at its first start, as when a file that it serves is opened:
+
+1. LSP4IJ runs the `check` in the background, with a progress bar in the status bar.
+2. If the check fails, LSP4IJ runs the `run`, and a notification says whether the installation completed successfully
+   or failed.
+3. LSP4IJ then starts the language server, also when the `run` failed.
+
+LSP4IJ keeps in the settings of the language server that this first check ran, also when it failed, so that the later
+starts don't check again, also after a restart of the IDE. With `"executeOnStartServer": true`, the installation is
+checked at the first start of the language server in each IDE session. The bundled installers have `false`.
+
+The installer also runs on request:
+
+* `Install if Needed`, in the context menu of the language server in the Language Servers view of the LSP console,
+  runs the `check`, and the `run` if the check fails.
+* `Reinstall`, in the same menu, runs the `run` without the `check`, as to get the latest version.
+* The links of the `Installer` tab of the LSP console run the JSON of the tab: `Check Installation` the `check`,
+  `Run Installation` the `run`, and `Check / Run Installation` the `check` and then the `run`, also when the check
+  passes. A link whose task the installer doesn't have runs nothing, and says that there is nothing to check or to
+  install. The `Installer` tab of the New Language Server dialog and of the settings page has no links.
+
+An installer without a `check` counts as installed, at the start of the language server and with `Install if Needed`,
+so only `Reinstall`, `Run Installation` and `Check / Run Installation` run its `run`.
+
+`Install if Needed` and `Reinstall` stop the language server, and start it again after the installation if it ran. A
+language server with [several instances](./UserDefinedLanguageServer.md#several-language-server-instances) has one
+installer for all of them.
+
+A debug adapter checks its installation before its first debug session in each IDE session, whatever
+`executeOnStartServer` says: a console, `DAP Debugger (initializing)`, shows the `check`, and the `run` if the check
+fails, and the debug session then starts. The `Installer` tab of the debug session has the links of the LSP console.
+
+### Task showMessage
+
+Shows a notification, as in the `onFail` of a check which finds that a tool is missing. The check of the Go language
+server shows this one when `go` isn't installed:
+
+```json
+{
+  "showMessage": {
+    "name": "Go Language Server install problem",
+    "content": [
+      "<a href=\"https://go.dev/doc/install\">Install Go</a> to install the Go Language Server (<code>gopls</code>) using <code>go install</code>.",
+      "Make sure <code>go</code> is in your PATH, then restart your IDE."
+    ]
+  }
+}
+```
+
+* `name`: the title of the notification, `Error` by default.
+* `content`: the message, in HTML: a string, or an array of strings, each a paragraph. A link opens in the browser.
+* `actions` (optional): an array of tasks, each an action of the notification, named by its `name`.
+
+Without `actions`, the task shows the message as an error and fails, and the installation shows no notification of
+its own. With `actions`, the task waits until the user clicks one of them, runs that task, and succeeds or fails as it
+does.
+
 ### Task exec
+
+Runs a command. The task succeeds when the command exits with 0 and writes nothing on its standard error.
+
+| Key            | Value                                                                                                                                                                                                                                                                                                                  | Default                                   |
+|----------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------------------------------|
+| `command`      | the command: a string, which LSP4IJ splits at its spaces outside double quotes, or an array of its arguments; or an object of these by OS, as [`programArgs`](#command). LSP4IJ expands the macros, such as `$USER_HOME$`, in each argument. Of the [properties](#properties), it replaces only a whole `${server.command}`. | none: the task fails                      |
+| `workingDir`   | the directory in which the command runs, with properties and macros. LSP4IJ creates it if it doesn't exist.                                                                                                                                                                                                            | the project's directory                   |
+| `timeout`      | the time in milliseconds after which LSP4IJ stops the command. The task then succeeds.                                                                                                                                                                                                                                 | none: LSP4IJ waits until the command ends |
+| `ignoreStderr` | `true` lets the task succeed when the command writes on its standard error, as `npm install` does with its warnings                                                                                                                                                                                                   | `false`                                   |
+
+The console of the installation shows the command after `> `, and its output. The command gets the environment
+variables of the IDE and, since IntelliJ 2025.1, the environment of its working directory, as a language server does
+(see [Directory-specific environment variables](./UserDefinedLanguageServer.md#directory-specific-environment-variables)),
+and LSP4IJ looks the command up in the `PATH` of that environment, so that `npm` is the one of the directory's `node`.
+
+Two `exec` tasks with the same `workingDir` run one after the other, also in two IDEs, as those of the CSS and ESLint
+installers, which install one npm package into `$USER_HOME$/.lsp4ij/lsp/vscode-langservers-extracted/node_modules`.
+An installation which started because its check failed, and waited, runs the check again once the other task is done,
+and skips the command if the check then passes. `Reinstall` and the links of the `Installer` tab don't skip it.
 
 Example using `npm` to install [typescript-language-server](https://github.com/typescript-language-server/typescript-language-server):
 
@@ -265,7 +481,12 @@ Example using `npm` to install [typescript-language-server](https://github.com/t
     "exec": {
       "name": "Trying current command",
       "command": "${server.command}",
-      "timeout": 2000
+      "timeout": 2000,
+      "onSuccess": {
+        "initialize": {
+          "name": "Check that typescript-language-server starts"
+        }
+      }
     }
   },
   "run": {
@@ -292,6 +513,97 @@ Example using `npm` to install [typescript-language-server](https://github.com/t
 }
 ```
 
+An `exec` whose command still runs at its `timeout` succeeds: that's meant for a command which waits, as a language
+server does, but a command which hangs, waits for input, or fails later, succeeds too. That's why the `check` above
+runs the [initialize](#task-initialize) task once the `exec` of `${server.command}` succeeds. Use `exec` alone for a
+command which ends by itself, as `node --version`.
+
+### Task initialize
+
+`initialize` checks that the language server or debug adapter starts and talks its protocol. It starts the server as
+LSP4IJ starts it, with its command, working directory, environment variables and transport, sends it `initialize` (the
+LSP request for a language server, the DAP request for a debug adapter), and succeeds only if the server answers within
+the `timeout`. An answer which is an error succeeds too, since it shows that the server runs, and the console says so.
+A server which can't be started, ends, or doesn't answer in time fails the check, so that the server gets installed.
+
+Then the task ends the server: it sends `shutdown` and `exit` to a language server, or `disconnect` to a debug adapter,
+and destroys the process if it hasn't ended within 2 seconds. It destroys the process at once when the installation is
+cancelled.
+
+```json
+{
+  "check": {
+    "exec": {
+      "name": "Trying current command",
+      "command": "${server.command}",
+      "timeout": 2000,
+      "onSuccess": {
+        "initialize": {
+          "name": "Check that ruby-lsp starts",
+          "timeout": 10000
+        }
+      }
+    }
+  }
+}
+```
+
+* `timeout` (optional, `30000` by default): how long the task waits for the answer to `initialize`, from the start of
+  the server, in milliseconds.
+
+The bundled installers run `initialize` as the `onSuccess` of the `exec` of `${server.command}` which they ran before,
+rather than as the `check` itself, for the LSP4IJ versions which don't know the `initialize` task. Such a version
+ignores it, as any task it doesn't know: as an `onSuccess`, the check is then the `exec` alone, as before, while as the
+`check`, the installer would have no check, and the server would count as installed. The cost is that LSP4IJ starts the
+server twice to check it: for the `timeout` of the `exec`, then for `initialize`.
+
+The `initialize` request of a language server has the initialization options of its settings, and the project's
+folder as root, without client capabilities. A language server which runs already, which LSP4IJ attaches to, isn't
+touched: the task succeeds. A debug adapter is reached as a debug session reaches it: over a socket to the port of
+`${port}` in its command, or to the address which it prints as its debug server ready pattern says, and otherwise over
+its standard input and output.
+
+### Task fileExists
+
+Checks that a file exists, as the server that the `run` of the installer installs, so that the installation doesn't run
+again once the server is there. Example: the check of clangd, whose archive has a folder named after the version of
+clangd, as `clangd_19.1.2/`:
+
+```json
+{
+  "check": {
+    "fileExists": {
+      "name": "Check if clangd is installed",
+      "file": {
+        "windows": "${serverDist}/clangd*/bin/clangd.exe",
+        "default": "${serverDist}/clangd*/bin/clangd"
+      },
+      "onSuccess": {
+        "replaceTemplateCommand": {
+          "name": "Configure Clangd server command",
+          "templateCommand": "clangd",
+          "command": "\"${check.file}\""
+        }
+      }
+    }
+  }
+}
+```
+
+* `file`: the path of the file, by OS and architecture as the `url` of a [download](#task-download), with the properties
+  of the installer, as `${serverDist}`, and macros, as `$USER_HOME$`. Its segments can have the globs `*` and `?`, as
+  `clangd*`, and `**` for any number of folders.
+* The file found is `${check.file}` for the tasks that run after the check, as its `onSuccess`: the path as written in
+  `file`, with the properties resolved, the macros kept and the globs replaced by the names found, as
+  `$USER_HOME$/.lsp4ij/lsp/clangd_19.1.2/bin/clangd`, in the form of the `${output.dir}` of a download. Of several files
+  that the globs match, it is the last in natural order, which compares the numbers in a name by their value, from the
+  first segment on: `clangd_19.1.10/bin/clangd` after `clangd_19.1.2/bin/clangd`. A `fileExists` which finds no file
+  removes `${check.file}`.
+
+When the check finds the server installed, the `run` doesn't run, so a server created from the template would keep the
+command of the template: a [replaceTemplateCommand](#task-replacetemplatecommand) in the `onSuccess` of the check gives
+it the command that the download gives, from `${check.file}`.
+
 ### Task download
 
 Structure of a `download` task:
@@ -314,6 +626,22 @@ Structure of a `download` task:
   }
 }
 ```
+
+| Key      | Value                                                                                          | Default                                     |
+|----------|------------------------------------------------------------------------------------------------|---------------------------------------------|
+| `url`    | the URL of the file, one for all, or by OS and architecture, see [below](#unique-url)          | none                                        |
+| `github` | the latest release of a GitHub repository, see [GitHub asset download](#github-asset-download) | none                                        |
+| `maven`  | the latest version on Maven Central, see [Maven artifact download](#maven-artifact-download)   | none                                        |
+| `output` | where the server goes, see [Output customization](#output-customization)                       | a new folder `$USER_HOME$/.lsp4ij/<random>` |
+
+LSP4IJ takes the URL from `github` when it has an `owner`, a `repository` and an `asset`, or else from `maven` when it
+has a `groupId` and an `artifactId`. When they give no URL, as when GitHub can't be reached, LSP4IJ falls back to `url`,
+and the console says so. Without a URL for the OS and the architecture, the task fails.
+
+LSP4IJ downloads the file into a temporary folder. An archive, such as a `.zip`, `.vsix`, `.tar`, `.tar.gz` or `.tgz`
+file, is extracted into `output.dir`, and a `.gz` file that isn't a `.tar.gz` is decompressed there, as the one that
+the rust-analyzer installer downloads on Linux and macOS. Any other file is copied there, under `output.file.name` or
+its own name, in place of the file of an earlier installation.
 
 Example: downloading a JAR and configuring the start command
 
@@ -343,6 +671,12 @@ Example: downloading a JAR and configuring the start command
 
 > `configureServer.command` supports variable substitution with `${output.dir}` and `${output.file.name}`.
 > These values are resolved from the `output` object of the preceding `download` task.
+
+In this example, `check` is empty, so the server counts as installed at the first start, and only `Reinstall`,
+`Run Installation` and `Check / Run Installation` download it (see [When the installer runs](#when-the-installer-runs)).
+The bundled [camel-lsp-server installer](../src/main/resources/templates/lsp/camel-lsp-server/installer.json) checks
+first that the JAR is in its folder, and downloads the latest version from Maven Central, with this `url` as a
+fallback.
 
 #### Unique URL:
 
@@ -385,6 +719,12 @@ you can find a sample with [clangd installer](../src/main/resources/templates/ls
 }
 ```
 
+A value by OS has the keys `windows`, `mac`, `unix` (Linux and other Unix systems) and `default`: LSP4IJ takes the key
+of the OS it runs on, or else `default`. A value by architecture, inside one of them, has the keys of the CPU: LSP4IJ
+takes IntelliJ's name for it, `x86_64`, `x86`, `arm64` or `arm32`, or else the `os.arch` of the JVM, such as `amd64` or
+`aarch64`, or else `default`. So `x86_64` and `arm64` match on every OS. The `asset` of `github`, and the `dir` and the
+`file.name` of `output`, take the same keys.
+
 #### GitHub asset download:
 
 If DAP/LSP server can be downloaded from GitHub release like https://github.com/clojure-lsp/clojure-lsp/releases
@@ -413,15 +753,20 @@ you can use the `github` JSON object to download the proper asset:
 }
 ```
 
-When download will occur, it will request https://api.github.com/repos/${owner}/${repository}/releases URL. 
-In the previous sample, URL requested will be https://api.github.com/repos/clojure-lsp/clojure-lsp/releases
-It will take the first JSON asset which matches GitHub `asset.name` (by using the `download.github.asset` rule) 
-and will return the `asset.browser_download_url`.
+When the download occurs, LSP4IJ requests the 100 newest releases of the repository,
+`https://api.github.com/repos/${owner}/${repository}/releases?per_page=100`: in the previous sample,
+https://api.github.com/repos/clojure-lsp/clojure-lsp/releases?per_page=100. It takes the newest of them whose
+`prerelease` is the `prerelease` of the task, and in it the first asset whose name matches `asset`, and downloads its
+`browser_download_url`. When that release has no such asset, LSP4IJ doesn't look at older releases, and falls back to
+`url`. It requests the releases of a repository once per IDE session.
 
  * `owner` (required) the github owner.
  * `repository` (required) the github repository. 
- * `prerelease` (optional) can be used to select pre-release or not. By default, `prerelease` is set to false.   
- * `asset` (required) is used to select the proper file to download. You can use `*` if asset to download contains some timestamp for instance.
+ * `prerelease` (optional): `true` takes the newest prerelease, and `false`, the default, the newest release which isn't
+   a prerelease.
+ * `asset` (required) is used to select the proper file to download. Without `*`, the name of the asset must contain
+   `asset`, ignoring case. With `*`, which stands for any text, the whole name must match, as for an asset whose name
+   has a version or a timestamp.
 
 ```json
 {
@@ -475,7 +820,7 @@ When the download occurs:
    ```
    https://search.maven.org/solrsearch/select?q=g:%22com.github.camel-tooling%22%20AND%20a:%22camel-lsp-server%22&rows=20&wt=json
    ```
-2. The first result from the response is used to determine the latest available version.
+2. The `latestVersion` of the first result is the version to download.
 3. The download URL is then computed as:
    ```
    https://repo1.maven.org/maven2/{groupId with slashes}/{artifactId}/{version}/{artifactId}-{version}.jar
@@ -485,6 +830,9 @@ For example, if the groupId is `com.github.camel-tooling` and the artifactId is 
 ```
 https://repo1.maven.org/maven2/com/github/camel-tooling/camel-lsp-server/1.5.0/camel-lsp-server-1.5.0.jar
 ```
+
+LSP4IJ requests the version once per IDE session. When Maven Central gives none, as when it can't be reached, the task
+falls back to `url`.
 
 **Fields:**
 
@@ -497,17 +845,25 @@ https://repo1.maven.org/maven2/com/github/camel-tooling/camel-lsp-server/1.5.0/c
 
 ##### Output customization
 
-You can customize the output directory and executable name:
+You can customize the output directory and executable name, as the
+[rust-analyzer installer](../src/main/resources/templates/lsp/rust-analyzer/installer.json) does, whose `serverDist`
+property is `$USER_HOME$/.lsp4ij/lsp/rust-analyzer`:
 
 ```json5
 {
   "output": {
-    "dir": "$USER_HOME$/.lsp4ij/lsp/rust-analyzer",
+    "dir": "${serverDist}",
     "file": {
       "name": {
         "windows": "rust-analyzer.exe",
-        "unix": "rust-analyzer-aarch64-unknown-linux-gnu",
-        "mac": "rust-analyzer-aarch64-apple-darwin"
+        "unix": {
+          "x86_64": "rust-analyzer-x86_64-unknown-linux-gnu",
+          "arm64": "rust-analyzer-aarch64-unknown-linux-gnu"
+        },
+        "mac": {
+          "x86_64": "rust-analyzer-x86_64-apple-darwin",
+          "arm64": "rust-analyzer-aarch64-apple-darwin"
+        }
       },
       "executable": true
     }
@@ -515,14 +871,20 @@ You can customize the output directory and executable name:
 }
 ```
 
-* `dir`: base folder where the downloaded file will be saved or extracted.
-  The value is available as `${output.dir}` for use in other tasks.
+* `dir`: base folder where the downloaded file will be saved or extracted, by OS and architecture, with
+  [properties](#properties) and macros. LSP4IJ creates it if it doesn't exist. Without it, LSP4IJ creates a new folder
+  in `$USER_HOME$/.lsp4ij` at each download.
+  The value is available as `${output.dir}` for use in other tasks, with the properties replaced and the macros kept,
+  as `$USER_HOME$/.lsp4ij/lsp/rust-analyzer`.
   An archive with a single root folder, as `perllsp-0.17.0-x86_64-unknown-linux-gnu/`, is extracted with that folder,
   which is then added to `${output.dir}`.
 * `stripRootFolder` (optional, `false` by default): extracts the content of the single root folder of the archive into
   `dir` itself, so the server is found at the same place from one version to the next, as the
   [perl-lsp installer](../src/main/resources/templates/lsp/perl-lsp/installer.json) does.
-* `file.name`: name of the executable file (registered as `${output.file.name}`).
+* `file.name`: name of the executable file (registered as `${output.file.name}`), by OS and architecture. When it is
+  set, the task fails if the file isn't in `${output.dir}` after the download. A file which isn't an archive is saved
+  under this name, and without it, under its own name, which is then `${output.file.name}`.
+* `file.executable` (optional, `false` by default): `true` makes the file of `file.name` executable.
 
 #### Task configureServer
 
@@ -537,3 +899,33 @@ Used to set the server launch command:
   }
 }
 ```
+
+* `command`: the command, by OS and architecture, with the properties of the installer and of the tasks before it, as
+  `${output.dir}` and `${output.file.name}` of a [download](#task-download), or `${check.file}` of a
+  [fileExists](#task-fileexists). A command with `${check.file}` that no `fileExists` found a file for is an error, and
+  the command of the server stays as it is.
+
+#### Task replaceTemplateCommand
+
+Sets the server launch command, as [configureServer](#task-configureServer) does, but only while the server has the
+command of its template. In the `onSuccess` of a check, which also runs from *Check installation* in the settings, it
+gives a server created from the template the command of the file that the check found, and leaves a command that the
+user or a download gave the server as it is:
+
+```json5
+{
+  "replaceTemplateCommand": {
+    "name": "Configure Clangd server command",
+    "templateCommand": "clangd",
+    "command": "\"${check.file}\""
+  }
+}
+```
+
+* `templateCommand`: the command of the template, by OS and architecture, as its `programArgs`, or the `launch` of a
+  debug adapter, compared as written. While the server has another command, the task leaves it as it is and succeeds.
+  On an OS without a `templateCommand`, the task never changes the command.
+* `command`: the command that replaces it, as the `command` of a `configureServer`.
+
+An earlier version of LSP4IJ, which doesn't know this task, skips it: the server keeps the command of its template, and
+the check still passes.

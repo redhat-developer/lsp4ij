@@ -15,6 +15,7 @@ import com.redhat.devtools.lsp4ij.dap.definitions.userdefined.UserDefinedDebugAd
 import com.redhat.devtools.lsp4ij.dap.descriptors.DebugAdapterServerListener;
 import com.redhat.devtools.lsp4ij.dap.settings.UserDefinedDebugAdapterServerSettings;
 import com.redhat.devtools.lsp4ij.installation.CommandLineUpdater;
+import com.redhat.devtools.lsp4ij.installation.ServerStarter;
 import org.jetbrains.annotations.NotNull;
 
 /**
@@ -31,6 +32,11 @@ public class UICommandLineUpdater implements CommandLineUpdater {
     @Override
     public String getCommandLine() {
         return createdServer.getCommandLine();
+    }
+
+    @Override
+    public @NotNull ServerStarter getServerStarter() {
+        return createdServer.getServerStarter();
     }
 
     @Override

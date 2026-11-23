@@ -30,10 +30,13 @@ Once you clicked on either of them, the dialog will appear:
 
 When you click the `OK` button, the language server will be created.
 
-If the language server definition [declares an installer](UserDefinedLanguageServerTemplate.md#installer-descriptor)  
-in the [Installer tab](#installer-tab), the installer will run once when the language server starts.
+If the language server definition [declares an installer](UserDefinedLanguageServerTemplate.md#installer-descriptor)
+in the [Installer tab](#installer-tab), the installer runs at the first start of the language server: it checks the
+installation, installs the language server if the check fails, and then starts it. See
+[When the installer runs](./UserDefinedLanguageServerTemplate.md#when-the-installer-runs).
 
-You can reinstall the server at any time (e.g. to fetch the latest version) using the `Reinstall` action:
+You can check the installation again with the `Install if Needed` action, or reinstall the server at any time (e.g. to
+fetch the latest version) using the `Reinstall` action, in the context menu of the language server in the LSP console:
 
 ![Install actions](./images/InstallActions.png)
 
@@ -133,15 +136,28 @@ server which talks LSP over a TCP socket instead is configured with `Transport: 
 
 When LSP4IJ starts the language server, the `Command` takes the port as `${port}`, and a `Port` of `Auto` lets LSP4IJ
 choose a free port each time: the `Command` must then have `${port}`, or the language server can't know the port. A
-start that gets no connection within 60 seconds fails. For instance, with a language server built on `vscode-languageserver`:
+`Fixed` port can't be 0. A start that gets no connection within 60 seconds fails. For instance, with a language server
+built on `vscode-languageserver`:
 
 `node path/to/server.js --socket=${port}`
+
+With `Transport: Standard input and output (stdio)`, LSP4IJ gives no port, so a `Command` with `${port}` gets a
+warning, "The command takes ${port}, but stdio gives no port, so the language server gets ${port} as it is. Did you
+mean Socket?". It's only a warning, since the command may give the text to a shell of its own: the New Language Server
+dialog still enables `OK`, and the settings still save.
+
+A language server whose start fails, as when LSP4IJ attaches to one which doesn't run yet, starts again when a file or
+a feature needs it: the first time at once, and then after a pause which doubles from 1 second up to 30 seconds. After
+20 failed starts within 10 minutes, LSP4IJ disables it, and a notification says so, with the error of the last start
+and an `Enable and Start` action.
 
 ![Socket transport](./images/user-defined-ls/SocketTransport.png)
 
 An [installer](#installer-tab) which sets the `Command` writes the command of its template, which is for the standard
 input and output unless it takes the port as `${port}`. A language server which LSP4IJ starts over a socket is then
-switched back to the standard input and output; set the socket again with a command that takes the port.
+switched back to the standard input and output, and a warning says so, with an action which opens its settings; set
+the socket again with a command that takes the port. A language server which runs already, and to which LSP4IJ
+attaches, keeps its socket, since LSP4IJ doesn't use its command.
 
 A [template](./UserDefinedLanguageServerTemplate.md#template-descriptor) sets the transport in its
 [`socket`](./UserDefinedLanguageServerTemplate.md#socket), and lists the transports which its language server supports
@@ -217,11 +233,16 @@ The `Installer tab` provides the capability to declare with JSON, the language s
 with task to execute like:
 
  * `exec` to execute a command (ex: `npm install typescript-language-server` to install the [typescript-language-server](https://github.com/typescript-language-server/typescript-language-server)).
- * `download` to download the language server from a given url according the OS.
+ * `download` to download the language server from a given url according the OS and the architecture.
+ * `showMessage` to show a notification, as when a tool which the installation needs is missing.
 
 ![Installer tab](images/user-defined-ls/InstallUserDefinedLanguageServer.png)
 
-This installer content will be used when you will create the language server. See [here](UserDefinedLanguageServerTemplate.md#installer-descriptor)
+A language server created with this JSON runs it at its first start, see
+[When the installer runs](UserDefinedLanguageServerTemplate.md#when-the-installer-runs). In the LSP console, the tab
+also has the links `Check Installation`, `Run Installation` and `Check / Run Installation`, which run the JSON of the
+tab and show its output next to it; a link whose task the JSON doesn't have says that there is nothing to check or to
+install. See [here](UserDefinedLanguageServerTemplate.md#installer-descriptor)
 to understand how to write this JSON installer descriptor.
 
 ### Workspace Folders tab
@@ -358,6 +379,7 @@ Files with the same root share an instance:
    with the environment of that directory.
  * Stop on an instance in the Language Servers view, or too many failed starts of it, switch off that instance only, and the others keep working. Restart switches it on again, and so does a changed configuration.
  * Each instance needs a connection of its own. Over a socket, use an automatic port, and let LSP4IJ start the language server: the settings don't save `serverInstances` with a language server that runs already, or with a fixed port.
+ * The [installer](#installer-tab) is one for all instances: it checks and installs the language server once.
 
 Without `rootType` and `markers` next to `serverInstances`, the root is the only workspace folder of an instance. With them, they describe the workspace folders inside an instance:
 
@@ -405,14 +427,16 @@ Template can be used to quickly create user defined language server pre-filled
 with server name, command, mappings and potential configurations.
 
 #### Default template
-The `Template combo-box` provides some default language servers templates (located in templates directory classpath), 
-pre-filled with server name, command, mappings and potential configuration.
+The `Choose template...` link, next to `Template` in the New Language Server dialog, lists the default language server
+templates (located in the `templates/lsp` directory of the classpath), pre-filled with server name, command, mappings
+and potential configuration.
 
 ![New Language Server with Default Template](./images/user-defined-ls/NewLanguageServerWithDefaultTemplate.png)
 
 * [Ada Language Server](./user-defined-ls/ada_language_server.md)
 * [Apache Camel Language Server](./user-defined-ls/camel-lsp-server.md)
 * [Astro Language Server](./user-defined-ls/astro-ls.md)
+* [Candor Language Server](../src/main/resources/templates/lsp/candor-lsp)
 * [CSS Language Server](./user-defined-ls/vscode-css-language-server.md)
 * [Clangd](./user-defined-ls/clangd.md) 
 * [Clojure LSP](./user-defined-ls/clojure-lsp.md)
@@ -426,10 +450,12 @@ pre-filled with server name, command, mappings and potential configuration.
 * [Harper Language Server](./user-defined-ls/harper-ls.md)
 * [JQ Language Server](./user-defined-ls/jq-lsp.md)
 * [Julia Language Server](./user-defined-ls/julia.md)
+* [Luau Language Server](../src/main/resources/templates/lsp/luau-lsp)
 * [Perl Language Server](./user-defined-ls/perl-lsp.md)
 * [Ruby LSP](./user-defined-ls/ruby-lsp.md)
 * [Rust Language Server](./user-defined-ls/rust-analyzer.md) 
 * [Scala Language Server (Metals)](./user-defined-ls/metals.md)
+* [Smart Data Lake Language Server](../src/main/resources/templates/lsp/sdl-lsp)
 * [SourceKit-LSP](./user-defined-ls/sourcekit-lsp.md)
 * [Stylelint-LSP](./user-defined-ls/stylelint-lsp.md)
 * [Svelte Language Server](./user-defined-ls/svelte-language-server.md) 
@@ -439,11 +465,13 @@ pre-filled with server name, command, mappings and potential configuration.
 * [Vue Language Server](./user-defined-ls/vue-js-language-server.md)
 * [WGSL Analyzer](./user-defined-ls/wgsl-analyzer.md)
 
-If the template directory contains a `README.md` file, you can open the instructions by pressing the help icon.
+If the template directory contains a `README.md` file, you can open the instructions by pressing the help icon: the
+dialog shows that button only for a template with a `README.md`. The `Server` tab also links the page of the template,
+its [`url`](./UserDefinedLanguageServerTemplate.md#fields), as `Read the instructions`.
 
 #### Custom template
 
-The `Import from custom template...` item from the `Template combo-box` can be used to select a directory from 
+The `Import template...` link, next to `Choose template...`, can be used to select a directory from
 the file system to load a custom language server template, 
 these templates can be pre-filled with server name, command, mappings and potential configuration.
 
@@ -461,18 +489,28 @@ This can be done from the LSP console, by selecting one or more language servers
 
 These directories can then be used as a template for a new language server by [importing a custom template](#custom-template).
 
-The `template.json` of a language server which talks over a socket has its
+The `template.json` of an exported language server has its `name`, its command as the `default` of `programArgs`, its
+working directory as `workingDir` when one is set, and its mappings. It has no `id` and no environment variables. The
+`template.json` of a language server which talks over a socket has its
 [`socket`](./UserDefinedLanguageServerTemplate.md#socket): the `mode`, the `port` (0 for `Auto`), and the `host` when
 one is set. Export doesn't write [`transports`](./UserDefinedLanguageServerTemplate.md#transports), since a language
-server keeps only its transport, not the list of its template.
+server keeps only its transport, not the list of its template. The New Language Server dialog doesn't apply the
+`workingDir` of a template yet, so set the working directory again after an import.
 
 ![Export Language Servers to a Zip](./images/user-defined-ls/ExportUserDefinedLanguageServer.png)
 
 #### Custom template structure
-By default, each directory contains the following files, but only `template.json` is required.
+An exported directory contains the following files, but only `template.json` is required.
 - `template.json`
 - `settings.json`
+- `settings.schema.json`
 - `initializationOptions.json`
+- `experimental.json`
+- `clientSettings.json`
+- `installer.json`
+- `workspaceFolderSettings.json`
+
+An empty field is exported as `{}`.
 
 A `README.md` file can be added manually to each of the language server directories to provide instructions 
 for the corresponding language server.

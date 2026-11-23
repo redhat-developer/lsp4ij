@@ -37,7 +37,7 @@ You should see some instructions how to start lldb-dap server.
 
    ![Create a new server](../images/DAP_server_create_link.png)
 
-5. It opens a new dialog to create DAP server, select `Swift lldb` template:
+5. It opens a new dialog to create DAP server, select `Swift lldb-dap` template:
    ![Select Template](../images/swift-lldb/select_template.png)
 
 6. After clicking on `OK` button, it will select the new server and pre-fill configurations:
@@ -73,7 +73,7 @@ you need to select `Trace` with `verbose`.
 ## Configure file mappings
 
 To allows settings breakpoints to Swift files, you need configure mappings in the `Mappings` tab.
-As you have selected `Swift lldb` server, it will automatically populate the file mappings like this:
+As you have selected `Swift lldb-dap` server, it will automatically populate the file mappings like this:
 
 ![File mappings](../images/swift-lldb/file_mappings_tab.png)
 

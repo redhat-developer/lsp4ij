@@ -10,6 +10,7 @@ To enable [SysML v2](https://www.omg.org/spec/SysML/2.0/) and [KerML](https://ww
 2. Click on **Install SysML v2 Language Server**.
 3. This will open the [New Language Server Dialog](../UserDefinedLanguageServer.md#new-language-server-dialog) with `SysML v2 Language Server` pre-selected.
 4. Click **OK**. This will create the `SysML v2 Language Server` definition and download the `sysml-lsp` release binary for your platform into `$USER_HOME$/.lsp4ij/lsp/sysml-lsp`.
+   The installer sets the command to it, as `"$USER_HOME$/.lsp4ij/lsp/sysml-lsp/sysml-lsp-linux-amd64" --stdio` on Linux x64.
 5. Once the installation completes, the server should start automatically and provide SysML v2 / KerML language support (diagnostics, completion, hover, navigation, rename, formatting, semantic highlighting, etc.).
 
 If `sysml-lsp` is already on your PATH (for example after `go install github.com/Open-MBEE/OpenSysML/cmd/sysml-lsp@latest`), the installer detects it and keeps the `sysml-lsp --stdio` command as is.

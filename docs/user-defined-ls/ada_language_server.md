@@ -23,6 +23,15 @@ To enable [Ada](https://ada-lang.io/) language support in your IDE, you can inte
 
 5. Once the installation completes, the server should start automatically and provide Ada language support (autocomplete, diagnostics, etc.).
 
+The installer downloads the `als-*-<os>-<arch>.tar.gz` asset of the latest
+[Ada Language Server release](https://github.com/AdaCore/ada_language_server/releases), extracts it into
+`$USER_HOME$/.lsp4ij/lsp/ada_language_server`, and sets the command to the `ada_language_server` executable in it,
+as `"$USER_HOME$/.lsp4ij/lsp/ada_language_server/vscode/ada/x64/linux/ada_language_server"` on Linux x64.
+
+To install the server yourself, extract that asset into a folder of your choice, set the command in the `Server` tab
+to its `vscode/ada/<arch>/<os>/ada_language_server` executable (`ada_language_server.exe` on Windows), and empty the
+`Installer` tab before you click **OK**, so that LSP4IJ doesn't install the server.
+
 ### Troubleshooting Installation
 
 If the installation fails, you can customize the installation settings in the **Installer** tab,  
@@ -42,6 +51,7 @@ Since IntelliJ does not provide native Ada TextMate support, and the language se
 
   ```bash
   git clone https://github.com/AdaCore/ada_language_server.git
+  ```
 
 * Open TextMate Bundles settings
 

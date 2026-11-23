@@ -8,7 +8,14 @@
   "check": {
     "fileExists": {
       "name": "Check if Camel Language Server is installed",
-      "file": "${serverDist}/camel-lsp-server-*.jar"
+      "file": "${serverDist}/camel-lsp-server-*.jar",
+      "onSuccess": {
+        "replaceTemplateCommand": {
+          "name": "Configure Camel Language Server command",
+          "templateCommand": "java -jar camel-lsp-server-XXX.jar",
+          "command": "java -jar \"${check.file}\""
+        }
+      }
     }
   },
   "run": {

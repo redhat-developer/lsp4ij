@@ -79,7 +79,8 @@ knows; `--editor intellij` can be added to the command to force this mode.
 
 ## Settings
 
-The server reads its settings from the `cppls` section, which LSP4IJ answers from the template `settings.json`:
+The server reads its settings from the `cppls` section, which LSP4IJ answers from the settings of the `Configuration`
+tab (`Server` sub-tab). The template sets an empty `exclude` list there; add the patterns you need, for instance:
 
 ```json
 {
