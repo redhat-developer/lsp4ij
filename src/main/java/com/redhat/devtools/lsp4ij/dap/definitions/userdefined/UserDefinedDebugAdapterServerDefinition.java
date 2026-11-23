@@ -11,12 +11,16 @@
 package com.redhat.devtools.lsp4ij.dap.definitions.userdefined;
 
 import com.google.common.collect.Streams;
+import com.redhat.devtools.lsp4ij.dap.DebugAdapterStreamConnectionProvider;
 import com.redhat.devtools.lsp4ij.dap.LaunchConfiguration;
+import com.redhat.devtools.lsp4ij.dap.configurations.extractors.NetworkAddressExtractor;
 import com.redhat.devtools.lsp4ij.dap.definitions.DebugAdapterServerDefinition;
 import com.redhat.devtools.lsp4ij.dap.descriptors.DebugAdapterDescriptorFactory;
 import com.redhat.devtools.lsp4ij.installation.CommandLineUpdater;
+import com.redhat.devtools.lsp4ij.installation.ServerStarter;
 import com.redhat.devtools.lsp4ij.installation.definition.ServerInstallerDescriptor;
 import com.redhat.devtools.lsp4ij.installation.definition.ServerInstallerManager;
+import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import com.redhat.devtools.lsp4ij.templates.ServerMappingSettings;
 import com.redhat.devtools.lsp4ij.server.definition.ServerMapping;
 import org.jetbrains.annotations.NotNull;
@@ -26,6 +30,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
+import static com.redhat.devtools.lsp4ij.server.definition.launching.CommandUtils.resolveCommandLine;
 import static com.redhat.devtools.lsp4ij.templates.ServerMappingSettings.toServerMappings;
 
 /**
@@ -187,6 +192,26 @@ public class UserDefinedDebugAdapterServerDefinition extends DebugAdapterServerD
     @Override
     public void setCommandLine(String commandLine) {
         this.commandLine = commandLine;
+    }
+
+    /**
+     * Returns how LSP4IJ starts the DAP server, with the command line, environment and wait strategy it has when the
+     * {@code initialize} task of its installer runs: over a socket to the port of {@code ${port}}, or to the address
+     * which the DAP server prints, as the debug server ready pattern says if the server is waited for with it, and
+     * otherwise over the standard input and output of its process.
+     *
+     * @return how LSP4IJ starts the DAP server.
+     */
+    @Override
+    public @NotNull ServerStarter getServerStarter() {
+        return new ServerStarter(getId(), ServerStarter.Protocol.DAP, project -> {
+            // As the wait strategy of the server's settings: a connect timeout, else the trace of the pattern
+            var waitForTrace = connectTimeout <= 0 && StringUtils.isNotBlank(debugServerReadyPattern);
+            return new DebugAdapterStreamConnectionProvider(resolveCommandLine(commandLine != null ? commandLine : "", project),
+                    getUserEnvironmentVariables(),
+                    includeSystemEnvironmentVariables,
+                    waitForTrace ? new NetworkAddressExtractor(debugServerReadyPattern) : null);
+        });
     }
 
     /**

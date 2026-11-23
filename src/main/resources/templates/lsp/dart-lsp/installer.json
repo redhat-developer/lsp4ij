@@ -7,6 +7,11 @@
       "name": "Trying current command",
       "command": "${server.command}",
       "timeout": 2000,
+      "onSuccess": {
+        "initialize": {
+          "name": "Check that the Dart language server starts"
+        }
+      },
       "onFail": {
         "exec": {
           "name": "Checking dart",

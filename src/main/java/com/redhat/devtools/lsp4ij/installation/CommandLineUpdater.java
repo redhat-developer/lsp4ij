@@ -13,6 +13,8 @@
  *******************************************************************************/
 package com.redhat.devtools.lsp4ij.installation;
 
+import org.jetbrains.annotations.Nullable;
+
 /**
  * Command line of DAP/LSP server updater API.
  */
@@ -30,5 +32,15 @@ public interface CommandLineUpdater {
      * @param commandLine the command line of the DAP/LSP server.
      */
     void setCommandLine(String commandLine);
+
+    /**
+     * Returns how LSP4IJ starts the DAP/LSP server, with its current command line, for the {@code initialize} task of
+     * its installer, or null if this updater doesn't know it: the {@code initialize} task then fails.
+     *
+     * @return how LSP4IJ starts the DAP/LSP server, or null if this updater doesn't know it.
+     */
+    default @Nullable ServerStarter getServerStarter() {
+        return null;
+    }
 
 }

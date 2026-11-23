@@ -308,6 +308,7 @@ It should follow this structure:
 LSP4IJ provides built-in tasks:
 
 * [exec](#task-exec) to execute a command (e.g., `npm install typescript-language-server`),
+* [initialize](#task-initialize) to check that the server starts and answers the `initialize` request,
 * [fileExists](#task-fileexists) to check that a file, as the installed server, exists,
 * [download](#task-download) to retrieve a server from a given URL,
 * [configureServer](#task-configureServer) to set the launch command based on the downloaded files,
@@ -480,7 +481,12 @@ Example using `npm` to install [typescript-language-server](https://github.com/t
     "exec": {
       "name": "Trying current command",
       "command": "${server.command}",
-      "timeout": 2000
+      "timeout": 2000,
+      "onSuccess": {
+        "initialize": {
+          "name": "Check that typescript-language-server starts"
+        }
+      }
     }
   },
   "run": {
@@ -506,6 +512,56 @@ Example using `npm` to install [typescript-language-server](https://github.com/t
   }
 }
 ```
+
+An `exec` whose command still runs at its `timeout` succeeds: that's meant for a command which waits, as a language
+server does, but a command which hangs, waits for input, or fails later, succeeds too. That's why the `check` above
+runs the [initialize](#task-initialize) task once the `exec` of `${server.command}` succeeds. Use `exec` alone for a
+command which ends by itself, as `node --version`.
+
+### Task initialize
+
+`initialize` checks that the language server or debug adapter starts and talks its protocol. It starts the server as
+LSP4IJ starts it, with its command, working directory, environment variables and transport, sends it `initialize` (the
+LSP request for a language server, the DAP request for a debug adapter), and succeeds only if the server answers within
+the `timeout`. An answer which is an error succeeds too, since it shows that the server runs, and the console says so.
+A server which can't be started, ends, or doesn't answer in time fails the check, so that the server gets installed.
+
+Then the task ends the server: it sends `shutdown` and `exit` to a language server, or `disconnect` to a debug adapter,
+and destroys the process if it hasn't ended within 2 seconds. It destroys the process at once when the installation is
+cancelled.
+
+```json
+{
+  "check": {
+    "exec": {
+      "name": "Trying current command",
+      "command": "${server.command}",
+      "timeout": 2000,
+      "onSuccess": {
+        "initialize": {
+          "name": "Check that ruby-lsp starts",
+          "timeout": 10000
+        }
+      }
+    }
+  }
+}
+```
+
+* `timeout` (optional, `30000` by default): how long the task waits for the answer to `initialize`, from the start of
+  the server, in milliseconds.
+
+The bundled installers run `initialize` as the `onSuccess` of the `exec` of `${server.command}` which they ran before,
+rather than as the `check` itself, for the LSP4IJ versions which don't know the `initialize` task. Such a version
+ignores it, as any task it doesn't know: as an `onSuccess`, the check is then the `exec` alone, as before, while as the
+`check`, the installer would have no check, and the server would count as installed. The cost is that LSP4IJ starts the
+server twice to check it: for the `timeout` of the `exec`, then for `initialize`.
+
+The `initialize` request of a language server has the initialization options of its settings, and the project's
+folder as root, without client capabilities. A language server which runs already, which LSP4IJ attaches to, isn't
+touched: the task succeeds. A debug adapter is reached as a debug session reaches it: over a socket to the port of
+`${port}` in its command, or to the address which it prints as its debug server ready pattern says, and otherwise over
+its standard input and output.
 
 ### Task fileExists
 

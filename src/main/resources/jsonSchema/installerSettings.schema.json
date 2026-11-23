@@ -12,6 +12,7 @@
         "anyOf": [
           { "$ref": "#/definitions/fileExists" },
           { "$ref": "#/definitions/exec" },
+          { "$ref": "#/definitions/initialize" },
           { "$ref": "#/definitions/showMessage" },
           { "$ref": "#/definitions/configureServer" },
           { "$ref": "#/definitions/replaceTemplateCommand" }
@@ -88,11 +89,50 @@
             "onFail": {
               "anyOf": [
                 { "$ref": "#/definitions/showMessage" },
-                { "$ref": "#/definitions/exec" }
+                { "$ref": "#/definitions/exec" },
+                { "$ref": "#/definitions/initialize" }
+              ]
+            },
+            "onSuccess": {
+              "anyOf": [
+                { "$ref": "#/definitions/showMessage" },
+                { "$ref": "#/definitions/exec" },
+                { "$ref": "#/definitions/initialize" }
               ]
             }
           },
           "required": ["command"]
+        }
+      }
+    },
+    "initialize": {
+      "type": "object",
+      "properties": {
+        "initialize": {
+          "type": "object",
+          "description": "Starts the language server or debug adapter as LSP4IJ starts it, sends it the initialize request, and succeeds only if it answers within the timeout; then ends it.",
+          "properties": {
+            "name": { "type": "string" },
+            "timeout": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "How long to wait for the answer to initialize, from the start of the server, in milliseconds. 30000 by default."
+            },
+            "onFail": {
+              "anyOf": [
+                { "$ref": "#/definitions/showMessage" },
+                { "$ref": "#/definitions/exec" },
+                { "$ref": "#/definitions/initialize" }
+              ]
+            },
+            "onSuccess": {
+              "anyOf": [
+                { "$ref": "#/definitions/showMessage" },
+                { "$ref": "#/definitions/exec" },
+                { "$ref": "#/definitions/initialize" }
+              ]
+            }
+          }
         }
       }
     },
