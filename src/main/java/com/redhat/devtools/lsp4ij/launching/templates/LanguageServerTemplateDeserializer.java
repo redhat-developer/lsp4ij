@@ -82,6 +82,11 @@ public class LanguageServerTemplateDeserializer extends ServerTemplateJsonDeseri
                             .collect(Collectors.toSet());
             languageServerTemplate.setDisablePromotionFor(disablePromotionFor);
         }
+        // Promotable unless the template says false
+        JsonElement promotable = jsonObject.get(PROMOTABLE_JSON_PROPERTY);
+        if (promotable != null && promotable.isJsonPrimitive() && promotable.getAsJsonPrimitive().isBoolean()) {
+            languageServerTemplate.setPromotable(promotable.getAsBoolean());
+        }
     }
 
     /**

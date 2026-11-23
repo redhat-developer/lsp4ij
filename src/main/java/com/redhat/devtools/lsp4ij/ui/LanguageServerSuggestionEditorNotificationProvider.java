@@ -31,6 +31,7 @@ import com.redhat.devtools.lsp4ij.server.definition.launching.UserDefinedLanguag
 import org.jetbrains.annotations.NonNls;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.jetbrains.annotations.VisibleForTesting;
 
 import javax.swing.*;
 import java.util.ArrayList;
@@ -74,6 +75,36 @@ public class LanguageServerSuggestionEditorNotificationProvider implements Edito
             return null;
         }
 
+        Suggestion suggestion = suggest(project, virtualFile);
+        if (suggestion == null) {
+            return null;
+        }
+
+        // Show the LSP4IJ editor notification to suggest installation of matched templates.
+        return fileEditor -> buildPanel(String.join(", ", suggestion.patterns()), suggestion.templates(), fileEditor,
+                project);
+    }
+
+    /**
+     * The templates which the banner suggests for a file.
+     *
+     * @param templates the templates, in the order of the template list.
+     * @param patterns  the file name patterns, file types or languages by which they match the file.
+     */
+    record Suggestion(@NotNull List<LanguageServerTemplate> templates, @NotNull Set<String> patterns) {
+    }
+
+    /**
+     * Returns the templates which the banner suggests for the given file, and null if it suggests none: the promotable
+     * templates which match a file that IntelliJ opens as plain text, with TextMate or with a file type of the user, and
+     * which no language server was created from.
+     *
+     * @param project     the project.
+     * @param virtualFile the file.
+     * @return the templates which the banner suggests for the file, and null if it suggests none.
+     */
+    @VisibleForTesting
+    @Nullable Suggestion suggest(@NotNull Project project, @NotNull VirtualFile virtualFile) {
         // If the registered file type for the given file is not AbstractFileType, PlainTextFileType, or TextMateFileType,
         // LSP4IJ should assume that the file is already handled in a first-class manner and the user should not be prompted.
         PsiFile file = LSPIJUtils.getPsiFile(virtualFile, project);
@@ -93,12 +124,7 @@ public class LanguageServerSuggestionEditorNotificationProvider implements Edito
         }
 
         // No language server templates which match the file, don't show the LSP4IJ editor notification
-        if (matchedTemplates.isEmpty()) {
-            return null;
-        }
-
-        // Show the LSP4IJ editor notification to suggest installation of matched templates.
-        return fileEditor -> buildPanel(String.join(", ", patterns), matchedTemplates, fileEditor, project);
+        return matchedTemplates.isEmpty() ? null : new Suggestion(matchedTemplates, patterns);
     }
 
     private boolean isServerExists(@Nullable String templateId) {

@@ -4,7 +4,7 @@
 > code are from October 2024, and its repository is archived. Its README recommends the
 > [Erlang Language Platform (ELP)](./erlang-elp.md), which has a template of its own. The template of Erlang LS is
 > still there, for instance for an Erlang/OTP version that ELP doesn't support, and a language server created from it
-> keeps working.
+> keeps working, but the banner which suggests a template for an Erlang file suggests ELP instead.
 
 To enable [Erlang](https://www.erlang.org/) language support in your IDE, you can integrate [Erlang Language Server](https://github.com/erlang-ls/erlang_ls) by following these steps:
 

@@ -41,6 +41,7 @@ public class LanguageServerTemplate extends ServerTemplate {
     public static final String README_FILE_NAME = "README.md";
 
     public static final String DISABLE_PROMOTION_FOR = "disablePromotionFor";
+    public static final String PROMOTABLE_JSON_PROPERTY = "promotable";
     public static final String PROGRAM_ARGS_JSON_PROPERTY = "programArgs";
     public static final String EXPAND_CONFIGURATION_JSON_PROPERTY = "expandConfiguration";
     public static final String SOCKET_JSON_PROPERTY = "socket";
@@ -62,10 +63,11 @@ public class LanguageServerTemplate extends ServerTemplate {
     private String workspaceFolderConfiguration;
 
     private Set<String> disablePromotionFor;
+    private boolean promotable = true;
     private @NotNull UserDefinedTransport transport = UserDefinedTransport.STDIO;
     private @NotNull List<TransportSupport> supportedTransports = List.of();
     private @NotNull List<String> problems = List.of();
-    private Boolean promotable;
+    private Boolean promotableWithTheInstalledPlugins;
 
     /**
      * Returns how LSP4IJ talks to the language server: over the standard input and output of its process, unless the
@@ -182,24 +184,38 @@ public class LanguageServerTemplate extends ServerTemplate {
     }
 
     /**
+     * Sets whether the banner which suggests templates for a file may suggest this one, as the {@code promotable} of
+     * the template says: {@code false} for a template that the dialog still lists but that LSP4IJ no longer recommends,
+     * as the one of a discontinued language server.
+     *
+     * @param promotable {@code false} so that the banner never suggests the template.
+     */
+    public void setPromotable(boolean promotable) {
+        this.promotable = promotable;
+    }
+
+    /**
      * Determines whether this language server template is eligible for promotion.
      * <p>
-     * Promotion is disabled if any of the plugins listed in {@code disablePromotionFor}
-     * are currently installed in the IDE. This prevents redundant or conflicting LSP suggestions
-     * when native IntelliJ plugins are present.
+     * Promotion is disabled if the template says {@code "promotable": false}, or if any of the plugins listed in
+     * {@code disablePromotionFor} are currently installed in the IDE. This prevents redundant or conflicting LSP
+     * suggestions when native IntelliJ plugins are present.
      * </p>
      *
      * @return {@code true} if the template should be promoted; {@code false} otherwise.
      */
     public boolean isPromotable() {
-        if (promotable != null) {
-            return promotable;
+        if (!promotable) {
+            return false;
+        }
+        if (promotableWithTheInstalledPlugins != null) {
+            return promotableWithTheInstalledPlugins;
         }
         if (disablePromotionFor == null || disablePromotionFor.isEmpty()) {
             return true;
         }
-        promotable = computePromotable();
-        return promotable;
+        promotableWithTheInstalledPlugins = computePromotable();
+        return promotableWithTheInstalledPlugins;
     }
 
     private boolean computePromotable() {
