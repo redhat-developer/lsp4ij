@@ -270,10 +270,27 @@ intellijPlatformTesting {
             task {
                 description = "Runs the tests that need the JavaScript plugin (*JavaScriptPluginTest), with -PplatformType=IU."
                 group = LifecycleBasePlugin.VERIFICATION_GROUP
+                // Gradle gives the classes and the classpath of the test source set to the test task only. Of those, the
+                // IntelliJ Platform Gradle Plugin gives this task only the classes of instrumentTestCode, which
+                // instrumentCode = false leaves empty. As for test, the main classes and their dependencies come from the
+                // plugin in the sandbox, so they are left out of the test runtime classpath that is added here.
+                val testSourceSet = sourceSets.test.get()
+                testClassesDirs = testSourceSet.output.classesDirs
+                classpath += testSourceSet.runtimeClasspath - sourceSets.main.get().runtimeClasspath
                 include(javaScriptPluginTests)
-                // A local copy: the configuration cache can't store a reference to the build script
+                // Local copies: the configuration cache can't store a reference to the build script
                 val bundlesPlugin = bundlesJavaScriptPlugin
+                val testPattern = javaScriptPluginTests
                 onlyIf("the IDE bundles the JavaScript plugin (-PplatformType=IU)") { bundlesPlugin }
+                // Gradle skips a test task that finds no test class as NO-SOURCE, and the build passes. Checked before
+                // that, and only where the tests are to run, this fails the build instead.
+                onlyIf("testJavaScript finds a $testPattern") { task ->
+                    val testTask = task as Test
+                    if (testTask.candidateClassFiles.isEmpty) {
+                        throw GradleException("${task.path} finds no $testPattern in ${testTask.testClassesDirs.files}")
+                    }
+                    true
+                }
             }
         }
     }
