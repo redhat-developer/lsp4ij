@@ -302,11 +302,46 @@ public class LanguageServiceAccessor implements Disposable {
         }
     }
 
+    /**
+     * Returns whether the document matcher of the given mapping matches the given file, in a read action. A matcher that
+     * throws an exception doesn't match the file, so that the other mappings of the file still match it. Nothing else
+     * reports its exception, so it is logged as a warning, with the name of the definition. The exception is caught in
+     * the read action, so that a caller without read access gets the same answer as one with it. A cancellation, as a
+     * {@link ProcessCanceledException}, still cancels the caller, and an {@link Error} is not the failure of one
+     * matcher: both propagate.
+     *
+     * @param file        the file.
+     * @param fileProject the project of the file.
+     * @param mapping     the mapping, which is matched synchronously.
+     * @return whether the document matcher of the mapping matches the file.
+     */
     private static boolean match(VirtualFile file, Project fileProject, LanguageServerFileAssociation mapping) {
         if (!ApplicationManager.getApplication().isReadAccessAllowed()) {
-            return runCancellableReadAction(() -> mapping.match(file, fileProject), fileProject);
+            return runCancellableReadAction(() -> matchInReadAction(file, fileProject, mapping), fileProject);
         }
-        return mapping.match(file, fileProject);
+        return matchInReadAction(file, fileProject, mapping);
+    }
+
+    private static boolean matchInReadAction(@NotNull VirtualFile file,
+                                             @NotNull Project fileProject,
+                                             @NotNull LanguageServerFileAssociation mapping) {
+        try {
+            return mapping.match(file, fileProject);
+        } catch (ProcessCanceledException cancellation) {
+            throw cancellation;
+        } catch (CancellationException cancellation) {
+            throw cancellation;
+        } catch (Exception e) {
+            logMatchFailure(file, mapping, e);
+            return false;
+        }
+    }
+
+    private static void logMatchFailure(@NotNull VirtualFile file,
+                                        @NotNull LanguageServerFileAssociation mapping,
+                                        @NotNull Throwable failure) {
+        LOGGER.warn("Cannot match {} to the language server '{}', as its document matcher failed",
+                file.getUrl(), mapping.getServerDefinition().getDisplayName(), failure);
     }
 
     /**
@@ -362,8 +397,7 @@ public class LanguageServiceAccessor implements Disposable {
                 || cause instanceof Error) {
             throw error instanceof CompletionException completion ? completion : new CompletionException(error);
         }
-        LOGGER.warn("Cannot match {} to the language server '{}', as its document matcher failed",
-                file.getUrl(), mapping.getServerDefinition().getDisplayName(), cause);
+        logMatchFailure(file, mapping, cause);
         return null;
     }
 
@@ -1298,6 +1332,7 @@ public class LanguageServiceAccessor implements Disposable {
         }
         Set<LanguageServerDefinition> syncMatchedDefinitions = null;
         Set<LanguageServerFileAssociation> asyncMatchedDefinitions = null;
+        Set<LanguageServerFileAssociation> unmatchedMappings = null;
 
         // look for running language servers via content-type
         Queue<Object> languages = new LinkedList<>();
@@ -1343,13 +1378,19 @@ public class LanguageServiceAccessor implements Disposable {
                             asyncMatchedDefinitions = new HashSet<>();
                         }
                         asyncMatchedDefinitions.add(mapping);
-                    } else {
-                        // Sync mapping
+                    } else if (unmatchedMappings == null || !unmatchedMappings.contains(mapping)) {
+                        // Sync mapping, asked once: a file name pattern mapping is found again for the file type of
+                        // the file, and a matcher that throws is logged once
                         if (match(file, project, mapping)) {
                             if (syncMatchedDefinitions == null) {
                                 syncMatchedDefinitions = new HashSet<>();
                             }
                             syncMatchedDefinitions.add(mapping.getServerDefinition());
+                        } else {
+                            if (unmatchedMappings == null) {
+                                unmatchedMappings = new HashSet<>();
+                            }
+                            unmatchedMappings.add(mapping);
                         }
                     }
                 }

@@ -7,6 +7,9 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij;
 
+import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.application.ReadAction;
+import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.Disposer;
 import com.intellij.openapi.vfs.VirtualFile;
@@ -22,6 +25,7 @@ import org.eclipse.lsp4j.DidOpenTextDocumentParams;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -36,7 +40,7 @@ import java.util.logging.Logger;
 
 /**
  * A language server definition that matches a file only through a mapping that is matched asynchronously. A matcher
- * that fails matches nothing, and takes away no other language server of the file.
+ * that fails, asynchronously or synchronously, matches nothing, and takes away no other language server of the file.
  */
 public class AsynchronousMatcherTest extends LSPCodeInsightFixtureTestCase {
 
@@ -91,12 +95,36 @@ public class AsynchronousMatcherTest extends LSPCodeInsightFixtureTestCase {
         return other;
     }
 
+    private static void registerSynchronousMapping(@NotNull LanguageServerDefinition definition,
+                                                   @NotNull String fileNamePattern,
+                                                   @NotNull DocumentMatcher matcher) {
+        LanguageServersRegistry.getInstance().registerAssociation(definition,
+                new ServerFileNamePatternMapping(List.of(fileNamePattern), definition.getId(), null, matcher));
+    }
+
     /**
      * Registers a definition, with a language server of its own, whose matcher answers the files of the given pattern
-     * with the given function, which fails, throws or is cancelled.
+     * asynchronously with the given function, which fails, throws or is cancelled.
      */
     private LanguageServerDefinition registerFailingDefinition(@NotNull String fileNamePattern,
                                                                @NotNull Function<VirtualFile, CompletableFuture<Boolean>> matches) {
+        var failing = addFailingDefinition();
+        registerAsynchronousMapping(failing, fileNamePattern, matches);
+        return failing;
+    }
+
+    /**
+     * Registers a definition, with a language server of its own, whose given matcher, which throws, matches the files
+     * of the given pattern synchronously.
+     */
+    private LanguageServerDefinition registerThrowingDefinition(@NotNull String fileNamePattern,
+                                                                @NotNull DocumentMatcher matcher) {
+        var throwing = addFailingDefinition();
+        registerSynchronousMapping(throwing, fileNamePattern, matcher);
+        return throwing;
+    }
+
+    private LanguageServerDefinition addFailingDefinition() {
         var failing = new MockLanguageServerDefinition("failing-mock-server-id", false) {
             @Override
             public String getDisplayName() {
@@ -107,7 +135,6 @@ public class AsynchronousMatcherTest extends LSPCodeInsightFixtureTestCase {
         LanguageServersRegistry.getInstance().addServerDefinition(project, failing, List.of());
         Disposer.register(getTestRootDisposable(),
                 () -> LanguageServersRegistry.getInstance().removeServerDefinition(project, failing));
-        registerAsynchronousMapping(failing, fileNamePattern, matches);
         return failing;
     }
 
@@ -260,6 +287,104 @@ public class AsynchronousMatcherTest extends LSPCodeInsightFixtureTestCase {
                 definition).get(10, TimeUnit.SECONDS));
         assertFalse(accessor.isFileMappedToServer(myFixture.addFileToProject("test.both", "content").getVirtualFile(),
                 failing).get(10, TimeUnit.SECONDS));
+    }
+
+    public void testASynchronousMatcherThatThrowsKeepsTheLanguageServersThatOtherMappingsMatch() throws Exception {
+        registerThrowingDefinition("*.both", (file, project) -> {
+            throw new IllegalStateException("The matcher throws");
+        });
+        PsiFile file = myFixture.addFileToProject("test.both", "content");
+
+        var servers = LanguageServiceAccessor.getInstance(myFixture.getProject()).getLanguageServers(file, null, null)
+                .get(10, TimeUnit.SECONDS);
+
+        assertEquals(List.of(definition), definitionsOf(servers));
+    }
+
+    public void testTheExceptionOfASynchronousMatcherIsLoggedOnceAsAWarningWithTheNameOfItsDefinition() throws Exception {
+        var failure = new IllegalStateException("The matcher throws");
+        var asked = new AtomicInteger();
+        registerThrowingDefinition("*.both", (file, project) -> {
+            asked.incrementAndGet();
+            throw failure;
+        });
+        PsiFile file = myFixture.addFileToProject("test.both", "content");
+
+        var logged = logRecordsOf(() -> assertEquals(List.of(definition), definitionsOf(LanguageServiceAccessor
+                .getInstance(myFixture.getProject()).getLanguageServers(file, null, null).get(10, TimeUnit.SECONDS))));
+
+        // A file name pattern mapping is found for the language of the file and for its file type
+        assertEquals("the file must be matched once", 1, asked.get());
+        var warnings = warnings(logged);
+        assertEquals("the exception must be logged once", 1, warnings.size());
+        var warning = warnings.get(0);
+        assertEquals(Level.WARNING, warning.getLevel());
+        assertSame(failure, warning.getThrown());
+        assertTrue(warning.getMessage(), warning.getMessage().contains("'" + FAILING_DEFINITION_NAME + "'"));
+        assertTrue(warning.getMessage(), warning.getMessage().contains(file.getVirtualFile().getUrl()));
+    }
+
+    public void testASynchronousMatcherThatThrowsMatchesNothingWithOrWithoutReadAccess() throws Exception {
+        var failure = new IllegalStateException("The matcher throws");
+        registerThrowingDefinition("*.both", (file, project) -> {
+            throw failure;
+        });
+        PsiFile file = myFixture.addFileToProject("test.both", "content");
+        var accessor = LanguageServiceAccessor.getInstance(myFixture.getProject());
+
+        var logged = logRecordsOf(() -> {
+            assertEquals(Set.of(definition), ReadAction.compute(() -> accessor.getMatchedLanguageServerDefinitions(file)));
+            // Without read access, the matcher is asked in a read action of its own
+            var withoutReadAccess = ApplicationManager.getApplication().executeOnPooledThread(() -> {
+                assertFalse(ApplicationManager.getApplication().isReadAccessAllowed());
+                return accessor.getMatchedLanguageServerDefinitions(file);
+            });
+            PlatformTestUtil.waitWithEventsDispatching("The match without read access must end", withoutReadAccess::isDone, 10);
+            assertEquals(Set.of(definition), withoutReadAccess.get());
+        });
+
+        var warnings = warnings(logged);
+        assertEquals("the exception must be logged once by each match", 2, warnings.size());
+        for (var warning : warnings) {
+            assertSame(failure, warning.getThrown());
+        }
+    }
+
+    public void testAFileIsMappedToADefinitionByItsOtherMappingWhenItsSynchronousMatcherThrows() throws Exception {
+        // The definition of the fixture matches test.async asynchronously too
+        registerSynchronousMapping(definition, "*.async", (file, project) -> {
+            throw new IllegalStateException("The matcher throws");
+        });
+        var throwing = registerThrowingDefinition("*.both", (file, project) -> {
+            throw new IllegalStateException("The matcher throws");
+        });
+        var accessor = LanguageServiceAccessor.getInstance(myFixture.getProject());
+        PsiFile file = myFixture.addFileToProject("test.async", "content");
+
+        assertTrue(accessor.isFileMappedToServer(file.getVirtualFile(), definition).get(10, TimeUnit.SECONDS));
+        assertEquals(List.of(definition), definitionsOf(accessor.getLanguageServers(file, null, null).get(10, TimeUnit.SECONDS)));
+        assertFalse(accessor.isFileMappedToServer(myFixture.addFileToProject("test.both", "content").getVirtualFile(),
+                throwing).get(10, TimeUnit.SECONDS));
+    }
+
+    public void testAProcessCanceledExceptionOfASynchronousMatcherStillPropagates() throws Exception {
+        var cancellation = new ProcessCanceledException();
+        registerThrowingDefinition("*.both", (file, project) -> {
+            throw cancellation;
+        });
+        PsiFile file = myFixture.addFileToProject("test.both", "content");
+        var accessor = LanguageServiceAccessor.getInstance(myFixture.getProject());
+
+        var logged = logRecordsOf(() -> {
+            try {
+                ReadAction.compute(() -> accessor.getMatchedLanguageServerDefinitions(file));
+                fail("The cancellation must propagate");
+            } catch (ProcessCanceledException e) {
+                assertSame(cancellation, e);
+            }
+        });
+
+        assertEquals("the cancellation must not be logged", List.of(), warnings(logged));
     }
 
     public void testARestartConnectsTheOpenFileAgain() throws Exception {
