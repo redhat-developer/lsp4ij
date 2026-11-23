@@ -8,7 +8,7 @@ This section provides an overview of the supported DAP features for IntelliJ:
 Current state of [Events](https://microsoft.github.io/debug-adapter-protocol//specification.html#Events) support:
 
 * ✅ [Breakpoint](https://microsoft.github.io/debug-adapter-protocol//specification.html#Events_Breakpoint).
-* ❌ [Capabilities](https://microsoft.github.io/debug-adapter-protocol//specification.html#Events_Capabilities).
+* ✅ [Capabilities](https://microsoft.github.io/debug-adapter-protocol//specification.html#Events_Capabilities): the capabilities that the debug adapter announces after `initialize` update those of its session. The function and data breakpoints are sent again when their support is turned on or off, the exception breakpoint filters when they change, and the instruction breakpoints once the debug adapter supports disassembling.
 * ❌ [Continued](https://microsoft.github.io/debug-adapter-protocol//specification.html#Events_Continued).
 * ✅ [Exited](https://microsoft.github.io/debug-adapter-protocol//specification.html#Events_Exited): the console shows the exit code of the debugged program when the debug adapter's process ends.
 * ✅ [Initialized](https://microsoft.github.io/debug-adapter-protocol//specification.html#Events_Initialized).
