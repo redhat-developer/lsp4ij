@@ -18,14 +18,13 @@ import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.openapi.vfs.VirtualFileWithId;
 import com.intellij.psi.PsiFile;
 import com.intellij.psi.util.CachedValue;
-import com.intellij.psi.util.CachedValueProvider.Result;
-import com.intellij.psi.util.CachedValuesManager;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -35,7 +34,7 @@ import java.util.concurrent.ConcurrentHashMap;
 @ApiStatus.Experimental
 public class EditorBehaviorFeature {
 
-    private static final Map<String, Key<CachedValue<Boolean>>> CACHE_KEYS = new ConcurrentHashMap<>();
+    private static final Map<String, Key<FlagValue>> CACHE_KEYS = new ConcurrentHashMap<>();
 
     private LSPClientFeatures clientFeatures;
 
@@ -202,41 +201,89 @@ public class EditorBehaviorFeature {
 
         if (!(virtualFile instanceof VirtualFileWithId)) {
             // A file outside the VFS, such as a document that a language server provides with
-            // workspace/textDocumentContent, holds its PSI, which the provider of a cached value must not keep
-            return compute(project, virtualFile, featureFlagChecker).getValue();
+            // workspace/textDocumentContent, holds its PSI: its flags are computed each time, so that no cache keeps it
+            FlagValue flagValue = compute(project, virtualFile, featureFlagChecker);
+            return flagValue != null && flagValue.value();
         }
-        Key<CachedValue<Boolean>> cacheKey = getCacheKey(virtualFile, featureFlagChecker);
-        return CachedValuesManager.getManager(project).getCachedValue(
-                project,
-                cacheKey,
-                () -> compute(project, virtualFile, featureFlagChecker),
-                false
-        );
+        Key<FlagValue> cacheKey = getCacheKey(virtualFile, featureFlagChecker);
+        FlagValue cached = project.getUserData(cacheKey);
+        if (cached != null && cached.isUpToDate()) {
+            return cached.value();
+        }
+        FlagValue computed = compute(project, virtualFile, featureFlagChecker);
+        if (computed == null) {
+            return false;
+        }
+        project.putUserData(cacheKey, computed);
+        return computed.value();
     }
 
-    private static Result<Boolean> compute(
+    /**
+     * Computes the given flag for the given file from its language servers.
+     *
+     * @return the flag, or null if the PSI file can't be found: the flag is then false/disabled, with no caching.
+     */
+    private static @Nullable FlagValue compute(
             @NotNull Project project,
             @NotNull VirtualFile virtualFile,
             @NotNull FeatureFlagChecker featureFlagChecker
     ) {
         PsiFile file = LSPIJUtils.getPsiFile(virtualFile, project);
         if ((file == null) || !file.isValid()) {
-            // If we couldn't find the PSI file, return false/disabled with no caching
-            return Result.create(false, ModificationTracker.EVER_CHANGED);
+            return null;
         }
 
-        return Result.create(
-                LanguageServiceAccessor.getInstance(project).hasAny(
-                        file,
-                        ls -> featureFlagChecker.isEnabled(ls.getClientFeatures().getEditorBehaviorFeature(), file)
-                ),
-                // Evict if any language server definition config that could affect the file changes
-                LanguageServiceAccessor.getInstance(project).getModificationTrackers(file).toArray()
+        LanguageServiceAccessor languageServiceAccessor = LanguageServiceAccessor.getInstance(project);
+        // Evict if any language server definition config that could affect the file changes. The counts are read
+        // before the language servers are, see FlagValue
+        List<TrackerCount> trackerCounts = languageServiceAccessor.getModificationTrackers(file)
+                .stream()
+                .map(TrackerCount::of)
+                .toList();
+        boolean value = languageServiceAccessor.hasAny(
+                file,
+                ls -> featureFlagChecker.isEnabled(ls.getClientFeatures().getEditorBehaviorFeature(), file)
         );
+        return new FlagValue(value, trackerCounts);
+    }
+
+    /**
+     * A flag of a file, with the modification counts that the language servers of the file had before it was computed
+     * from them. It is up to date while none of the counts has changed.
+     * <p>
+     * The counts are read before the flag is computed. A language server that starts, or whose configuration changes,
+     * while the flag is computed changes a count after it was read, and the flag is computed again the next time.
+     * Counts read after the computation, as a {@link CachedValue} reads those of its dependencies, can already include
+     * a change that the flag missed, and keep the flag until the next change: a file opened as its language server
+     * started then kept the flags of a file that no started language server serves, such as a semantic tokens-based
+     * file view provider that stays disabled.
+     *
+     * @param value         the flag.
+     * @param trackerCounts the modification counts read before the flag was computed.
+     */
+    private record FlagValue(boolean value, @NotNull List<TrackerCount> trackerCounts) {
+
+        boolean isUpToDate() {
+            return trackerCounts.stream().allMatch(TrackerCount::isUnchanged);
+        }
+    }
+
+    /**
+     * A modification tracker, with the modification count that it had when it was read.
+     */
+    private record TrackerCount(@NotNull ModificationTracker tracker, long count) {
+
+        static @NotNull TrackerCount of(@NotNull ModificationTracker tracker) {
+            return new TrackerCount(tracker, tracker.getModificationCount());
+        }
+
+        boolean isUnchanged() {
+            return tracker.getModificationCount() == count;
+        }
     }
 
     @NotNull
-    private static Key<CachedValue<Boolean>> getCacheKey(
+    private static Key<FlagValue> getCacheKey(
             @NotNull VirtualFile virtualFile,
             @NotNull FeatureFlagChecker featureFlagChecker
     ) {
