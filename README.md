@@ -280,6 +280,7 @@ Here are some projects that use LSP4IJ, grouped by the protocol they use it for.
 
  * [aer Local Apex Debugger](https://www.octoberswimmer.com/tools/aer/docs/intellij-debugging/)
  * [C/C++ Project (LSP)](https://github.com/Ant-ON/intellij-c-cpp-lsp)
+ * [Ecstasy Language Support](https://plugins.jetbrains.com/plugin/31202-ecstasy-language-support)
  * [Flint](https://github.com/Mission-Platform/composable-mission-ready-platform/tree/main/extensions/flint-ij)
  * [Gleam Pro](https://plugins.jetbrains.com/plugin/33935-gleam-pro)
  * [Go (gopls)](https://github.com/Xefise/jetbrains-go-plugin)
