@@ -54,6 +54,7 @@ public class DAPStackFrame extends XStackFrame {
 
     private final @NotNull StackFrame stackFrame;
     private final @NotNull DAPClient client;
+    private final int stopNumber;
     private volatile @Nullable XSourcePosition sourcePosition;
     private @Nullable DisassemblyDeferredSourcePosition disassemblyInstructionSourcePosition;
     private XDebuggerEvaluator evaluator;
@@ -61,8 +62,20 @@ public class DAPStackFrame extends XStackFrame {
 
     public DAPStackFrame(@NotNull DAPClient client,
                          @NotNull StackFrame stackFrame) {
+        this(client, stackFrame, client.getLastStopNumber());
+    }
+
+    /**
+     * @param client     the client of the debug adapter.
+     * @param stackFrame the stack frame which the debug adapter sent.
+     * @param stopNumber the number of the stop of the program at which the debug adapter sent the frame.
+     */
+    public DAPStackFrame(@NotNull DAPClient client,
+                         @NotNull StackFrame stackFrame,
+                         int stopNumber) {
         this.client = client;
         this.stackFrame = stackFrame;
+        this.stopNumber = stopNumber;
     }
 
     @Override
@@ -261,6 +274,17 @@ public class DAPStackFrame extends XStackFrame {
 
     public int getFrameId() {
         return stackFrame.getId();
+    }
+
+    /**
+     * Returns true if the debug adapter sent this frame at the last stop of the program, and false if the program
+     * stopped again since: the id of the frame may then name another frame, as when a debug adapter numbers the frames
+     * of each stop from 0, as GDB does.
+     *
+     * @return true if the debug adapter sent this frame at the last stop of the program, and false otherwise.
+     */
+    public boolean isOfTheLastStop() {
+        return stopNumber == client.getLastStopNumber();
     }
 
     /**
