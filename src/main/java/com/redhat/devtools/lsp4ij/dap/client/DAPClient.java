@@ -1549,6 +1549,29 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
         return debugProtocolServer.setVariable(args);
     }
 
+    /**
+     * Assigns a value to an expression with the 'setExpression' request.
+     *
+     * @param expression the expression which the value is assigned to, such as the expression of an Evaluate result
+     *                   or the 'evaluateName' of a variable.
+     * @param frameId    the stack frame in which the expression and the value are evaluated.
+     * @param value      the expression of the value which is assigned.
+     * @return the new value of the expression, or null when the client is not connected to the debug adapter.
+     */
+    public CompletableFuture<SetExpressionResponse> setExpression(@NotNull String expression,
+                                                                  int frameId,
+                                                                  @NotNull String value) {
+        if (debugProtocolServer == null) {
+            return CompletableFuture.completedFuture(null);
+        }
+        SetExpressionArguments args = new SetExpressionArguments();
+        args.setExpression(expression);
+        args.setValue(value);
+        args.setFrameId(frameId);
+        args.setFormat(getValueFormat());
+        return debugProtocolServer.setExpression(args);
+    }
+
     // Threads
 
     @Override
@@ -1729,6 +1752,16 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
      */
     public boolean isSupportsSetVariable() {
         return Boolean.TRUE.equals(getCapabilities().getSupportsSetVariable());
+    }
+
+    /**
+     * Returns true if the debug adapter supports assigning a value to an expression with the 'setExpression' request
+     * and false otherwise.
+     *
+     * @return true if the debug adapter supports the 'setExpression' request and false otherwise.
+     */
+    public boolean isSupportsSetExpression() {
+        return Boolean.TRUE.equals(getCapabilities().getSupportsSetExpression());
     }
 
     /**

@@ -409,8 +409,18 @@ You should edit the variable:
 the edit apply will consume the
 [SetVariable request](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_SetVariable):
 
-`Set Value...` isn't available for the result of an expression, as `Evaluate Expression` shows it: the SetVariable
-request names the variable's container, and such a result has none. The variables inside the result can be set.
+The result of an expression, as `Evaluate Expression` and the value popup of an expression in the editor show it, has
+no container for the SetVariable request to name. When the debug adapter supports the
+[SetExpression request](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_SetExpression)
+(`supportsSetExpression`), `Set Value...` assigns the new value to the expression with it; otherwise `Set Value...`
+isn't available for the result. The variables inside the result are set as any other variable.
+
+When the debug adapter supports the SetExpression request but not the SetVariable request, a variable is set with the
+SetExpression request, which assigns the new value to the expression that the debug adapter gives for the variable
+(`evaluateName`). When the debug adapter supports both requests, variables are set with the SetVariable request, as in
+VS Code.
+
+The Watches view doesn't offer `Set Value...`: there, editing a watch changes its expression.
 
 ## Debugged process
 

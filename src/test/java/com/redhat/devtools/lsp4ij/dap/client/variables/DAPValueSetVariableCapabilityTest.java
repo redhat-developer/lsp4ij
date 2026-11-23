@@ -23,10 +23,12 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * "Set Value…" and F2 follow the 'supportsSetVariable' capability which a 'capabilities' event enables after the
- * 'initialize' response, and still honor the 'readOnly' hint of each variable.
+ * "Set Value…" and F2 follow the 'supportsSetVariable' and 'supportsSetExpression' capabilities which a 'capabilities'
+ * event enables after the 'initialize' response, and still honor the 'readOnly' hint of each variable.
  */
 public class DAPValueSetVariableCapabilityTest {
+
+    private static final int LOCALS_REFERENCE = 1;
 
     private final DAPCapabilities capabilities = new DAPCapabilities();
 
@@ -76,16 +78,49 @@ public class DAPValueSetVariableCapabilityTest {
         assertTrue(canSetValue(variable("fromVar")));
     }
 
+    @Test
+    void setsAnEvaluateResultOnceTheEventEnablesSetExpression() {
+        enableSetVariable(true);
+        assertFalse(canSetEvaluateResult(variable("answer")));
+
+        enableSetExpression(true);
+        assertTrue(canSetEvaluateResult(variable("answer")));
+        assertFalse(canSetEvaluateResult(readOnly(variable("answer"))));
+
+        enableSetExpression(false);
+        assertFalse(canSetEvaluateResult(variable("answer")));
+    }
+
     /**
-     * As DAPValue.getModifier(): the client reads 'supportsSetVariable' from its current capabilities.
+     * As DAPValue.getModifier() for a variable of the Variables view, which has the 'variablesReference' of its
+     * parent: the client reads 'supportsSetVariable' and 'supportsSetExpression' from its current capabilities.
      */
     private boolean canSetValue(Variable variable) {
-        return DAPValue.canSetValue(Boolean.TRUE.equals(capabilities.get().getSupportsSetVariable()), variable);
+        return getSetValueRequest(LOCALS_REFERENCE, variable) != null;
+    }
+
+    /**
+     * As DAPValue.getModifier() for an Evaluate result, which has no parent 'variablesReference'.
+     */
+    private boolean canSetEvaluateResult(Variable variable) {
+        return getSetValueRequest(null, variable) != null;
+    }
+
+    private DAPValue.SetValueRequest getSetValueRequest(Integer parentVariablesReference, Variable variable) {
+        var current = capabilities.get();
+        return DAPValue.getSetValueRequest(Boolean.TRUE.equals(current.getSupportsSetVariable()),
+                Boolean.TRUE.equals(current.getSupportsSetExpression()), parentVariablesReference, variable, variable);
     }
 
     private void enableSetVariable(boolean supported) {
         var update = new Capabilities();
         update.setSupportsSetVariable(supported);
+        capabilities.update(event(update));
+    }
+
+    private void enableSetExpression(boolean supported) {
+        var update = new Capabilities();
+        update.setSupportsSetExpression(supported);
         capabilities.update(event(update));
     }
 
