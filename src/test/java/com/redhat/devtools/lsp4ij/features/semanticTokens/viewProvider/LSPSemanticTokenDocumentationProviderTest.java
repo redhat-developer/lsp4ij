@@ -19,7 +19,10 @@ import com.redhat.devtools.lsp4ij.templates.ServerMappingSettings;
 import org.eclipse.lsp4j.Hover;
 import org.eclipse.lsp4j.MarkupContent;
 import org.eclipse.lsp4j.MarkupKind;
+import org.eclipse.lsp4j.jsonrpc.ResponseErrorException;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
+import org.eclipse.lsp4j.jsonrpc.messages.ResponseError;
+import org.eclipse.lsp4j.jsonrpc.messages.ResponseErrorCode;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
@@ -143,9 +146,33 @@ public class LSPSemanticTokenDocumentationProviderTest extends LSPSemanticTokens
         assertEquals(body, 1, StringUtil.getOccurrenceCount(body, "<hr />"));
     }
 
+    public void testTheHoverOfALanguageServerWhenTheOtherOneCannotStart() {
+        PsiFile file = openFile();
+        addSecondServerWhichCannotStart();
+
+        String hintText = getHintText(file, new Hover(new MarkupContent(MarkupKind.PLAINTEXT, "First line\nSecond line")));
+
+        assertEquals("First line<br>Second line", UIUtil.getHtmlBody(hintText));
+    }
+
     private void addSecondServer(@NotNull Hover hover) {
         secondServer = new MockLanguageServerDefinition("second-server", false);
         secondServer.getServer().setHover(hover);
+        registerSecondServer();
+    }
+
+    /**
+     * Adds a second language server, which fails its initialize, and so cannot start.
+     */
+    private void addSecondServerWhichCannotStart() {
+        secondServer = new MockLanguageServerDefinition("second-server", false);
+        // Before it is registered, which starts it for the open file
+        secondServer.getServer().holdInitialize().completeExceptionally(new ResponseErrorException(
+                new ResponseError(ResponseErrorCode.InternalError, "The language server cannot start", null)));
+        registerSecondServer();
+    }
+
+    private void registerSecondServer() {
         LanguageServersRegistry.getInstance().addServerDefinition(myFixture.getProject(), secondServer,
                 List.of(ServerMappingSettings.createFileNamePatternsMappingSettings(List.of("*.ts"), "typescript")));
     }
