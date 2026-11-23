@@ -28,6 +28,9 @@ import com.redhat.devtools.lsp4ij.mock.MockWorkspaceService;
 import com.redhat.devtools.lsp4ij.server.CannotStartProcessException;
 import com.redhat.devtools.lsp4ij.server.StreamConnectionProvider;
 import com.redhat.devtools.lsp4ij.templates.ServerMappingSettings;
+import org.eclipse.lsp4j.ConfigurationItem;
+import org.eclipse.lsp4j.ConfigurationParams;
+import org.eclipse.lsp4j.DidChangeConfigurationParams;
 import org.eclipse.lsp4j.Hover;
 import org.eclipse.lsp4j.HoverParams;
 import org.eclipse.lsp4j.Position;
@@ -69,8 +72,10 @@ import java.util.concurrent.TimeoutException;
 
 /**
  * A language server is sent nothing but {@code exit} after {@code shutdown}, as LSP requires: a request that is
- * cancelled once its stopping language server has been sent {@code shutdown} ends without a {@code $/cancelRequest}.
- * A request that is cancelled while its language server runs still sends one.
+ * cancelled once its stopping language server has been sent {@code shutdown} ends without a {@code $/cancelRequest},
+ * a request sent then is cancelled at once without being sent, and a notification sent then is dropped. The answer to
+ * a request of the language server is still sent, and a request that is cancelled while its language server runs still
+ * sends {@code $/cancelRequest}.
  */
 public class CancelRequestAfterShutdownTest extends UsefulTestCase {
 
@@ -178,6 +183,76 @@ public class CancelRequestAfterShutdownTest extends UsefulTestCase {
         PlatformTestUtil.waitWithEventsDispatching("The language server must stop", stopped::isDone, 10);
         assertEquals("The language server must read nothing but exit after shutdown",
                 List.of("shutdown", "exit"), connection.readFromShutdown());
+    }
+
+    public void testARequestSentOnceTheShutdownIsSentIsCancelledAtOnceAndNotSent() throws Exception {
+        var server = connect();
+        var connection = definition.lastConnection();
+        var shutdownAnswer = new CompletableFuture<Void>();
+        definition.getServer().holdShutdown(shutdownAnswer);
+        CompletableFuture<Void> stopped;
+        try {
+            stopped = server.getServerWrapper().stop();
+            awaitRead(connection, "shutdown");
+
+            // A feature sends its request to the language server that it got before the stop, as the code vision of
+            // an editor does
+            var request = server.getWorkspaceService().symbol(new WorkspaceSymbolParams("main"));
+
+            assertTrue("The request must be cancelled at once, as the requests of a stopped language server are",
+                    request.isCancelled());
+        } finally {
+            shutdownAnswer.complete(null);
+        }
+
+        PlatformTestUtil.waitWithEventsDispatching("The language server must stop", stopped::isDone, 10);
+        assertEquals("The language server must read nothing but exit after shutdown",
+                List.of("shutdown", "exit"), connection.readFromShutdown());
+    }
+
+    public void testANotificationSentOnceTheShutdownIsSentIsNotSent() throws Exception {
+        var server = connect();
+        var connection = definition.lastConnection();
+        var shutdownAnswer = new CompletableFuture<Void>();
+        definition.getServer().holdShutdown(shutdownAnswer);
+        CompletableFuture<Void> stopped;
+        try {
+            stopped = server.getServerWrapper().stop();
+            awaitRead(connection, "shutdown");
+
+            server.getWorkspaceService().didChangeConfiguration(new DidChangeConfigurationParams(Map.of()));
+        } finally {
+            shutdownAnswer.complete(null);
+        }
+
+        PlatformTestUtil.waitWithEventsDispatching("The language server must stop", stopped::isDone, 10);
+        assertEquals("The language server must read nothing but exit after shutdown",
+                List.of("shutdown", "exit"), connection.readFromShutdown());
+    }
+
+    public void testTheAnswerToARequestOfTheLanguageServerIsSentOnceTheShutdownIsSent() throws Exception {
+        var server = connect();
+        var connection = definition.lastConnection();
+        var shutdownAnswer = new CompletableFuture<Void>();
+        definition.getServer().holdShutdown(shutdownAnswer);
+        CompletableFuture<Void> stopped;
+        try {
+            stopped = server.getServerWrapper().stop();
+            awaitRead(connection, "shutdown");
+
+            // The language server asks for its configuration while it shuts down
+            var clients = definition.getServer().getRemoteProxies();
+            var configuration = clients.get(clients.size() - 1)
+                    .configuration(new ConfigurationParams(List.of(new ConfigurationItem())));
+            PlatformTestUtil.waitWithEventsDispatching("The language server must get the configuration",
+                    configuration::isDone, 10);
+        } finally {
+            shutdownAnswer.complete(null);
+        }
+
+        PlatformTestUtil.waitWithEventsDispatching("The language server must stop", stopped::isDone, 10);
+        assertEquals("The language server must read the answer to its request, and exit, after shutdown",
+                List.of("shutdown", "ResponseMessage", "exit"), connection.readFromShutdown());
     }
 
     public void testARequestCancelledWhileTheServerRunsSendsCancelRequest() throws Exception {
