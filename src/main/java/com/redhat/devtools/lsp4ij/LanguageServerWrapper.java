@@ -65,6 +65,7 @@ import org.eclipse.lsp4j.jsonrpc.messages.Either;
 import org.eclipse.lsp4j.jsonrpc.messages.Message;
 import org.eclipse.lsp4j.jsonrpc.messages.NotificationMessage;
 import org.eclipse.lsp4j.jsonrpc.messages.RequestMessage;
+import org.eclipse.lsp4j.jsonrpc.messages.ResponseMessage;
 import org.eclipse.lsp4j.jsonrpc.json.MessageJsonHandler;
 import org.eclipse.lsp4j.jsonrpc.json.StreamMessageConsumer;
 import org.eclipse.lsp4j.services.LanguageServer;
@@ -757,12 +758,20 @@ public class LanguageServerWrapper implements Disposable {
                                 if (isDisposed()) {
                                     return;
                                 }
-                                // A $/cancelRequest is traced once it is queued, as it is dropped after the shutdown
-                                // request; nothing answers it, so its trace has no answer to come before
+                                // A message that would follow the shutdown request is neither traced nor sent
+                                if (outgoing && !outgoingMessages.accepts(message)) {
+                                    OutgoingMessages.refuse(message);
+                                    return;
+                                }
+                                // A message is traced before it is queued, so that the trace of a request comes before
+                                // the trace of its answer. A $/cancelRequest, which the stop sends as it starts the
+                                // shutdown, is traced once it is queued, as the shutdown request can be queued in
+                                // between; nothing answers it, so its trace has no answer to come before
                                 boolean cancelRequest = outgoing && OutgoingMessages.isCancelRequest(message);
                                 if (!cancelRequest) {
                                     logMessage(message, consumer);
                                 }
+                                boolean queued = true;
                                 try {
                                     if (outgoing) {
                                         Runnable write = () -> CompletableFuture.runAsync(
@@ -771,10 +780,8 @@ public class LanguageServerWrapper implements Disposable {
                                                     getLanguageServerLifecycleManager().onError(this, e);
                                                     return null;
                                                 });
-                                        if (!outgoingMessages.queue(message, write)) {
-                                            return;
-                                        }
-                                        if (cancelRequest) {
+                                        queued = outgoingMessages.queue(message, write);
+                                        if (queued && cancelRequest) {
                                             logMessage(message, consumer);
                                         }
                                     } else {
@@ -783,6 +790,12 @@ public class LanguageServerWrapper implements Disposable {
                                 } catch (Throwable e) {
                                     getLanguageServerLifecycleManager().onError(this, e);
                                     throw e;
+                                }
+                                if (!queued) {
+                                    // The shutdown request was queued since the check above: the message, unless it
+                                    // is a $/cancelRequest, is traced, but not sent
+                                    OutgoingMessages.refuse(message);
+                                    return;
                                 }
                                 if (provider != null && isActive()) {
                                     provider.handleMessage(message, this.languageServer, rootURI);
@@ -3260,25 +3273,42 @@ public class LanguageServerWrapper implements Disposable {
 
     /**
      * Queues the messages that one connection sends to the message writer, which writes them in the order they are
-     * queued, and drops a {@code $/cancelRequest} that would follow the {@code shutdown} request: LSP allows only the
-     * {@code exit} notification after {@code shutdown}. The request that it would cancel ends all the same, as LSP4J
-     * cancels the future of a request once it has handed over the notification, and the language server, which shuts
-     * down, would not answer the request anyway.
+     * queued. LSP allows only the {@code exit} notification after the {@code shutdown} request, so once it is queued,
+     * only {@code exit} and the responses to the requests of the language server still are:
+     * <ul>
+     * <li>A request that would follow it ends at once, cancelled, as the requests of a stopped language server do: the
+     * language server, which shuts down, would not answer it.</li>
+     * <li>A notification that would follow it is dropped. For a {@code $/cancelRequest}, the request that it would
+     * cancel ends all the same, as LSP4J cancels the future of a request once it has handed over the
+     * notification.</li>
+     * </ul>
      */
     private static final class OutgoingMessages {
 
-        private boolean shutdownQueued;
+        // Set under the monitor, which orders it with the messages queued; read without it by accepts
+        private volatile boolean shutdownQueued;
 
         /**
-         * Queues the given message with the given action, unless it is a {@code $/cancelRequest} that would follow the
-         * {@code shutdown} request.
+         * Returns true if the given message may be queued: any message until the {@code shutdown} request is queued,
+         * and then only the {@code exit} notification and the responses to the requests of the language server.
+         *
+         * @param message the message.
+         * @return true if the message may be queued, and false otherwise.
+         */
+        boolean accepts(@NotNull Message message) {
+            return !shutdownQueued || message instanceof ResponseMessage || isExit(message);
+        }
+
+        /**
+         * Queues the given message with the given action, unless the {@code shutdown} request is queued and the message
+         * may not follow it.
          *
          * @param message the message.
          * @param queue   the action that queues the message to the message writer.
-         * @return true if the message is queued, and false if it is dropped.
+         * @return true if the message is queued, and false if it is refused, which {@link #refuse(Message)} ends.
          */
         synchronized boolean queue(@NotNull Message message, @NotNull Runnable queue) {
-            if (shutdownQueued && isCancelRequest(message)) {
+            if (!accepts(message)) {
                 return false;
             }
             if (message instanceof RequestMessage request && "shutdown".equals(request.getMethod())) {
@@ -3286,6 +3316,25 @@ public class LanguageServerWrapper implements Disposable {
             }
             queue.run();
             return true;
+        }
+
+        /**
+         * Ends the given message, which is refused as it would follow the {@code shutdown} request. A request ends at
+         * once with a {@link CancellationException}: LSP4J completes the future of a request with the exception that
+         * its send throws. A notification is dropped.
+         *
+         * @param message the refused message.
+         * @throws CancellationException if the message is a request.
+         */
+        static void refuse(@NotNull Message message) {
+            if (message instanceof RequestMessage request) {
+                throw new CancellationException("The request '" + request.getMethod()
+                        + "' is not sent: it would follow the shutdown request of its language server");
+            }
+        }
+
+        private static boolean isExit(@NotNull Message message) {
+            return message instanceof NotificationMessage notification && "exit".equals(notification.getMethod());
         }
 
         static boolean isCancelRequest(@NotNull Message message) {
