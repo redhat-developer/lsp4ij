@@ -314,6 +314,25 @@ option. When it is selected, `Step Over`, `Step Into`, `Smart Step Into` and `St
 resumes only the thread that steps while the other threads stay stopped. `Resume Program` still resumes every thread.
 The choice holds for the debug session.
 
+### Terminate a thread
+
+When the DAP server supports the
+[terminateThreads](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_TerminateThreads)
+request (`supportsTerminateThreadsRequest`), the context menu of the debug session's `Threads` tab has
+`Terminate Thread`, which asks the DAP server to terminate the selected threads:
+
+![Terminate Thread](./images/DAP_terminate_thread.png)
+
+The DAP server then reports each thread that ended, which the tab shows as `exited`:
+
+![A terminated thread](./images/DAP_terminate_thread_exited.png)
+
+The `Threads` tab shows the threads of the DAP session that stopped last, which can be a child session that the DAP
+server started with
+[startDebugging](https://microsoft.github.io/debug-adapter-protocol//specification.html#Reverse_Requests_StartDebugging),
+and `Terminate Thread` terminates them in that session. For a DAP server which doesn't support the request, as
+debugpy, vscode-js-debug and Delve don't, the menu item isn't shown.
+
 ## Reset Frame
 
 When the DAP server supports the

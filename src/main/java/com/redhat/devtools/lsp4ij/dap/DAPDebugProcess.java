@@ -875,8 +875,24 @@ public class DAPDebugProcess extends XDebugProcess implements Disposable {
         return CompletableFuture.completedFuture(null);
     }
 
+    /**
+     * Shows the given threads of the root session in the "Threads" panel.
+     *
+     * @param threads the threads of the root session.
+     */
     public void refreshThreads(Thread[] threads) {
-        threadsPanel.refreshThreads(threads);
+        refreshThreads(parentClient, threads);
+    }
+
+    /**
+     * Shows the given threads in the "Threads" panel, as threads of the given client's DAP session: the sessions of a
+     * tree ('startDebugging') number their threads each, and a thread is terminated in its own session.
+     *
+     * @param client  the client of the DAP session of the threads, or null if it is not known yet.
+     * @param threads the threads.
+     */
+    public void refreshThreads(@Nullable DAPClient client, Thread[] threads) {
+        threadsPanel.refreshThreads(client, threads);
     }
 
     public void refreshThread(ThreadEventArguments args) {
@@ -931,6 +947,13 @@ public class DAPDebugProcess extends XDebugProcess implements Disposable {
         modulesReported = true;
         showModules();
         modulesPanel.update(client, args);
+    }
+
+    /**
+     * @return the "Threads" panel.
+     */
+    public @NotNull ThreadsPanel getThreadsPanel() {
+        return threadsPanel;
     }
 
     /**

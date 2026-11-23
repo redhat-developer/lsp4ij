@@ -68,7 +68,7 @@ Current state of [Requests](https://microsoft.github.io/debug-adapter-protocol//
 * ✅ [StepInTargets](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_StepInTargets).
 * ✅ [StepOut](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_StepOut).
 * ✅ [Terminate](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_Terminate).
-* ❌ [TerminateThreads](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_TerminateThreads).
+* ✅ [TerminateThreads](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_TerminateThreads), with the `supportsTerminateThreadsRequest` capability: `Terminate Thread` in the context menu of the `Threads` tab terminates the selected threads, in the DAP session they belong to (see [user guide](./UserGuide.md#terminate-a-thread)).
 * ✅ [Threads](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_Threads).
 * ✅ [Variables](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_Variables).
 * ❌ [WriteMemory](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_WriteMemory).

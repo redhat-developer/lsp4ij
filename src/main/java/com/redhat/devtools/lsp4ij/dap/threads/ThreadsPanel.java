@@ -12,8 +12,15 @@ package com.redhat.devtools.lsp4ij.dap.threads;
 
 import com.intellij.icons.AllIcons;
 import com.intellij.openapi.Disposable;
+import com.intellij.openapi.actionSystem.ActionGroup;
+import com.intellij.openapi.actionSystem.ActionManager;
+import com.intellij.openapi.actionSystem.ActionPlaces;
+import com.intellij.openapi.actionSystem.DataKey;
+import com.intellij.openapi.actionSystem.DataSink;
+import com.intellij.openapi.actionSystem.UiDataProvider;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.ui.ColoredTableCellRenderer;
+import com.intellij.ui.PopupHandler;
 import com.intellij.ui.ScrollPaneFactory;
 import com.intellij.ui.SimpleTextAttributes;
 import com.intellij.ui.table.TableView;
@@ -21,6 +28,7 @@ import com.intellij.util.ui.ColumnInfo;
 import com.intellij.util.ui.ListTableModel;
 import com.intellij.util.ui.components.BorderLayoutPanel;
 import com.redhat.devtools.lsp4ij.dap.DAPDebugProcess;
+import com.redhat.devtools.lsp4ij.dap.client.DAPClient;
 import org.eclipse.lsp4j.debug.Thread;
 import org.eclipse.lsp4j.debug.ThreadEventArguments;
 import org.eclipse.lsp4j.debug.ThreadEventArgumentsReason;
@@ -32,21 +40,45 @@ import javax.swing.table.TableCellRenderer;
 import java.util.*;
 
 /**
- * Threads panel which shows DAP threads (name and status).
+ * Threads panel which shows DAP threads (name and status), with a context menu of actions on the selected threads.
  */
-public class ThreadsPanel extends BorderLayoutPanel implements Disposable {
+public class ThreadsPanel extends BorderLayoutPanel implements Disposable, UiDataProvider {
 
     public static final @NotNull String ID = "dap-threads-panel";
+
+    /**
+     * The group of the actions of the panel's context menu.
+     */
+    public static final @NotNull String POPUP_GROUP_ID = "DAP.Threads.Popup";
+
+    /**
+     * The threads selected in the panel, for the actions of its context menu.
+     */
+    public static final @NotNull DataKey<SelectedThreads> SELECTED_THREADS = DataKey.create("lsp4ij.dap.selectedThreads");
+
+    /**
+     * The threads selected in the panel, and the client of the DAP session they are threads of.
+     *
+     * @param client    the client of the DAP session of the threads.
+     * @param threadIds the IDs of the selected threads, as that session numbers them.
+     */
+    public record SelectedThreads(@NotNull DAPClient client, @NotNull List<Integer> threadIds) {
+    }
 
     private final ListTableModel<ThreadInfo> model;
     private final TableView<ThreadInfo> table;
     private final DAPDebugProcess debugProcess;
+    // The client of the DAP session whose threads the panel shows, set on the EDT with them
+    private volatile @Nullable DAPClient client;
 
     public ThreadsPanel(@NotNull DAPDebugProcess debugProcess) {
         this.debugProcess = debugProcess;
 
         this.model = new ListTableModel<>(new NameColumnInfo());
         this.table = new TableView<>(model);
+        if (ActionManager.getInstance().getAction(POPUP_GROUP_ID) instanceof ActionGroup popupGroup) {
+            PopupHandler.installPopupMenu(table, popupGroup, ActionPlaces.getPopupPlace(ID));
+        }
 
         this.addToCenter(ScrollPaneFactory.createScrollPane(table));
     }
@@ -56,9 +88,33 @@ public class ThreadsPanel extends BorderLayoutPanel implements Disposable {
     }
 
     @Override
+    public void uiDataSnapshot(@NotNull DataSink sink) {
+        var threadsClient = client;
+        if (threadsClient != null) {
+            var threadIds = table.getSelectedObjects().stream().map(ThreadInfo::getId).toList();
+            sink.set(SELECTED_THREADS, new SelectedThreads(threadsClient, threadIds));
+        }
+    }
+
+    @Override
     public void dispose() {}
 
+    /**
+     * Shows the given threads of the root session.
+     *
+     * @param threads the threads of the root session.
+     */
     public void refreshThreads(Thread[] threads) {
+        debugProcess.refreshThreads(threads);
+    }
+
+    /**
+     * Shows the given threads, as threads of the given client's DAP session.
+     *
+     * @param client  the client of the DAP session of the threads, or null if it is not known yet.
+     * @param threads the threads.
+     */
+    public void refreshThreads(@Nullable DAPClient client, Thread[] threads) {
         Map<Integer, ThreadInfo> existingById = new HashMap<>();
         for (ThreadInfo info : model.getItems()) {
             existingById.put(info.getId(), info);
@@ -70,7 +126,10 @@ public class ThreadsPanel extends BorderLayoutPanel implements Disposable {
             updated.add(info);
         }
 
-        ApplicationManager.getApplication().invokeLater(() -> model.setItems(updated));
+        ApplicationManager.getApplication().invokeLater(() -> {
+            this.client = client;
+            model.setItems(updated);
+        });
     }
 
     public void refreshThread(ThreadEventArguments args) {

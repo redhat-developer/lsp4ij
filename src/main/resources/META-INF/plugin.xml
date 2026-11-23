@@ -1283,4 +1283,12 @@
                 description="Resume only the thread that steps, while the other threads stay stopped"/>
     </actions>
 
+    <actions resource-bundle="messages.DAPBundle">
+        <!-- The context menu of the "Threads" panel of a DAP debug session, installed by ThreadsPanel -->
+        <group id="DAP.Threads.Popup">
+            <action id="DAP.TerminateThread"
+                    class="com.redhat.devtools.lsp4ij.dap.threads.DAPTerminateThreadAction"/>
+        </group>
+    </actions>
+
 </idea-plugin>
