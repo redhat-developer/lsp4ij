@@ -18,7 +18,11 @@ import com.intellij.openapi.util.TextRange;
 import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.redhat.devtools.lsp4ij.features.completion.SnippetTemplateFactory;
-import com.redhat.devtools.lsp4ij.features.completion.snippet.DefaultLspSnippetHandler;
+import com.redhat.devtools.lsp4ij.features.completion.snippet.AbstractLspSnippetHandler;
+import com.redhat.devtools.lsp4ij.features.completion.snippet.LspSnippetDefaults;
+import com.redhat.devtools.lsp4ij.features.completion.snippet.LspSnippetDefaults.Part;
+import com.redhat.devtools.lsp4ij.features.completion.snippet.LspSnippetDefaults.TabStop;
+import com.redhat.devtools.lsp4ij.features.completion.snippet.LspSnippetDefaults.Text;
 import com.redhat.devtools.lsp4ij.features.completion.snippet.LspSnippetParser;
 import org.eclipse.lsp4j.Range;
 import org.eclipse.lsp4j.SnippetTextEdit;
@@ -27,10 +31,10 @@ import org.eclipse.lsp4j.jsonrpc.messages.Either;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.ArrayDeque;
 import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.Deque;
 import java.util.List;
-import java.util.Map;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
@@ -147,37 +151,116 @@ final class SnippetTextEdits {
     }
 
     /**
-     * Returns the text of the given snippet, in which a placeholder or a choice has its default value, and a tab stop
-     * repeats the default of the placeholder or the choice with its index, wherever that one is, as
-     * {@code ${1:name} = $1} gives {@code name = name}.
+     * Returns the text of the given snippet, in which a tab stop, a placeholder or a choice has the default of its
+     * index, and a variable its value, as in the template that the snippet starts in the selected editor (#2073). So
+     * {@code ${1:name} = $1} gives {@code name = name}. The default of a placeholder is its text with that of its
+     * nested placeholders, as {@code ${1:a ${2:b}} = $1} gives {@code a b = a b}, and the defaults that its tab stops
+     * repeat, as {@code ${1:${2:x}-$2}=$1} gives {@code x-x=x-x}.
      */
     private static @NotNull String textOf(@NotNull String snippet, @NotNull Function<String, String> variables) {
-        Map<Integer, String> defaults = new HashMap<>();
-        new LspSnippetParser(new DefaultLspSnippetHandler(variables, null) {
-            @Override
-            public void startPlaceholder(int index, String name, int level) {
-                defaults.putIfAbsent(index, name);
-            }
+        var text = new SnippetText(variables);
+        new LspSnippetParser(text).parse(snippet);
+        return text.getText();
+    }
 
-            @Override
-            public void choice(int index, List<String> choices) {
-                defaults.putIfAbsent(index, choices.isEmpty() ? "" : choices.get(0));
-            }
-        }).parse(snippet);
-        var handler = new DefaultLspSnippetHandler(variables, null) {
-            @Override
-            public void tabstop(int index) {
-                appendContent(defaults.get(index));
-            }
+    /**
+     * The text of a snippet, in which a tab stop, a placeholder or a choice repeats the default of its index, which
+     * can come later in the snippet, and a variable has its value, or its name for a variable that has none here.
+     */
+    private static class SnippetText extends AbstractLspSnippetHandler {
 
-            @Override
-            public void variable(String name) {
-                String value = resolveVariable(name);
-                super.variable(value != null ? value : name);
+        private final List<Part> parts = new ArrayList<>();
+        private final LspSnippetDefaults defaults = new LspSnippetDefaults();
+        // The placeholders being read, inside out
+        private final Deque<PlaceholderStart> placeholders = new ArrayDeque<>();
+
+        SnippetText(@NotNull Function<String, String> variables) {
+            super(variables, null);
+        }
+
+        @NotNull
+        String getText() {
+            return defaults.getText(parts);
+        }
+
+        @Override
+        public void startSnippet() {
+        }
+
+        @Override
+        public void endSnippet() {
+        }
+
+        @Override
+        public void text(String text) {
+            add(new Text(text));
+        }
+
+        @Override
+        public void tabstop(int index) {
+            // As in the template, $0 repeats nothing
+            if (index != 0) {
+                add(new TabStop(index));
             }
-        };
-        new LspSnippetParser(handler).parse(snippet);
-        return handler.getTemplateContent();
+        }
+
+        @Override
+        public void choice(int index, List<String> choices) {
+            boolean givesDefault = defaults.choice(index, choices);
+            // A choice in a placeholder gives its first value to the text of the placeholder, if it gives the default
+            // of its index. Otherwise it repeats that default, as in VS Code
+            add(placeholders.isEmpty() || !givesDefault
+                    ? new TabStop(index)
+                    : new Text(choices.isEmpty() ? "" : choices.get(0)));
+        }
+
+        @Override
+        public void choice(String name, List<String> choices) {
+            add(new Text(name));
+        }
+
+        @Override
+        public void startPlaceholder(int index, String name, int level) {
+            // The first placeholder of an index to open gives its default, also before a placeholder nested in it
+            placeholders.push(new PlaceholderStart(index, parts.size(), defaults.open(index)));
+            // The text of a placeholder can start with a variable, as in ${1:$TM_FILENAME_BASE}
+            String value = name.startsWith("$") ? resolveVariable(name) : null;
+            add(new Text(value != null ? value : name));
+        }
+
+        @Override
+        public void endPlaceholder(int level) {
+            // The text of the placeholder, with the text of its nested placeholders
+            PlaceholderStart start = placeholders.pop();
+            List<Part> text = parts.subList(start.offset(), parts.size());
+            boolean givesDefault = start.givesDefault() && defaults.close(start.index(), text);
+            if (placeholders.isEmpty() || !givesDefault) {
+                // As in the template, the placeholder has the default of its index, which a placeholder or a choice
+                // before it can give, and a nested placeholder that doesn't give it repeats it
+                text.clear();
+                parts.add(new TabStop(start.index()));
+            }
+        }
+
+        @Override
+        public void variable(String name) {
+            String value = resolveVariable(name);
+            add(new Text(value != null ? value : name));
+        }
+
+        private void add(@NotNull Part part) {
+            // An empty text adds none, so a placeholder without a text, as ${1:}, has no parts
+            if (!(part instanceof Text text && text.value().isEmpty())) {
+                parts.add(part);
+            }
+        }
+    }
+
+    /**
+     * Where the text of a placeholder starts in the parts of its snippet, and whether it gives the default of its
+     * index.
+     */
+    private record PlaceholderStart(int index, int offset, boolean givesDefault) {
     }
 
     private static @NotNull Template createTemplate(@NotNull String snippet,

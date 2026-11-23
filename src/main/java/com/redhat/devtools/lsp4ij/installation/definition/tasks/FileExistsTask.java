@@ -10,6 +10,8 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.installation.definition.tasks;
 
+import com.intellij.openapi.project.Project;
+import com.intellij.openapi.util.text.NaturalComparator;
 import com.redhat.devtools.lsp4ij.installation.definition.InstallerContext;
 import com.redhat.devtools.lsp4ij.installation.definition.InstallerTask;
 import com.redhat.devtools.lsp4ij.installation.definition.ServerInstallerDescriptor;
@@ -20,12 +22,22 @@ import org.jetbrains.annotations.Nullable;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.*;
+import java.util.Comparator;
 import java.util.regex.PatternSyntaxException;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import java.util.stream.StreamSupport;
 
 /**
  * Installer task that checks whether a file exists at a given path.
  * Supports glob patterns (e.g. {@code *.jar}, {@code clangd*}) in any path segment.
+ * <p>
+ * The file it finds is the property {@code ${check.file}} of the tasks that run after it, as its {@code onSuccess}: the
+ * path as written in {@code file}, with its {@code ${key}} properties resolved and its macros, as {@code $USER_HOME$},
+ * kept, and the segments from the first glob on replaced by those of the file found. Of several files that the glob
+ * matches, it is the last in natural order, which compares the numbers in a name by their value, segment by segment:
+ * {@code clangd_19.1.10/bin/clangd} after {@code clangd_19.1.2/bin/clangd}. A check which finds no file removes the
+ * property.
  *
  * <pre>
  * "fileExists": {
@@ -35,6 +47,15 @@ import java.util.stream.Stream;
  * </pre>
  */
 public class FileExistsTask extends InstallerTask {
+
+    /**
+     * The property of the file that the check found, as {@code ${check.file}}.
+     */
+    public static final String CHECK_FILE_PROPERTY = "check.file";
+
+    // The last of several files that a glob matches is the one found, as the highest version of clangd_<version>/
+    private static final Comparator<Path> NATURAL_ORDER = ((Comparator<Path>) FileExistsTask::compareNaturally)
+            .thenComparing(Comparator.naturalOrder());
 
     private final @NotNull String file;
 
@@ -51,54 +72,59 @@ public class FileExistsTask extends InstallerTask {
     @Override
     public boolean run(@NotNull InstallerContext context) {
         // Resolve ${key} template variables
-        String resolvedPath = context.resolveValues(file);
+        String path = context.resolveValues(file);
         // Resolve $USER_HOME$, $PROJECT_DIR$ and other IntelliJ macros
-        resolvedPath = CommandUtils.resolveCommandLine(resolvedPath, context.getProject());
+        String resolvedPath = CommandUtils.resolveCommandLine(path, context.getProject());
 
-        boolean exists;
-
+        String found;
         if (resolvedPath.contains("*") || resolvedPath.contains("?")) {
-            exists = matchesGlob(resolvedPath);
+            found = matchGlob(path, context.getProject());
         } else {
-            exists = Files.isRegularFile(Paths.get(resolvedPath));
+            found = Files.isRegularFile(Paths.get(resolvedPath)) ? path : null;
         }
 
-        if (exists) {
+        if (found != null) {
             context.print("File exists: " + resolvedPath);
-        } else {
-            context.print("File not found: " + resolvedPath);
+            context.putProperty(CHECK_FILE_PROPERTY, found);
+            return true;
         }
-
-        return exists;
+        context.print("File not found: " + resolvedPath);
+        context.removeProperty(CHECK_FILE_PROPERTY);
+        return false;
     }
 
-    private static boolean matchesGlob(@NotNull String globPath) {
-        String normalized = globPath.replace('\\', '/');
-
+    /**
+     * Returns the file that the given glob path matches, as written in the given path, with the segments from the first
+     * glob on replaced by those of the file, and the last in natural order of several.
+     */
+    private static @Nullable String matchGlob(@NotNull String globPath, @Nullable Project project) {
         // Find the position of the first glob character
         int firstGlobPos = -1;
-        for (int i = 0; i < normalized.length(); i++) {
-            char c = normalized.charAt(i);
+        for (int i = 0; i < globPath.length(); i++) {
+            char c = globPath.charAt(i);
             if (c == '*' || c == '?') {
                 firstGlobPos = i;
                 break;
             }
         }
         if (firstGlobPos < 0) {
-            return false;
+            return null;
         }
 
         // Split into base directory (before glob) and glob pattern (from glob segment onwards)
-        int baseDirEnd = normalized.lastIndexOf('/', firstGlobPos);
+        int baseDirEnd = Math.max(globPath.lastIndexOf('/', firstGlobPos), globPath.lastIndexOf('\\', firstGlobPos));
         if (baseDirEnd < 0) {
-            return false;
+            return null;
         }
 
-        Path baseDir = Paths.get(normalized.substring(0, baseDirEnd));
-        String globPattern = normalized.substring(baseDirEnd + 1);
+        String base = globPath.substring(0, baseDirEnd);
+        String separator = globPath.substring(baseDirEnd, baseDirEnd + 1);
+        Path baseDir = Paths.get(CommandUtils.resolveCommandLine(base, project).replace('\\', '/'));
+        String globPattern = CommandUtils.resolveCommandLine(globPath.substring(baseDirEnd + 1), project)
+                .replace('\\', '/');
 
         if (!Files.isDirectory(baseDir)) {
-            return false;
+            return null;
         }
 
         // ** can match any number of directories, so don't limit depth
@@ -111,14 +137,27 @@ public class FileExistsTask extends InstallerTask {
             return files
                     .filter(p -> !p.equals(baseDir))
                     .filter(Files::isRegularFile)
-                    .anyMatch(p -> {
-                        Path relative = baseDir.relativize(p);
-                        // Normalize to forward slashes for consistent matching
-                        String relativePath = relative.toString().replace('\\', '/');
-                        return matcher.matches(Paths.get(relativePath));
-                    });
+                    .map(baseDir::relativize)
+                    // Normalize to forward slashes for consistent matching
+                    .filter(relative -> matcher.matches(Paths.get(relative.toString().replace('\\', '/'))))
+                    .max(NATURAL_ORDER)
+                    .map(relative -> base + separator + StreamSupport.stream(relative.spliterator(), false)
+                            .map(Path::toString)
+                            .collect(Collectors.joining(separator)))
+                    .orElse(null);
         } catch (IOException | UncheckedIOException | PatternSyntaxException e) {
-            return false;
+            return null;
         }
+    }
+
+    private static int compareNaturally(@NotNull Path first, @NotNull Path second) {
+        int count = Math.min(first.getNameCount(), second.getNameCount());
+        for (int i = 0; i < count; i++) {
+            int result = NaturalComparator.INSTANCE.compare(first.getName(i).toString(), second.getName(i).toString());
+            if (result != 0) {
+                return result;
+            }
+        }
+        return Integer.compare(first.getNameCount(), second.getNameCount());
     }
 }

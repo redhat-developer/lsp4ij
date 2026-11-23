@@ -14,11 +14,9 @@
 package com.redhat.devtools.lsp4ij.inspections;
 
 import com.intellij.codeInspection.LocalInspectionTool;
-import com.intellij.codeInspection.ui.InspectionOptionsPanel;
-import com.intellij.codeInspection.ui.ListEditForm;
+import com.intellij.codeInspection.options.OptPane;
 import org.jetbrains.annotations.NotNull;
 
-import javax.swing.*;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -40,13 +38,11 @@ public abstract class AbstractDelegateInspectionWithExclusions extends LocalInsp
     //Field is public, so it can be serialized as XML
     public final @NotNull List<String> excludeList = new ArrayList<>();
 
-    public JComponent createOptionsPanel() {
-        InspectionOptionsPanel panel = new InspectionOptionsPanel();
-
-        var injectionListTable = new ListEditForm("", exclusionsLabel, excludeList);
-
-        panel.addGrowing(injectionListTable.getContentPanel());
-
-        return panel;
+    /**
+     * The options: the exclusions, which the pane binds to {@link #excludeList} by its name, and edits in place.
+     */
+    @Override
+    public @NotNull OptPane getOptionsPane() {
+        return OptPane.pane(OptPane.stringList("excludeList", exclusionsLabel));
     }
 }

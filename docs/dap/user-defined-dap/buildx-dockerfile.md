@@ -23,7 +23,8 @@ You will need Buildx v0.28.0. You can get Buildx by [installing Docker Desktop](
 
 ![Select the Dockerfile Build Debugging template](../images/buildx-dockerfile/setup-03-template-selection.png)
 
-4. In 'Environment variables:', enter in `BUILDX_EXPERIMENTAL=1`.
+4. The template fills 'Environment variables:' with `BUILDX_EXPERIMENTAL=1`, and the command with `docker buildx dap build`
+   (`docker.exe buildx dap build` on Windows).
 
 ![Set the environment variable in the dialog](../images/buildx-dockerfile/setup-04-env-var.png)
 

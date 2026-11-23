@@ -7,12 +7,18 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.settings;
 
+import com.intellij.openapi.application.PathManager;
 import com.intellij.openapi.options.ConfigurationException;
 import com.intellij.openapi.util.Disposer;
+import com.intellij.openapi.vfs.newvfs.impl.VfsRootAccess;
 import com.intellij.testFramework.fixtures.BasePlatformTestCase;
+import com.intellij.ui.components.JBLabel;
+import com.intellij.ui.components.JBRadioButton;
+import com.intellij.util.ui.UIUtil;
 import com.redhat.devtools.lsp4ij.LanguageServerBundle;
 import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
 import com.redhat.devtools.lsp4ij.launching.UserDefinedLanguageServerSettings;
+import com.redhat.devtools.lsp4ij.launching.templates.LanguageServerTemplateManager;
 import com.redhat.devtools.lsp4ij.mock.MockLanguageServerDefinition;
 import com.redhat.devtools.lsp4ij.server.definition.launching.UserDefinedLanguageServerDefinition;
 import com.redhat.devtools.lsp4ij.server.definition.launching.UserDefinedTransport;
@@ -29,6 +35,8 @@ import java.util.UUID;
 public class LanguageServerViewTransportTest extends BasePlatformTestCase {
 
     private static final UserDefinedTransport ACCEPT = new UserDefinedTransport(UserDefinedTransport.Mode.START_AND_ACCEPT, null, 0);
+    // typescript-language-server talks only over stdio
+    private static final String TYPESCRIPT_TEMPLATE = "typescript-language-server";
 
     private UserDefinedLanguageServerDefinition definition;
     private LanguageServerView view;
@@ -189,7 +197,115 @@ public class LanguageServerViewTransportTest extends BasePlatformTestCase {
         throw new AssertionError("apply() saved settings with problems");
     }
 
+    public void testASavedSocketOfALanguageServerWhoseTemplateListsOnlyStdioIsShownWithAWarningAndSaved()
+            throws ConfigurationException {
+        var fromTemplate = fromStdioOnlyTemplate("node my-server.js --socket=${port}", ACCEPT);
+        var page = new LanguageServerView(fromTemplate, null, false, getProject());
+        try {
+            page.reset();
+
+            assertEquals(ACCEPT, page.getTransport());
+            assertFalse(page.isModified());
+            var socket = radio(page, "language.server.transport.socket");
+            assertTrue(socket.isSelected());
+            assertTrue(socket.isEnabled());
+            assertTrue("the hint stays", label(page, "language.server.transport.stdio.only").isVisible());
+            var problems = page.validateFields();
+            assertEquals(1, problems.size());
+            assertEquals(LanguageServerBundle.message("language.server.validation.socket.stdio.only"),
+                    problems.get(0).message);
+            assertSame(socket, problems.get(0).component);
+            assertTrue(problems.get(0).warning);
+
+            // a warning, which doesn't block Apply
+            var connect = new UserDefinedTransport(UserDefinedTransport.Mode.START_AND_CONNECT, null, 4389);
+            page.setTransport(connect);
+            page.apply();
+
+            assertEquals(connect, settings(fromTemplate).getTransport());
+            assertEquals(connect, fromTemplate.getTransport());
+        } finally {
+            Disposer.dispose(page);
+            LanguageServersRegistry.getInstance().removeServerDefinition(getProject(), fromTemplate);
+        }
+    }
+
+    public void testASocketChosenForALanguageServerWhoseTemplateListsOnlyStdioIsAWarningAndSaved()
+            throws ConfigurationException {
+        var fromTemplate = fromStdioOnlyTemplate("node my-server.js --stdio", UserDefinedTransport.STDIO);
+        var page = new LanguageServerView(fromTemplate, null, false, getProject());
+        try {
+            page.reset();
+            assertEmpty(page.validateFields());
+
+            radio(page, "language.server.transport.socket").doClick();
+
+            assertEquals(ACCEPT, page.getTransport());
+            String warning = LanguageServerBundle.message("language.server.validation.socket.stdio.only");
+            // next to the error of the command, which the template has no socket argument to swap in
+            assertEquals(List.of(LanguageServerBundle.message("language.server.validation.socket.port.macro",
+                            UserDefinedTransport.PORT_MACRO), warning),
+                    page.validateFields().stream().map(problem -> problem.message).toList());
+            page.setCommandLine("node my-server.js --socket=${port}");
+            assertEquals(List.of(warning), page.validateFields().stream().map(problem -> problem.message).toList());
+            page.apply();
+            assertEquals(ACCEPT, settings(fromTemplate).getTransport());
+        } finally {
+            Disposer.dispose(page);
+            LanguageServersRegistry.getInstance().removeServerDefinition(getProject(), fromTemplate);
+        }
+    }
+
+    public void testASocketOfALanguageServerWithoutATemplateIsNoWarning() {
+        assertEquals(ACCEPT, view.getTransport());
+        assertEmpty(view.validateFields());
+    }
+
+    /**
+     * Adds a language server created from the TypeScript template, which lists only stdio, with the given command and
+     * transport, and returns it.
+     */
+    private @NotNull UserDefinedLanguageServerDefinition fromStdioOnlyTemplate(
+            @NotNull String command, @NotNull UserDefinedTransport transport) {
+        // The bundled templates are read from the jar of LSP4IJ in the test sandbox, which is outside the roots that a
+        // test may read when the checkout isn't in the user's home directory
+        String templates = PathManager.getResourceRoot(LanguageServerTemplateManager.class, "/templates/lsp");
+        assertNotNull(templates);
+        VfsRootAccess.allowRootAccess(getTestRootDisposable(), templates);
+        var template = LanguageServerTemplateManager.getInstance().findTemplateById(TYPESCRIPT_TEMPLATE);
+        assertNotNull(template);
+        assertTrue("the template lists only stdio", template.getSupportedTransports().stream()
+                .allMatch(support -> support.mode() == UserDefinedTransport.Mode.STDIO));
+        var fromTemplate = new UserDefinedLanguageServerDefinition(UUID.randomUUID().toString(), TYPESCRIPT_TEMPLATE,
+                "My TypeScript server", null, null, command, null, Map.of(), false, null, false, null, null, null, null,
+                null, null);
+        fromTemplate.setTransport(transport);
+        LanguageServersRegistry.getInstance().addServerDefinition(getProject(), fromTemplate, List.of());
+        return fromTemplate;
+    }
+
+    private static @NotNull JBRadioButton radio(@NotNull LanguageServerView page, @NotNull String key) {
+        String text = LanguageServerBundle.message(key);
+        return UIUtil.findComponentsOfType(page.getComponent(), JBRadioButton.class).stream()
+                .filter(button -> text.equals(button.getText()))
+                .findFirst()
+                .orElseThrow(() -> new AssertionError("No radio button " + text));
+    }
+
+    private static @NotNull JBLabel label(@NotNull LanguageServerView page, @NotNull String key) {
+        String text = LanguageServerBundle.message(key);
+        return UIUtil.findComponentsOfType(page.getComponent(), JBLabel.class).stream()
+                .filter(label -> text.equals(label.getText()))
+                .findFirst()
+                .orElseThrow(() -> new AssertionError("No label " + text));
+    }
+
     private UserDefinedLanguageServerSettings.UserDefinedLanguageServerItemSettings settings() {
+        return settings(definition);
+    }
+
+    private static UserDefinedLanguageServerSettings.UserDefinedLanguageServerItemSettings settings(
+            @NotNull UserDefinedLanguageServerDefinition definition) {
         return UserDefinedLanguageServerSettings.getInstance().getUserDefinedLanguageServerSettings(definition.getId());
     }
 }

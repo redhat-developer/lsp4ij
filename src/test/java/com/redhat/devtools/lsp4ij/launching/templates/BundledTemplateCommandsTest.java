@@ -12,6 +12,7 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.redhat.devtools.lsp4ij.server.definition.launching.CommandUtils;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
@@ -26,7 +27,9 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
@@ -51,6 +54,7 @@ public class BundledTemplateCommandsTest {
 
     private static final String HOME = "C:/Users/Jane Doe";
     private static final Pattern PROPERTY = Pattern.compile("\\$\\{([\\w.]+)}");
+    private static final Pattern QUOTED = Pattern.compile("\"([^\"]+)\"");
     /**
      * A folder under {@code ~/.lsp4ij}: {@code lsp} or {@code dap}, and the folder of the server in it, if there is one.
      */
@@ -60,6 +64,21 @@ public class BundledTemplateCommandsTest {
             "lsp/vscode-eslint-language-server", "vscode-langservers-extracted");
 
     private static final Pattern INSTALL_FOLDER = Pattern.compile("\\.lsp4ij/([^/\"\\\\$]*)(?:/([^/\"\\\\$]*))?");
+
+    /**
+     * The templates whose command has no fixed path, which the check of their installer gives them once it finds the
+     * server installed (#2011), with the root folder of the archive of their download, if it has one, which the download
+     * adds to {@code ${output.dir}}, as {@code clangd_snapshot_20250518/} in {@code clangd-mac-snapshot_20250518.zip}.
+     */
+    private static final Map<String, String> CHECKS_WHICH_GIVE_THE_COMMAND = Map.of(
+            "lsp/clangd", "clangd_snapshot_20250518",
+            "lsp/camel-lsp-server", "",
+            "lsp/ada_language_server", "integration",
+            "lsp/rust-analyzer", "",
+            "lsp/wgsl-analyzer", "",
+            "dap/codelldb", "",
+            "dap/perl-dap", "",
+            "dap/vscode-js-debug", "js-debug");
 
     @Test
     void shRunsTheWholeCommandWhereABundledTemplateUsesIt() throws IOException, URISyntaxException {
@@ -92,6 +111,8 @@ public class BundledTemplateCommandsTest {
                 }
                 collectInstallation(json, properties, fileCommands);
                 properties.put("output.file.name", "server");
+                // The file that the check found
+                properties.put("check.file", "$USER_HOME$/.lsp4ij/server");
             }
             for (String command : fileCommands) {
                 String expanded = resolve(command, properties)
@@ -141,6 +162,97 @@ public class BundledTemplateCommandsTest {
     }
 
     /**
+     * A template whose server has no fixed path, as clangd, whose archive has a folder named after the version of clangd,
+     * or rust-analyzer, a file by architecture, keeps the command of its template when the check of its installer finds
+     * the server installed, since the download doesn't run: so the check gives it the command that the download gives,
+     * with the file that it found, {@code ${check.file}}, for each OS and architecture. Only while the server has the
+     * command of its template, as when the user didn't change it (#2011).
+     */
+    @Test
+    void aPassingCheckGivesTheServerTheCommandThatItsDownloadGivesIt() throws IOException, URISyntaxException {
+        var files = bundledFiles();
+        List<String> checked = new ArrayList<>();
+        List<String> problems = new ArrayList<>();
+        CHECKS_WHICH_GIVE_THE_COMMAND.forEach((server, archiveRoot) -> {
+            var template = files.get(server + "/template.json");
+            var installer = files.get(server + "/installer.json");
+            assertNotNull(template, server);
+            assertNotNull(installer, server);
+            Map<String, String> properties = new HashMap<>();
+            installer.getAsJsonObject("properties").entrySet()
+                    .forEach(property -> properties.put(property.getKey(), property.getValue().getAsString()));
+            var fileExists = installer.getAsJsonObject("check").getAsJsonObject("fileExists");
+            var onSuccess = fileExists.getAsJsonObject("onSuccess");
+            if (onSuccess == null || !onSuccess.has("replaceTemplateCommand")) {
+                problems.add(server + ": the check gives no command");
+                return;
+            }
+            var checkConfigure = onSuccess.getAsJsonObject("replaceTemplateCommand");
+            var download = installer.getAsJsonObject("run").getAsJsonObject("download");
+            var output = download.getAsJsonObject("output");
+            var outputFile = output.getAsJsonObject("file");
+            var downloadConfigure = download.getAsJsonObject("onSuccess").getAsJsonObject("configureServer");
+            var templateCommand = template.get(server.startsWith("dap/") ? "launch" : "programArgs");
+            for (String os : List.of("windows", "mac", "unix")) {
+                Set<String> architectures = new TreeSet<>(architectures(fileExists.get("file"), os));
+                architectures.addAll(architectures(outputFile != null ? outputFile.get("name") : null, os));
+                architectures.addAll(architectures(download.get("url"), os));
+                for (String arch : architectures) {
+                    String platform = server + " (" + os + (arch.isEmpty() ? "" : ", " + arch) + ")";
+                    String file = forPlatform(fileExists.get("file"), os, arch);
+                    String fileName = outputFile != null ? forPlatform(outputFile.get("name"), os, arch) : null;
+                    String url = forPlatform(download.get("url"), os, arch);
+                    if (fileName == null && url != null && !url.matches(".*\\.(zip|vsix|tar|gz|tgz|txz|xz)")) {
+                        // Without a file name, the download keeps the name of the file of its URL, which isn't unpacked
+                        fileName = url.substring(url.lastIndexOf('/') + 1);
+                    }
+                    if (file == null) {
+                        if (fileName != null) {
+                            problems.add(platform + ": the check looks for no file, the download installs " + fileName);
+                        }
+                        continue;
+                    }
+                    checked.add(platform);
+                    Map<String, String> downloaded = new HashMap<>(properties);
+                    downloaded.put("output.dir", resolve(output.get("dir").getAsString(), properties)
+                            + (archiveRoot.isEmpty() ? "" : "/" + archiveRoot));
+                    if (fileName != null) {
+                        downloaded.put("output.file.name", fileName);
+                    }
+                    String downloadCommand = resolve(forPlatform(downloadConfigure.get("command"), os, arch), downloaded);
+                    // The server that the download installed, which its command starts
+                    Matcher quoted = QUOTED.matcher(downloadCommand);
+                    if (!quoted.find()) {
+                        problems.add(platform + ": the download gives no path in quotes: " + downloadCommand);
+                        continue;
+                    }
+                    String installed = quoted.group(1);
+                    String lookedFor = resolve(file, properties);
+                    if (!matchesGlob(lookedFor, installed)) {
+                        problems.add(platform + ": the check looks for " + lookedFor + ", the download installs " + installed);
+                    }
+
+                    Map<String, String> found = new HashMap<>(properties);
+                    found.put("check.file", installed);
+                    String checkCommand = resolve(forPlatform(checkConfigure.get("command"), os, arch), found);
+                    if (!checkCommand.equals(downloadCommand)) {
+                        problems.add(platform + ": the check gives " + checkCommand + ", the download " + downloadCommand);
+                    }
+
+                    String replaced = forPlatform(checkConfigure.get("templateCommand"), os, arch);
+                    String ofTemplate = forPlatform(templateCommand, os, arch);
+                    if (!Objects.equals(replaced, ofTemplate)) {
+                        problems.add(platform + ": the check replaces the command " + replaced
+                                + ", the template has " + ofTemplate);
+                    }
+                }
+            }
+        });
+        assertTrue(checked.size() > 20, "the OS and architectures of the templates: " + checked);
+        assertEquals(List.of(), problems, "the check of an installer should give the command that its download gives");
+    }
+
+    /**
      * An installer puts its language server or debug adapter in {@code ~/.lsp4ij/lsp} or {@code ~/.lsp4ij/dap}, in a
      * folder of its own, named after its template, as {@code ~/.lsp4ij/dap/perl-dap} for the debug adapter
      * {@code perl-dap}, and the files of the template, as its command or its initialization options, take it from
@@ -180,6 +292,55 @@ public class BundledTemplateCommandsTest {
         });
         assertTrue(folders.size() > 30, "the folders of the installers and of the templates: " + folders);
         assertEquals(List.of(), problems, "install a server in ~/.lsp4ij/lsp or ~/.lsp4ij/dap, in the folder of its template");
+    }
+
+    /**
+     * An {@code npm install} of an installer runs in the {@code node_modules} folder of its server, as
+     * {@code ~/.lsp4ij/lsp/typescript-language-server/node_modules}. npm installs into the first folder, from its
+     * working directory up, that has a {@code package.json} or a {@code node_modules} folder: from a
+     * {@code node_modules} folder, that's the folder of the server. From the folder of the server itself, a
+     * {@code package.json} in the home directory takes the install, and the command that the installer gives the
+     * language server doesn't find it (#1960).
+     */
+    @Test
+    void anNpmInstallRunsInTheNodeModulesFolderOfItsServer() throws IOException, URISyntaxException {
+        List<String> installs = new ArrayList<>();
+        List<String> problems = new ArrayList<>();
+        bundledFiles().forEach((file, json) -> {
+            if (!file.endsWith("/installer.json")) {
+                return;
+            }
+            Map<String, String> properties = new HashMap<>();
+            var declared = json.getAsJsonObject("properties");
+            if (declared != null) {
+                declared.entrySet().forEach(property -> properties.put(property.getKey(),
+                        property.getValue().getAsString()));
+            }
+            collectNpmInstalls(json, file, properties, installs, problems);
+        });
+        assertTrue(installs.size() > 5, "the npm installs of the installers: " + installs);
+        assertEquals(List.of(), problems, "run npm install in the node_modules folder of the server");
+    }
+
+    private static void collectNpmInstalls(@NotNull JsonElement json, @NotNull String file,
+                                           @NotNull Map<String, String> properties, @NotNull List<String> installs,
+                                           @NotNull List<String> problems) {
+        if (!json.isJsonObject()) {
+            return;
+        }
+        JsonObject object = json.getAsJsonObject();
+        if (object.has("command") && object.has("workingDir")) {
+            List<String> commands = new ArrayList<>();
+            collectByOs(object.get("command"), commands);
+            if (commands.stream().anyMatch(command -> command.matches("npm(\\.cmd)? install .*"))) {
+                String workingDir = resolve(object.get("workingDir").getAsString(), properties);
+                installs.add(file + ": " + workingDir);
+                if (!workingDir.endsWith("/node_modules")) {
+                    problems.add(file + ": " + workingDir);
+                }
+            }
+        }
+        object.entrySet().forEach(entry -> collectNpmInstalls(entry.getValue(), file, properties, installs, problems));
     }
 
     /**
@@ -231,6 +392,53 @@ public class BundledTemplateCommandsTest {
         throw new AssertionError("No value for " + os + " in " + value);
     }
 
+    /**
+     * Returns the value for the given OS, {@code windows}, {@code mac} or {@code unix}, and architecture, as
+     * {@code arm64}, or empty, of a value that can differ by OS and architecture, as an installer takes it: for the OS,
+     * or else {@code default}, then for the architecture, or else {@code default}.
+     */
+    private static @Nullable String forPlatform(@Nullable JsonElement value, @NotNull String os, @NotNull String arch) {
+        JsonElement forArch = forKey(forKey(value, os), arch);
+        return forArch != null && forArch.isJsonPrimitive() ? forArch.getAsString() : null;
+    }
+
+    /**
+     * Returns the architectures for which a value that can differ by OS and architecture differs on the given OS, or
+     * only the empty architecture if it doesn't differ by architecture there.
+     */
+    private static @NotNull Set<String> architectures(@Nullable JsonElement value, @NotNull String os) {
+        JsonElement forOs = forKey(value, os);
+        return forOs != null && forOs.isJsonObject() ? forOs.getAsJsonObject().keySet() : Set.of("");
+    }
+
+    /**
+     * Returns the value for the given key, as an OS, or else for {@code default}, of a value by key, or the value itself
+     * if it isn't by key.
+     */
+    private static @Nullable JsonElement forKey(@Nullable JsonElement value, @NotNull String key) {
+        if (value == null || !value.isJsonObject()) {
+            return value;
+        }
+        var byKey = value.getAsJsonObject();
+        return byKey.has(key) ? byKey.get(key) : byKey.get("default");
+    }
+
+    /**
+     * Returns true if the given path matches the given path of the check of an installer, whose globs {@code *} and
+     * {@code ?} match within one segment.
+     */
+    private static boolean matchesGlob(@NotNull String glob, @NotNull String path) {
+        StringBuilder regex = new StringBuilder();
+        for (char c : glob.toCharArray()) {
+            regex.append(switch (c) {
+                case '*' -> "[^/]*";
+                case '?' -> "[^/]";
+                default -> Pattern.quote(String.valueOf(c));
+            });
+        }
+        return path.matches(regex.toString());
+    }
+
     private static @NotNull String resolve(@NotNull String text, @NotNull Map<String, String> properties) {
         String resolved = text;
         for (int i = 0; i < 5; i++) {
@@ -247,7 +455,7 @@ public class BundledTemplateCommandsTest {
             return;
         }
         json.getAsJsonObject().entrySet().forEach(entry -> {
-            if (entry.getKey().equals("configureServer")) {
+            if (entry.getKey().equals("configureServer") || entry.getKey().equals("replaceTemplateCommand")) {
                 collectByOs(entry.getValue().getAsJsonObject().get("command"), commands);
             } else if (entry.getKey().equals("output") && entry.getValue().isJsonObject()
                     && entry.getValue().getAsJsonObject().has("dir")) {

@@ -343,8 +343,10 @@ handler's `getProcessInput()`.
 ## Install the DAP server
 
 A factory whose `createServerInstaller()` returns a `ServerInstaller` lets LSP4IJ install the DAP server before a debug
-session needs it: the runner checks the installation first and shows its progress in the console. See
-[Install language server](../DeveloperGuide.md#install-language-server) for how to write an installer.
+session needs it: the runner checks the installation first and shows its progress in the console. LSP4IJ asks the
+factory for the installer once, so once the installer reports the DAP server installed, the next debug sessions start
+at once. See [Language server installer](../LSPApi.md#language-server-installer) for how to write an installer, and
+[Install language server](../DeveloperGuide.md#install-language-server) for how it runs.
 
 # Launch and attach
 

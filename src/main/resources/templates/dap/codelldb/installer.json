@@ -10,6 +10,16 @@
       "file": {
         "windows": "${serverDist}/extension/adapter/codelldb.exe",
         "default": "${serverDist}/extension/adapter/codelldb"
+      },
+      "onSuccess": {
+        "replaceTemplateCommand": {
+          "name": "Configure CodeLLDB server command",
+          "templateCommand": {
+            "windows": "<<insert base directory>>/extension/adapter/codelldb.exe",
+            "default": "<<insert base directory>>/extension/adapter/codelldb"
+          },
+          "command": "\"${check.file}\""
+        }
       }
     }
   },

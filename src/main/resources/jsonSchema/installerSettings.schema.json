@@ -13,7 +13,9 @@
           { "$ref": "#/definitions/fileExists" },
           { "$ref": "#/definitions/exec" },
           { "$ref": "#/definitions/initialize" },
-          { "$ref": "#/definitions/showMessage" }
+          { "$ref": "#/definitions/showMessage" },
+          { "$ref": "#/definitions/configureServer" },
+          { "$ref": "#/definitions/replaceTemplateCommand" }
         ]
       }
     }
@@ -27,6 +29,7 @@
           "properties": {
             "name": { "type": "string" },
             "file": {
+              "description": "The file to look for, by OS. A segment can have the globs * and ?, as clangd* for a folder named after its version. The file found is ${check.file} for the tasks after it, as its onSuccess: the path as written, with the macros as $USER_HOME$ kept, and of several files that a glob matches, the last in natural order, as clangd_19.1.10 after clangd_19.1.2.",
               "anyOf": [
                 { "type": "string" },
                 {
@@ -39,6 +42,12 @@
                   },
                   "additionalProperties": false
                 }
+              ]
+            },
+            "onSuccess": {
+              "anyOf": [
+                { "$ref": "#/definitions/replaceTemplateCommand" },
+                { "$ref": "#/definitions/configureServer" }
               ]
             }
           },
@@ -124,6 +133,52 @@
               ]
             }
           }
+        }
+      }
+    },
+    "configureServer": {
+      "type": "object",
+      "properties": {
+        "configureServer": {
+          "type": "object",
+          "properties": {
+            "name": { "type": "string" },
+            "command": {
+              "description": "The command of the server, by OS, with the properties of the tasks before it, as ${output.dir} and ${output.file.name} of a download, or ${check.file} of a fileExists.",
+              "anyOf": [
+                { "type": "string" },
+                { "type": "object" }
+              ]
+            },
+            "update": { "type": "boolean" }
+          },
+          "required": ["command"]
+        }
+      }
+    },
+    "replaceTemplateCommand": {
+      "type": "object",
+      "properties": {
+        "replaceTemplateCommand": {
+          "type": "object",
+          "properties": {
+            "name": { "type": "string" },
+            "templateCommand": {
+              "description": "The command of the template, by OS, compared as written: the task changes the command of the server only while it is this one, and otherwise leaves it and succeeds.",
+              "anyOf": [
+                { "type": "string" },
+                { "type": "object" }
+              ]
+            },
+            "command": {
+              "description": "The command that replaces the command of the template, by OS, as \"${check.file}\" with the file that a fileExists found.",
+              "anyOf": [
+                { "type": "string" },
+                { "type": "object" }
+              ]
+            }
+          },
+          "required": ["templateCommand", "command"]
         }
       }
     },

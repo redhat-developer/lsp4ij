@@ -109,4 +109,15 @@ public class SnippetTemplateLoaderTest extends LSPCompletionFixtureTestCase {
                 4
         );
     }
+
+    public void testUseTemplateForInvocationOnlyTemplate_disabled_invocation_tabStopOfAnArgument() {
+        // $1 repeats the first argument: the template keeps its variables (#2073)
+        assertUseTemplateForInvocationOnlyTemplate(
+                false,
+                ".pow(${1:x}, ${2:y}) /* $1 */$0",
+                ".pow(, ) /*  */<end>",
+                2,
+                4
+        );
+    }
 }

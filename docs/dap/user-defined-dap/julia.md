@@ -2,7 +2,7 @@
 
 To debug [Julia](https://julialang.org/) files, you can use the [Julia](https://github.com/julia-vscode/DebugAdapter.jl) DAP server.
 
-Let’s debug the following `test.julia` file:
+Let’s debug the following `test.jl` file:
 
 ```julia
 function main()
@@ -34,10 +34,10 @@ using DebugAdapter
 using Logging
 
 function start_debugger()
-try
-server_port = parse(Int, ARGS[1])
-server = Sockets.listen(server_port)
-println("Listening on port $server_port")
+    try
+        server_port = parse(Int, ARGS[1])
+        server = Sockets.listen(server_port)
+        println("Listening on port $server_port")
 
         conn = Sockets.accept(server)
         println("Client connected")

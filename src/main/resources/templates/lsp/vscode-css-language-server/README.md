@@ -5,4 +5,10 @@ You can use [Visual Studio Code's CSS language server](https://github.com/micros
 The command starts the CSS language server where the installer puts it:
 > **$USER_HOME$/.lsp4ij/lsp/vscode-langservers-extracted/node_modules/vscode-langservers-extracted/lib/css-language-server/node/cssServerMain.js**
 
+The ESLint Language Server template installs the same package into the same folder.
+
 If you installed vscode-langservers-extracted somewhere else, change the path of **cssServerMain.js** in the command.
+
+The server talks LSP over its standard input and output (**--stdio**), or over a socket: set **Transport** to
+**Socket** with **Start the language server, it connects to LSP4IJ**, and LSP4IJ replaces **--stdio** with
+**--socket=${port}** in the command.

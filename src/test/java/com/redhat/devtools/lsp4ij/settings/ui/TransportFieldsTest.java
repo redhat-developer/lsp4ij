@@ -142,13 +142,45 @@ public class TransportFieldsTest extends LightPlatformTestCase {
         assertTrue(label("language.server.socket.port.attach.hint").isVisible());
     }
 
-    public void testALanguageServerWhichTalksOnlyOverStdioCanNotBeGivenASocket() {
+    public void testASocketForALanguageServerWhichTalksOnlyOverStdioIsAWarningWhichDoesNotBlockOk() {
         assertFalse(label("language.server.transport.stdio.only").isVisible());
 
         fields.setSupportedTransports(List.of(new TransportSupport(UserDefinedTransport.Mode.STDIO, "--stdio")));
 
-        assertFalse(radio("language.server.transport.socket").isEnabled());
+        // the template may be the starting point of a language server of one's own, which does talk over a socket
+        assertTrue(radio("language.server.transport.socket").isEnabled());
         assertTrue(label("language.server.transport.stdio.only").isVisible());
+        assertNull("stdio is what the template lists", fields.validateForTemplate());
+
+        radio("language.server.transport.socket").doClick();
+
+        var warning = fields.validateForTemplate();
+        assertNotNull(warning);
+        assertEquals(message("language.server.validation.socket.stdio.only"), warning.message);
+        assertSame(radio("language.server.transport.socket"), warning.component);
+        assertTrue(warning.warning);
+        assertTrue(warning.okEnabled);
+        assertTrue("the hint stays", label("language.server.transport.stdio.only").isVisible());
+
+        radio("language.server.transport.stdio").doClick();
+
+        assertNull(fields.validateForTemplate());
+    }
+
+    public void testASavedSocketOfALanguageServerWhichTalksOnlyOverStdioStaysChosenWithAWarning() {
+        var connect = new UserDefinedTransport(UserDefinedTransport.Mode.START_AND_CONNECT, null, 4389);
+        fields.setTransport(connect);
+
+        // as when the settings of a language server open: the saved transport first, then its template's transports
+        fields.setSupportedTransports(List.of(new TransportSupport(UserDefinedTransport.Mode.STDIO, "--stdio")));
+
+        assertEquals(connect, fields.getTransport());
+        assertTrue(radio("language.server.transport.socket").isSelected());
+        assertTrue(radio("language.server.transport.socket").isEnabled());
+        assertNull(fields.validate());
+        var warning = fields.validateForTemplate();
+        assertNotNull(warning);
+        assertEquals(message("language.server.validation.socket.stdio.only"), warning.message);
     }
 
     public void testASocketWhichTheTemplateListsHasAHint() {
@@ -163,6 +195,16 @@ public class TransportFieldsTest extends LightPlatformTestCase {
         radio("language.server.transport.socket").doClick();
 
         assertTrue(labelWithText(hint).isVisible());
+        assertNull("the template lists the socket", fields.validateForTemplate());
+    }
+
+    public void testATemplateWhichListsOnlyASocketGivesNoWarningForTheSocket() {
+        fields.setSupportedTransports(List.of(new TransportSupport(UserDefinedTransport.Mode.START_AND_CONNECT, null)));
+
+        radio("language.server.transport.socket").doClick();
+
+        assertFalse(label("language.server.transport.stdio.only").isVisible());
+        assertNull(fields.validateForTemplate());
     }
 
     public void testWithoutAWordFromTheTemplateEveryTransportCanBeChosenWithoutAHint() {
@@ -173,6 +215,7 @@ public class TransportFieldsTest extends LightPlatformTestCase {
         assertFalse(label("language.server.transport.stdio.only").isVisible());
         assertTrue(UIUtil.findComponentsOfType(form, JBLabel.class).stream()
                 .noneMatch(label -> label.isVisible() && label.getText().startsWith("This language server takes")));
+        assertNull("nor a warning", fields.validateForTemplate());
     }
 
     public void testTheHostOfARunningLanguageServerIsAPlainHostNameOrIpAddress() {

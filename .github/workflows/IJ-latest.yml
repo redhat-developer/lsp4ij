@@ -10,8 +10,15 @@ on:
 
 jobs:
 
-  build:
+  # Finds the newest IntelliJ IDEA build, which the job build tests, and whether ci.yml is behind the newest release,
+  # which the job newest-release then tests
+  discover:
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.latest.outputs.version }}
+      behind: ${{ steps.latest.outputs.behind }}
+      newest-release: ${{ steps.latest.outputs.newest-release }}
+      ci-release: ${{ steps.latest.outputs.ci-release }}
 
     steps:
       # Check out current repository
@@ -29,10 +36,91 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v5
 
-      - name: Build with Gradle
+      # The newest build of the unified IntelliJ IDEA (IU): the current EAP if there is one, else the newest release.
+      # From 2025.3 on, the list of releases has only IntelliJ IDEA (IU), so only IU has the newest builds; the IntelliJ
+      # Maven repository still has IC.
+      # build.gradle.kts takes the IDE from the IntelliJ Maven repository (useInstaller = false), where a release has
+      # its version, such as 2026.3, and an EAP, RC or other preview build is '<build number>-EAP-SNAPSHOT'.
+      - name: Find the newest IntelliJ IDEA
+        id: latest
         run: |
-          LATEST_EAP_SNAPSHOT=$(./gradlew printProductsReleases | grep 'IC-' | head -n 1 | cut -d'-' -f2)
-          ./gradlew check -PplatformVersion=$LATEST_EAP_SNAPSHOT
+          RELEASES=build/intellij-releases.json
+          ./gradlew intellijPlatformDiscover --kind=releases --type=IU --output=$RELEASES
+          # The releases, newest build first
+          SORTED='.data.releases
+            | map(select(.buildNumber | test("^[0-9]+(\\.[0-9]+)*$")))
+            | sort_by(.buildNumber | split(".") | map(tonumber)) | reverse'
+          # One build as "<build number>  <version>  <channel>", such as "263.8311.30  2026.3.1  EAP"
+          ROW='[.buildNumber, .version, .channel]'
+          LINE="$ROW | join(\"  \")"
+
+          echo "The 10 newest IntelliJ IDEA (IU) builds:"
+          jq -r "$SORTED | .[:10][] | $ROW | @tsv" $RELEASES | column -t
+          echo
+
+          NEWEST=$(jq -c "$SORTED | first // empty" $RELEASES)
+          if [ -z "$NEWEST" ]; then
+            echo "::error::No IntelliJ IDEA (IU) release found in $RELEASES"
+            exit 1
+          fi
+          LATEST=$(echo "$NEWEST" | jq -r 'if .channel == "RELEASE" then .version else .buildNumber + "-EAP-SNAPSHOT" end')
+
+          echo "Newest IntelliJ IDEA: $(echo "$NEWEST" | jq -r "$LINE")"
+          echo "Platform version for Gradle: $LATEST"
+          echo "Tested against IntelliJ IDEA \`$(echo "$NEWEST" | jq -r "$LINE")\`, platform version \`$LATEST\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "version=$LATEST" >> "$GITHUB_OUTPUT"
+
+          # ci.yml tests pull requests against a fixed IntelliJ IDEA (IU) release, so that a new release does not turn
+          # them red. Warn, without failing, when a newer release is out, so that someone updates ci.yml.
+          NEWEST_RELEASE=$(jq -r "$SORTED | map(select(.channel == \"RELEASE\")) | first | .version // empty" $RELEASES)
+          # Every IU release that ci.yml tests, the highest of them counts. A matrix entry without platformType or
+          # platformVersion takes the one of gradle.properties.
+          DEFAULT_TYPE=$(yq -p=props -o=yaml '.platformType // ""' gradle.properties)
+          DEFAULT_VERSION=$(yq -p=props -o=yaml '.platformVersion // ""' gradle.properties)
+          CI_RELEASE=$(DEFAULT_TYPE="$DEFAULT_TYPE" DEFAULT_VERSION="$DEFAULT_VERSION" yq '
+            .jobs[].strategy.matrix
+            | ((.platformVersion // [""]) | map({"platformVersion": .})) + (.include // [])
+            | .[]
+            | select((.platformType // strenv(DEFAULT_TYPE)) == "IU")
+            | (.platformVersion // "") | (select(. != "") // strenv(DEFAULT_VERSION))
+          ' .github/workflows/ci.yml | grep -v '^$' | sort -V | tail -n 1)
+          echo "Newest IntelliJ IDEA release: ${NEWEST_RELEASE:-none}, ci.yml tests: ${CI_RELEASE:-none}"
+          if [ -z "$NEWEST_RELEASE" ] || [ -z "$CI_RELEASE" ]; then
+            echo "::warning::Could not compare the IntelliJ IDEA release of ci.yml (${CI_RELEASE:-not found}) with the newest release (${NEWEST_RELEASE:-not found})"
+          elif [ "$NEWEST_RELEASE" != "$CI_RELEASE" ] && [ "$(printf '%s\n' "$CI_RELEASE" "$NEWEST_RELEASE" | sort -V | tail -n 1)" = "$NEWEST_RELEASE" ]; then
+            MESSAGE="ci.yml tests IntelliJ IDEA $CI_RELEASE, but the newest release is $NEWEST_RELEASE. The job newest-release tests it, and says whether ci.yml can move to it."
+            echo "::warning title=ci.yml is behind::$MESSAGE"
+            {
+              echo "> [!WARNING]"
+              echo "> $MESSAGE"
+            } >> "$GITHUB_STEP_SUMMARY"
+            {
+              echo "behind=true"
+              echo "newest-release=$NEWEST_RELEASE"
+              echo "ci-release=$CI_RELEASE"
+            } >> "$GITHUB_OUTPUT"
+          fi
+
+  # Tests the newest build, often an EAP
+  build:
+    needs: discover
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Fetch Sources
+        uses: actions/checkout@v7
+
+      - name: Setup Java
+        uses: actions/setup-java@v6
+        with:
+          distribution: 'temurin'
+          java-version: 21
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v5
+
+      - name: Build with Gradle
+        run: ./gradlew check -PplatformType=IU -PplatformVersion=${{ needs.discover.outputs.version }}
 
       - name: Collect Tests Result
         uses: actions/upload-artifact@v7
@@ -40,5 +128,57 @@ jobs:
         with:
           name: test-reports
           path: |
-            path: ${{ github.workspace }}/build/reports/tests
-            path: ${{ github.workspace }}/build/jacoco/
+            ${{ github.workspace }}/build/reports/tests
+            ${{ github.workspace }}/build/jacoco/
+
+  # While ci.yml tests an older IntelliJ IDEA (IU) release than the newest, tests the newest release too, and says
+  # whether ci.yml can move to it: if it passes, that's a one-line change of ci.yml, and if it doesn't, the log shows
+  # what fails before a pull request runs into it (#2062)
+  newest-release:
+    needs: discover
+    if: needs.discover.outputs.behind == 'true'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Fetch Sources
+        uses: actions/checkout@v7
+
+      - name: Setup Java
+        uses: actions/setup-java@v6
+        with:
+          distribution: 'temurin'
+          java-version: 21
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v5
+
+      - name: Build with Gradle
+        id: check
+        run: ./gradlew check -PplatformType=IU -PplatformVersion=${{ needs.discover.outputs.newest-release }}
+
+      - name: Say whether ci.yml can move to the newest release
+        if: always()
+        env:
+          OUTCOME: ${{ steps.check.outcome }}
+          NEWEST_RELEASE: ${{ needs.discover.outputs.newest-release }}
+          CI_RELEASE: ${{ needs.discover.outputs.ci-release }}
+        run: |
+          if [ "$OUTCOME" = "success" ]; then
+            MESSAGE="ci.yml tests IntelliJ IDEA $CI_RELEASE, and the newest release, $NEWEST_RELEASE, passes: ci.yml can move to it by changing the platformVersion of its matrix entry with platformType IU."
+            echo "::notice title=ci.yml can move to $NEWEST_RELEASE::$MESSAGE"
+            echo "> [!NOTE]" >> "$GITHUB_STEP_SUMMARY"
+          else
+            MESSAGE="ci.yml tests IntelliJ IDEA $CI_RELEASE, and the newest release, $NEWEST_RELEASE, doesn't pass ./gradlew check: see the log of this job before ci.yml moves to it."
+            echo "::warning title=$NEWEST_RELEASE doesn't pass::$MESSAGE"
+            echo "> [!WARNING]" >> "$GITHUB_STEP_SUMMARY"
+          fi
+          echo "> $MESSAGE" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Collect Tests Result
+        uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: test-reports-newest-release
+          path: |
+            ${{ github.workspace }}/build/reports/tests
+            ${{ github.workspace }}/build/jacoco/

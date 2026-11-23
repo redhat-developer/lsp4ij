@@ -166,9 +166,17 @@ public class LspSnippetParser {
      * @throws IOException
      */
     private void readAny() throws IOException {
-        if (isEndOfText()) {
-            return;
+        while (!isEndOfText()) {
+            readElement();
         }
+    }
+
+    /**
+     * Reads one element of the snippet: a text, a tab stop, a placeholder, a choice or a variable.
+     *
+     * @throws IOException
+     */
+    private void readElement() throws IOException {
         switch (current) {
             case '$':
                 // read next character
@@ -179,37 +187,7 @@ public class LspSnippetParser {
                     handleTabstop(index);
                 } else if (readChar('{')) {
                     if (isDigit()) {
-                        // - ${1:name} <-- placeholder
-                        // - ${1|one,two,three|} <-- choice
-                        // - ${1} <-- tabstop
-                        int index = readInt();
-                        if (readChar(':')) {
-                            if (readChar('}')) {
-                                // - ${1:} <-- tabstop
-                                handleTabstop(index);
-                            } else {
-                                // - ${1:name} <-- placeholder
-                                String name = readString('}', '$');
-                                nestingLevel++;
-                                handler.startPlaceholder(index, name, nestingLevel);
-                                // placeholder ::= '${' int ':' any '}'
-                                if (current == '}') {
-                                    // read next character
-                                    read();
-                                } else {
-                                    readAny();
-                                }
-                                handler.endPlaceholder(nestingLevel);
-                                nestingLevel--;
-                            }
-                        } else if (readChar('|')) {
-                            // - ${1|one,two,three|} <-- choice
-                            handleChoice(null, index);
-                        } else {
-                            // - ${1} <-- tabstop
-                            handleTabstop(index);
-                            readRequiredChar('}');
-                        }
+                        readIndexed();
                     } else {
                         // - ${name} <-- variable
                         String name = readString('}');
@@ -219,7 +197,8 @@ public class LspSnippetParser {
 
                 } else {
                     // - $name <-- variable
-                    String name = readString('$', ' ');
+                    // In a placeholder, the name ends at the '}' of the placeholder
+                    String name = nestingLevel > 0 ? readString('$', ' ', '}') : readString('$', ' ');
                     handleVariable(name);
                 }
                 break;
@@ -227,7 +206,98 @@ public class LspSnippetParser {
                 handleText();
                 break;
         }
-        readAny();
+    }
+
+    /**
+     * Reads a tab stop, a placeholder or a choice from its index, after its {@code ${}.
+     *
+     * @throws IOException
+     */
+    private void readIndexed() throws IOException {
+        // - ${1:name} <-- placeholder
+        // - ${1|one,two,three|} <-- choice
+        // - ${1} <-- tabstop
+        int index = readInt();
+        if (readChar(':')) {
+            if (readChar('}')) {
+                // - ${1:} <-- tabstop
+                handleTabstop(index);
+            } else {
+                // - ${1:name} <-- placeholder
+                nestingLevel++;
+                readPlaceholder(index);
+                nestingLevel--;
+            }
+        } else if (readChar('|')) {
+            // - ${1|one,two,three|} <-- choice
+            handleChoice(null, index);
+        } else {
+            // - ${1} <-- tabstop
+            handleTabstop(index);
+            readRequiredChar('}');
+        }
+    }
+
+    /**
+     * Reads a placeholder after its {@code ${1:}, up to the character after its {@code }}.
+     *
+     * @param index the index of the placeholder.
+     * @throws IOException
+     */
+    private void readPlaceholder(int index) throws IOException {
+        if (current == '$') {
+            startCapture();
+            read();
+            boolean braced = current == '{';
+            if (braced) {
+                read();
+            }
+            if (isDigit()) {
+                // - ${1:$2 ...}, ${1:${2:name} ...}, ${1:${2|one,two|} ...} <-- a placeholder that starts with a tab
+                // stop, a placeholder or a choice has no text before it
+                cancelCapture();
+                handler.startPlaceholder(index, "", nestingLevel);
+                if (braced) {
+                    readIndexed();
+                } else {
+                    handleTabstop(readInt());
+                }
+            } else if (braced) {
+                // - ${1:${name}} <-- the text of the placeholder starts with the variable, as for ${1:$name}. The '}'
+                // of the variable doesn't end the placeholder
+                cancelCapture();
+                String name = readString('}');
+                readRequiredChar('}');
+                handler.startPlaceholder(index, "$" + name, nestingLevel);
+            } else {
+                // - ${1:$name} <-- the text of the placeholder starts with the variable, which the handlers resolve
+                // (#1313). Its name ends where the identifier does: var ::= [_a-zA-Z] [_a-zA-Z0-9]*
+                while (isIdentifierPart()) {
+                    read();
+                }
+                handler.startPlaceholder(index, endCapture(), nestingLevel);
+            }
+        } else {
+            String text = readString('}', '$');
+            if (text.startsWith("$")) {
+                // - ${1:\$name} <-- an escaped '$' starts a text, not a variable. The handlers resolve a variable that
+                // starts the text of a placeholder, so the text follows the placeholder's start
+                handler.startPlaceholder(index, "", nestingLevel);
+                handler.text(text);
+            } else {
+                handler.startPlaceholder(index, text, nestingLevel);
+            }
+        }
+        // placeholder ::= '${' int ':' any '}'
+        // The rest of the placeholder, as a nested placeholder, ends at its '}'
+        while (!isEndOfText() && current != '}') {
+            readElement();
+        }
+        if (current == '}') {
+            // read next character
+            read();
+        }
+        handler.endPlaceholder(nestingLevel);
     }
 
     private void handleChoice(String name, Integer index) throws IOException {
@@ -278,6 +348,15 @@ public class LspSnippetParser {
         return endCapture();
     }
 
+    private boolean isIdentifierPart() {
+        return current == '_' || (current >= 'a' && current <= 'z') || (current >= 'A' && current <= 'Z') || isDigit();
+    }
+
+    private void cancelCapture() {
+        captureStart = -1;
+        captureBuffer.setLength(0);
+    }
+
     private void readEscape() throws IOException {
         // here current is equals to '\'
         // read the next character
@@ -304,7 +383,8 @@ public class LspSnippetParser {
     }
 
     private void handleText() throws IOException {
-        String text = readString('$');
+        // In a placeholder, the text ends at the '}' of the placeholder
+        String text = nestingLevel > 0 ? readString('$', '}') : readString('$');
         handler.text(text);
     }
 

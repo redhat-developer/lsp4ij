@@ -62,6 +62,12 @@ This will generate an executable in the `target/debug` folder.
 
 ![Select New server](../images/codelldb/select_new_server.png)
 
+The command of the template is `<<insert base directory>>/extension/adapter/codelldb` (`codelldb.exe` on Windows):
+the installer of the template sets it when it installs CodeLLDB (see [Debugging](#debugging)). To use a CodeLLDB that
+you installed yourself, replace `<<insert base directory>>` with the folder where you extracted the `.vsix` file of a
+[CodeLLDB release](https://github.com/vadimcn/codelldb/releases), and empty the `Installer` tab, so that LSP4IJ doesn't
+install CodeLLDB.
+
 5. Enable DAP server traces
 
 If you wish to show DAP request/response traces when you will debug:
@@ -112,7 +118,9 @@ For example, set a breakpoint in the `main.rs` file:
 You can start the run configuration in either Run or Debug mode. 
 
 The first time you run it, [CodeLLDB](https://github.com/vadimcn/codelldb), 
-the DAP server, will be downloaded and installed:
+the DAP server, will be downloaded and installed: the installer downloads the `codelldb-<os>-<arch>.vsix` asset of the
+latest release for your OS and architecture, extracts it into `$USER_HOME$/.lsp4ij/dap/codelldb`, and sets the command
+to `"$USER_HOME$/.lsp4ij/dap/codelldb/extension/adapter/codelldb"` (`codelldb.exe` on Windows):
 
 ![Debugging / Installing](../images/codelldb/server_installing.png)
 

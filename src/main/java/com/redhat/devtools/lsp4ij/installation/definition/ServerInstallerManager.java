@@ -23,6 +23,9 @@ import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.progress.Task;
 import com.redhat.devtools.lsp4ij.ServerMessageHandler;
 import com.redhat.devtools.lsp4ij.installation.PrintableProgressIndicator;
+import kotlinx.coroutines.CoroutineScope;
+import kotlinx.coroutines.CoroutineScopeKt;
+import kotlinx.coroutines.JobKt;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -47,13 +50,18 @@ public class ServerInstallerManager extends InstallerTaskRegistry implements Dis
 
     private static final Logger LOGGER = LoggerFactory.getLogger(ServerInstallerManager.class);
 
+    // The scope of the extension point listener, which dispose() cancels, so that it ends with this service, as with it
+    // as its parent Disposable
+    private final CoroutineScope extensionPointListenerScope = CoroutineScopeKt.CoroutineScope(JobKt.Job(null));
+
     private ServerInstallerManager() {
         super();
         var beans = InstallerTaskFactoryPointBean.EP_NAME.getExtensions();
         for (InstallerTaskFactoryPointBean bean : beans) {
             registerFactoryFromBean(bean);
         }
-        InstallerTaskFactoryPointBean.EP_NAME.getPoint().addExtensionPointListener(
+        InstallerTaskFactoryPointBean.EP_NAME.addExtensionPointListener(
+                extensionPointListenerScope,
                 new ExtensionPointListener<>() {
                     @Override
                     public void extensionAdded(@NotNull InstallerTaskFactoryPointBean bean,
@@ -66,9 +74,7 @@ public class ServerInstallerManager extends InstallerTaskRegistry implements Dis
                                                  @NotNull PluginDescriptor pluginDescriptor) {
                         unregisterFactory(bean.type);
                     }
-                },
-                /* invokeForLoadedExtensions */ false,
-                /* parentDisposable */ this);
+                });
     }
 
     private void registerFactoryFromBean(@NotNull InstallerTaskFactoryPointBean bean) {
@@ -81,6 +87,8 @@ public class ServerInstallerManager extends InstallerTaskRegistry implements Dis
 
     @Override
     public void dispose() {
+        // Removes the extension point listener
+        CoroutineScopeKt.cancel(extensionPointListenerScope, null);
     }
 
     /**

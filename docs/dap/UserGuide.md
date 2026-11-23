@@ -24,6 +24,16 @@ The `Server` tab to specify the DAP server:
 
   ![DAP Configuration Type/Server](./images/DAP_config_type_server.png)
 
+- `Command`: the command which starts the DAP server. It can take `${port}`, see
+  [LSP4IJ placeholders](#lsp4ij-placeholders).
+- The environment variables of the DAP server's process.
+- `Connect to the server by waiting:` `Timeout(ms) before readiness`, the time the client waits before it connects, or
+  `Log pattern before proceeding`, a text which the DAP server writes once it is ready.
+
+The client connects to the DAP server with a socket when it knows a port: the port of `${port}` in the command, the one
+which the log pattern finds in the output of the DAP server, or, to attach, the `Port` of the `Attach` tab of the
+`Configuration` tab. Otherwise it talks to the DAP server over the standard input and output of its process.
+
 ### Mappings tab
 
 The `Mappings` tab to specify the files which can be debugged to allow adding/removing breakpoints:
@@ -64,6 +74,15 @@ The debug adapter's process gets that environment when it starts, and LSP4IJ loo
 > - **Windows**: with a working directory, a debug adapter's command without its extension, such as `node` or `npx`, is looked up with the extensions in `PATHEXT`, as Windows does, so that the directory's `node.exe` or `npx.cmd` starts.
 > - **Tools not bundled**: LSP4IJ doesn't bundle mise or direnv. Install the tool and its IntelliJ plugin. The mise plugin customizes the processes of other plugins only with its `useMiseInAllCommandLines` setting, which is off by default.
 > - **IntelliJ 2024.x** has no such extension point, so the environment is as before. The command is looked up as described above, also with the extensions in `PATHEXT` on Windows.
+
+### Installer tab
+
+The `Installer` tab holds the JSON of the [installer](../UserDefinedLanguageServerTemplate.md#installer-descriptor) of
+the DAP server, as its [template](#templates) gives it. Before the first debug session of the DAP server in each IDE
+session, LSP4IJ runs the `check` of the installer, and its `run` if the check fails, in a console, and then starts the
+debug session (see [When the installer runs](../UserDefinedLanguageServerTemplate.md#when-the-installer-runs)). The
+`Installer` tab of the debug session has the links `Check Installation`, `Run Installation` and
+`Check / Run Installation`, which run the installer again.
 
 ### IntelliJ macro expansion
 
@@ -390,6 +409,9 @@ You should edit the variable:
 the edit apply will consume the
 [SetVariable request](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_SetVariable):
 
+`Set Value...` isn't available for the result of an expression, as `Evaluate Expression` shows it: the SetVariable
+request names the variable's container, and such a result has none. The variables inside the result can be set.
+
 ## Loaded sources and modules
 
 When the DAP server reports the sources it has loaded (`supportsLoadedSourcesRequest`), the debug tab gets a
@@ -488,7 +510,7 @@ you need to select `Trace` with `verbose`.
 
 ## DAP settings
 
-You can `create/remove/update` DAP servers with `Debug Adapter Protocol` entry:
+You can `create/remove/update` DAP servers with the `Build, Execution, Deployment | Debugger | Debug Adapter Protocol` settings page:
 
 ![DAP settings](./images/DAP_settings.png)
 
@@ -497,6 +519,8 @@ You can `create/remove/update` DAP servers with `Debug Adapter Protocol` entry:
 LSP4IJ provides DAP templates that allow to initialize a given DAP server very quickly:
 
 - [CodeLLDB](./user-defined-dap/codelldb.md) which allows you to debug `Rust`,`Swift`, etc. files.
+- [Docker: Dockerfile Build Debugging](./user-defined-dap/buildx-dockerfile.md) which allows you to debug the build of a
+  `Dockerfile`.
 - [Go Delve DAP server](./user-defined-dap/go-delve.md) which allows you to debug `Go` files.
 - [Julia DAP server](./user-defined-dap/julia.md) which allows you to debug `Julia` files.
 - [Perl DAP server](./user-defined-dap/perl-dap.md) which allows you to debug `Perl` files. 
@@ -504,3 +528,50 @@ LSP4IJ provides DAP templates that allow to initialize a given DAP server very q
 - [Ruby rdbg DAP server](./user-defined-dap/ruby-rdbg.md) which allows you to debug `Ruby` files.
 - [Swift DAP Server](./user-defined-dap/swift-lldb.md) which allows you to debug `Swift` files.
 - [VSCode JS Debug DAP Server](./user-defined-dap/vscode-js-debug.md) which allows you to debug `JavaScript/TypeScript` files.
+
+To create a DAP server from a template, click `Choose template...` in the `New Debug Adapter Server` dialog, which the
+`+` of the [DAP settings](#dap-settings) and the `create a new server.` link of the [Server tab](#server-tab) open.
+
+### Template descriptor
+
+A DAP template is a folder in
+[`templates/dap`](https://github.com/redhat-developer/lsp4ij/tree/main/src/main/resources/templates/dap) with these
+files, of which only `template.json` is required:
+
+- `template.json`: the DAP server, its command and its file mappings.
+- `installer.json`: the [installer](../UserDefinedLanguageServerTemplate.md#installer-descriptor) of the DAP server.
+- each file whose name starts with `launch.` or `attach.`, such as `launch.json` or `attach.tcp.json`: a launch or an
+  attach configuration, the `DAP parameters (JSON)` of the `Configuration` tab, named by its `name`. The tab offers
+  them in `Use the configuration:`, and fills the first launch and the first attach configuration. A template with
+  attach configurations only selects the `Attach` debug mode.
+
+The [Go Delve template](https://github.com/redhat-developer/lsp4ij/tree/main/src/main/resources/templates/dap/go-delve)
+has these fields in its `template.json`:
+
+```json
+{
+  "id": "go-delve",
+  "name": "Go - Delve",
+  "launch": {
+    "default": "dlv dap"
+  },
+  "debugServerReadyPattern": "DAP server listening at: ${address}:${port}",
+  "attach": {
+    "port": "$port"
+  }
+}
+```
+
+| Field                     | Value                                                                                                                                                                                                       | Default                                                                                |
+|---------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------|
+| `id`                      | the id of the template                                                                                                                                                                                      | none                                                                                   |
+| `name`                    | the name of the DAP server                                                                                                                                                                                  | none                                                                                   |
+| `url`                     | the page of the instructions, which the `Server` tab links                                                                                                                                                  | `https://github.com/redhat-developer/lsp4ij/tree/main/docs/dap/user-defined-dap/<id>.md` |
+| `dev`                     | `true` lists the template only when the IDE runs with `idea.plugin.in.sandbox.mode`                                                                                                                         | `false`                                                                                |
+| `launch`                  | the `Command` of the DAP server, by OS: `windows`, `mac`, `unix` (Linux and other Unix systems), and `default` for an OS without one                                                                         | none, as for a DAP server which LSP4IJ only attaches to                                |
+| `env`                     | the environment variables, read only with a `launch`: `variables`, an object of names and values, and `includeSystemEnvironmentVariables`, `true` to pass the IDE's environment variables too               | `includeSystemEnvironmentVariables` is `false` when `env` doesn't set it               |
+| `connectTimeout`          | the `Timeout(ms) before readiness`: above 0, the client waits this many milliseconds before it connects                                                                                                     | 0                                                                                      |
+| `debugServerReadyPattern` | the `Log pattern before proceeding`, used when `connectTimeout` isn't above 0. It can take `${address}` and `${port}`, see [LSP4IJ placeholders](#lsp4ij-placeholders)                                    | none                                                                                   |
+| `attach`                  | the `address` and the `port` to which an attach connects: a value, or `$` and the path of a value in the attach configuration, as `$port`, or `$connect.host` in the Python Debugpy template               | none                                                                                   |
+| `fileTypeMappings`        | the files of the DAP server, as in a [language server template](../UserDefinedLanguageServerTemplate.md#fields)                                                                                            | none                                                                                   |
+| `languageMappings`        | the files of the DAP server by IntelliJ language, as in a language server template                                                                                                                          | none                                                                                   |

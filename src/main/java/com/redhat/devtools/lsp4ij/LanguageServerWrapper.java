@@ -63,6 +63,9 @@ import org.eclipse.lsp4j.jsonrpc.Launcher;
 import org.eclipse.lsp4j.jsonrpc.MessageConsumer;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
 import org.eclipse.lsp4j.jsonrpc.messages.Message;
+import org.eclipse.lsp4j.jsonrpc.messages.NotificationMessage;
+import org.eclipse.lsp4j.jsonrpc.messages.RequestMessage;
+import org.eclipse.lsp4j.jsonrpc.json.MessageJsonHandler;
 import org.eclipse.lsp4j.jsonrpc.json.StreamMessageConsumer;
 import org.eclipse.lsp4j.services.LanguageServer;
 import org.jetbrains.annotations.ApiStatus;
@@ -703,21 +706,33 @@ public class LanguageServerWrapper implements Disposable {
                         // requests (e.g. workspace/configuration) are never blocked
                         // behind a slow outgoing notification write that saturates
                         // the pipe.
+                        var outgoingMessages = new OutgoingMessages();
                         UnaryOperator<MessageConsumer> wrapper = consumer -> {
                             boolean outgoing = consumer instanceof StreamMessageConsumer;
                             return message -> {
                                 if (isDisposed()) {
                                     return;
                                 }
-                                logMessage(message, consumer);
+                                // A $/cancelRequest is traced once it is queued, as it is dropped after the shutdown
+                                // request; nothing answers it, so its trace has no answer to come before
+                                boolean cancelRequest = outgoing && OutgoingMessages.isCancelRequest(message);
+                                if (!cancelRequest) {
+                                    logMessage(message, consumer);
+                                }
                                 try {
                                     if (outgoing) {
-                                        CompletableFuture.runAsync(
+                                        Runnable write = () -> CompletableFuture.runAsync(
                                                         () -> consumer.consume(message), messageWriter)
                                                 .exceptionally(e -> {
                                                     getLanguageServerLifecycleManager().onError(this, e);
                                                     return null;
                                                 });
+                                        if (!outgoingMessages.queue(message, write)) {
+                                            return;
+                                        }
+                                        if (cancelRequest) {
+                                            logMessage(message, consumer);
+                                        }
                                     } else {
                                         consumer.consume(message);
                                     }
@@ -2763,9 +2778,12 @@ public class LanguageServerWrapper implements Disposable {
             CompletableFuture<Void> stopped;
             if (isDisposed()) {
                 // When project is closing we shutdown everything in synch mode
-                shutdownAll(languageServer, lspStreamProvider, launcherFuture);
+                shutdownAll(languageServer, lspStreamProvider, launcherFuture, null);
                 stopped = CompletableFuture.completedFuture(null);
             } else {
+                // The notifications queued so far for the stopped server, as the didClose of the document whose
+                // disconnection stops it, and not those of a start after this
+                CompletableFuture<?> queuedNotifications = current ? getLastNotification() : null;
                 // We need to shutdown, kill and stop the process in a thread to avoid for instance
                 // stopping the new process created with a new start.
                 // Use the IntelliJ application pool instead of ForkJoinPool.commonPool() to avoid
@@ -2773,7 +2791,7 @@ public class LanguageServerWrapper implements Disposable {
                 // in the current thread when stop() is called from a ReadAction.
                 // See: https://github.com/redhat-developer/lsp4ij/issues/1672
                 runningStop = CompletableFuture.runAsync(() -> {
-                    shutdownAll(languageServer, lspStreamProvider, launcherFuture);
+                    shutdownAll(languageServer, lspStreamProvider, launcherFuture, queuedNotifications);
                     boolean delayedCurrent = currentInitializingContext == null || currentInitializingContext.equals(initializingContext);
                     if (delayedCurrent) {
                         updateStatus(ServerStatus.stopped);
@@ -2896,7 +2914,8 @@ public class LanguageServerWrapper implements Disposable {
                 .submit(AppExecutorUtil.getAppExecutorService());
     }
 
-    private void shutdownAll(LanguageServer languageServerInstance, StreamConnectionProvider provider, Future<?> serverFuture) {
+    private void shutdownAll(LanguageServer languageServerInstance, StreamConnectionProvider provider, Future<?> serverFuture,
+                             @Nullable CompletableFuture<?> queuedNotifications) {
         if (languageServerInstance != null && provider != null && provider.isAlive()) {
             // The LSP language server instance and the process which starts the language server is alive. Process
             // - shutdown
@@ -2904,6 +2923,9 @@ public class LanguageServerWrapper implements Disposable {
 
             // shutdown the language server
             if (provider.isAlive()) {
+                // Only the exit notification may follow the shutdown request, and a notification sent after it could
+                // reach the connection after it closes, so the server would never read it
+                waitForTheNotifications(queuedNotifications);
                 try {
                     shutdownLanguageServerInstance(languageServerInstance);
                 } catch (Exception ex) {
@@ -2930,6 +2952,37 @@ public class LanguageServerWrapper implements Disposable {
             provider.stop();
         }
 
+    }
+
+    /**
+     * Waits until the dispatcher has handed the given notifications to the message writer, for a second at most, so
+     * that a request sent after this is written after them. A disposed language server sends no messages, and isn't
+     * waited for.
+     *
+     * @param notifications the last of the notifications to wait for, as {@link #getLastNotification()} gave it, or
+     *                      null for none.
+     */
+    private void waitForTheNotifications(@Nullable CompletableFuture<?> notifications) {
+        if (notifications == null || isDisposed()) {
+            return;
+        }
+        try {
+            notifications.get(1, TimeUnit.SECONDS);
+        } catch (InterruptedException ex) {
+            Thread.currentThread().interrupt();
+        } catch (ExecutionException | CancellationException | TimeoutException ex) {
+            // A notification that failed was not sent, and one that the dispatcher holds back longer is left behind
+        }
+    }
+
+    /**
+     * Returns the last notification queued, which completes once the dispatcher has handed it, and every notification
+     * queued before it, to the message writer.
+     */
+    private @NotNull CompletableFuture<LanguageServer> getLastNotification() {
+        synchronized (notificationLock) {
+            return lastNotification;
+        }
     }
 
     /**
@@ -3073,6 +3126,42 @@ public class LanguageServerWrapper implements Disposable {
         public LanguageServer languageServer;
         public Future<?> launcherFuture;
         public InitializeResult initializeResult;
+    }
+
+    /**
+     * Queues the messages that one connection sends to the message writer, which writes them in the order they are
+     * queued, and drops a {@code $/cancelRequest} that would follow the {@code shutdown} request: LSP allows only the
+     * {@code exit} notification after {@code shutdown}. The request that it would cancel ends all the same, as LSP4J
+     * cancels the future of a request once it has handed over the notification, and the language server, which shuts
+     * down, would not answer the request anyway.
+     */
+    private static final class OutgoingMessages {
+
+        private boolean shutdownQueued;
+
+        /**
+         * Queues the given message with the given action, unless it is a {@code $/cancelRequest} that would follow the
+         * {@code shutdown} request.
+         *
+         * @param message the message.
+         * @param queue   the action that queues the message to the message writer.
+         * @return true if the message is queued, and false if it is dropped.
+         */
+        synchronized boolean queue(@NotNull Message message, @NotNull Runnable queue) {
+            if (shutdownQueued && isCancelRequest(message)) {
+                return false;
+            }
+            if (message instanceof RequestMessage request && "shutdown".equals(request.getMethod())) {
+                shutdownQueued = true;
+            }
+            queue.run();
+            return true;
+        }
+
+        static boolean isCancelRequest(@NotNull Message message) {
+            return message instanceof NotificationMessage notification
+                    && MessageJsonHandler.CANCEL_METHOD.getMethodName().equals(notification.getMethod());
+        }
     }
 
 

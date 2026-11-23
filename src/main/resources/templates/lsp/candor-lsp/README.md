@@ -15,11 +15,15 @@ engine (JVM bytecode / TypeScript / Rust / Swift; see [candor.poly.io](https://c
 **npx -y candor-ts src --out .candor/report**   (TypeScript/JavaScript)
 
 Setup:
-* [Install Node.js](https://nodejs.org/en/download)
-* Open a terminal and execute:
+* [Install Node.js](https://nodejs.org/en/download), with `npm`.
+* Click **OK**. The first time the server starts, the installer of the template installs the candor-ts package, which
+  has the `candor-lsp` language server, into `$USER_HOME$/.lsp4ij/lsp/candor-lsp` with **npm install candor-ts**, and
+  sets the command to `"$USER_HOME$/.lsp4ij/lsp/candor-lsp/node_modules/.bin/candor-lsp"` (`candor-lsp.cmd` on
+  Windows).
 
-**npm install -g candor-ts**
+To install the server yourself, open a terminal and execute **npm install -g candor-ts**, keep the command of the
+template, `candor-lsp` (`cmd /C candor-lsp.cmd` on Windows), and empty the **Installer** tab before you click **OK**,
+so that LSP4IJ doesn't install the server.
 
-It will install the `candor-lsp` executable (the language server ships in the candor-ts package). The
-server resolves the report at `<project>/.candor/report` and the policy from the checked-in
+The server resolves the report at `<project>/.candor/report` and the policy from the checked-in
 `.candor/config` — no per-project server configuration is needed.

@@ -19,6 +19,14 @@ To enable [Stylelint](https://stylelint.io/) language support in your IDE, you c
 
 5. Once the installation completes, the server should start automatically and provide Stylelint language diagnostics directly within the IDE.
 
+The installer installs the `stylelint-lsp` npm package into `$USER_HOME$/.lsp4ij/lsp/stylelint-lsp` with `npm install`,
+and sets the command to `"$USER_HOME$/.lsp4ij/lsp/stylelint-lsp/node_modules/.bin/stylelint-lsp" --stdio`
+(`stylelint-lsp.cmd` on Windows). You need [Node.js](https://nodejs.org/en/download), with `npm`, on your PATH.
+
+To install the server yourself, run `npm install -g stylelint-lsp`, keep the command of the template,
+`stylelint-lsp --stdio` (`cmd /C stylelint-lsp.cmd --stdio` on Windows), and empty the `Installer` tab before you click
+**OK**, so that LSP4IJ doesn't install the server.
+
 ## Step 2: Configure Stylelint
 
 * If necessary, execute `npm install stylelint` in your project root.

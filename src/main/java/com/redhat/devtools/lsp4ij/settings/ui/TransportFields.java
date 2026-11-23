@@ -126,9 +126,11 @@ final class TransportFields {
     }
 
     /**
-     * Shows what the template of the language server says of its transports: Socket is disabled for a language server
-     * which talks only over its standard input and output, and a hint names the mode, and the argument, of a socket
-     * which it supports. Without a word from the template, every transport can be chosen and no hint shows.
+     * Shows what the template of the language server says of its transports: a hint says that a language server talks
+     * only over its standard input and output, and another names the mode, and the argument, of a socket which it
+     * supports. Every transport can still be chosen, as a template is also the starting point of a language server of
+     * one's own; a socket for a language server which talks only over its standard input and output is a warning of
+     * {@link #validateForTemplate()}. Without a word from the template, no hint shows.
      *
      * @param supportedTransports the transports which the template lists, empty if it lists none.
      */
@@ -246,6 +248,31 @@ final class TransportFields {
     }
 
     /**
+     * Returns a warning when a socket is chosen for a language server whose template lists only the standard input and
+     * output. It is a warning, which doesn't block OK or Apply: the template may be the starting point of a language
+     * server of one's own, which does talk over a socket, and saved settings with a socket keep working.
+     *
+     * @return the warning, or null for stdio, or for a template which lists a socket mode or no transports.
+     */
+    @Nullable
+    ValidationInfo validateForTemplate() {
+        if (!socket.isSelected() || !listsOnlyStdio()) {
+            return null;
+        }
+        return new ValidationInfo(message("language.server.validation.socket.stdio.only"), socket)
+                .asWarning()
+                .withOKEnabled();
+    }
+
+    /**
+     * Returns true if the template lists transports, and none of them is a socket.
+     */
+    private boolean listsOnlyStdio() {
+        return !supportedTransports.isEmpty() && supportedTransports.stream()
+                .allMatch(transport -> transport.mode() == UserDefinedTransport.Mode.STDIO);
+    }
+
+    /**
      * Shows the fields which the selected transport uses, and tells the listeners.
      */
     private void update() {
@@ -267,9 +294,7 @@ final class TransportFields {
         var socketSupport = supportedTransports.stream()
                 .filter(transport -> transport.mode() != UserDefinedTransport.Mode.STDIO)
                 .findFirst();
-        boolean socketSupported = supportedTransports.isEmpty() || socketSupport.isPresent();
-        socket.setEnabled(socketSupported);
-        stdioOnlyHint.setVisible(!socketSupported);
+        stdioOnlyHint.setVisible(listsOnlyStdio());
         socketSupport.ifPresent(transport -> templateSocketHint.setText(transport.argument() != null
                 ? message("language.server.socket.template.hint", transport.argument(), modeButton(transport.mode()).getText())
                 : message("language.server.socket.template.mode.hint", modeButton(transport.mode()).getText())));

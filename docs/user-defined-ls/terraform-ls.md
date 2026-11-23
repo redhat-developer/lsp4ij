@@ -23,6 +23,15 @@ To enable [Terraform](https://www.terraform.io/) language support in your IDE, y
 
 5. Once the installation completes, the server should start automatically and provide Terraform language support (autocomplete, diagnostics, etc.).
 
+The installer downloads the version of `terraform-ls` that its `installer.json` names, for your OS and architecture, from
+[releases.hashicorp.com](https://releases.hashicorp.com/terraform-ls/), extracts it into
+`$USER_HOME$/.lsp4ij/lsp/terraform-ls`, and sets the command to
+`"$USER_HOME$/.lsp4ij/lsp/terraform-ls/terraform-ls" serve` (`terraform-ls.exe` on Windows).
+
+To install the server yourself, see [Installation](https://github.com/hashicorp/terraform-ls/blob/main/docs/installation.md),
+keep the command of the template, `terraform-ls serve`, if `terraform-ls` is on your PATH, and empty the `Installer`
+tab before you click **OK**, so that LSP4IJ doesn't install the server.
+
 ### Troubleshooting Installation
 
 If the installation fails or if you need to download other version of the language server, you can customize the installation settings in the **Installer** tab,  

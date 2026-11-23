@@ -16,6 +16,7 @@ import com.intellij.openapi.util.io.FileUtil;
 import com.intellij.testFramework.TestApplicationManager;
 import com.redhat.devtools.lsp4ij.installation.CommandLineUpdater;
 import com.redhat.devtools.lsp4ij.installation.definition.tasks.*;
+import com.redhat.devtools.lsp4ij.launching.templates.LanguageServerTemplate;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
@@ -50,6 +51,7 @@ public class InstallerTaskRegistryFileExistsTest {
         registry.registerFactory("exec", new ExecTaskFactory());
         registry.registerFactory("download", new DownloadTaskFactory());
         registry.registerFactory("configureServer", new ConfigureServerTaskFactory());
+        registry.registerFactory("replaceTemplateCommand", new ReplaceTemplateCommandTaskFactory());
         registry.registerFactory("showMessage", new ShowMessageTaskFactory());
         return registry;
     }
@@ -380,6 +382,44 @@ public class InstallerTaskRegistryFileExistsTest {
     }
 
     @Test
+    public void testClangdGetsFromItsCheckTheCommandThatItsDownloadGivesIt() throws Exception {
+        // The download unpacks the folder of the archive, named after the version of clangd, next to an earlier one
+        assertTheCheckGivesTheCommandThatTheDownloadGives("lsp/clangd", "clangd-mac-snapshot_20250518.zip",
+                List.of("clangd_snapshot_20250518/bin/clangd", "clangd_snapshot_20250518/bin/clangd.exe",
+                        "clangd_snapshot_20250518/lib/clang/include/stddef.h"),
+                List.of("clangd_snapshot_20250101/bin/clangd", "clangd_snapshot_20250101/bin/clangd.exe"),
+                "snapshot_20250518", "snapshot_20250101");
+    }
+
+    @Test
+    public void testCamelLspServerGetsFromItsCheckTheCommandThatItsDownloadGivesIt() throws Exception {
+        // A jar named after its version, next to an earlier one, which comes after it in the order of the characters
+        assertTheCheckGivesTheCommandThatTheDownloadGives("lsp/camel-lsp-server", "camel-lsp-server-1.31.0.jar",
+                List.of(), List.of("camel-lsp-server-1.9.0.jar"), "1.31.0", "1.9.0");
+    }
+
+    @Test
+    public void testCodelldbGetsFromItsCheckTheCommandThatItsDownloadGivesIt() throws Exception {
+        assertTheCheckGivesTheCommandThatTheDownloadGives("dap/codelldb", "codelldb-darwin-arm64.vsix",
+                List.of("extension/adapter/codelldb", "extension/adapter/codelldb.exe", "extension.vsixmanifest"),
+                List.of(), null, null);
+    }
+
+    @Test
+    public void testPerlDapGetsFromItsCheckTheCommandThatItsDownloadGivesIt() throws Exception {
+        String root = "perllsp-0.17.0-x86_64-pc-windows-msvc/";
+        assertTheCheckGivesTheCommandThatTheDownloadGives("dap/perl-dap", "perllsp-0.17.0-x86_64-pc-windows-msvc.zip",
+                List.of(root + "perl-dap", root + "perl-dap.exe", root + "README.md"), List.of(), null, null);
+    }
+
+    @Test
+    public void testVscodeJsDebugGetsFromItsCheckTheCommandThatItsDownloadGivesIt() throws Exception {
+        // The archive has the folder js-debug/
+        assertTheCheckGivesTheCommandThatTheDownloadGives("dap/vscode-js-debug", "js-debug-dap-v1.100.1.zip",
+                List.of("js-debug/src/dapDebugServer.js", "js-debug/package.json"), List.of(), null, null);
+    }
+
+    @Test
     public void testAllDapTemplatesParseWithoutError() throws IOException {
         assertAllTemplatesInDirectoryParse("dap");
     }
@@ -434,6 +474,92 @@ public class InstallerTaskRegistryFileExistsTest {
             FileUtil.delete(serverDist);
             FileUtil.delete(downloads);
         }
+    }
+
+    /**
+     * Runs the download of the given bundled installer, from an asset which is a zip of the given entries, or a file
+     * without them, into a folder with the given files of an earlier installation; then its check, for a server created
+     * from the template once the server is installed, which has the command of the template: the check must give the
+     * server the command that the download gave it, and leave a command that the user changed, or that an earlier
+     * download gave, of the given earlier version instead of the given version, as it is (#2011).
+     */
+    private void assertTheCheckGivesTheCommandThatTheDownloadGives(String templatePath,
+                                                                   String asset,
+                                                                   List<String> entries,
+                                                                   List<String> installedBefore,
+                                                                   String version,
+                                                                   String earlierVersion) throws Exception {
+        Path serverDist = Files.createTempDirectory("lsp4ij-server-dist");
+        Path downloads = Files.createTempDirectory("lsp4ij-release");
+        try {
+            for (String file : installedBefore) {
+                Path installed = serverDist.resolve(file);
+                Files.createDirectories(installed.getParent());
+                Files.writeString(installed, file);
+            }
+            Path archive = downloads.resolve(asset);
+            if (entries.isEmpty()) {
+                Files.writeString(archive, asset);
+            } else {
+                try (var zip = new ZipOutputStream(Files.newOutputStream(archive))) {
+                    for (String entry : entries) {
+                        zip.putNextEntry(new ZipEntry(entry));
+                        zip.write(entry.getBytes(StandardCharsets.UTF_8));
+                        zip.closeEntry();
+                    }
+                }
+            }
+            JsonObject json = JsonParser.parseString(
+                    Files.readString(Paths.get("src/main/resources/templates", templatePath, "installer.json")))
+                    .getAsJsonObject();
+            json.getAsJsonObject("properties").addProperty("serverDist", serverDist.toString().replace('\\', '/'));
+            JsonObject download = json.getAsJsonObject("run").getAsJsonObject("download");
+            download.remove("github");
+            download.remove("maven");
+            download.addProperty("url", archive.toUri().toString());
+            ServerInstallerDescriptor descriptor = createRegistry().loadInstaller(json.toString());
+
+            List<String> commands = new ArrayList<>();
+            assertTrue(execute(descriptor, descriptor.getRun(), commands), "The download should install " + templatePath);
+            String downloaded = commands.get(commands.size() - 1);
+
+            commands.add(templateCommand(templatePath));
+            assertTrue(execute(descriptor, descriptor.getCheck(), commands),
+                    "The check should find what the download of " + templatePath + " installed");
+            assertEquals(downloaded, commands.get(commands.size() - 1),
+                    "The check should give a server with the command of the template the command of the download: "
+                            + commands);
+
+            List<String> kept = new ArrayList<>(List.of("/opt/server --verbose"));
+            if (version != null) {
+                assertTrue(downloaded.contains(version), downloaded);
+                kept.add(downloaded.replace(version, earlierVersion));
+            }
+            for (String command : kept) {
+                commands.add(command);
+                int size = commands.size();
+                assertTrue(execute(descriptor, descriptor.getCheck(), commands));
+                assertEquals(size, commands.size(), "The check should leave the command " + command + " as it is: "
+                        + commands);
+            }
+        } finally {
+            FileUtil.delete(serverDist);
+            FileUtil.delete(downloads);
+        }
+    }
+
+    /**
+     * Returns the command of the given bundled template on this OS: the {@code programArgs} of a language server, or
+     * the {@code launch} of a debug adapter.
+     */
+    private static String templateCommand(String templatePath) throws IOException {
+        JsonObject template = JsonParser.parseString(
+                Files.readString(Paths.get("src/main/resources/templates", templatePath, "template.json")))
+                .getAsJsonObject();
+        JsonObject command = template.getAsJsonObject(templatePath.startsWith("dap/") ? "launch" : "programArgs");
+        return command.has(LanguageServerTemplate.OS_KEY)
+                ? command.get(LanguageServerTemplate.OS_KEY).getAsString()
+                : command.get(LanguageServerTemplate.DEFAULT_KEY).getAsString();
     }
 
     private static boolean execute(ServerInstallerDescriptor descriptor, InstallerTask task, List<String> commands) {

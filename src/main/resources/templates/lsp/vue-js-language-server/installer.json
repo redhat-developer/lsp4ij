@@ -3,7 +3,7 @@
   "name": "Vue.js Language Server",
   "executeOnStartServer": false,
   "properties": {
-    "workingDir" : "$USER_HOME$/.lsp4ij/lsp/vue-js-language-server"
+    "workingDir" : "$USER_HOME$/.lsp4ij/lsp/vue-js-language-server/node_modules"
   },
   "check": {
     "exec": {
@@ -30,8 +30,8 @@
         "configureServer": {
           "name": "Configure Vue.js Language Server command",
           "command": {
-            "windows": "\"${workingDir}/node_modules/.bin/vue-language-server.cmd\" --stdio",
-            "default": "\"${workingDir}/node_modules/.bin/vue-language-server\" --stdio"
+            "windows": "\"${workingDir}/.bin/vue-language-server.cmd\" --stdio",
+            "default": "\"${workingDir}/.bin/vue-language-server\" --stdio"
           },
           "update": true
         }

@@ -23,6 +23,18 @@ To enable [Astro](https://astro.build/) language support in your IDE, you can in
 
 5. Once the installation completes, the server should start automatically and provide Astro language support (autocomplete, diagnostics, etc.).
 
+The installer installs `@astrojs/language-server`, `prettier-plugin-astro` and `typescript` into
+`$USER_HOME$/.lsp4ij/lsp/astro-ls` with `npm install`, and sets the command to
+`"$USER_HOME$/.lsp4ij/lsp/astro-ls/node_modules/.bin/astro-ls" --stdio` (`astro-ls.cmd` on Windows).
+You need [Node.js](https://nodejs.org/en/download), with `npm`, on your PATH.
+
+To install the server yourself, run `npm install -g @astrojs/language-server prettier-plugin-astro typescript`, keep
+the command of the template, `astro-ls --stdio` (`astro-ls.cmd --stdio` on Windows), and empty the `Installer` tab
+before you click **OK**, so that LSP4IJ doesn't install the server. Then set `typescript.tsdk` in the
+`Initialization Options` to `typescript/lib` in the directory that `npm root -g` prints, such as
+`/usr/local/lib/node_modules/typescript/lib`. The template sets it to
+`$USER_HOME$/.lsp4ij/lsp/astro-ls/node_modules/typescript/lib`, which only the installer creates.
+
 ### Troubleshooting Installation
 
 If the installation fails, you can customize the installation settings in the **Installer** tab,  
@@ -42,6 +54,7 @@ Since IntelliJ does not provide native Astro TextMate support, and the language 
 
   ```bash
   git clone https://github.com/withastro/language-tools.git
+  ```
 
 * Remove this [snippets section](https://github.com/withastro/language-tools/blob/main/packages/vscode/package.json#L45-L49) from the package.json
   Otherwise, IntelliJ will fail to import the TextMate bundle.

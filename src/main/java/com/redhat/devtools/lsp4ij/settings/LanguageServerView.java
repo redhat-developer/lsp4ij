@@ -21,6 +21,7 @@ import com.intellij.openapi.fileTypes.FileType;
 import com.intellij.openapi.options.ConfigurationException;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.project.ProjectManager;
+import com.intellij.openapi.ui.ValidationInfo;
 import com.intellij.openapi.util.Disposer;
 import com.intellij.openapi.util.text.HtmlBuilder;
 import com.intellij.openapi.util.text.HtmlChunk;
@@ -43,6 +44,7 @@ import com.redhat.devtools.lsp4ij.settings.ui.ServerMappingsPanel;
 import com.redhat.devtools.lsp4ij.templates.ServerMappingSettings;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.jetbrains.annotations.TestOnly;
 
 import javax.swing.*;
 import javax.swing.border.TitledBorder;
@@ -417,6 +419,14 @@ public class LanguageServerView implements Disposable {
                         .handleChanged(globalSettingsChangedEvent);
             }
         }
+    }
+
+    /**
+     * Returns every problem of the fields, the warnings which Apply lets through included.
+     */
+    @TestOnly
+    @NotNull List<ValidationInfo> validateFields() {
+        return languageServerPanel.validateFields();
     }
 
     private String getDisplayName() {

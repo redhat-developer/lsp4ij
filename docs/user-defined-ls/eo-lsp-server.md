@@ -21,7 +21,15 @@ To enable [EO](https://www.eolang.org/) language support in your IDE, you can in
 
    ![Installing Language Server](../images/user-defined-ls/eo-lsp-server/language_server_installing.png)
 
-5. Once the installation completes, the server should start automatically and provide EO language support (diagnostics and semantic tokens.).
+5. Once the installation completes, the server should start automatically and provide EO language support (diagnostics and semantic tokens).
+
+The installer installs the `eo-lsp-server` npm package into `$USER_HOME$/.lsp4ij/lsp/eo-lsp-server` with
+`npm install`, and sets the command to `"$USER_HOME$/.lsp4ij/lsp/eo-lsp-server/node_modules/.bin/eo-lsp-server" --stdio`
+(`eo-lsp-server.cmd` on Windows). You need [Node.js](https://nodejs.org/en/download), with `npm`, on your PATH.
+
+To install the server yourself, run `npm install -g eo-lsp-server`, keep the command of the template,
+`eo-lsp-server --stdio` (`cmd /C eo-lsp-server.cmd --stdio` on Windows), and empty the `Installer` tab before you click
+**OK**, so that LSP4IJ doesn't install the server.
 
 ### Troubleshooting Installation
 
@@ -42,6 +50,7 @@ Even if [EO LSP Server](https://github.com/objectionary/eo-lsp-server) can suppo
 
   ```bash
   git clone https://github.com/objectionary/eo-vscode.git
+  ```
 
 * Open TextMate Bundles settings
 
