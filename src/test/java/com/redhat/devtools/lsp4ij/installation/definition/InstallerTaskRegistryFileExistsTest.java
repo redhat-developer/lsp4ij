@@ -302,6 +302,11 @@ public class InstallerTaskRegistryFileExistsTest {
     }
 
     @Test
+    public void testErlangEdbInstallerJson() throws IOException {
+        assertTemplateInstaller("dap/erlang-edb", FileExistsTask.class, DownloadTask.class);
+    }
+
+    @Test
     public void testClojureLspInstallerJson() throws IOException {
         assertTemplateInstaller("lsp/clojure-lsp", FileExistsTask.class, DownloadTask.class);
     }
@@ -454,6 +459,14 @@ public class InstallerTaskRegistryFileExistsTest {
         assertTheCheckGivesTheCommandThatTheDownloadGives("lsp/erlang-elp",
                 "elp-macos-aarch64-apple-darwin-otp-27.3.tar.gz", List.of(SystemInfo.isWindows ? "elp.exe" : "elp"),
                 List.of(), null, null);
+    }
+
+    @Test
+    public void testErlangEdbGetsFromItsCheckTheCommandThatItsDownloadGivesIt() throws Exception {
+        // The template has the command of an edb on the PATH; the archive of edb has the folder edb-<version>/, whose
+        // content goes into the folder of the template, as the launcher edb finds its escripts next to it
+        assertTheCheckGivesTheCommandThatTheDownloadGives("dap/erlang-edb", "edb-1.0.0.tar.gz",
+                List.of("edb-1.0.0/edb", "edb-1.0.0/otp-28/edb", "edb-1.0.0/otp-29/edb"), List.of(), null, null);
     }
 
     @Test

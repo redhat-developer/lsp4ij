@@ -1,0 +1,54 @@
+{
+  "id": "erlang-edb-installer",
+  "name": "edb",
+  "executeOnStartServer": false,
+  "properties": {
+    "serverDist": "$USER_HOME$/.lsp4ij/dap/erlang-edb"
+  },
+  "check": {
+    "fileExists": {
+      "name": "Check if edb is installed",
+      "file": "${serverDist}/edb",
+      "onSuccess": {
+        "replaceTemplateCommand": {
+          "name": "Configure edb command",
+          "templateCommand": "edb dap",
+          "command": "\"${check.file}\" dap"
+        }
+      }
+    }
+  },
+  "run": {
+    "download": {
+      "name": "Download edb",
+      "github": {
+        "owner": "WhatsApp",
+        "repository": "edb",
+        "prerelease": false,
+        "asset": {
+          "mac": "edb-*.tar.gz",
+          "unix": "edb-*.tar.gz"
+        }
+      },
+      "url": {
+        "mac": "https://github.com/WhatsApp/edb/releases/download/1.0.0/edb-1.0.0.tar.gz",
+        "unix": "https://github.com/WhatsApp/edb/releases/download/1.0.0/edb-1.0.0.tar.gz"
+      },
+      "output": {
+        "dir": "${serverDist}",
+        "stripRootFolder": true,
+        "file": {
+          "name": "edb",
+          "executable": true
+        }
+      },
+      "onSuccess": {
+        "configureServer": {
+          "name": "Configure edb command",
+          "command": "\"${output.dir}/${output.file.name}\" dap",
+          "update": true
+        }
+      }
+    }
+  }
+}
