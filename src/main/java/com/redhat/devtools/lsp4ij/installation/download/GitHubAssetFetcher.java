@@ -18,6 +18,8 @@ import com.intellij.util.EnvironmentUtil;
 import com.redhat.devtools.lsp4ij.JSONUtils;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -30,6 +32,7 @@ import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -141,6 +144,8 @@ public class GitHubAssetFetcher implements AssetFetcher {
         }
     }
 
+    private static final Logger LOGGER = LoggerFactory.getLogger(GitHubAssetFetcher.class);
+
     /**
      * The URL of the GitHub API.
      */
@@ -166,6 +171,8 @@ public class GitHubAssetFetcher implements AssetFetcher {
     private final @NotNull String apiUrl;
     private final @NotNull Function<String, String> environment;
     private @Nullable JsonArray releases;
+    // Where the releases come from, for the log: never the token
+    private volatile @NotNull String source = "the GitHub API";
 
     /**
      * Constructs a GitHubAssetFetcher for a given repository owner and name.
@@ -255,6 +262,17 @@ public class GitHubAssetFetcher implements AssetFetcher {
     }
 
     /**
+     * Returns where the releases of the last download URL come from: the GitHub API, with the token of an environment
+     * variable, by its name, or anonymously. Never the token.
+     *
+     * @return where the releases of the last download URL come from.
+     */
+    @Override
+    public @NotNull String getSource() {
+        return source;
+    }
+
+    /**
      * Returns cached releases or loads them from GitHub if not already loaded.
      *
      * @param reporter an object to report progress or status messages
@@ -327,6 +345,8 @@ public class GitHubAssetFetcher implements AssetFetcher {
             }
             reporter.setText("The environment variable " + variable
                     + " has characters which a GitHub token doesn't have: LSP4IJ doesn't send it to GitHub");
+            LOGGER.warn("The environment variable {} has characters which a GitHub token doesn't have: LSP4IJ "
+                    + "doesn't send it to GitHub", variable);
         }
         return null;
     }
@@ -346,23 +366,34 @@ public class GitHubAssetFetcher implements AssetFetcher {
 
         try {
             URL url = URI.create(urlStr).toURL();
+            long start = System.nanoTime();
             HttpURLConnection conn = get(url, token);
             int responseCode = conn.getResponseCode();
+            Token refusedToken = null;
             if (token != null && isRefused(conn, responseCode)) {
+                logRequest(url, token, conn, responseCode, start);
                 // The releases of a public repository don't need a token: one which GitHub refuses, as an expired
                 // one, or whose rate limit is reached, doesn't keep them from installing. A request is tried again
                 // once, and only when it had a token
                 String refused = getErrorMessage(conn, responseCode, token);
-                reporter.setText("Error while loading GitHub releases: ", new GitHubApiError((refused != null
-                        ? refused
-                        : "GitHub API refused the token of the environment variable " + token.variable() + " (HTTP "
-                        + responseCode + ").") + " Trying again without the token."));
+                if (refused == null) {
+                    refused = "GitHub API refused the token of the environment variable " + token.variable()
+                            + " (HTTP " + responseCode + ").";
+                }
+                reporter.setText("Error while loading GitHub releases: ",
+                        new GitHubApiError(refused + " Trying again without the token."));
+                LOGGER.warn("GitHub releases of {}/{}: {}", owner, repository, refused);
+                LOGGER.info("GitHub releases of {}/{}: trying again anonymously, since GitHub refused the token of "
+                        + "the environment variable {}", owner, repository, token.variable());
                 conn.disconnect();
+                refusedToken = token;
                 token = null;
+                start = System.nanoTime();
                 conn = get(url, null);
                 responseCode = conn.getResponseCode();
             }
             if (responseCode != 200) {
+                logRequest(url, token, conn, responseCode, start);
                 String error = getErrorMessage(conn, responseCode, token);
                 if (error != null) {
                     throw new GitHubApiError(error);
@@ -375,13 +406,48 @@ public class GitHubAssetFetcher implements AssetFetcher {
                 while ((line = br.readLine()) != null) {
                     sb.append(line);
                 }
+                logRequest(url, token, conn, responseCode, start);
+                source = "the GitHub API, " + (token != null
+                        ? "with the token of the environment variable " + token.variable()
+                        : "anonymously" + (refusedToken != null
+                        ? ", since GitHub refused the token of the environment variable " + refusedToken.variable()
+                        : ""));
                 return sb.toString();
             }
         }
         catch(Exception e) {
             reporter.setText("Error while loading GitHub releases: ", e);
+            if (e instanceof GitHubApiError) {
+                LOGGER.warn("Cannot load the GitHub releases of {}/{}: {}", owner, repository, e.getMessage());
+            } else {
+                LOGGER.warn("Cannot load the GitHub releases of {}/{}", owner, repository, e);
+            }
         }
         return null;
+    }
+
+    /**
+     * Logs, for Debug Log Settings, the given request to the GitHub API: its URL, whether it had a token, by the name
+     * of its variable, its HTTP status, its rate limit and how long it took. Never the token.
+     */
+    private static void logRequest(@NotNull URL url,
+                                   @Nullable Token token,
+                                   @NotNull HttpURLConnection conn,
+                                   int responseCode,
+                                   long start) {
+        if (!LOGGER.isDebugEnabled()) {
+            return;
+        }
+        String remaining = conn.getHeaderField("X-RateLimit-Remaining");
+        String limit = conn.getHeaderField("X-RateLimit-Limit");
+        LOGGER.debug("GitHub API request {} {}: HTTP {} in {} ms{}",
+                url,
+                token != null ? "with the token of the environment variable " + token.variable() : "anonymously",
+                responseCode,
+                TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start),
+                remaining != null && limit != null
+                        ? ", X-RateLimit-Remaining " + remaining + " of X-RateLimit-Limit " + limit
+                        : "");
     }
 
     /**

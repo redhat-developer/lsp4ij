@@ -28,6 +28,7 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.regex.Pattern;
 
 import static com.redhat.devtools.lsp4ij.installation.download.GitHubAssetFetcherTest.RELEASES_PATH;
 import static com.redhat.devtools.lsp4ij.installation.download.GitHubAssetFetcherTest.RESET;
@@ -131,6 +132,93 @@ public class GitHubDownloadTaskTest {
                                 + "environment variable GITHUB_TOKEN")),
                 "the console must show the rate limit as an error: " + context.output());
         assertTrue(context.output().contains("fallback to the 'url' JSON property"), context.output());
+    }
+
+    @Test
+    public void testTheLogHasOneLinePerDownloadWithWhereItsUrlComesFrom() throws Exception {
+        server.answer(RELEASES_PATH, Response.ok(releases(server.url() + ASSET_PATH)));
+        server.answer(ASSET_PATH, Response.ok("server"));
+
+        try (var log = new LogRecorder()) {
+            assertTrue(createTask(Map.of("GITHUB_TOKEN", TOKEN), null).run(new RecordingContext()));
+
+            assertEquals(1, infoAndWarnings(log).size(), log.output());
+            assertTrue(infoAndWarnings(log).get(0).matches(Pattern.quote("INFO Installer 'test' downloaded "
+                            + server.url() + ASSET_PATH + " (6 bytes) in ") + "\\d+" + Pattern.quote(" ms; its URL "
+                            + "comes from the GitHub API, with the token of the environment variable GITHUB_TOKEN (")
+                            + "\\d+" + Pattern.quote(" ms)")),
+                    log.output());
+            assertNoToken(log);
+        }
+    }
+
+    @Test
+    public void testTheLogSaysThatADownloadWhoseTokenGitHubRefusesIsAnonymous() throws Exception {
+        server.answer(RELEASES_PATH, new Response(401, Map.of(), ""), Response.ok(releases(server.url() + ASSET_PATH)));
+        server.answer(ASSET_PATH, Response.ok("server"));
+
+        try (var log = new LogRecorder()) {
+            assertTrue(createTask(Map.of("GITHUB_TOKEN", TOKEN), null).run(new RecordingContext()));
+
+            var lines = infoAndWarnings(log);
+            assertEquals(3, lines.size(), log.output());
+            assertTrue(lines.get(0).startsWith("WARNING GitHub releases of owner/repo: GitHub API refused the token "),
+                    lines.get(0));
+            assertTrue(lines.get(1).startsWith("INFO GitHub releases of owner/repo: trying again anonymously"),
+                    lines.get(1));
+            assertTrue(lines.get(2).contains("; its URL comes from the GitHub API, anonymously, since GitHub refused "
+                    + "the token of the environment variable GITHUB_TOKEN ("), lines.get(2));
+            assertNoToken(log);
+        }
+    }
+
+    @Test
+    public void testTheLogSaysThatADownloadFallsBackToItsUrl() throws Exception {
+        server.answer(RELEASES_PATH, GitHubAssetFetcherTest.rateLimit(403, 60, RESET));
+        server.answer(ASSET_PATH, Response.ok("server"));
+
+        try (var log = new LogRecorder()) {
+            assertTrue(createTask(Map.of(), server.url() + ASSET_PATH).run(new RecordingContext()));
+
+            var lines = infoAndWarnings(log);
+            assertEquals(3, lines.size(), log.output());
+            assertTrue(lines.get(0).startsWith("WARNING Cannot load the GitHub releases of owner/repo: GitHub API "
+                    + "rate limit reached: 60 requests an hour (HTTP 403)."), lines.get(0));
+            assertEquals("INFO Installer 'test': no download URL from the GitHub API; falling back to the 'url' of the "
+                    + "download: " + server.url() + ASSET_PATH, lines.get(1));
+            assertTrue(lines.get(2).startsWith("INFO Installer 'test' downloaded " + server.url() + ASSET_PATH
+                    + " (6 bytes) in "), lines.get(2));
+            assertTrue(lines.get(2).contains(
+                    "; its URL comes from its 'url', since its 'github' or 'maven' gave none ("), lines.get(2));
+        }
+    }
+
+    @Test
+    public void testTheLogWarnsOfAFailedDownload() throws Exception {
+        server.answer(RELEASES_PATH, Response.ok(releases(server.url() + ASSET_PATH)));
+        server.answer(ASSET_PATH, new Response(500, Map.of(), ""));
+
+        try (var log = new LogRecorder()) {
+            assertFalse(createTask(Map.of("GITHUB_TOKEN", TOKEN), null).run(new RecordingContext()));
+
+            var lines = infoAndWarnings(log);
+            assertEquals(1, lines.size(), log.output());
+            assertTrue(lines.get(0).startsWith("WARNING Installer 'test': the download of " + server.url() + ASSET_PATH
+                    + " failed\n"), lines.get(0));
+            assertNoToken(log);
+        }
+    }
+
+    /**
+     * Returns the records of the log which IntelliJ writes by default, of the levels INFO and above.
+     */
+    private static @NotNull List<String> infoAndWarnings(@NotNull LogRecorder log) {
+        return log.lines().stream().filter(line -> !line.startsWith("FINE ")).toList();
+    }
+
+    private static void assertNoToken(@NotNull LogRecorder log) {
+        assertFalse(log.output().contains(TOKEN), "the log must not have the token");
+        assertFalse(log.output().contains("Bearer"), "the log must not have the Authorization header");
     }
 
     /**

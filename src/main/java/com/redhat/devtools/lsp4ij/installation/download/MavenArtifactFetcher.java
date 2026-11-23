@@ -77,6 +77,11 @@ public class MavenArtifactFetcher implements AssetFetcher {
         return null;
     }
 
+    @Override
+    public @NotNull String getSource() {
+        return "Maven Central";
+    }
+
     private @Nullable JsonArray getOrLoadDocs(@NotNull Reporter reporter) throws Exception {
         if (docs != null) {
             return docs;
