@@ -63,6 +63,9 @@ import org.eclipse.lsp4j.jsonrpc.Launcher;
 import org.eclipse.lsp4j.jsonrpc.MessageConsumer;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
 import org.eclipse.lsp4j.jsonrpc.messages.Message;
+import org.eclipse.lsp4j.jsonrpc.messages.NotificationMessage;
+import org.eclipse.lsp4j.jsonrpc.messages.RequestMessage;
+import org.eclipse.lsp4j.jsonrpc.json.MessageJsonHandler;
 import org.eclipse.lsp4j.jsonrpc.json.StreamMessageConsumer;
 import org.eclipse.lsp4j.services.LanguageServer;
 import org.jetbrains.annotations.ApiStatus;
@@ -703,21 +706,33 @@ public class LanguageServerWrapper implements Disposable {
                         // requests (e.g. workspace/configuration) are never blocked
                         // behind a slow outgoing notification write that saturates
                         // the pipe.
+                        var outgoingMessages = new OutgoingMessages();
                         UnaryOperator<MessageConsumer> wrapper = consumer -> {
                             boolean outgoing = consumer instanceof StreamMessageConsumer;
                             return message -> {
                                 if (isDisposed()) {
                                     return;
                                 }
-                                logMessage(message, consumer);
+                                // A $/cancelRequest is traced once it is queued, as it is dropped after the shutdown
+                                // request; nothing answers it, so its trace has no answer to come before
+                                boolean cancelRequest = outgoing && OutgoingMessages.isCancelRequest(message);
+                                if (!cancelRequest) {
+                                    logMessage(message, consumer);
+                                }
                                 try {
                                     if (outgoing) {
-                                        CompletableFuture.runAsync(
+                                        Runnable write = () -> CompletableFuture.runAsync(
                                                         () -> consumer.consume(message), messageWriter)
                                                 .exceptionally(e -> {
                                                     getLanguageServerLifecycleManager().onError(this, e);
                                                     return null;
                                                 });
+                                        if (!outgoingMessages.queue(message, write)) {
+                                            return;
+                                        }
+                                        if (cancelRequest) {
+                                            logMessage(message, consumer);
+                                        }
                                     } else {
                                         consumer.consume(message);
                                     }
@@ -3111,6 +3126,42 @@ public class LanguageServerWrapper implements Disposable {
         public LanguageServer languageServer;
         public Future<?> launcherFuture;
         public InitializeResult initializeResult;
+    }
+
+    /**
+     * Queues the messages that one connection sends to the message writer, which writes them in the order they are
+     * queued, and drops a {@code $/cancelRequest} that would follow the {@code shutdown} request: LSP allows only the
+     * {@code exit} notification after {@code shutdown}. The request that it would cancel ends all the same, as LSP4J
+     * cancels the future of a request once it has handed over the notification, and the language server, which shuts
+     * down, would not answer the request anyway.
+     */
+    private static final class OutgoingMessages {
+
+        private boolean shutdownQueued;
+
+        /**
+         * Queues the given message with the given action, unless it is a {@code $/cancelRequest} that would follow the
+         * {@code shutdown} request.
+         *
+         * @param message the message.
+         * @param queue   the action that queues the message to the message writer.
+         * @return true if the message is queued, and false if it is dropped.
+         */
+        synchronized boolean queue(@NotNull Message message, @NotNull Runnable queue) {
+            if (shutdownQueued && isCancelRequest(message)) {
+                return false;
+            }
+            if (message instanceof RequestMessage request && "shutdown".equals(request.getMethod())) {
+                shutdownQueued = true;
+            }
+            queue.run();
+            return true;
+        }
+
+        static boolean isCancelRequest(@NotNull Message message) {
+            return message instanceof NotificationMessage notification
+                    && MessageJsonHandler.CANCEL_METHOD.getMethodName().equals(notification.getMethod());
+        }
     }
 
 
