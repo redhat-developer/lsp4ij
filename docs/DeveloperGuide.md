@@ -1392,7 +1392,7 @@ The methods that only take the id mean the instance created first, so use the on
 
 For user-defined language servers, workspace folder configuration is configured in the `Workspace Folders` tab of the
 settings of the language server. A template can have it as a `workspaceFolderSettings.json` file, which an export
-writes, but the New Language Server dialog doesn't apply it yet:
+writes, and which the New Language Server dialog gives the language server it creates:
 
 ![Workspace Folders Configuration](./images/WorkspaceFoldersConfiguration.png)
 
