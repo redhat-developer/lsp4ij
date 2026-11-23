@@ -799,6 +799,37 @@ public class BundledTemplateCommandsTest {
     }
 
     /**
+     * gopls reads a file that it gets as {@code gotmpl} or {@code tmpl} as a template, but finds the templates that
+     * aren't open, which the definitions, references and completions in a template look in, by the extensions of its
+     * {@code templateExtensions} setting, which has none by default. So the bundled settings of gopls give the
+     * extensions of the files that its template sends it as templates, without the dot: gopls compares them with the
+     * part of a file name after its last dot.
+     */
+    @Test
+    void goplsFindsTheTemplatesThatItsTemplateSendsItAlsoWhenTheyAreNotOpen() throws IOException, URISyntaxException {
+        Pattern extension = Pattern.compile("\\*\\.(\\w+)");
+        List<String> extensions = new ArrayList<>();
+        forEachFileTypeMapping((file, fileType, languageId) -> {
+            var patterns = fileType.getAsJsonArray("patterns");
+            if (file.equals("lsp/gopls/template.json") && Set.of("gotmpl", "tmpl").contains(languageId)
+                    && patterns != null) {
+                patterns.forEach(pattern -> {
+                    Matcher matcher = extension.matcher(pattern.getAsString());
+                    extensions.add(matcher.matches() ? matcher.group(1) : pattern.getAsString());
+                });
+            }
+        });
+        var settings = JsonParser.parseString(bundledTexts("settings\\.json").get("lsp/gopls/settings.json"))
+                .getAsJsonObject().getAsJsonObject("gopls");
+        List<String> templateExtensions = new ArrayList<>();
+        settings.getAsJsonArray("build.templateExtensions")
+                .forEach(element -> templateExtensions.add(element.getAsString()));
+        assertEquals(List.of("tmpl", "gotmpl"), extensions, "the extensions of the Go templates in the gopls template");
+        assertEquals(extensions, templateExtensions,
+                "give build.templateExtensions of the gopls settings the extensions of its Go template mapping");
+    }
+
+    /**
      * A step that installs, downloads or configures a server names it as its template or its installer does: the word
      * after Install, Download or Configure is the first word of the name or of the id of the template or of the
      * installer, as Svelte in "Configure Svelte Language Server command", and not a server that it was copied from.
