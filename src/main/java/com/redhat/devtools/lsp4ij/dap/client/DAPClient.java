@@ -162,6 +162,8 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
     // Whether the last request that resumed the program was a step that resumed only its thread. A breakpoint which
     // doesn't suspend then resumes only the stopped thread, so the threads the step kept stopped stay stopped.
     private volatile boolean singleThreadResumed;
+    // The last 'process' event of the DAP server, which describes the process it debugs, or null until it sends one
+    private volatile @Nullable ProcessEventArguments processEvent;
 
     public DAPClient(@NotNull DAPDebugProcess debugProcess,
                      @NotNull Map<String, Object> dapParameters,
@@ -507,9 +509,70 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
         return client.connectToServer(new EmptyProgressIndicator());
     }
 
+    /**
+     * Shows in the console which process the DAP server debugs, with its PID, as its 'process' event describes it. In
+     * launch mode the process of the debug session is the debug adapter's, so the event is how the user learns the
+     * program's PID. The line of a child session started with 'startDebugging' names that session.
+     */
     @Override
     public void process(ProcessEventArguments args) {
-        IDebugProtocolClient.super.process(args);
+        processEvent = args;
+        debugProcess.print(getProcessMessage(args, getChildSessionName()), ConsoleViewContentType.SYSTEM_OUTPUT);
+    }
+
+    /**
+     * Returns the last 'process' event of the DAP server, which describes the process it debugs: its name, PID, start
+     * method and pointer size, as far as the DAP server knows them.
+     *
+     * @return the last 'process' event of the DAP server, or null if it sent none.
+     */
+    public @Nullable ProcessEventArguments getProcessEvent() {
+        return processEvent;
+    }
+
+    /**
+     * Returns the name of this session if it is a child session started with 'startDebugging': the name of the
+     * configuration it was started with, as VS Code names a child session, or else the name of the run configuration.
+     * Returns null for the root session.
+     */
+    private @Nullable String getChildSessionName() {
+        if (parentClient == null) {
+            return null;
+        }
+        return dapParameters.get("name") instanceof String name && StringUtils.isNotBlank(name) ? name : getConfigName();
+    }
+
+    /**
+     * Returns the line which the console shows for a 'process' event, such as
+     * {@code Debugging process '/path/app' (PID 1234, launched)}. What the event leaves out is left out of the line.
+     *
+     * @param args             the 'process' event.
+     * @param childSessionName the name of the child session which received the event, or null for the root session.
+     * @return the line which the console shows for the 'process' event.
+     */
+    static @NotNull String getProcessMessage(@NotNull ProcessEventArguments args, @Nullable String childSessionName) {
+        var details = new ArrayList<String>();
+        if (args.getSystemProcessId() != null) {
+            // A string, since MessageFormat would group the digits of a number, as in 1,234
+            details.add(DAPBundle.message("dap.process.pid", String.valueOf(args.getSystemProcessId())));
+        }
+        if (Boolean.FALSE.equals(args.getIsLocalProcess())) {
+            details.add(DAPBundle.message("dap.process.remote"));
+        }
+        if (args.getStartMethod() != null) {
+            details.add(switch (args.getStartMethod()) {
+                case LAUNCH -> DAPBundle.message("dap.process.launch");
+                case ATTACH -> DAPBundle.message("dap.process.attach");
+                case ATTACH_FOR_SUSPENDED_LAUNCH -> DAPBundle.message("dap.process.attach.for.suspended.launch");
+            });
+        }
+        String name = args.getName();
+        String message = StringUtils.isNotBlank(name) ?
+                DAPBundle.message("dap.process", name) : DAPBundle.message("dap.process.unnamed");
+        if (!details.isEmpty()) {
+            message = DAPBundle.message("dap.process.details", message, String.join(", ", details));
+        }
+        return childSessionName != null ? DAPBundle.message("dap.process.child.session", message, childSessionName) : message;
     }
 
     @Override

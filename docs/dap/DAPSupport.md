@@ -17,7 +17,7 @@ Current state of [Events](https://microsoft.github.io/debug-adapter-protocol//sp
 * ❌ [Memory](https://microsoft.github.io/debug-adapter-protocol//specification.html#Events_Memory).
 * ✅ [Module](https://microsoft.github.io/debug-adapter-protocol//specification.html#Events_Module).
 * ✅ [Output](https://microsoft.github.io/debug-adapter-protocol//specification.html#Events_Output).
-* ❌ [Process](https://microsoft.github.io/debug-adapter-protocol//specification.html#Events_Process).
+* ✅ [Process](https://microsoft.github.io/debug-adapter-protocol//specification.html#Events_Process): the console shows which process the debug adapter debugs, with its PID and how it was started when the event gives them, such as `Debugging process '/path/app' (PID 1234, launched)`; the line of a child session started with `startDebugging` names that session (see [user guide](./UserGuide.md#debugged-process)).
 * ❌ [ProgressEnd](https://microsoft.github.io/debug-adapter-protocol//specification.html#Events_ProgressEnd).
 * ❌ [ProgressStart](https://microsoft.github.io/debug-adapter-protocol//specification.html#Events_ProgressStart).
 * ❌ [ProgressUpdate](https://microsoft.github.io/debug-adapter-protocol//specification.html#Events_ProgressUpdate).
