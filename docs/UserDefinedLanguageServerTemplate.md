@@ -829,6 +829,9 @@ the asset, nor to another host, and the console doesn't show it. The variable mu
 as for the commands of `exec` tasks: set in the shell that starts the IDE, or, for an IDE started from the Dock on
 macOS, in the profile of the login shell, as `~/.zprofile` or `~/.zshrc`. After setting it, restart the IDE.
 
+When the limit is reached, the console says so, and when the limit resets. When GitHub refuses the token, as an expired
+one, the console says so, and names its variable.
+
 #### Maven artifact download
 
 If the DAP/LSP server is published on [Maven Central](https://search.maven.org), you can use the `maven` object in your installer JSON to download the corresponding artifact:

@@ -18,9 +18,14 @@ import org.junit.jupiter.api.Test;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.time.Instant;
+import java.time.LocalTime;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.TimeZone;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -39,6 +44,9 @@ public class GitHubAssetFetcherTest {
     static final String OTHER_TOKEN = "github_pat_test0123456789OTHER";
 
     static final String RELEASES_PATH = "/repos/owner/repo/releases";
+
+    // 2026-11-23T14:35:07Z, whose seconds aren't 0, which LocalTime#toString would leave out
+    static final long RESET = 1795444507L;
 
     private LocalHttpServer api;
 
@@ -194,14 +202,108 @@ public class GitHubAssetFetcherTest {
 
     @Test
     void theTokenIsNotShownWhenTheRequestFails() {
-        for (int code : List.of(401, 403, 404, 500)) {
-            api.answer(RELEASES_PATH, new Response(code, Map.of(), "{\"message\":\"failed\"}"));
+        for (var response : List.of(error(401), error(403), error(404), error(500),
+                rateLimit(403, 5000, RESET), rateLimit(429, 5000, RESET),
+                new Response(403, Map.of("Retry-After", "60"), ""))) {
+            api.answer(RELEASES_PATH, response);
 
             var reporter = new RecordingReporter();
             assertNull(fetch(Map.of("GITHUB_TOKEN", TOKEN), reporter));
 
             assertTrue(reporter.output().contains("Error while loading GitHub releases: "), reporter.output());
             assertNoToken(reporter, TOKEN);
+        }
+    }
+
+    @Test
+    void theRateLimitSaysWhenItResetsAndThatATokenRaisesIt() {
+        for (int code : List.of(403, 429)) {
+            api.answer(RELEASES_PATH, rateLimit(code, 60, RESET));
+
+            var reporter = new RecordingReporter();
+            assertNull(fetch(Map.of(), reporter));
+
+            assertEquals("Error while loading GitHub releases: GitHub API rate limit reached: 60 requests an hour "
+                            + "(HTTP " + code + "). It resets at " + localTime(RESET) + " (local time). Setting the "
+                            + "environment variable GITHUB_TOKEN of the IDE to a GitHub token raises the limit to "
+                            + "5,000 requests an hour.",
+                    reporter.lines().get(1).strip(), "the message must explain the error, without a stack trace");
+        }
+    }
+
+    @Test
+    void theRateLimitResetsAtTheLocalTime() {
+        api.answer(RELEASES_PATH, rateLimit(403, 60, RESET));
+        TimeZone timeZone = TimeZone.getDefault();
+        try {
+            TimeZone.setDefault(TimeZone.getTimeZone("Pacific/Kiritimati"));
+            var reporter = new RecordingReporter();
+            fetch(Map.of(), reporter);
+
+            // 14 hours ahead of UTC
+            String local = LocalTime.ofInstant(Instant.ofEpochSecond(RESET), ZoneId.of("Pacific/Kiritimati"))
+                    .format(DateTimeFormatter.ISO_LOCAL_TIME);
+            assertTrue(reporter.output().contains("It resets at " + local + " (local time)."), reporter.output());
+        } finally {
+            TimeZone.setDefault(timeZone);
+        }
+    }
+
+    @Test
+    void theRateLimitOfATokenNamesItsVariable() {
+        api.answer(RELEASES_PATH, rateLimit(403, 5000, RESET));
+
+        var reporter = new RecordingReporter();
+        assertNull(fetch(Map.of("GH_TOKEN", TOKEN), reporter));
+
+        assertEquals("Error while loading GitHub releases: GitHub API rate limit reached for the token of the "
+                        + "environment variable GH_TOKEN: 5000 requests an hour (HTTP 403). It resets at "
+                        + localTime(RESET) + " (local time).",
+                reporter.lines().get(1).strip());
+    }
+
+    @Test
+    void aSecondaryRateLimitSaysWhenToTryAgain() {
+        api.answer(RELEASES_PATH, new Response(403, Map.of("Retry-After", "60", "X-RateLimit-Remaining", "42"), ""));
+
+        var reporter = new RecordingReporter();
+        assertNull(fetch(Map.of(), reporter));
+
+        String message = reporter.lines().get(1).strip();
+        assertTrue(message.startsWith("Error while loading GitHub releases: GitHub API rate limit reached (HTTP 403). "
+                + "Try again in 60 seconds, at "), message);
+        assertTrue(message.endsWith(" (local time). Setting the environment variable GITHUB_TOKEN of the IDE to a "
+                + "GitHub token raises the limit."), message);
+    }
+
+    @Test
+    void aTokenThatGitHubRefusesIsSaidToBeRefused() {
+        api.answer(RELEASES_PATH, new Response(401, Map.of(), "{\"message\": \"Bad credentials\"}"));
+
+        var reporter = new RecordingReporter();
+        assertNull(fetch(Map.of("GH_TOKEN", TOKEN), reporter));
+
+        assertEquals("Error while loading GitHub releases: GitHub API refused the token of the environment variable "
+                        + "GH_TOKEN (HTTP 401): the token is invalid or has expired. Set GH_TOKEN to a valid token, or "
+                        + "unset it.",
+                reporter.lines().get(1).strip());
+        assertNoToken(reporter, TOKEN);
+    }
+
+    @Test
+    void otherErrorsArePrintedAsBefore() {
+        // A 401 without a token, and a 403 which isn't the rate limit
+        for (var response : List.of(error(401), error(403), error(404), error(500),
+                new Response(403, Map.of("X-RateLimit-Remaining", "42", "X-RateLimit-Reset", "" + RESET), ""))) {
+            api.answer(RELEASES_PATH, response);
+
+            var reporter = new RecordingReporter();
+            assertNull(fetch(Map.of(), reporter));
+
+            assertTrue(reporter.lines().get(1).startsWith("Error while loading GitHub releases: "
+                            + "java.lang.RuntimeException: GitHub API returned HTTP " + response.code()
+                            + System.lineSeparator() + "\tat "),
+                    reporter.output());
         }
     }
 
@@ -212,6 +314,35 @@ public class GitHubAssetFetcherTest {
     private @Nullable String fetch(@NotNull Map<String, String> environment, @NotNull Reporter reporter) {
         return new GitHubAssetFetcher("owner", "repo", api.url(), environment::get)
                 .getDownloadUrl(new GitHubAssetFetcher.AssetMatcher("server.jar"), reporter);
+    }
+
+    /**
+     * Returns a response of the GitHub API with the given HTTP status code, which isn't the rate limit.
+     */
+    private static @NotNull Response error(int code) {
+        return new Response(code, Map.of(), "{\"message\": \"failed\"}");
+    }
+
+    /**
+     * Returns a response of the GitHub API at the given rate limit, which resets at the given time, in seconds since
+     * the epoch.
+     */
+    static @NotNull Response rateLimit(int code, int limit, long reset) {
+        return new Response(code, Map.of(
+                "X-RateLimit-Limit", "" + limit,
+                "X-RateLimit-Remaining", "0",
+                "X-RateLimit-Used", "" + limit,
+                "X-RateLimit-Reset", "" + reset,
+                "X-RateLimit-Resource", "core"),
+                "{\"message\": \"API rate limit exceeded for 127.0.0.1.\"}");
+    }
+
+    /**
+     * Returns the given time, in seconds since the epoch, in the time zone of the JVM, as {@code 14:35:07}.
+     */
+    static @NotNull String localTime(long epochSecond) {
+        return LocalTime.ofInstant(Instant.ofEpochSecond(epochSecond), ZoneId.systemDefault())
+                .format(DateTimeFormatter.ISO_LOCAL_TIME);
     }
 
     /**

@@ -30,7 +30,9 @@ import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 import static com.redhat.devtools.lsp4ij.installation.download.GitHubAssetFetcherTest.RELEASES_PATH;
+import static com.redhat.devtools.lsp4ij.installation.download.GitHubAssetFetcherTest.RESET;
 import static com.redhat.devtools.lsp4ij.installation.download.GitHubAssetFetcherTest.TOKEN;
+import static com.redhat.devtools.lsp4ij.installation.download.GitHubAssetFetcherTest.localTime;
 import static com.redhat.devtools.lsp4ij.installation.download.GitHubAssetFetcherTest.releases;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -38,7 +40,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * A download task with a {@code github} source sends the GitHub token of the environment to the GitHub API, and not
- * with the download of the asset, and its console never shows the token (#2142).
+ * with the download of the asset, and its console never shows the token, and says when the rate limit of the GitHub
+ * API resets (#2142).
  */
 public class GitHubDownloadTaskTest {
 
@@ -71,7 +74,7 @@ public class GitHubDownloadTaskTest {
         server.answer(ASSET_PATH, Response.ok("server"));
 
         var context = new RecordingContext();
-        boolean installed = createTask(null).run(context);
+        boolean installed = createTask(Map.of("GITHUB_TOKEN", TOKEN), null).run(context);
 
         assertTrue(installed, context.output());
         assertEquals("server", Files.readString(outputDir.resolve("server.jar")));
@@ -85,20 +88,38 @@ public class GitHubDownloadTaskTest {
         server.answer(RELEASES_PATH, new Response(401, Map.of(), "{\"message\": \"Bad credentials\"}"));
 
         var context = new RecordingContext();
-        boolean installed = createTask(null).run(context);
+        boolean installed = createTask(Map.of("GITHUB_TOKEN", TOKEN), null).run(context);
 
         assertFalse(installed, "the download has no url to fall back to");
         assertTrue(context.output().contains("Error while loading GitHub releases: "), context.output());
         assertNoToken(context);
     }
 
+    @Test
+    public void testTheConsoleSaysWhenTheRateLimitResetsAndFallsBackToTheUrl() throws Exception {
+        server.answer(RELEASES_PATH, GitHubAssetFetcherTest.rateLimit(403, 60, RESET));
+        server.answer(ASSET_PATH, Response.ok("server"));
+
+        var context = new RecordingContext();
+        boolean installed = createTask(Map.of(), server.url() + ASSET_PATH).run(context);
+
+        assertTrue(installed, context.output());
+        assertEquals("server", Files.readString(outputDir.resolve("server.jar")));
+        assertTrue(context.errors().stream().anyMatch(error -> error.startsWith(
+                        "Error while loading GitHub releases: GitHub API rate limit reached: 60 requests an hour "
+                                + "(HTTP 403). It resets at " + localTime(RESET) + " (local time). Setting the "
+                                + "environment variable GITHUB_TOKEN")),
+                "the console must show the rate limit as an error: " + context.output());
+        assertTrue(context.output().contains("fallback to the 'url' JSON property"), context.output());
+    }
+
     /**
      * Returns a download task which downloads the asset {@code server.jar} of the latest release of
-     * {@code owner/repo}, which it finds through the local GitHub API with the token
-     * {@link GitHubAssetFetcherTest#TOKEN} in {@code GITHUB_TOKEN}, or else the given URL, into the output directory.
+     * {@code owner/repo}, which it finds through the local GitHub API with the given environment variables, or else
+     * the given URL, into the output directory.
      */
-    private @NotNull DownloadTask createTask(@Nullable String url) {
-        var fetcher = new GitHubAssetFetcher("owner", "repo", server.url(), Map.of("GITHUB_TOKEN", TOKEN)::get);
+    private @NotNull DownloadTask createTask(@NotNull Map<String, String> environment, @Nullable String url) {
+        var fetcher = new GitHubAssetFetcher("owner", "repo", server.url(), environment::get);
         var assetFetcherInfo = new DownloadTask.AssetFetcherInfo(fetcher,
                 GitHubAssetFetcher.RELEASE_MATCHER,
                 new GitHubAssetFetcher.AssetMatcher("server.jar"));
@@ -119,6 +140,7 @@ public class GitHubDownloadTaskTest {
     static class RecordingContext extends InstallerContext {
 
         private final List<String> output = new CopyOnWriteArrayList<>();
+        private final List<String> errors = new CopyOnWriteArrayList<>();
 
         RecordingContext() {
             super(null, InstallerAction.RUN);
@@ -128,12 +150,19 @@ public class GitHubDownloadTaskTest {
         public void print(@Nullable String message, @NotNull ConsoleViewContentType contentType) {
             if (message != null) {
                 output.add(message);
+                if (contentType == ConsoleViewContentType.ERROR_OUTPUT) {
+                    errors.add(message);
+                }
             }
             super.print(message, contentType);
         }
 
         @NotNull String output() {
             return String.join("\n", output);
+        }
+
+        @NotNull List<String> errors() {
+            return errors;
         }
     }
 }

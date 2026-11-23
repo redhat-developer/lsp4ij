@@ -24,6 +24,9 @@ import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URI;
 import java.net.URL;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.function.Function;
 import java.util.regex.Pattern;
@@ -146,6 +149,8 @@ public class GitHubAssetFetcher implements AssetFetcher {
      * 60 an hour by IP address (#2142).
      */
     private static final List<String> TOKEN_VARIABLES = List.of("GITHUB_TOKEN", "GH_TOKEN");
+
+    private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ofPattern("HH:mm:ss");
 
     private final @NotNull String owner;
     private final @NotNull String repository;
@@ -341,6 +346,10 @@ public class GitHubAssetFetcher implements AssetFetcher {
             }
             int responseCode = conn.getResponseCode();
             if (responseCode != 200) {
+                String error = getErrorMessage(conn, responseCode, token);
+                if (error != null) {
+                    throw new GitHubApiError(error);
+                }
                 throw new RuntimeException("GitHub API returned HTTP " + responseCode);
             }
             try (BufferedReader br = new BufferedReader(new InputStreamReader(conn.getInputStream()))) {
@@ -356,6 +365,85 @@ public class GitHubAssetFetcher implements AssetFetcher {
             reporter.setText("Error while loading GitHub releases: ", e);
         }
         return null;
+    }
+
+    /**
+     * Returns the message which explains the given error of the GitHub API when it's the rate limit, or a token that
+     * GitHub refused, and null otherwise. The GitHub API answers 403 or 429 at the rate limit, with
+     * {@code X-RateLimit-Remaining: 0} and the time when the limit resets, in seconds since the epoch, in
+     * {@code X-RateLimit-Reset}, or, at a secondary rate limit, the seconds to wait in {@code Retry-After}.
+     *
+     * @param conn         the connection, with the response of the GitHub API.
+     * @param responseCode the HTTP status code of the response.
+     * @param token        the GitHub token of the request, or null.
+     * @return the message which explains the error, or null.
+     */
+    private static @Nullable String getErrorMessage(@NotNull HttpURLConnection conn,
+                                                    int responseCode,
+                                                    @Nullable Token token) {
+        if (responseCode == HttpURLConnection.HTTP_UNAUTHORIZED && token != null) {
+            return "GitHub API refused the token of the environment variable " + token.variable()
+                    + " (HTTP 401): the token is invalid or has expired. Set " + token.variable()
+                    + " to a valid token, or unset it.";
+        }
+        if (responseCode != HttpURLConnection.HTTP_FORBIDDEN && responseCode != 429) {
+            return null;
+        }
+        boolean exhausted = "0".equals(conn.getHeaderField("X-RateLimit-Remaining"));
+        String retryAfter = conn.getHeaderField("Retry-After");
+        if (!exhausted && retryAfter == null) {
+            return null;
+        }
+        StringBuilder message = new StringBuilder("GitHub API rate limit reached");
+        if (token != null) {
+            message.append(" for the token of the environment variable ").append(token.variable());
+        }
+        String limit = conn.getHeaderField("X-RateLimit-Limit");
+        if (exhausted && limit != null) {
+            message.append(": ").append(limit).append(" requests an hour");
+        }
+        message.append(" (HTTP ").append(responseCode).append(").");
+        Long reset = exhausted ? parseLong(conn.getHeaderField("X-RateLimit-Reset")) : null;
+        Long seconds = parseLong(retryAfter);
+        if (reset != null) {
+            message.append(" It resets at ").append(formatLocalTime(Instant.ofEpochSecond(reset))).append('.');
+        } else if (seconds != null) {
+            message.append(" Try again in ").append(seconds).append(" seconds, at ")
+                    .append(formatLocalTime(Instant.now().plusSeconds(seconds))).append('.');
+        }
+        if (token == null) {
+            message.append(" Setting the environment variable GITHUB_TOKEN of the IDE to a GitHub token raises the")
+                    .append(exhausted ? " limit to 5,000 requests an hour." : " limit.");
+        }
+        return message.toString();
+    }
+
+    private static @Nullable Long parseLong(@Nullable String value) {
+        try {
+            return value != null ? Long.parseLong(value.trim()) : null;
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
+    private static @NotNull String formatLocalTime(@NotNull Instant instant) {
+        return TIME_FORMATTER.withZone(ZoneId.systemDefault()).format(instant) + " (local time)";
+    }
+
+    /**
+     * An error of the GitHub API whose message says what happened and what to do. The console shows the message
+     * without a stack trace, which wouldn't help.
+     */
+    private static class GitHubApiError extends Exception {
+
+        GitHubApiError(@NotNull String message) {
+            super(message, null, false, false);
+        }
+
+        @Override
+        public @NotNull String toString() {
+            return getMessage();
+        }
     }
 
 }
