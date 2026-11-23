@@ -175,7 +175,7 @@ public class DAPSetExpressionSessionTest extends HeavyPlatformTestCase {
         // the children of the new value load with its 'variablesReference'
         server.variablesReferences.clear();
         var children = children(result);
-        assertEquals(List.of(NEW_ANSWER_REFERENCE), List.copyOf(server.variablesReferences));
+        assertEquals(List.of(NEW_ANSWER_REFERENCE), variablesRequestsOtherThanLocals());
         assertEquals(1, children.size());
         assertEquals("value", children.getName(0));
         assertEquals(Integer.valueOf(NEW_ANSWER_REFERENCE), ((DAPValue) children.getValue(0)).getParentVariablesReference());
@@ -324,6 +324,17 @@ public class DAPSetExpressionSessionTest extends HeavyPlatformTestCase {
             }
         });
         return PlatformTestUtil.waitForFuture(done, BOUND_SECONDS * 1000L);
+    }
+
+    /**
+     * Returns the 'variablesReference' of each 'variables' request which the DAP server received since the test last
+     * cleared them, except the locals'. The debugger asks for the locals by itself once the program stops, for the
+     * Variables view and the inline values in the editor, and that request may come at any time during the test.
+     */
+    private @NotNull List<Integer> variablesRequestsOtherThanLocals() {
+        return server.variablesReferences.stream()
+                .filter(reference -> reference != LOCALS_REFERENCE)
+                .toList();
     }
 
     /**
