@@ -26,6 +26,8 @@ import com.redhat.devtools.lsp4ij.dap.client.variables.DAPValue;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import org.eclipse.lsp4j.debug.EvaluateArgumentsContext;
 import org.eclipse.lsp4j.debug.Variable;
+import org.eclipse.lsp4j.debug.VariablePresentationHint;
+import org.eclipse.lsp4j.debug.VariablePresentationHintAttributes;
 import org.eclipse.lsp4j.jsonrpc.ResponseErrorException;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -33,7 +35,9 @@ import org.jetbrains.concurrency.Promise;
 import org.jetbrains.concurrency.Promises;
 
 import java.lang.reflect.Method;
+import java.util.Arrays;
 import java.util.concurrent.CompletionException;
+import java.util.stream.Stream;
 
 /**
  * Debug Adapter Protocol (DAP) debugger evaluator.
@@ -130,11 +134,35 @@ public class DAPDebuggerEvaluator extends XDebuggerEvaluator {
                     variable.setVariablesReference(evaluateResponse.getVariablesReference());
                     variable.setNamedVariables(evaluateResponse.getNamedVariables());
                     variable.setIndexedVariables(evaluateResponse.getIndexedVariables());
+                    variable.setPresentationHint(getResultPresentationHint(evaluateResponse.getPresentationHint()));
                     callback.evaluated(new DAPValue(stackFrame, variable, null));
                 }).exceptionally(error -> {
                     errorOccurred(error, callback);
                     return null;
                 });
+    }
+
+    /**
+     * Returns the presentation hint of an Evaluate result, from the one of the 'evaluate' response: "Set Value..." is
+     * offered for neither a result which the DAP server marks read-only nor a lazy one, as VS Code sets neither.
+     * A lazy result is shown without its 'lazy' flag, as it was before: with its placeholder value and the one
+     * variable which gives its value, and which can be set.
+     *
+     * @param hint the presentation hint of the 'evaluate' response.
+     * @return the presentation hint of the Evaluate result.
+     */
+    static @Nullable VariablePresentationHint getResultPresentationHint(@Nullable VariablePresentationHint hint) {
+        if (hint == null || !Boolean.TRUE.equals(hint.getLazy())) {
+            return hint;
+        }
+        var result = new VariablePresentationHint();
+        result.setKind(hint.getKind());
+        result.setVisibility(hint.getVisibility());
+        var attributes = hint.getAttributes() != null ? Arrays.stream(hint.getAttributes()) : Stream.<String>empty();
+        result.setAttributes(Stream.concat(attributes, Stream.of(VariablePresentationHintAttributes.READ_ONLY))
+                .distinct()
+                .toArray(String[]::new));
+        return result;
     }
 
     @Override
