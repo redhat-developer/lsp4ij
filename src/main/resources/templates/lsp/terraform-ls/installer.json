@@ -11,6 +11,16 @@
       "file": {
         "windows": "${serverDist}/terraform-ls.exe",
         "default": "${serverDist}/terraform-ls"
+      },
+      "onSuccess": {
+        "replaceTemplateCommand": {
+          "name": "Configure terraform-ls server command",
+          "templateCommand": {
+            "windows": "terraform-ls.exe serve",
+            "default": "terraform-ls serve"
+          },
+          "command": "\"${check.file}\" serve"
+        }
       }
     }
   },

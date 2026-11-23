@@ -11,6 +11,13 @@
       "file": {
         "windows": "${serverDist}/docker-language-server.exe",
         "default": "${serverDist}/docker-language-server"
+      },
+      "onSuccess": {
+        "replaceTemplateCommand": {
+          "name": "Configure docker-language-server server command",
+          "templateCommand": "docker-language-server start --stdio",
+          "command": "\"${check.file}\" start --stdio"
+        }
       }
     }
   },

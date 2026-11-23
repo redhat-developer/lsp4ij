@@ -71,16 +71,22 @@ public class BundledTemplateCommandsTest {
      * The templates whose command has no fixed path, which the check of their installer gives them once it finds the
      * server installed (#2011), with the root folder of the archive of their download, if it has one, which the download
      * adds to {@code ${output.dir}}, as {@code clangd_snapshot_20250518/} in {@code clangd-mac-snapshot_20250518.zip}.
+     * Also the templates whose command is the one of a server on the PATH, as {@code cpp_ls}, whose installer puts the
+     * server in {@code ~/.lsp4ij}, not on the PATH. The {@code ./} root of the cpp_ls archives on Linux and macOS,
+     * which the download adds as {@code /.}, names the same folder.
      */
-    private static final Map<String, String> CHECKS_WHICH_GIVE_THE_COMMAND = Map.of(
-            "lsp/clangd", "clangd_snapshot_20250518",
-            "lsp/camel-lsp-server", "",
-            "lsp/ada_language_server", "integration",
-            "lsp/rust-analyzer", "",
-            "lsp/wgsl-analyzer", "",
-            "dap/codelldb", "",
-            "dap/perl-dap", "",
-            "dap/vscode-js-debug", "js-debug");
+    private static final Map<String, String> CHECKS_WHICH_GIVE_THE_COMMAND = Map.ofEntries(
+            Map.entry("lsp/clangd", "clangd_snapshot_20250518"),
+            Map.entry("lsp/camel-lsp-server", ""),
+            Map.entry("lsp/ada_language_server", "integration"),
+            Map.entry("lsp/rust-analyzer", ""),
+            Map.entry("lsp/wgsl-analyzer", ""),
+            Map.entry("lsp/cpp_ls", ""),
+            Map.entry("lsp/docker-language-server", ""),
+            Map.entry("lsp/terraform-ls", ""),
+            Map.entry("dap/codelldb", ""),
+            Map.entry("dap/perl-dap", ""),
+            Map.entry("dap/vscode-js-debug", "js-debug"));
 
     @Test
     void shRunsTheWholeCommandWhereABundledTemplateUsesIt() throws IOException, URISyntaxException {
@@ -138,9 +144,10 @@ public class BundledTemplateCommandsTest {
      * A template whose installer checks for the language server where its download puts it starts the language server
      * there, as the command that the installer gives it once it has downloaded it: when the check finds the language
      * server installed, the download doesn't run, and the language server keeps the command of its template (#2011).
-     * Not the templates that start a language server on the PATH, as cpp_ls, nor those whose installer puts it in a
-     * folder named after its version, as clangd. The CSS and ESLint language servers start from the npm package that
-     * their installers share (#1960).
+     * Not the templates whose command is the one of a server on the PATH, as cpp_ls, nor those whose installer puts it
+     * in a folder named after its version, as clangd: the check of their installer gives them the command of the file
+     * that it finds. The CSS and ESLint language servers start from the npm package that their installers share
+     * (#1960).
      */
     @Test
     void aTemplateStartsItsLanguageServerWhereItsInstallerPutsIt() throws IOException, URISyntaxException {

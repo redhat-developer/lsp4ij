@@ -420,6 +420,26 @@ public class InstallerTaskRegistryFileExistsTest {
     }
 
     @Test
+    public void testCppLsGetsFromItsCheckTheCommandThatItsDownloadGivesIt() throws Exception {
+        // The template has the command of a cpp_ls on the PATH; the download puts it in the folder of the template
+        assertTheCheckGivesTheCommandThatTheDownloadGives("lsp/cpp_ls", "cpp_ls-win32-x64.zip",
+                List.of("cpp_ls", "cpp_ls.exe"), List.of(), null, null);
+    }
+
+    @Test
+    public void testDockerLanguageServerGetsFromItsCheckTheCommandThatItsDownloadGivesIt() throws Exception {
+        // The asset is the executable itself, which the download renames
+        assertTheCheckGivesTheCommandThatTheDownloadGives("lsp/docker-language-server",
+                "docker-language-server-darwin-arm64-v0.20.2", List.of(), List.of(), null, null);
+    }
+
+    @Test
+    public void testTerraformLsGetsFromItsCheckTheCommandThatItsDownloadGivesIt() throws Exception {
+        assertTheCheckGivesTheCommandThatTheDownloadGives("lsp/terraform-ls", "terraform-ls_0.39.1_darwin_arm64.zip",
+                List.of("terraform-ls", "terraform-ls.exe", "LICENSE.txt"), List.of(), null, null);
+    }
+
+    @Test
     public void testAllDapTemplatesParseWithoutError() throws IOException {
         assertAllTemplatesInDirectoryParse("dap");
     }

@@ -18,7 +18,8 @@ You can use [Cpp Language Server](https://github.com/CppCXY/cpp_ls) (`cpp_ls`) t
 
 2. **Install the language server** from the `Installer` tab, by clicking the `Check / Run Installation` link:
 
-   * `Check Installation` tests whether `cpp_ls` has already been installed in `$USER_HOME$/.lsp4ij/lsp/cpp_ls`.
+   * `Check Installation` tests whether `cpp_ls` has already been installed in `$USER_HOME$/.lsp4ij/lsp/cpp_ls`. If it
+     has, and the server still has the command of the template, it sets the command to that executable.
    * `Run Installation` downloads the asset which matches your OS and architecture, extracts it in
      `$USER_HOME$/.lsp4ij/lsp/cpp_ls`, and updates the server command to the extracted executable.
    * `Check / Run Installation` does both, which is the simplest choice on a fresh installation.
