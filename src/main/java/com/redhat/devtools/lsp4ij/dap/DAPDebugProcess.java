@@ -292,18 +292,29 @@ public class DAPDebugProcess extends XDebugProcess implements Disposable {
         });
     }
 
-    private static @NlsContexts.ProgressTitle @NotNull String getStartingServerTaskTitle(@Nullable String file,
-                                                                                         @Nullable String serverName,
-                                                                                         @Nullable String address,
-                                                                                         @Nullable Integer port,
-                                                                                         @NotNull DebugMode debugMode) {
+    /**
+     * Returns the title of the task which starts the DAP server, also printed in the console.
+     *
+     * @param file       the file of the run configuration, or null or blank when it has none.
+     * @param serverName the name of the DAP server, or null.
+     * @param address    the address of the DAP server, or null.
+     * @param port       the port of the DAP server, or null.
+     * @param debugMode  launch or attach.
+     * @return the title, such as "Launching 'test.ts' with 'VSCode JS Debug' at 127.0.0.1:9999".
+     */
+    static @NlsContexts.ProgressTitle @NotNull String getStartingServerTaskTitle(@Nullable String file,
+                                                                                 @Nullable String serverName,
+                                                                                 @Nullable String address,
+                                                                                 @Nullable Integer port,
+                                                                                 @NotNull DebugMode debugMode) {
         // Ex :
         // Launching 'test.ts' with 'VSCode JS Debug' at 9999 port...
         // Attaching 'test.ts' with 'VSCode JS Debug' at 9999 port...
         StringBuilder title = new StringBuilder(debugMode == DebugMode.ATTACH ? "Attaching" : "Launching");
 
-        // Add file info
-        if (file != null) {
+        // Add file info. A run configuration whose file field is empty has an empty file, not a null one
+        boolean hasFile = file != null && !file.isBlank();
+        if (hasFile) {
             int index = file.lastIndexOf('/');
             if (index == -1) {
                 index = file.lastIndexOf('\\');
@@ -315,7 +326,7 @@ public class DAPDebugProcess extends XDebugProcess implements Disposable {
 
         // Add server info
         title.append(" ");
-        if (file != null) {
+        if (hasFile) {
             title.append("with ");
         }
         title.append("'");
