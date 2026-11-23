@@ -347,14 +347,14 @@ public class BundledTemplateCommandsTest {
 
     /**
      * An install step that runs a package manager, as {@code go install}, {@code gem install}, {@code pip install},
-     * {@code npm install} or {@code cs install}, ignores its standard error. Package managers write their progress
-     * there, as {@code go: downloading …}, and an {@code exec} that writes to it fails unless it ignores it: the
-     * installation would fail although the server was installed. The exit code of the package manager says whether it
-     * installed the server.
+     * {@code npm install}, {@code cs install} or {@code coursier install}, ignores its standard error. Package managers
+     * write their progress there, as {@code go: downloading …}, and an {@code exec} that writes to it fails unless it
+     * ignores it: the installation would fail although the server was installed. The exit code of the package manager
+     * says whether it installed the server.
      */
     @Test
     void anInstallStepOfAPackageManagerIgnoresItsStandardError() throws IOException, URISyntaxException {
-        Pattern install = Pattern.compile("\\b(go|gem|pip3?|npm(\\.cmd)?|cs) install\\b");
+        Pattern install = Pattern.compile("\\b(go|gem|pip3?|npm(\\.cmd)?|cs|coursier) install\\b");
         List<String> installs = new ArrayList<>();
         List<String> problems = new ArrayList<>();
         bundledFiles().forEach((file, json) -> {
