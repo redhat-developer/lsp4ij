@@ -222,6 +222,23 @@ public class KeepAliveDuringPendingStopTest extends UsefulTestCase {
         assertTrue(definition.statusChanges.contains(ServerStatus.stopping));
     }
 
+    public void testTheReconnectionOfAStartForAnEndedConnectionEndsWhenTheStartIsStopped() throws Exception {
+        var wrapper = start().getServerWrapper();
+        var file = fixture.addFileToProject("ended.kept", "").getVirtualFile();
+        assertNotNull(wrapper.connect(file, new LanguageServerWrapper.LSPFileConnectionInfo(null, null, null, true))
+                .get(10, TimeUnit.SECONDS));
+        // As when the connection to the language server has ended: the next start connects its documents again
+        endTheConnection(wrapper);
+        var initialize = definition.getServer().holdInitialize();
+        try {
+            wrapper.start();
+            wrapper.stop();
+        } finally {
+            initialize.complete(null);
+        }
+        awaitTheEndOfTheReconnection(wrapper);
+    }
+
     public void testTheReconnectionOfARestartEndsWhenTheRestartIsStopped() throws Exception {
         var item = start();
         var wrapper = item.getServerWrapper();
@@ -328,6 +345,16 @@ public class KeepAliveDuringPendingStopTest extends UsefulTestCase {
                 throw new IllegalStateException(e);
             }
         }, 10);
+    }
+
+    /**
+     * Ends the connection to the language server as its end of stream does, which leaves the language server inactive.
+     */
+    private static void endTheConnection(LanguageServerWrapper wrapper) throws ReflectiveOperationException {
+        var launcherFuture = LanguageServerWrapper.class.getDeclaredField("launcherFuture");
+        launcherFuture.setAccessible(true);
+        launcherFuture.set(wrapper, CompletableFuture.completedFuture(null));
+        assertFalse(wrapper.isActive());
     }
 
     private static Alarm stopAlarm(LanguageServerWrapper wrapper) throws ReflectiveOperationException {

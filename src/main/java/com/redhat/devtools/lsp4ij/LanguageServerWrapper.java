@@ -871,6 +871,16 @@ public class LanguageServerWrapper implements Disposable {
                             }
                         }
                     });
+            if (reconnected != null) {
+                // A stop of this start cancels initializeFuture, which then neither connects the documents again nor
+                // runs the failure handler. Off the thread that completes it, as a failure does in its handler, which a
+                // stop for idleness asked for meanwhile must not come in the middle of
+                this.initializeFuture.whenCompleteAsync((unused, error) -> {
+                    if (error != null) {
+                        reconnected.run();
+                    }
+                }, AppExecutorUtil.getAppExecutorService());
+            }
             // Submitted only now that initializeFuture is set: a start which fails at once runs the failure handler
             // above, which fails initializeFuture and then stops the server, clearing it
             ApplicationManager.getApplication().executeOnPooledThread(startTask);
