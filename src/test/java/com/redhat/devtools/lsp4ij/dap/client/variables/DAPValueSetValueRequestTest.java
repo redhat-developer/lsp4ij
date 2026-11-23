@@ -97,40 +97,28 @@ public class DAPValueSetValueRequestTest {
         assertNull(request(true, true, LOCALS_REFERENCE, variable));
     }
 
-    // Lazy variables, whose value the user asked for
+    // Lazy variables: what decides is the variable as the DAP server describes it, not its value, which the user may ask
+    // for later; what that value changes is checked when the value is set
 
     @Test
-    void aLazyVariableIsSetWithSetExpressionOfTheEvaluateNameOfItsValue() {
-        var lazy = variable("size", null);
-        var value = variable("size", "this.size");
+    void aLazyVariableIsSetAsTheDAPServerDescribesIt() {
+        var lazy = lazy(variable("size", "this.size"));
 
-        assertNull(request(false, true, LOCALS_REFERENCE, lazy, lazy));
-        assertEquals(new SetExpression("this.size"), request(false, true, LOCALS_REFERENCE, lazy, value));
-        assertEquals(new SetVariable(), request(true, true, LOCALS_REFERENCE, lazy, value));
+        assertEquals(new SetVariable(), request(true, true, LOCALS_REFERENCE, lazy));
+        assertEquals(new SetExpression("this.size"), request(false, true, LOCALS_REFERENCE, lazy));
+        assertNull(request(false, true, LOCALS_REFERENCE, lazy(variable("size", null))));
+        assertNull(request(true, true, LOCALS_REFERENCE, readOnly(lazy)));
     }
 
-    @Test
-    void aLazyVariableWhoseValueIsReadOnlyCantBeSet() {
-        var lazy = variable("size", "this.size");
-
-        assertNull(request(true, true, LOCALS_REFERENCE, lazy, readOnly(variable("size", "this.size"))));
-        assertNull(request(true, true, LOCALS_REFERENCE, readOnly(lazy), variable("size", "this.size")));
-    }
-
+    /**
+     * As DAPValue.getModifier(), for a value which the DAP server describes with the given variable.
+     */
     private static @Nullable SetValueRequest request(boolean supportsSetVariable,
                                                      boolean supportsSetExpression,
                                                      @Nullable Integer parentVariablesReference,
                                                      @NotNull Variable variable) {
-        return request(supportsSetVariable, supportsSetExpression, parentVariablesReference, variable, variable);
-    }
-
-    private static @Nullable SetValueRequest request(boolean supportsSetVariable,
-                                                     boolean supportsSetExpression,
-                                                     @Nullable Integer parentVariablesReference,
-                                                     @NotNull Variable variable,
-                                                     @NotNull Variable shown) {
         return DAPValue.getSetValueRequest(supportsSetVariable, supportsSetExpression, parentVariablesReference,
-                variable, shown);
+                DAPValue.isReadOnly(variable), DAPValue.getAssignableExpression(parentVariablesReference, variable));
     }
 
     /**
@@ -148,6 +136,14 @@ public class DAPValueSetValueRequestTest {
         variable.setName(name);
         variable.setValue("41");
         variable.setEvaluateName(evaluateName);
+        return variable;
+    }
+
+    private static @NotNull Variable lazy(@NotNull Variable variable) {
+        var hint = new VariablePresentationHint();
+        hint.setLazy(true);
+        variable.setPresentationHint(hint);
+        variable.setVariablesReference(2);
         return variable;
     }
 

@@ -13,6 +13,7 @@ package com.redhat.devtools.lsp4ij.dap.client.variables;
 import com.intellij.xdebugger.XExpression;
 import com.intellij.xdebugger.frame.XValueModifier;
 import com.redhat.devtools.lsp4ij.dap.evaluation.DAPDebuggerEvaluator;
+import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import org.eclipse.lsp4j.debug.SetExpressionResponse;
 import org.eclipse.lsp4j.debug.Variable;
 import org.jetbrains.annotations.NotNull;
@@ -30,7 +31,8 @@ public class DAPExpressionModifier extends XValueModifier {
 
     /**
      * @param value      the value which is set.
-     * @param expression the expression which the value is assigned to.
+     * @param expression the expression which the value is assigned to: the evaluated expression of an Evaluate
+     *                   result, or the 'evaluateName' of a variable.
      */
     public DAPExpressionModifier(@NotNull DAPValue value, @NotNull String expression) {
         this.value = value;
@@ -39,8 +41,13 @@ public class DAPExpressionModifier extends XValueModifier {
 
     @Override
     public void setValue(@NotNull XExpression expression, @NotNull XModificationCallback callback) {
+        String whyItCantBeSet = value.getWhyItCantBeSet(value.getClient().isSupportsSetExpression());
+        if (whyItCantBeSet != null) {
+            DAPValue.reportWhyItCantBeSet(callback, whyItCantBeSet);
+            return;
+        }
         value.getClient()
-                .setExpression(this.expression, value.getStackFrame().getFrameId(), expression.getExpression())
+                .setExpression(getAssignedExpression(), value.getStackFrame().getFrameId(), expression.getExpression())
                 .thenAccept(setExpressionResponse -> {
                     if (setExpressionResponse == null) {
                         callback.errorOccurred("response null");
@@ -53,6 +60,18 @@ public class DAPExpressionModifier extends XValueModifier {
                     DAPDebuggerEvaluator.errorOccurred(error, callback);
                     return null;
                 });
+    }
+
+    /**
+     * Returns the expression which the value is assigned to: the 'evaluateName' of the value which a lazy variable
+     * shows once the user asked for it, if it has one, as in VS Code, and the expression of this modifier otherwise.
+     *
+     * @return the expression which the value is assigned to.
+     */
+    @NotNull String getAssignedExpression() {
+        String evaluateName = value.getShownVariable().getEvaluateName();
+        return value.getParentVariablesReference() != null && StringUtils.isNotBlank(evaluateName) ?
+                evaluateName : expression;
     }
 
     /**
