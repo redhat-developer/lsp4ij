@@ -18,10 +18,13 @@ import com.redhat.devtools.lsp4ij.features.AbstractLSPDocumentFeatureSupport;
 import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
 import com.redhat.devtools.lsp4ij.internal.CompletableFutures;
 import com.redhat.devtools.lsp4ij.usages.LocationData;
+import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+
+import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.isDoneNormally;
 
 /**
  * LSP declaration support which collect:
@@ -38,6 +41,14 @@ public class LSPDeclarationSupport extends AbstractLSPDocumentFeatureSupport<LSP
         super(file, true, true);
     }
 
+    /**
+     * Returns the declarations that the language servers found, as textDocument/declaration answers them. A language
+     * server which fails, or doesn't answer, adds none: when no language server answers, the future completes with an
+     * empty list, and with null when no language server can be asked.
+     *
+     * @param params the parameters of textDocument/declaration.
+     * @return the declarations that the language servers found.
+     */
     public CompletableFuture<List<LocationData>> getDeclarations(LSPDeclarationParams params) {
         int offset = params.getOffset();
         if (previousOffset != null && !previousOffset.equals(offset)) {
@@ -45,6 +56,24 @@ public class LSPDeclarationSupport extends AbstractLSPDocumentFeatureSupport<LSP
         }
         previousOffset = offset;
         return super.getFeatureData(params);
+    }
+
+    /**
+     * Returns the declarations that the language servers answered. It shares the request, and its cache, with
+     * {@link #getDeclarations(LSPDeclarationParams)}, but its future fails when no language server answered: a
+     * cancelled or failed request has nothing to show. The next call sends again a request that no language server
+     * answered.
+     *
+     * @param params the parameters of textDocument/declaration.
+     * @return the declarations that the language servers answered.
+     */
+    @ApiStatus.Internal
+    public synchronized CompletableFuture<List<LocationData>> getAnsweredDeclarations(LSPDeclarationParams params) {
+        if (CompletableFutures.isUnanswered(super.getFuture())) {
+            // Send the request again, instead of the cached result that no language server answered
+            super.cancel();
+        }
+        return CompletableFutures.answersOf(getDeclarations(params));
     }
 
     @Override
@@ -63,6 +92,8 @@ public class LSPDeclarationSupport extends AbstractLSPDocumentFeatureSupport<LSP
                     // Here languageServers is the list of language servers which matches the given file
                     // and which have declaration capability
                     if (languageServers.isEmpty()) {
+                        // No language server can be asked: null, as the public method gave before, which
+                        // getAnsweredDeclarations doesn't take for an answer
                         return CompletableFuture.completedFuture(null);
                     }
 
@@ -72,8 +103,9 @@ public class LSPDeclarationSupport extends AbstractLSPDocumentFeatureSupport<LSP
                             .map(languageServer -> getDeclarationFor(params, file, languageServer, cancellationSupport))
                             .toList();
 
-                    // Merge list of textDocument/declaration future in one future which return the list of declaration ranges
-                    return CompletableFutures.mergeInOneFuture(declarationsPerServerFutures, cancellationSupport);
+                    // Merge list of textDocument/declaration future in one future which return the list of declaration ranges,
+                    // which is a marked empty list when no language server has answered
+                    return CompletableFutures.mergeAnswersInOneFuture(declarationsPerServerFutures, cancellationSupport);
                 });
     }
 
@@ -83,9 +115,14 @@ public class LSPDeclarationSupport extends AbstractLSPDocumentFeatureSupport<LSP
                                                                            @NotNull CancellationSupport cancellationSupport) {
         // Update textDocument Uri with custom file Uri if needed
         updateTextDocumentUri(params.getTextDocument(), file, languageServer);
-        return cancellationSupport.execute(languageServer
-                        .getTextDocumentService()
-                        .declaration(params), languageServer, LSPRequestConstants.TEXT_DOCUMENT_DECLARATION)
-                .thenApplyAsync(locations -> LSPIJUtils.getLocations(locations, languageServer));
+        var request = languageServer
+                .getTextDocumentService()
+                .declaration(params);
+        return cancellationSupport.execute(request, languageServer, LSPRequestConstants.TEXT_DOCUMENT_DECLARATION)
+                // null when the language server hasn't answered: CancellationSupport has reported its error, if any,
+                // and completed with null instead
+                .thenApplyAsync(locations -> isDoneNormally(request)
+                        ? LSPIJUtils.getLocations(locations, languageServer)
+                        : null);
     }
 }

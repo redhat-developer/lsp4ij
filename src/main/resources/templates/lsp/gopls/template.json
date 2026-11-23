@@ -47,8 +47,8 @@
       "fileType": {
         "name": "Go Template File",
         "patterns": [
-          ".tmpl",
-          ".gotmpl"
+          "*.tmpl",
+          "*.gotmpl"
         ]
       },
       "languageId": "gotmpl"

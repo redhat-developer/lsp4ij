@@ -31,7 +31,7 @@
             "arm64": "docker-language-server-linux-arm64-*"
           },
           "mac": {
-            "amd64": "docker-language-server-darwin-amd64-*",
+            "x86_64": "docker-language-server-darwin-amd64-*",
             "arm64": "docker-language-server-darwin-arm64-*"
           }
         }

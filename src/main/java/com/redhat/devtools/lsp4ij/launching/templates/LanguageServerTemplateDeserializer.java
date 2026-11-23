@@ -42,11 +42,13 @@ public class LanguageServerTemplateDeserializer extends ServerTemplateJsonDeseri
                                      @NotNull JsonObject jsonObject,
                                      Type type,
                                      JsonDeserializationContext jsonDeserializationContext) throws JsonParseException {
-        JsonObject programArgs = jsonObject.get(PROGRAM_ARGS_JSON_PROPERTY).getAsJsonObject();
-        if (programArgs != null) {
+        // Without programArgs, there is no command, as for a language server which runs already. A value which isn't an
+        // object fails the template
+        JsonElement programArgs = jsonObject.get(PROGRAM_ARGS_JSON_PROPERTY);
+        if (programArgs != null && !programArgs.isJsonNull()) {
             Gson gson = new Gson();
             Type mapType = new TypeToken<Map<String, String>>(){}.getType();
-            Map<String, String> programArgsMap = gson.fromJson(programArgs, mapType);
+            Map<String, String> programArgsMap = gson.fromJson(programArgs.getAsJsonObject(), mapType);
             languageServerTemplate.setProgramArgs(programArgsMap);
         }
         String workingDir = JSONUtils.getString(jsonObject, WORKING_DIR_JSON_PROPERTY);

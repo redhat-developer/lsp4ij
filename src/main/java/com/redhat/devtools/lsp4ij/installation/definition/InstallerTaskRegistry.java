@@ -59,7 +59,6 @@ public class InstallerTaskRegistry {
         ServerInstallerDescriptor serverInstallerDescriptor = new ServerInstallerDescriptor(name != null ? name : "Untitled", executeOnStartServer,this);
         loadProperties(json, serverInstallerDescriptor);
         loadTask(json, INSTALLER_CHECK_JSON_PROPERTY, serverInstallerDescriptor);
-        loadTask(json, INSTALLER_CHECK_JSON_PROPERTY, serverInstallerDescriptor);
         loadTask(json, INSTALLER_RUN_JSON_PROPERTY, serverInstallerDescriptor);
         return serverInstallerDescriptor;
     }

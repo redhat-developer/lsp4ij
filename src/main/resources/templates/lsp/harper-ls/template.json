@@ -302,7 +302,6 @@
     },
     {
       "fileType": {
-        "name": "Scala",
         "patterns": [
           "*.sh",
           "*.bash",

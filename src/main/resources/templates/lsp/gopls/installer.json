@@ -47,13 +47,14 @@
   "run": {
     "exec": {
       "name": "Install Go Language Server Globally",
-      "command": "go install golang.org/x/tools/gopls@latest"
-    },
-    "onSuccess": {
-      "configureServer": {
-        "name": "Configure Go Language Server command",
-        "command": "gopls -mode=stdio",
-        "update": true
+      "ignoreStderr": true,
+      "command": "go install golang.org/x/tools/gopls@latest",
+      "onSuccess": {
+        "configureServer": {
+          "name": "Configure Go Language Server command",
+          "command": "gopls -mode=stdio",
+          "update": true
+        }
       }
     }
   }
