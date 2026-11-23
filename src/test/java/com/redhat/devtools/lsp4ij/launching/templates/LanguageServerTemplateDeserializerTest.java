@@ -98,6 +98,27 @@ public class LanguageServerTemplateDeserializerTest {
         assertEquals("https://example.com/my-ls", url("\"url\": \"https://example.com/my-ls\""));
     }
 
+    @Test
+    public void aTemplateIsPromotableUnlessItSaysPromotableFalse() {
+        assertFalse(promotable("\"promotable\": false"), "a template with \"promotable\": false");
+        assertTrue(promotable("\"promotable\": true"), "a template with \"promotable\": true");
+        // without the key, as the templates before it
+        assertTrue(promotable(null), "a template without \"promotable\"");
+        // a value which isn't a boolean is ignored
+        assertTrue(promotable("\"promotable\": \"no\""), "a template with \"promotable\": \"no\"");
+    }
+
+    private static boolean promotable(String promotableProperty) {
+        String json = """
+            { "id": "my-ls",
+                "name": "My LS",
+                %s"programArgs": {
+                    "default": "./start.sh"
+                }
+            }""".formatted(promotableProperty != null ? promotableProperty + ",\n" : "");
+        return createGson().fromJson(json, LanguageServerTemplate.class).isPromotable();
+    }
+
     private static String url(String urlProperty) {
         String json = """
             { "id": "my-ls",
