@@ -14,6 +14,7 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import com.intellij.util.EnvironmentUtil;
 import com.redhat.devtools.lsp4ij.JSONUtils;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -23,6 +24,7 @@ import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URI;
 import java.net.URL;
+import java.util.List;
 import java.util.function.Function;
 import java.util.regex.Pattern;
 
@@ -133,8 +135,22 @@ public class GitHubAssetFetcher implements AssetFetcher {
         }
     }
 
+    /**
+     * The URL of the GitHub API.
+     */
+    private static final String GITHUB_API_URL = "https://api.github.com";
+
+    /**
+     * The environment variables which can hold a GitHub token, in order of precedence: {@code GITHUB_TOKEN}, and
+     * {@code GH_TOKEN}, which the gh CLI reads. With a token, the GitHub API allows 5,000 requests an hour, instead of
+     * 60 an hour by IP address (#2142).
+     */
+    private static final List<String> TOKEN_VARIABLES = List.of("GITHUB_TOKEN", "GH_TOKEN");
+
     private final @NotNull String owner;
     private final @NotNull String repository;
+    private final @NotNull String apiUrl;
+    private final @NotNull Function<String, String> environment;
     private @Nullable JsonArray releases;
 
     /**
@@ -144,8 +160,28 @@ public class GitHubAssetFetcher implements AssetFetcher {
      * @param repository the GitHub repository name
      */
     public GitHubAssetFetcher(@NotNull String owner, @NotNull String repository) {
+        // The environment of the IDE, as the commands of the exec tasks get it: on macOS, with the variables of the
+        // login shell when the IDE was started from the Dock
+        this(owner, repository, GITHUB_API_URL, EnvironmentUtil::getValue);
+    }
+
+    /**
+     * Constructs a GitHubAssetFetcher for a given repository owner and name, which requests the given GitHub API, and
+     * finds a GitHub token in the given environment.
+     *
+     * @param owner       the GitHub repository owner
+     * @param repository  the GitHub repository name
+     * @param apiUrl      the URL of the GitHub API, without a trailing slash
+     * @param environment the value of an environment variable, by name, or null if it isn't set
+     */
+    GitHubAssetFetcher(@NotNull String owner,
+                       @NotNull String repository,
+                       @NotNull String apiUrl,
+                       @NotNull Function<String, String> environment) {
         this.owner = owner;
         this.repository = repository;
+        this.apiUrl = apiUrl;
+        this.environment = environment;
     }
 
     /**
@@ -233,7 +269,52 @@ public class GitHubAssetFetcher implements AssetFetcher {
      * @return the URL which lists the releases of the repository.
      */
     static @NotNull String releasesUrl(@NotNull String owner, @NotNull String repository) {
-        return "https://api.github.com/repos/" + owner + "/" + repository + "/releases?per_page=100";
+        return releasesUrl(GITHUB_API_URL, owner, repository);
+    }
+
+    private static @NotNull String releasesUrl(@NotNull String apiUrl,
+                                               @NotNull String owner,
+                                               @NotNull String repository) {
+        return apiUrl + "/repos/" + owner + "/" + repository + "/releases?per_page=100";
+    }
+
+    /**
+     * A GitHub token, and the environment variable which holds it. Its string doesn't show the token.
+     *
+     * @param variable the environment variable which holds the token.
+     * @param value    the token.
+     */
+    private record Token(@NotNull String variable, @NotNull String value) {
+
+        @Override
+        public @NotNull String toString() {
+            return "Token[" + variable + "]";
+        }
+    }
+
+    /**
+     * Returns the GitHub token of the first environment variable of {@link #TOKEN_VARIABLES} which is set and isn't
+     * blank, without the spaces around it, or null if there is none. A value with a space or a control character
+     * inside, which a token doesn't have, is skipped and reported, without the value: a line break in a header would
+     * make {@link HttpURLConnection} throw an exception whose message shows it.
+     *
+     * @param reporter an object to report progress or status messages
+     * @return the GitHub token, or null if there is none.
+     */
+    private @Nullable Token findToken(@NotNull Reporter reporter) {
+        for (String variable : TOKEN_VARIABLES) {
+            String value = environment.apply(variable);
+            if (value == null || value.isBlank()) {
+                continue;
+            }
+            value = value.strip();
+            if (value.chars().allMatch(c -> c > ' ' && c < 0x7F)) {
+                return new Token(variable, value);
+            }
+            reporter.setText("The environment variable " + variable
+                    + " has characters which a GitHub token doesn't have: LSP4IJ doesn't send it to GitHub");
+        }
+        return null;
     }
 
     /**
@@ -243,13 +324,21 @@ public class GitHubAssetFetcher implements AssetFetcher {
      * @return the JSON string of releases, or null if an error occurred
      */
     private @Nullable String fetchReleasesJson(@NotNull Reporter reporter)  {
-        String urlStr = releasesUrl(owner, repository);
-        reporter.setText("> Loading GitHub releases: " + urlStr);
+        String urlStr = releasesUrl(apiUrl, owner, repository);
+        // Read at each request, after the IDE has loaded the environment of the login shell
+        Token token = findToken(reporter);
+        reporter.setText("> Loading GitHub releases: " + urlStr
+                + (token != null ? " (with the token of the environment variable " + token.variable() + ")" : ""));
 
         try {
             URL url = URI.create(urlStr).toURL();
             HttpURLConnection conn = (HttpURLConnection) url.openConnection();
             conn.setRequestMethod("GET");
+            if (token != null) {
+                // HttpURLConnection follows the redirects, and drops the header on a redirect to another host, port or
+                // protocol: the token goes to the GitHub API only
+                conn.setRequestProperty("Authorization", "Bearer " + token.value());
+            }
             int responseCode = conn.getResponseCode();
             if (responseCode != 200) {
                 throw new RuntimeException("GitHub API returned HTTP " + responseCode);
