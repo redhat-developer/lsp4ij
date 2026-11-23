@@ -4,14 +4,19 @@
   "executeOnStartServer": false,
   "check": {
     "exec": {
-      "name": "Trying current command",
-      "command": "${server.command}",
-      "timeout": 2000
+      "name": "Check if Ruby Debug is installed",
+      "command": {
+        "windows": "cmd /C rdbg --version",
+        "default": "rdbg --version"
+      },
+      "ignoreStderr": true,
+      "timeout": 10000
     }
   },
   "run": {
     "exec": {
       "name": "Install Ruby Debug",
+      "ignoreStderr": true,
       "command": {
         "windows": "cmd /C gem install debug",
         "default": "gem install debug"

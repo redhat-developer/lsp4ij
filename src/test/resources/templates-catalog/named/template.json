@@ -1,0 +1,17 @@
+{
+  "id": "named-language-server",
+  "name": "Named Language Server",
+  "programArgs": {
+    "default": "named-language-server --stdio"
+  },
+  "fileTypeMappings": [
+    {
+      "fileType": {
+        "patterns": [
+          "*.named"
+        ]
+      },
+      "languageId": "named"
+    }
+  ]
+}

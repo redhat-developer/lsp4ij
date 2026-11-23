@@ -31,6 +31,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.AbstractMap.SimpleEntry;
 import java.util.List;
+import java.util.Objects;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
@@ -76,7 +77,8 @@ public class LanguageServerTemplateManager extends ServerTemplateManager<Languag
      *
      * @param templateFolder directory that contains the template files
      * @return LanguageServerTemplate or null if one couldn't be created
-     * @throws IOException if an IO error occurs when loading the text from any template file
+     * @throws IOException if an IO error occurs when loading the text from any template file, or if template.json is
+     *                     missing, empty or invalid
      */
     @Nullable
     public LanguageServerTemplate createLsTemplate(@NotNull VirtualFile templateFolder) throws IOException {
@@ -148,7 +150,21 @@ public class LanguageServerTemplateManager extends ServerTemplateManager<Languag
         builder.registerTypeAdapter(LanguageServerTemplate.class, new LanguageServerTemplateDeserializer());
         Gson gson = builder.create();
 
-        LanguageServerTemplate template = gson.fromJson(templateJson, LanguageServerTemplate.class);
+        LanguageServerTemplate template;
+        try {
+            template = gson.fromJson(templateJson, LanguageServerTemplate.class);
+        } catch (RuntimeException e) {
+            // Gson throws a JsonParseException for text which isn't JSON, and the deserializer, which reads the values
+            // with Gson's accessors, an unchecked exception for a value of the wrong type, such as an object where an
+            // array is expected. As an IOException, it fails this template only, which the import reports, and the
+            // other templates still load
+            throw new IOException("template.json of " + templateFolder.getName() + " is invalid: "
+                    + Objects.requireNonNullElse(e.getMessage(), e.toString()), e);
+        }
+        if (template == null) {
+            // Gson reads an empty text as no value
+            throw new IOException("template.json of " + templateFolder.getName() + " is empty");
+        }
         template.setConfiguration(settingsJson);
         template.setConfigurationSchema(settingsSchemaJson);
         template.setInitializationOptions(initializationOptionsJson);

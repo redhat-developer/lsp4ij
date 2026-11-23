@@ -782,8 +782,22 @@ public class WorkspaceFoldersPanel extends JPanel implements Disposable {
         if (!showJsonEditor || jsonEditor == null) {
             return null;
         }
-        String jsonContent = jsonEditor.getText().trim();
-        return (jsonContent.isEmpty() || jsonContent.equals("{}")) ? null : jsonContent;
+        return toJsonConfiguration(jsonEditor.getText());
+    }
+
+    /**
+     * Returns the workspace folder configuration of the given JSON as this panel holds it: trimmed, and null for no
+     * configuration, an empty one or {@code {}}.
+     *
+     * @param jsonContent the JSON of the workspace folder configuration.
+     * @return the workspace folder configuration, or null if there is none.
+     */
+    public static @Nullable String toJsonConfiguration(@Nullable String jsonContent) {
+        if (jsonContent == null) {
+            return null;
+        }
+        String trimmed = jsonContent.trim();
+        return (trimmed.isEmpty() || trimmed.equals("{}")) ? null : trimmed;
     }
 
     public void setJsonConfiguration(@Nullable String jsonConfiguration) {

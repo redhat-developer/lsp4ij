@@ -22,9 +22,7 @@
         "repository": "OpenSysML",
         "prerelease": false,
         "asset": {
-          "windows": {
-            "x86_64": "sysml-lsp-windows-amd64.zip"
-          },
+          "windows": "sysml-lsp-windows-amd64.zip",
           "unix": {
             "x86_64": "sysml-lsp-linux-amd64.tar.gz",
             "arm64": "sysml-lsp-linux-arm64.tar.gz"
@@ -36,9 +34,7 @@
         }
       },
       "url": {
-        "windows": {
-          "x86_64": "https://github.com/Open-MBEE/OpenSysML/releases/download/v0.9.1/sysml-lsp-windows-amd64.zip"
-        },
+        "windows": "https://github.com/Open-MBEE/OpenSysML/releases/download/v0.9.1/sysml-lsp-windows-amd64.zip",
         "unix": {
           "x86_64": "https://github.com/Open-MBEE/OpenSysML/releases/download/v0.9.1/sysml-lsp-linux-amd64.tar.gz",
           "arm64": "https://github.com/Open-MBEE/OpenSysML/releases/download/v0.9.1/sysml-lsp-linux-arm64.tar.gz"

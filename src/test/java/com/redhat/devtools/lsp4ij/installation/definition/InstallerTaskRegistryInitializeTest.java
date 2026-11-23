@@ -159,8 +159,9 @@ public class InstallerTaskRegistryInitializeTest {
 
     /**
      * The bundled installers which checked with an {@code exec} of {@code ${server.command}}, which a server that hangs
-     * passes, still do, and then check with {@code initialize}, as its {@code onSuccess}: but those of the debug adapters
-     * which LSP4IJ attaches to, which have no command, as debugpy and rdbg. {@code initialize} is nowhere else.
+     * passes, still do, and then check with {@code initialize}, as its {@code onSuccess}. {@code initialize} is nowhere
+     * else: the debug adapters which LSP4IJ attaches to, as debugpy and rdbg, have no command, and check that their
+     * debugger is installed with its own {@code --version}.
      */
     @Test
     public void testTheBundledInstallersCheckWithInitializeOnceTheServerCommandRuns() throws IOException {
@@ -184,8 +185,6 @@ public class InstallerTaskRegistryInitializeTest {
         }
         expected.put("lsp/gopls", List.of(EXEC_THEN_INITIALIZE, EXEC_THEN_INITIALIZE));
         expected.put("lsp/jq-lsp", List.of(EXEC_THEN_INITIALIZE, EXEC_THEN_INITIALIZE));
-        expected.put("dap/python-debugpy", List.of(EXEC));
-        expected.put("dap/ruby-rdbg", List.of(EXEC));
         assertEquals(expected, checks);
     }
 

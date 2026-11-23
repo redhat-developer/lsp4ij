@@ -10,6 +10,8 @@ package com.redhat.devtools.lsp4ij.launching.templates;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import com.intellij.util.system.CpuArch;
+import com.redhat.devtools.lsp4ij.installation.definition.InstallerTaskFactoryBase;
 import com.redhat.devtools.lsp4ij.server.definition.launching.CommandUtils;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -344,6 +346,49 @@ public class BundledTemplateCommandsTest {
     }
 
     /**
+     * An install step that runs a package manager, as {@code go install}, {@code gem install}, {@code pip install},
+     * {@code npm install} or {@code cs install}, ignores its standard error. Package managers write their progress
+     * there, as {@code go: downloading …}, and an {@code exec} that writes to it fails unless it ignores it: the
+     * installation would fail although the server was installed. The exit code of the package manager says whether it
+     * installed the server.
+     */
+    @Test
+    void anInstallStepOfAPackageManagerIgnoresItsStandardError() throws IOException, URISyntaxException {
+        Pattern install = Pattern.compile("\\b(go|gem|pip3?|npm(\\.cmd)?|cs) install\\b");
+        List<String> installs = new ArrayList<>();
+        List<String> problems = new ArrayList<>();
+        bundledFiles().forEach((file, json) -> {
+            if (file.endsWith("/installer.json") && json.has("run")) {
+                collectPackageManagerInstalls(json.get("run"), file, install, installs, problems);
+            }
+        });
+        assertTrue(installs.size() > 10, "the installs of a package manager in the installers: " + installs);
+        assertEquals(List.of(), problems, "set \"ignoreStderr\": true on the exec of the install of a package manager");
+    }
+
+    private static void collectPackageManagerInstalls(@NotNull JsonElement json, @NotNull String file,
+                                                      @NotNull Pattern install, @NotNull List<String> installs,
+                                                      @NotNull List<String> problems) {
+        if (!json.isJsonObject()) {
+            return;
+        }
+        JsonObject object = json.getAsJsonObject();
+        if (object.has("command")) {
+            List<String> commands = new ArrayList<>();
+            collectByOs(object.get("command"), commands);
+            if (commands.stream().anyMatch(command -> install.matcher(command).find())) {
+                installs.add(file + ": " + commands);
+                JsonElement ignoreStderr = object.get("ignoreStderr");
+                if (ignoreStderr == null || !ignoreStderr.getAsBoolean()) {
+                    problems.add(file + ": " + commands);
+                }
+            }
+        }
+        object.entrySet().forEach(entry -> collectPackageManagerInstalls(entry.getValue(), file, install, installs,
+                problems));
+    }
+
+    /**
      * Returns the command that the download or the install command of the given installer gives the language server on
      * the given OS, {@code windows} or {@code default}, with the directory and the file of the download, or the
      * properties of the installer, as the working directory of an {@code npm install}.
@@ -537,5 +582,425 @@ public class BundledTemplateCommandsTest {
                 problems.add(file + ": " + command);
             }
         }
+    }
+
+    /**
+     * The {@code os.arch} that the JVM reports on each OS, by the key of the OS in an installer: OpenJDK sets it in
+     * {@code make/autoconf/platform.m4}, as {@code amd64} for x86_64 on every OS but macOS, where it stays
+     * {@code x86_64}, {@code i386} for x86 on Linux, and {@code aarch64} for arm64, and on Windows in
+     * {@code java_props_md.c}. LSP4IJ takes the value of an installer for the CPU of the IDE, as {@link CpuArch} names it,
+     * {@code x86_64}, {@code arm64} or {@code x86}, or else for the {@code os.arch}, or else for {@code default}.
+     */
+    private static final Map<String, List<String>> OS_ARCHS = Map.of(
+            "mac", List.of("x86_64", "aarch64"),
+            "windows", List.of("amd64", "aarch64", "x86"),
+            "unix", List.of("amd64", "aarch64", "i386", "arm", "riscv64", "ppc64le", "s390x"));
+
+    /**
+     * The platforms for which the installers download a server.
+     */
+    private static final List<Platform> PLATFORMS = List.of(
+            new Platform("macOS Apple Silicon", "mac", "aarch64"),
+            new Platform("macOS Intel", "mac", "x86_64"),
+            new Platform("Linux x64", "unix", "amd64"),
+            new Platform("Linux arm64", "unix", "aarch64"),
+            new Platform("Windows x64", "windows", "amd64"),
+            new Platform("Windows arm64", "windows", "aarch64"));
+
+    private static final Pattern ARM64 = words("aarch64|arm64");
+    private static final Pattern X64 = words("x86_64|x64|amd64");
+    /**
+     * The names of the OSes other than the given one, by its key in an installer.
+     */
+    private static final Map<String, Pattern> OTHER_OSES = Map.of(
+            "mac", words("linux|windows|win32|win64|msvc"),
+            "unix", words("darwin|apple|macos|windows|win32|win64|msvc"),
+            "windows", words("linux|darwin|apple|macos"));
+
+    /**
+     * A step which installs, downloads or configures a server, with what follows the verb.
+     */
+    private static final Pattern SERVER_STEP = Pattern.compile("(?:Install|Download|Configure) (.+)");
+    private static final Pattern WORD = Pattern.compile("[A-Za-z0-9]+");
+
+    /**
+     * The dot files that the templates map, which are file names: a pattern without {@code *} or {@code ?} is the exact
+     * name of a file for IntelliJ's {@code FileNameMatcherFactoryImpl.createMatcher}.
+     */
+    private static final Set<String> DOT_FILES = Set.of(".eslintignore", ".eslintrc.json", ".envrc", ".hushlogin");
+
+    /**
+     * A value of an installer for a CPU, as {@code "mac": {"x86_64": ..., "arm64": ...}}, is one that LSP4IJ picks on
+     * some platform of its OS: the JVM reports {@code x86_64} on an Intel Mac, so {@code amd64} is never picked on macOS,
+     * {@code 386} never anywhere, and {@code aarch64} never where {@code arm64} is there too.
+     */
+    @Test
+    void everyValueOfAnInstallerForACpuIsOneThatLsp4ijPicks() throws IOException, URISyntaxException {
+        List<String> values = new ArrayList<>();
+        List<String> problems = new ArrayList<>();
+        bundledFiles().forEach((file, json) -> {
+            if (file.endsWith("/installer.json")) {
+                checkValuesByCpu(json, file, values, problems);
+            }
+        });
+        assertTrue(values.size() > 50, "the values of the installers for a CPU: " + values);
+        assertEquals(List.of(), problems,
+                "give a value for a CPU that LSP4IJ picks: x86_64, arm64 or x86, or an os.arch of the OS");
+    }
+
+    /**
+     * On macOS on Apple Silicon and on Intel, and on Linux and Windows on x64 and on arm64, the download of an installer
+     * has a URL or a GitHub asset, and what an installer takes there by OS and CPU, the asset, the URL and the file of a
+     * download and the file that a check looks for, names no other OS, nor a CPU that the platform can't run: Windows and
+     * macOS on arm64 run x64 programs, Linux on arm64 doesn't.
+     */
+    @Test
+    void anInstallerDownloadsItsServerForEachPlatform() throws IOException, URISyntaxException {
+        List<String> downloads = new ArrayList<>();
+        List<String> problems = new ArrayList<>();
+        bundledFiles().forEach((file, json) -> {
+            if (!file.endsWith("/installer.json")) {
+                return;
+            }
+            for (Platform platform : PLATFORMS) {
+                String where = file + " (" + platform.name() + ")";
+                for (var task : tasks(json, "check", "run")) {
+                    JsonObject body = task.getValue();
+                    if (task.getKey().equals("download")) {
+                        downloads.add(where);
+                        var github = body.getAsJsonObject("github");
+                        String asset = github != null ? platform.get(github, "asset") : null;
+                        String url = platform.get(body, "url");
+                        if (asset == null && url == null && !body.has("maven")) {
+                            problems.add(where + ": no URL nor asset");
+                        }
+                        var output = body.getAsJsonObject("output");
+                        var outputFile = output != null ? output.getAsJsonObject("file") : null;
+                        String fileName = outputFile != null ? platform.get(outputFile, "name") : null;
+                        Stream.of(asset, url, fileName).forEach(value -> platform.check(value, where, problems));
+                    } else if (task.getKey().equals("fileExists")) {
+                        platform.check(platform.get(body, "file"), where, problems);
+                    }
+                }
+            }
+        });
+        assertTrue(downloads.size() > 100, "the downloads of the installers on each platform: " + downloads);
+        assertEquals(List.of(), problems, "download the server of each platform");
+    }
+
+    /**
+     * A step of an installer, its check and its run, and the onSuccess and the onFail of a task, has one task: LSP4IJ
+     * loads only the first key of a step, so an onSuccess beside the exec of a run never runs.
+     */
+    @Test
+    void aStepOfAnInstallerHasOneTask() throws IOException, URISyntaxException {
+        List<String> steps = new ArrayList<>();
+        List<String> problems = new ArrayList<>();
+        bundledFiles().forEach((file, json) -> {
+            if (file.endsWith("/installer.json")) {
+                for (String step : List.of("check", "run")) {
+                    checkStep(json.getAsJsonObject(step), file + ": " + step, steps, problems);
+                }
+            }
+        });
+        assertTrue(steps.size() > 60, "the steps of the installers: " + steps);
+        assertEquals(List.of(), problems, "give a step one task, and its onSuccess and onFail in the task");
+    }
+
+    /**
+     * The check of an installer runs the command of its server, {@code ${server.command}}, only if its template gives the
+     * server a command: a debug adapter that LSP4IJ attaches to, as debugpy, which the user starts, has none, so the
+     * check would never pass, and the installer would install it again at the first debug of each IDE session.
+     */
+    @Test
+    void aCheckRunsTheCommandOfItsServerOnlyIfItsTemplateHasOne() throws IOException, URISyntaxException {
+        var files = bundledFiles();
+        List<String> checks = new ArrayList<>();
+        List<String> problems = new ArrayList<>();
+        files.forEach((file, json) -> {
+            if (!file.endsWith("/installer.json")) {
+                return;
+            }
+            var template = files.get(file.replace("/installer.json", "/template.json"));
+            assertNotNull(template, file);
+            List<String> templateCommands = new ArrayList<>();
+            collectByOs(template.get(file.startsWith("dap/") ? "launch" : "programArgs"), templateCommands);
+            for (var task : tasks(json, "check")) {
+                List<String> commands = new ArrayList<>();
+                if (task.getKey().equals("exec")) {
+                    collectByOs(task.getValue().get("command"), commands);
+                }
+                if (commands.contains("${server.command}")) {
+                    checks.add(file);
+                    if (templateCommands.stream().allMatch(String::isBlank)) {
+                        problems.add(file + ": " + task.getValue().get("name").getAsString());
+                    }
+                }
+            }
+        });
+        assertTrue(checks.size() > 10, "the checks which run the command of their server: " + checks);
+        assertEquals(List.of(), problems, "check for the server with a command that ends, as python -m debugpy --version");
+    }
+
+    /**
+     * The file name patterns of a template match the files that they are for: a pattern without {@code *} or {@code ?}
+     * is the exact name of a file, so an extension is {@code *.tmpl}, as {@code .tmpl} matches only a file named
+     * {@code .tmpl}; and a mapping has a pattern once.
+     */
+    @Test
+    void theFileNamePatternsOfATemplateMatchTheFilesThatTheyAreFor() throws IOException, URISyntaxException {
+        List<String> patterns = new ArrayList<>();
+        List<String> problems = new ArrayList<>();
+        forEachFileTypeMapping((file, fileType, languageId) -> {
+            var mappingPatterns = fileType.getAsJsonArray("patterns");
+            if (mappingPatterns == null) {
+                return;
+            }
+            List<String> seen = new ArrayList<>();
+            mappingPatterns.forEach(element -> {
+                String pattern = element.getAsString();
+                patterns.add(file + ": " + pattern);
+                boolean fileName = !pattern.contains("*") && !pattern.contains("?");
+                if (fileName && pattern.startsWith(".") && !DOT_FILES.contains(pattern)) {
+                    problems.add(file + ": " + pattern + " is the name of a file, not an extension");
+                }
+                if (seen.contains(pattern)) {
+                    problems.add(file + ": " + pattern + " twice");
+                }
+                seen.add(pattern);
+            });
+        });
+        assertTrue(patterns.size() > 200, "the file name patterns of the templates: " + patterns);
+        assertEquals(List.of(), problems,
+                "write an extension as *.ext, and add the dot files that a template maps to DOT_FILES");
+    }
+
+    /**
+     * A file type that a template names goes to one language: in an IDE which has a file type of that name, LSP4IJ maps
+     * the file type, and not the patterns of the mapping, so the shell scripts of a mapping named Scala would go to the
+     * Scala files.
+     */
+    @Test
+    void aFileTypeOfATemplateGoesToOneLanguage() throws IOException, URISyntaxException {
+        Map<String, String> languages = new HashMap<>();
+        List<String> problems = new ArrayList<>();
+        forEachFileTypeMapping((file, fileType, languageId) -> {
+            var name = fileType.get("name");
+            if (name == null) {
+                return;
+            }
+            String previous = languages.putIfAbsent(file + ": " + name.getAsString(), languageId);
+            if (previous != null && !previous.equals(languageId)) {
+                problems.add(file + ": " + name.getAsString() + " goes to " + previous + " and to " + languageId);
+            }
+        });
+        assertTrue(languages.size() > 50, "the file types of the templates: " + languages);
+        assertEquals(List.of(), problems, "name the file type of each language of a template");
+    }
+
+    /**
+     * gopls reads a file that it gets as {@code gotmpl} or {@code tmpl} as a template, but finds the templates that
+     * aren't open, which the definitions, references and completions in a template look in, by the extensions of its
+     * {@code templateExtensions} setting, which has none by default. So the bundled settings of gopls give the
+     * extensions of the files that its template sends it as templates, without the dot: gopls compares them with the
+     * part of a file name after its last dot.
+     */
+    @Test
+    void goplsFindsTheTemplatesThatItsTemplateSendsItAlsoWhenTheyAreNotOpen() throws IOException, URISyntaxException {
+        Pattern extension = Pattern.compile("\\*\\.(\\w+)");
+        List<String> extensions = new ArrayList<>();
+        forEachFileTypeMapping((file, fileType, languageId) -> {
+            var patterns = fileType.getAsJsonArray("patterns");
+            if (file.equals("lsp/gopls/template.json") && Set.of("gotmpl", "tmpl").contains(languageId)
+                    && patterns != null) {
+                patterns.forEach(pattern -> {
+                    Matcher matcher = extension.matcher(pattern.getAsString());
+                    extensions.add(matcher.matches() ? matcher.group(1) : pattern.getAsString());
+                });
+            }
+        });
+        var settings = JsonParser.parseString(bundledTexts("settings\\.json").get("lsp/gopls/settings.json"))
+                .getAsJsonObject().getAsJsonObject("gopls");
+        List<String> templateExtensions = new ArrayList<>();
+        settings.getAsJsonArray("build.templateExtensions")
+                .forEach(element -> templateExtensions.add(element.getAsString()));
+        assertEquals(List.of("tmpl", "gotmpl"), extensions, "the extensions of the Go templates in the gopls template");
+        assertEquals(extensions, templateExtensions,
+                "give build.templateExtensions of the gopls settings the extensions of its Go template mapping");
+    }
+
+    /**
+     * A step that installs, downloads or configures a server names it as its template or its installer does: the word
+     * after Install, Download or Configure is the first word of the name or of the id of the template or of the
+     * installer, as Svelte in "Configure Svelte Language Server command", and not a server that it was copied from.
+     */
+    @Test
+    void aStepNamesTheServerOfItsInstaller() throws IOException, URISyntaxException {
+        var files = bundledFiles();
+        List<String> names = new ArrayList<>();
+        List<String> problems = new ArrayList<>();
+        files.forEach((file, json) -> {
+            if (!file.endsWith("/installer.json")) {
+                return;
+            }
+            var template = files.get(file.replace("/installer.json", "/template.json"));
+            assertNotNull(template, file);
+            List<String> serverWords = Stream.of(template.get("name"), template.get("id"), json.get("name"), json.get("id"))
+                    .filter(value -> value != null && value.isJsonPrimitive())
+                    .map(value -> firstWord(value.getAsString()))
+                    .toList();
+            for (var task : tasks(json, "check", "run")) {
+                var name = task.getValue().get("name");
+                Matcher step = name != null && name.isJsonPrimitive() ? SERVER_STEP.matcher(name.getAsString()) : null;
+                if (step != null && step.matches()) {
+                    names.add(file + ": " + name.getAsString());
+                    if (!serverWords.contains(firstWord(step.group(1)))) {
+                        problems.add(file + ": " + name.getAsString() + ", not " + serverWords);
+                    }
+                }
+            }
+        });
+        assertTrue(names.size() > 50, "the steps that install, download or configure a server: " + names);
+        assertEquals(List.of(), problems, "name the server of the installer in its steps");
+    }
+
+    /**
+     * A platform for which an installer downloads a server.
+     *
+     * @param name   the name of the platform.
+     * @param os     the key of its OS in an installer.
+     * @param osArch the {@code os.arch} that the JVM reports there.
+     */
+    private record Platform(@NotNull String name, @NotNull String os, @NotNull String osArch) {
+
+        /**
+         * Returns the value that an installer takes on this platform for the given property, by OS and CPU.
+         */
+        @Nullable String get(@NotNull JsonObject json, @NotNull String property) {
+            return InstallerTaskFactoryBase.getStringFromOs(json, property, os, CpuArch.fromString(osArch), osArch);
+        }
+
+        /**
+         * Adds a problem if the given value, which an installer takes on this platform, names another OS, or a CPU that
+         * this platform can't run.
+         */
+        void check(@Nullable String value, @NotNull String where, @NotNull List<String> problems) {
+            if (value == null) {
+                return;
+            }
+            boolean arm64 = CpuArch.fromString(osArch) == CpuArch.ARM64;
+            if (!arm64 && ARM64.matcher(value).find()
+                    || arm64 && os.equals("unix") && X64.matcher(value).find()
+                    || OTHER_OSES.get(os).matcher(value).find()
+                    || !os.equals("windows") && value.endsWith(".exe")) {
+                problems.add(where + ": " + value);
+            }
+        }
+    }
+
+    @FunctionalInterface
+    private interface FileTypeMappingConsumer {
+        void accept(@NotNull String file, @NotNull JsonObject fileType, @NotNull String languageId);
+    }
+
+    /**
+     * Calls the given consumer with each file type mapping of the bundled templates.
+     */
+    private static void forEachFileTypeMapping(@NotNull FileTypeMappingConsumer consumer)
+            throws IOException, URISyntaxException {
+        bundledFiles().forEach((file, json) -> {
+            if (file.endsWith("/template.json") && json.has("fileTypeMappings")) {
+                json.getAsJsonArray("fileTypeMappings").forEach(mapping -> consumer.accept(file,
+                        mapping.getAsJsonObject().getAsJsonObject("fileType"),
+                        mapping.getAsJsonObject().get("languageId").getAsString()));
+            }
+        });
+    }
+
+    /**
+     * Returns the tasks of the given steps of the given installer that LSP4IJ loads, by their type, as {@code exec}:
+     * the first key of each step, and of the onSuccess and the onFail of each task, as {@code InstallerTaskRegistry}
+     * loads them.
+     */
+    private static @NotNull List<Map.Entry<String, JsonObject>> tasks(@NotNull JsonObject installer,
+                                                                      @NotNull String... steps) {
+        List<Map.Entry<String, JsonObject>> tasks = new ArrayList<>();
+        for (String step : steps) {
+            addTasks(installer.getAsJsonObject(step), tasks);
+        }
+        return tasks;
+    }
+
+    private static void addTasks(@Nullable JsonObject step, @NotNull List<Map.Entry<String, JsonObject>> tasks) {
+        if (step == null || step.size() == 0) {
+            return;
+        }
+        String type = step.keySet().iterator().next();
+        JsonObject task = step.getAsJsonObject(type);
+        tasks.add(Map.entry(type, task));
+        addTasks(task.getAsJsonObject("onSuccess"), tasks);
+        addTasks(task.getAsJsonObject("onFail"), tasks);
+    }
+
+    private static void checkStep(@Nullable JsonObject step, @NotNull String path, @NotNull List<String> steps,
+                                  @NotNull List<String> problems) {
+        if (step == null) {
+            return;
+        }
+        steps.add(path);
+        if (step.size() != 1) {
+            problems.add(path + ": " + step.keySet());
+        }
+        for (var task : step.entrySet()) {
+            if (task.getValue().isJsonObject()) {
+                for (String next : List.of("onSuccess", "onFail")) {
+                    checkStep(task.getValue().getAsJsonObject().getAsJsonObject(next),
+                            path + "/" + task.getKey() + "/" + next, steps, problems);
+                }
+            }
+        }
+    }
+
+    /**
+     * Adds a problem for each value of the given JSON by CPU, as {@code "mac": {"x86_64": ..., "arm64": ...}}, that
+     * LSP4IJ picks for none of the {@code os.arch} of its OS.
+     */
+    private static void checkValuesByCpu(@NotNull JsonElement json, @NotNull String file, @NotNull List<String> values,
+                                         @NotNull List<String> problems) {
+        if (!json.isJsonObject()) {
+            return;
+        }
+        json.getAsJsonObject().entrySet().forEach(entry -> {
+            String os = entry.getKey();
+            List<String> osArchs = OS_ARCHS.get(os);
+            if (osArchs == null || !entry.getValue().isJsonObject()) {
+                checkValuesByCpu(entry.getValue(), file, values, problems);
+                return;
+            }
+            // The values that LSP4IJ picks on this OS, for each of its os.arch
+            JsonObject byOs = new JsonObject();
+            byOs.add(os, entry.getValue());
+            JsonObject property = new JsonObject();
+            property.add("value", byOs);
+            List<String> picked = osArchs.stream()
+                    .map(osArch -> InstallerTaskFactoryBase.getStringFromOs(property, "value", os,
+                            CpuArch.fromString(osArch), osArch))
+                    .toList();
+            entry.getValue().getAsJsonObject().entrySet().forEach(cpu -> {
+                values.add(file + ": " + os + "/" + cpu.getKey());
+                if (!cpu.getValue().isJsonPrimitive() || !picked.contains(cpu.getValue().getAsString())) {
+                    problems.add(file + ": " + os + "/" + cpu.getKey() + ": " + cpu.getValue());
+                }
+            });
+        });
+    }
+
+    private static @NotNull String firstWord(@NotNull String text) {
+        Matcher word = WORD.matcher(text);
+        return word.find() ? word.group().toLowerCase() : "";
+    }
+
+    private static @NotNull Pattern words(@NotNull String words) {
+        return Pattern.compile("(?<![a-z0-9])(?:" + words + ")(?![a-z0-9])", Pattern.CASE_INSENSITIVE);
     }
 }

@@ -17,6 +17,8 @@ import com.intellij.notification.NotificationType;
 import com.intellij.notification.Notifications;
 import com.intellij.openapi.actionSystem.AnAction;
 import com.intellij.openapi.actionSystem.AnActionEvent;
+import com.intellij.openapi.progress.ProcessCanceledException;
+import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.util.Ref;
 import com.redhat.devtools.lsp4ij.ServerMessageHandler;
 import com.redhat.devtools.lsp4ij.installation.definition.InstallerContext;
@@ -61,7 +63,10 @@ public class ShowMessageTask extends InstallerTask {
             notification.addAction(new AnAction(action.getName()) {
                 @Override
                 public void actionPerformed(@NotNull AnActionEvent anActionEvent) {
-                    selectedAction.set(action);
+                    synchronized (selectedAction) {
+                        selectedAction.set(action);
+                        selectedAction.notifyAll();
+                    }
                 }
             });
         }
@@ -74,14 +79,18 @@ public class ShowMessageTask extends InstallerTask {
 
 
 
-        while(selectedAction.isNull() || notification.isExpired()) {
-            // Wait...
+        // Waits until the user chooses an action, closes the notification, or cancels the installation
+        while (selectedAction.isNull() && !notification.isExpired()) {
+            ProgressManager.checkCanceled();
             try {
                 synchronized (selectedAction) {
-                    selectedAction.wait(1000);
+                    if (selectedAction.isNull()) {
+                        selectedAction.wait(1000);
+                    }
                 }
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
+                throw new ProcessCanceledException(e);
             }
         }
         if (!selectedAction.isNull()) {
