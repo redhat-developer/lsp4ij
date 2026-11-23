@@ -817,6 +817,18 @@ Samples:
 * [clojure-lsp installer](../src/main/resources/templates/lsp/clojure-lsp/installer.json)
 * [rust-analyzer installer](../src/main/resources/templates/lsp/rust-analyzer/installer.json)
 
+##### GitHub API rate limit
+
+Without a token, the GitHub API allows 60 requests an hour per IP address, which all the IDEs and tools behind one
+address share, as on a corporate network, a VPN or CI runners. When they are used up, LSP4IJ falls back to `url`, and a
+download without `url` fails until the limit resets. With a GitHub token in the environment variable `GITHUB_TOKEN`, or
+else `GH_TOKEN`, the variable that the `gh` CLI reads, LSP4IJ sends it to the GitHub API, `api.github.com`, and the
+limit is 5,000 requests an hour. Any token works, as a fine-grained personal access token or the one that
+`gh auth token` prints: public repositories need no scope or permission. LSP4IJ doesn't send it with the download of
+the asset, nor to another host, and the console doesn't show it. The variable must be in the environment of the IDE,
+as for the commands of `exec` tasks: set in the shell that starts the IDE, or, for an IDE started from the Dock on
+macOS, in the profile of the login shell, as `~/.zprofile` or `~/.zshrc`. After setting it, restart the IDE.
+
 #### Maven artifact download
 
 If the DAP/LSP server is published on [Maven Central](https://search.maven.org), you can use the `maven` object in your installer JSON to download the corresponding artifact:
