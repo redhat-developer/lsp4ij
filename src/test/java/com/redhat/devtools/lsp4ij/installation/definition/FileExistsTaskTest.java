@@ -10,6 +10,8 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.installation.definition;
 
+import com.intellij.openapi.application.PathMacros;
+import com.intellij.openapi.util.io.FileUtil;
 import com.intellij.testFramework.TestApplicationManager;
 import com.redhat.devtools.lsp4ij.installation.definition.tasks.*;
 import org.junit.BeforeClass;
@@ -18,6 +20,7 @@ import org.junit.Test;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -211,6 +214,101 @@ public class FileExistsTaskTest {
             Files.deleteIfExists(dir1bin);
             Files.deleteIfExists(dir1);
             Files.deleteIfExists(tempDir);
+        }
+    }
+
+    // --- The file found, ${check.file} ---
+
+    @Test
+    public void testCheckFileIsTheFileWithoutGlob() throws IOException {
+        Path tempDir = Files.createTempDirectory("lsp4ij-test");
+        try {
+            Files.createFile(tempDir.resolve("server"));
+            InstallerContext context = createContext();
+            context.putProperty("serverDist", tempDir.toString());
+            assertTrue(createTask("${serverDist}/server").run(context));
+            assertEquals(tempDir + "/server", context.getProperty(FileExistsTask.CHECK_FILE_PROPERTY));
+        } finally {
+            FileUtil.delete(tempDir);
+        }
+    }
+
+    @Test
+    public void testCheckFileIsTheLastInNaturalOrderOfTheFilesThatTheGlobMatches() throws IOException {
+        Path tempDir = Files.createTempDirectory("lsp4ij-test");
+        try {
+            // 19.1.10 is after 19.1.2 in natural order, and before it in the order of the characters
+            for (String version : List.of("clangd_9.0.0", "clangd_19.1.10", "clangd_19.1.2", "clangd_19.1")) {
+                Files.createDirectories(tempDir.resolve(version).resolve("bin"));
+                Files.createFile(tempDir.resolve(version).resolve("bin").resolve("clangd"));
+            }
+            // A folder without the file, after the others, isn't the one found
+            Files.createDirectories(tempDir.resolve("clangd_20.1.0").resolve("bin"));
+            InstallerContext context = createContext();
+            context.putProperty("serverDist", tempDir.toString().replace('\\', '/'));
+            assertTrue(createTask("${serverDist}/clangd*/bin/clangd").run(context));
+            assertEquals(tempDir.toString().replace('\\', '/') + "/clangd_19.1.10/bin/clangd",
+                    context.getProperty(FileExistsTask.CHECK_FILE_PROPERTY));
+        } finally {
+            FileUtil.delete(tempDir);
+        }
+    }
+
+    @Test
+    public void testCheckFileOfAGlobInTheFileName() throws IOException {
+        Path tempDir = Files.createTempDirectory("lsp4ij-test");
+        try {
+            // A jar named after its version, as the Camel Language Server
+            for (String jar : List.of("camel-lsp-server-1.9.0.jar", "camel-lsp-server-1.31.0.jar", "other-2.0.jar")) {
+                Files.createFile(tempDir.resolve(jar));
+            }
+            InstallerContext context = createContext();
+            assertTrue(createTask(tempDir + "/camel-lsp-server-*.jar").run(context));
+            assertEquals(tempDir + "/camel-lsp-server-1.31.0.jar", context.getProperty(FileExistsTask.CHECK_FILE_PROPERTY));
+        } finally {
+            FileUtil.delete(tempDir);
+        }
+    }
+
+    @Test
+    public void testCheckFileKeepsTheMacrosOfThePath() throws IOException {
+        Path tempDir = Files.createTempDirectory("lsp4ij-test");
+        // A path macro, as $USER_HOME$, which a command keeps until the server starts, as the download does
+        String macro = "LSP4IJ_TEST_SERVER_DIST";
+        PathMacros.getInstance().setMacro(macro, tempDir.toString());
+        try {
+            Files.createDirectories(tempDir.resolve("clangd_19.1.2").resolve("bin"));
+            Files.createFile(tempDir.resolve("clangd_19.1.2").resolve("bin").resolve("clangd"));
+            Files.createFile(tempDir.resolve("server"));
+            InstallerContext context = createContext();
+            assertTrue(createTask("$" + macro + "$/clangd*/bin/clangd").run(context));
+            assertEquals("$" + macro + "$/clangd_19.1.2/bin/clangd", context.getProperty(FileExistsTask.CHECK_FILE_PROPERTY));
+            assertTrue(createTask("$" + macro + "$/server").run(context));
+            assertEquals("$" + macro + "$/server", context.getProperty(FileExistsTask.CHECK_FILE_PROPERTY));
+        } finally {
+            PathMacros.getInstance().setMacro(macro, null);
+            FileUtil.delete(tempDir);
+        }
+    }
+
+    @Test
+    public void testNoCheckFileWhenTheFileIsNotFound() throws IOException {
+        Path tempDir = Files.createTempDirectory("lsp4ij-test");
+        try {
+            Files.createFile(tempDir.resolve("server"));
+            InstallerContext context = createContext();
+            assertFalse(createTask(tempDir + "/missing").run(context));
+            assertNull(context.getProperty(FileExistsTask.CHECK_FILE_PROPERTY));
+            assertFalse(createTask(tempDir + "/missing-*").run(context));
+            assertNull(context.getProperty(FileExistsTask.CHECK_FILE_PROPERTY));
+
+            // Nor the file that an earlier check found
+            assertTrue(createTask(tempDir + "/server").run(context));
+            assertNotNull(context.getProperty(FileExistsTask.CHECK_FILE_PROPERTY));
+            assertFalse(createTask(tempDir + "/missing").run(context));
+            assertFalse(context.getPropertyKeys().contains(FileExistsTask.CHECK_FILE_PROPERTY));
+        } finally {
+            FileUtil.delete(tempDir);
         }
     }
 

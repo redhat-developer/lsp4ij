@@ -308,8 +308,11 @@ It should follow this structure:
 LSP4IJ provides built-in tasks:
 
 * [exec](#task-exec) to execute a command (e.g., `npm install typescript-language-server`),
+* [fileExists](#task-fileexists) to check that a file, as the installed server, exists,
 * [download](#task-download) to retrieve a server from a given URL,
-* [configureServer](#task-configureServer) to set the launch command based on the downloaded files.
+* [configureServer](#task-configureServer) to set the launch command based on the downloaded files,
+* [replaceTemplateCommand](#task-replacetemplatecommand) to set the launch command while the server still has the
+  command of its template.
 
 To define custom tasks, you can contribute to the extension point `com.redhat.devtools.lsp4ij.installerTaskFactory`.
 
@@ -503,6 +506,47 @@ Example using `npm` to install [typescript-language-server](https://github.com/t
   }
 }
 ```
+
+### Task fileExists
+
+Checks that a file exists, as the server that the `run` of the installer installs, so that the installation doesn't run
+again once the server is there. Example: the check of clangd, whose archive has a folder named after the version of
+clangd, as `clangd_19.1.2/`:
+
+```json
+{
+  "check": {
+    "fileExists": {
+      "name": "Check if clangd is installed",
+      "file": {
+        "windows": "${serverDist}/clangd*/bin/clangd.exe",
+        "default": "${serverDist}/clangd*/bin/clangd"
+      },
+      "onSuccess": {
+        "replaceTemplateCommand": {
+          "name": "Configure Clangd server command",
+          "templateCommand": "clangd",
+          "command": "\"${check.file}\""
+        }
+      }
+    }
+  }
+}
+```
+
+* `file`: the path of the file, by OS and architecture as the `url` of a [download](#task-download), with the properties
+  of the installer, as `${serverDist}`, and macros, as `$USER_HOME$`. Its segments can have the globs `*` and `?`, as
+  `clangd*`, and `**` for any number of folders.
+* The file found is `${check.file}` for the tasks that run after the check, as its `onSuccess`: the path as written in
+  `file`, with the properties resolved, the macros kept and the globs replaced by the names found, as
+  `$USER_HOME$/.lsp4ij/lsp/clangd_19.1.2/bin/clangd`, in the form of the `${output.dir}` of a download. Of several files
+  that the globs match, it is the last in natural order, which compares the numbers in a name by their value, from the
+  first segment on: `clangd_19.1.10/bin/clangd` after `clangd_19.1.2/bin/clangd`. A `fileExists` which finds no file
+  removes `${check.file}`.
+
+When the check finds the server installed, the `run` doesn't run, so a server created from the template would keep the
+command of the template: a [replaceTemplateCommand](#task-replacetemplatecommand) in the `onSuccess` of the check gives
+it the command that the download gives, from `${check.file}`.
 
 ### Task download
 
@@ -799,3 +843,33 @@ Used to set the server launch command:
   }
 }
 ```
+
+* `command`: the command, by OS and architecture, with the properties of the installer and of the tasks before it, as
+  `${output.dir}` and `${output.file.name}` of a [download](#task-download), or `${check.file}` of a
+  [fileExists](#task-fileexists). A command with `${check.file}` that no `fileExists` found a file for is an error, and
+  the command of the server stays as it is.
+
+#### Task replaceTemplateCommand
+
+Sets the server launch command, as [configureServer](#task-configureServer) does, but only while the server has the
+command of its template. In the `onSuccess` of a check, which also runs from *Check installation* in the settings, it
+gives a server created from the template the command of the file that the check found, and leaves a command that the
+user or a download gave the server as it is:
+
+```json5
+{
+  "replaceTemplateCommand": {
+    "name": "Configure Clangd server command",
+    "templateCommand": "clangd",
+    "command": "\"${check.file}\""
+  }
+}
+```
+
+* `templateCommand`: the command of the template, by OS and architecture, as its `programArgs`, or the `launch` of a
+  debug adapter, compared as written. While the server has another command, the task leaves it as it is and succeeds.
+  On an OS without a `templateCommand`, the task never changes the command.
+* `command`: the command that replaces it, as the `command` of a `configureServer`.
+
+An earlier version of LSP4IJ, which doesn't know this task, skips it: the server keeps the command of its template, and
+the check still passes.

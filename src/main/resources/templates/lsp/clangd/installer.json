@@ -11,6 +11,13 @@
       "file": {
         "windows": "${serverDist}/clangd*/bin/clangd.exe",
         "default": "${serverDist}/clangd*/bin/clangd"
+      },
+      "onSuccess": {
+        "replaceTemplateCommand": {
+          "name": "Configure Clangd server command",
+          "templateCommand": "clangd",
+          "command": "\"${check.file}\""
+        }
       }
     }
   },

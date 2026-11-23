@@ -18,6 +18,16 @@
           "x86_64": "${serverDist}/rust-analyzer-x86_64-apple-darwin",
           "arm64": "${serverDist}/rust-analyzer-aarch64-apple-darwin"
         }
+      },
+      "onSuccess": {
+        "replaceTemplateCommand": {
+          "name": "Configure Rust Language server command",
+          "templateCommand": {
+            "windows": "${BASE_DIR}/rust-analyzer.exe",
+            "default": "${BASE_DIR}/rust-analyzer"
+          },
+          "command": "\"${check.file}\""
+        }
       }
     }
   },
