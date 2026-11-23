@@ -49,6 +49,7 @@ public abstract class ServerTemplateManager<T extends ServerTemplate> {
                     try {
                         T template = importServerTemplate(templateDir);
                         if (template != null) {
+                            checkName(template, templateDir);
                             if (IntelliJPlatformUtils.isDevMode() || !template.isDev()) {
                                 templates.add(template);
                             }
@@ -65,6 +66,17 @@ public abstract class ServerTemplateManager<T extends ServerTemplate> {
         }
         // Sort templates by name
         templates.sort(Comparator.comparing(ServerTemplate::getName));
+    }
+
+    /**
+     * Fails the load of a template without a name, as the templates are sorted and chosen by their names. A template
+     * which the user imports in the New Language Server dialog may have none: the dialog then asks for a name.
+     */
+    private static void checkName(@NotNull ServerTemplate template,
+                                  @NotNull VirtualFile templateDir) throws IOException {
+        if (template.getName() == null) {
+            throw new IOException("template.json of " + templateDir.getName() + " has no name");
+        }
     }
 
     /**
