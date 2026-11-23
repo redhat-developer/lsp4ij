@@ -17,7 +17,7 @@
       },
       "onFail": {
         "exec": {
-          "name": "Checking coursier",
+          "name": "Checking cs",
           "command": {
             "windows": "where cs",
             "default": "which cs"
@@ -32,12 +32,30 @@
             }
           },
           "onFail": {
-            "showMessage": {
-              "name": "Scala Language Server install problem",
-              "content": [
-                "<a href=\"https://get-coursier.io/docs/cli-overview\">Coursier</a> is required to install Scala Language Server (Metals).",
-                "Please <a href=\"https://get-coursier.io/docs/cli-installation\" >install it </a> and ensure <code>cs</code> is in your system PATH. Restart your IDE if needed."
-              ]
+            "exec": {
+              "name": "Checking coursier",
+              "command": {
+                "windows": "where coursier",
+                "default": "which coursier"
+              },
+              "onSuccess": {
+                "fileExists": {
+                  "name": "Check if Scala Language Server is installed",
+                  "file": {
+                    "windows": "${workingDir}/metals.bat",
+                    "default": "${workingDir}/metals"
+                  }
+                }
+              },
+              "onFail": {
+                "showMessage": {
+                  "name": "Scala Language Server install problem",
+                  "content": [
+                    "<a href=\"https://get-coursier.io/docs/cli-overview\">Coursier</a> is required to install Scala Language Server (Metals).",
+                    "<a href=\"https://get-coursier.io/docs/cli-installation\">Install it</a> with <code>cs setup</code>, or with Homebrew: <code>brew install coursier</code>, or <code>brew install coursier/formulas/coursier</code>. Make sure that <code>cs</code> or <code>coursier</code> is in your system PATH, and restart your IDE if needed."
+                  ]
+                }
+              }
             }
           }
         }
@@ -46,18 +64,48 @@
   },
   "run": {
     "exec": {
-      "name": "Install Scala Language Server",
-      "workingDir": "${workingDir}",
-      "ignoreStderr": true,
-      "command": "cs install metals --install-dir .",
+      "name": "Checking cs",
+      "command": {
+        "windows": "where cs",
+        "default": "which cs"
+      },
       "onSuccess": {
-        "configureServer": {
-          "name": "Configure Scala Language Server command",
+        "exec": {
+          "name": "Install Scala Language Server",
+          "workingDir": "${workingDir}",
+          "ignoreStderr": true,
+          "command": "cs install metals --install-dir .",
+          "onSuccess": {
+            "configureServer": {
+              "name": "Configure Scala Language Server command",
+              "command": {
+                "windows": "\"${workingDir}/metals.bat\"",
+                "default": "\"${workingDir}/metals\""
+              },
+              "update": true
+            }
+          }
+        }
+      },
+      "onFail": {
+        "exec": {
+          "name": "Install Scala Language Server with coursier",
+          "workingDir": "${workingDir}",
+          "ignoreStderr": true,
           "command": {
-            "windows": "\"${workingDir}/metals.bat\"",
-            "default": "\"${workingDir}/metals\""
+            "windows": "cmd /C coursier install metals --install-dir .",
+            "default": "coursier install metals --install-dir ."
           },
-          "update": true
+          "onSuccess": {
+            "configureServer": {
+              "name": "Configure Scala Language Server command",
+              "command": {
+                "windows": "\"${workingDir}/metals.bat\"",
+                "default": "\"${workingDir}/metals\""
+              },
+              "update": true
+            }
+          }
         }
       }
     }
