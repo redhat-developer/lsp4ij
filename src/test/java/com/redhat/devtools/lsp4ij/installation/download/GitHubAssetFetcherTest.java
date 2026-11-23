@@ -27,6 +27,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.TimeZone;
+import java.util.regex.Pattern;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -540,6 +541,89 @@ public class GitHubAssetFetcherTest {
         assertNull(fetch(Map.of("GITHUB_TOKEN", TOKEN), reporter));
 
         assertEquals(List.of(new Request(RELEASES_PATH, "Bearer " + TOKEN)), api.requests());
+    }
+
+    @Test
+    void theLogHasEachRequestToTheGitHubApiAtDebugLevel() {
+        api.answer(RELEASES_PATH, new Response(200,
+                Map.of("X-RateLimit-Limit", "5000", "X-RateLimit-Remaining", "4999"),
+                releases(api.url() + "/download/server.jar")));
+
+        try (var log = new LogRecorder()) {
+            fetch(Map.of("GITHUB_TOKEN", TOKEN), new RecordingReporter());
+
+            assertEquals(1, log.lines().size(), log.output());
+            assertTrue(log.lines().get(0).matches(Pattern.quote("FINE GitHub API request " + api.url() + RELEASES_PATH
+                            + "?per_page=100 with the token of the environment variable GITHUB_TOKEN: HTTP 200 in ")
+                            + "\\d+" + Pattern.quote(" ms, X-RateLimit-Remaining 4999 of X-RateLimit-Limit 5000")),
+                    log.output());
+            assertNoToken(log, TOKEN);
+        }
+    }
+
+    @Test
+    void theLogWarnsOfATokenThatGitHubRefusesAndSaysThatTheRequestIsTriedAgain() {
+        api.answer(RELEASES_PATH, new Response(401, Map.of(), "{\"message\": \"Bad credentials\"}"),
+                Response.ok(releases(api.url() + "/download/server.jar")));
+
+        try (var log = new LogRecorder()) {
+            fetch(Map.of("GITHUB_TOKEN", TOKEN), new RecordingReporter());
+
+            var lines = log.lines();
+            assertEquals(4, lines.size(), log.output());
+            assertTrue(lines.get(0).startsWith("FINE GitHub API request " + api.url() + RELEASES_PATH
+                    + "?per_page=100 with the token of the environment variable GITHUB_TOKEN: HTTP 401 in "),
+                    lines.get(0));
+            assertEquals("WARNING GitHub releases of owner/repo: GitHub API refused the token of the environment "
+                    + "variable GITHUB_TOKEN (HTTP 401): the token is invalid or has expired. Set GITHUB_TOKEN to a "
+                    + "valid token, or unset it.", lines.get(1));
+            assertEquals("INFO GitHub releases of owner/repo: trying again anonymously, since GitHub refused the "
+                    + "token of the environment variable GITHUB_TOKEN", lines.get(2));
+            assertTrue(lines.get(3).startsWith("FINE GitHub API request " + api.url() + RELEASES_PATH
+                    + "?per_page=100 anonymously: HTTP 200 in "), lines.get(3));
+            assertNoToken(log, TOKEN);
+        }
+    }
+
+    @Test
+    void theLogWarnsOfTheRateLimit() {
+        api.answer(RELEASES_PATH, rateLimit(403, 60, RESET));
+
+        try (var log = new LogRecorder()) {
+            fetch(Map.of(), new RecordingReporter());
+
+            assertEquals("WARNING Cannot load the GitHub releases of owner/repo: GitHub API rate limit reached: 60 "
+                            + "requests an hour (HTTP 403). It resets at " + localTime(RESET) + " (local time). "
+                            + "Setting the environment variable GITHUB_TOKEN of the IDE to a GitHub token raises the "
+                            + "limit to 5,000 requests an hour.",
+                    log.lines().get(1), log.output());
+        }
+    }
+
+    @Test
+    void theLogNeverHasTheToken() {
+        for (var response : List.of(Response.ok(releases(api.url() + "/download/server.jar")), error(401),
+                error(403), error(404), error(500), rateLimit(403, 5000, RESET),
+                new Response(403, Map.of("Retry-After", "60"), ""),
+                new Response(403, Map.of("X-GitHub-SSO", "required; url=" + SSO_URL + "&t=" + TOKEN), ""),
+                new Response(403, Map.of("X-Accepted-GitHub-Permissions", "contents=read"), ""))) {
+            for (String token : List.of(TOKEN, TOKEN + "\nX-Injected: " + OTHER_TOKEN)) {
+                api.answer(RELEASES_PATH, response);
+
+                try (var log = new LogRecorder()) {
+                    fetch(Map.of("GITHUB_TOKEN", token), new RecordingReporter());
+
+                    assertFalse(log.lines().isEmpty());
+                    assertNoToken(log, TOKEN);
+                    assertNoToken(log, OTHER_TOKEN);
+                    assertFalse(log.output().contains("Bearer"), log.output());
+                }
+            }
+        }
+    }
+
+    static void assertNoToken(@NotNull LogRecorder log, @NotNull String token) {
+        assertFalse(log.output().contains(token), "the log must not have the token");
     }
 
     /**

@@ -849,6 +849,11 @@ When GitHub refuses the token, as for these messages, or the rate limit of the t
 request once again without the token, since the releases of a public repository don't need one, and the console says
 so.
 
+The IDE's log, `idea.log` (*Help | Show Log in Finder*, *Explorer* or *Files*), has a line for each download, with its
+URL, where the URL comes from and how long it took, and a warning for a rate limit, a refused token or a failed
+download. With `#com.redhat.devtools.lsp4ij.installation` in *Help | Diagnostic Tools | Debug Log Settings*, it also
+has each request to the GitHub API, with its status, its rate limit and how long it took. The log never has the token.
+
 #### Maven artifact download
 
 If the DAP/LSP server is published on [Maven Central](https://search.maven.org), you can use the `maven` object in your installer JSON to download the corresponding artifact:

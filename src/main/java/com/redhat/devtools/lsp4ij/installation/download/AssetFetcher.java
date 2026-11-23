@@ -33,4 +33,14 @@ public interface AssetFetcher {
     @Nullable String getDownloadUrl(@NotNull Function<JsonObject, Boolean> releaseMatcher,
                                     @NotNull Function<JsonObject, Boolean> assetMatcher,
                                     @NotNull Reporter reporter);
+
+    /**
+     * Returns where the last download URL of this fetcher comes from, for the log, as "the GitHub API, anonymously".
+     * It never has a secret, as a token.
+     *
+     * @return where the last download URL comes from.
+     */
+    default @NotNull String getSource() {
+        return getClass().getSimpleName();
+    }
 }

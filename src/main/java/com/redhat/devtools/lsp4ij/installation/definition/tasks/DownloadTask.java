@@ -23,6 +23,8 @@ import com.redhat.devtools.lsp4ij.launching.templates.LanguageServerTemplate;
 import com.redhat.devtools.lsp4ij.server.definition.launching.CommandUtils;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
@@ -30,6 +32,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.stream.Stream;
 
@@ -52,6 +55,8 @@ import java.util.stream.Stream;
  * </pre>
  */
 public class DownloadTask extends InstallerTask {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(DownloadTask.class);
 
     private final @Nullable String downloadUrl;
     private final @Nullable DownloadTask.AssetFetcherInfo assetFetcherInfo;
@@ -79,9 +84,15 @@ public class DownloadTask extends InstallerTask {
 
     @Override
     public boolean run(@NotNull InstallerContext context) {
-        String downloadUrl = getDownloadUrl(context);
+        String installer = getServerInstallerDeclaration().getName();
+        long lookupStart = System.nanoTime();
+        DownloadUrl found = getDownloadUrl(context);
+        long lookupMillis = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - lookupStart);
+        String downloadUrl = found.url();
         try {
             if (downloadUrl == null) {
+                LOGGER.warn("Installer '{}': no download URL for the OS {} and the architecture {}",
+                        installer, LanguageServerTemplate.OS_KEY, CpuArch.CURRENT.name().toLowerCase());
                 // language=html
                 String htmlError = """
                         <p>Unable to retrieve the download URL for your platform <code>%s</code> and architecture <code>%s</code>.</p>
@@ -98,6 +109,8 @@ public class DownloadTask extends InstallerTask {
             String originFileName = extractFileName(downloadUrl);
             if (originFileName.isEmpty()) {
                 context.printError("Cannot extract file name from URL.");
+                LOGGER.warn("Installer '{}': cannot extract the file name from the download URL {}", installer,
+                        downloadUrl);
                 return false;
             }
 
@@ -105,7 +118,15 @@ public class DownloadTask extends InstallerTask {
             Path downloadedAsset = tempDir.resolve(originFileName);
 
             // Download with progress
+            long downloadStart = System.nanoTime();
             DownloadUtils.download(downloadUrl, downloadedAsset, context.getProgressIndicator());
+            LOGGER.info("Installer '{}' downloaded {} ({} bytes) in {} ms; its URL comes from {} ({} ms)",
+                    installer,
+                    downloadUrl,
+                    Files.size(downloadedAsset),
+                    TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - downloadStart),
+                    found.source(),
+                    lookupMillis);
             context.print("\nDownloaded asset done in " + downloadedAsset.toString());
 
             // Create output directory where downloaded file must be extracted
@@ -181,6 +202,8 @@ public class DownloadTask extends InstallerTask {
                             <p>Please update the <code>output.file.name</code> section of your <code>installer.json</code> to correctly match your OS and architecture.</p>
                             """.formatted(outputFileName, LanguageServerTemplate.OS_KEY, CpuArch.CURRENT.name().toLowerCase(), outputDir.toString());
                     context.printError(htmlError, true);
+                    LOGGER.warn("Installer '{}': the file {} of output.file.name isn't in {}", installer,
+                            outputFileName, outputDir);
                     return false;
                 }
                 if (outputInfo != null && outputInfo.executable()) {
@@ -198,6 +221,7 @@ public class DownloadTask extends InstallerTask {
         } catch (Exception e) {
             context.addErrorMessage("Download server failed: " + e.getMessage());
             context.printError("Download server failed: ", e);
+            LOGGER.warn("Installer '{}': the download of {} failed", installer, downloadUrl, e);
             return false;
         }
     }
@@ -227,17 +251,32 @@ public class DownloadTask extends InstallerTask {
         return dir;
     }
 
-    private String getDownloadUrl(@NotNull InstallerContext context) {
-        String downloadUrl = null;
-        if (assetFetcherInfo != null) {
-            downloadUrl = assetFetcherInfo.assetFetcher().getDownloadUrl(assetFetcherInfo.releaseMatcher(),
-                    assetFetcherInfo.assetMatcher(),
-                    context);
-            if (downloadUrl == null) {
-                context.print("Cannot retrieve url from 'github/asset', 'maven', fallback to the 'url' JSON property");
-            }
+    private @NotNull DownloadUrl getDownloadUrl(@NotNull InstallerContext context) {
+        if (assetFetcherInfo == null) {
+            return new DownloadUrl(downloadUrl, "its 'url'");
         }
-        return downloadUrl != null ? downloadUrl : this.downloadUrl;
+        AssetFetcher assetFetcher = assetFetcherInfo.assetFetcher();
+        String url = assetFetcher.getDownloadUrl(assetFetcherInfo.releaseMatcher(),
+                assetFetcherInfo.assetMatcher(),
+                context);
+        if (url != null) {
+            return new DownloadUrl(url, assetFetcher.getSource());
+        }
+        context.print("Cannot retrieve url from 'github/asset', 'maven', fallback to the 'url' JSON property");
+        LOGGER.info("Installer '{}': no download URL from {}; falling back to the 'url' of the download: {}",
+                getServerInstallerDeclaration().getName(),
+                assetFetcher.getSource(),
+                downloadUrl != null ? downloadUrl : "none");
+        return new DownloadUrl(downloadUrl, "its 'url', since its 'github' or 'maven' gave none");
+    }
+
+    /**
+     * The URL of a download, and where it comes from, for the log.
+     *
+     * @param url    the URL of the download, or null if there is none.
+     * @param source where the URL comes from.
+     */
+    private record DownloadUrl(@Nullable String url, @NotNull String source) {
     }
 
     public record AssetFetcherInfo(@NotNull AssetFetcher assetFetcher,
