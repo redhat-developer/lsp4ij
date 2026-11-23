@@ -55,7 +55,7 @@ final class LocalHttpServer implements AutoCloseable {
     }
 
     private final @NotNull HttpServer server;
-    private final @NotNull Map<String, Response> responses = new ConcurrentHashMap<>();
+    private final @NotNull Map<String, List<Response>> responses = new ConcurrentHashMap<>();
     private final @NotNull List<Request> requests = new CopyOnWriteArrayList<>();
 
     LocalHttpServer() throws IOException {
@@ -72,10 +72,11 @@ final class LocalHttpServer implements AutoCloseable {
     }
 
     /**
-     * Answers the requests to the given path, without its query, with the given response.
+     * Answers the requests to the given path, without its query, with the given responses, one after the other, and
+     * then with the last one.
      */
-    void answer(@NotNull String path, @NotNull Response response) {
-        responses.put(path, response);
+    void answer(@NotNull String path, @NotNull Response... responses) {
+        this.responses.put(path, new CopyOnWriteArrayList<>(List.of(responses)));
     }
 
     /**
@@ -89,7 +90,8 @@ final class LocalHttpServer implements AutoCloseable {
         try {
             String path = exchange.getRequestURI().getPath();
             requests.add(new Request(path, exchange.getRequestHeaders().getFirst("Authorization")));
-            Response response = responses.getOrDefault(path, new Response(404, Map.of(), ""));
+            List<Response> answers = responses.getOrDefault(path, List.of(new Response(404, Map.of(), "")));
+            Response response = answers.size() > 1 ? answers.remove(0) : answers.get(0);
             response.headers().forEach((name, value) -> exchange.getResponseHeaders().add(name, value));
             byte[] body = response.body().getBytes(StandardCharsets.UTF_8);
             exchange.sendResponseHeaders(response.code(), body.length > 0 ? body.length : -1);

@@ -18,6 +18,7 @@ import org.junit.jupiter.api.Test;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.io.UncheckedIOException;
 import java.time.Instant;
 import java.time.LocalTime;
 import java.time.ZoneId;
@@ -47,6 +48,9 @@ public class GitHubAssetFetcherTest {
 
     // 2026-11-23T14:35:07Z, whose seconds aren't 0, which LocalTime#toString would leave out
     static final long RESET = 1795444507L;
+
+    // What the console adds to the message of a token which GitHub refuses
+    static final String RETRY = " Trying again without the token.";
 
     // As in GitHub's documentation: the authorization request has the id of the token, not the token
     static final String SSO_URL = "https://github.com/orgs/owner/sso?authorization_request="
@@ -267,7 +271,7 @@ public class GitHubAssetFetcherTest {
 
         assertEquals("Error while loading GitHub releases: GitHub API rate limit reached for the token of the "
                         + "environment variable GH_TOKEN: 5000 requests an hour (HTTP 403). It resets at "
-                        + localTime(RESET) + " (local time).",
+                        + localTime(RESET) + " (local time)." + RETRY,
                 reporter.lines().get(1).strip());
     }
 
@@ -294,7 +298,7 @@ public class GitHubAssetFetcherTest {
 
         assertEquals("Error while loading GitHub releases: GitHub API refused the token of the environment variable "
                         + "GH_TOKEN (HTTP 401): the token is invalid or has expired. Set GH_TOKEN to a valid token, or "
-                        + "unset it.",
+                        + "unset it." + RETRY,
                 reporter.lines().get(1).strip());
         assertNoToken(reporter, TOKEN);
     }
@@ -328,7 +332,7 @@ public class GitHubAssetFetcherTest {
         assertEquals("Error while loading GitHub releases: GitHub API refused the token of the environment variable "
                         + "GITHUB_TOKEN (HTTP 403): the organization owner enforces SAML single sign-on, and the token "
                         + "isn't authorized for it. Authorize it at " + SSO_URL
-                        + ", a link which expires after an hour.",
+                        + ", a link which expires after an hour." + RETRY,
                 reporter.lines().get(1).strip());
         assertNoToken(reporter, TOKEN);
     }
@@ -343,7 +347,8 @@ public class GitHubAssetFetcherTest {
 
         assertEquals("Error while loading GitHub releases: GitHub API refused the token of the environment variable "
                         + "GH_TOKEN (HTTP 403): the organization owner enforces SAML single sign-on, and the token "
-                        + "isn't authorized for it. Authorize it for owner in the settings of the token on GitHub.",
+                        + "isn't authorized for it. Authorize it for owner in the settings of the token on GitHub."
+                        + RETRY,
                 reporter.lines().get(1).strip());
     }
 
@@ -357,7 +362,7 @@ public class GitHubAssetFetcherTest {
 
         assertNoToken(reporter, TOKEN);
         assertTrue(reporter.lines().get(1).strip().endsWith(
-                "Authorize it for owner in the settings of the token on GitHub."), reporter.output());
+                "Authorize it for owner in the settings of the token on GitHub." + RETRY), reporter.output());
     }
 
     @Test
@@ -369,7 +374,7 @@ public class GitHubAssetFetcherTest {
         assertNull(fetch(Map.of("GITHUB_TOKEN", TOKEN), reporter));
 
         assertEquals("Error while loading GitHub releases: GitHub API refused the token of the environment variable "
-                        + "GITHUB_TOKEN (HTTP 403): the token lacks the permission contents=read.",
+                        + "GITHUB_TOKEN (HTTP 403): the token lacks the permission contents=read." + RETRY,
                 reporter.lines().get(1).strip());
         assertNoToken(reporter, TOKEN);
     }
@@ -384,7 +389,7 @@ public class GitHubAssetFetcherTest {
 
         assertEquals("Error while loading GitHub releases: GitHub API refused the token of the environment variable "
                         + "GITHUB_TOKEN (HTTP 403): the token lacks the permissions pull_requests=read and "
-                        + "contents=read, or issues=read and contents=read.",
+                        + "contents=read, or issues=read and contents=read." + RETRY,
                 reporter.lines().get(1).strip());
     }
 
@@ -397,7 +402,7 @@ public class GitHubAssetFetcherTest {
 
         assertEquals("Error while loading GitHub releases: GitHub API returned HTTP 404: the repository owner/repo "
                         + "was not found, or it is private and the token of the environment variable GITHUB_TOKEN "
-                        + "can't read it.",
+                        + "can't read it." + RETRY,
                 reporter.lines().get(1).strip());
         assertNoToken(reporter, TOKEN);
     }
@@ -411,7 +416,7 @@ public class GitHubAssetFetcherTest {
 
         assertEquals("Error while loading GitHub releases: GitHub API returned HTTP 404: the repository owner/repo "
                         + "was not found, or it is private and the token of the environment variable GITHUB_TOKEN "
-                        + "can't read it. Reading it needs the permission contents=read.",
+                        + "can't read it. Reading it needs the permission contents=read." + RETRY,
                 reporter.lines().get(1).strip());
     }
 
@@ -425,6 +430,116 @@ public class GitHubAssetFetcherTest {
         assertEquals("Error while loading GitHub releases: GitHub API returned HTTP 404: the repository owner/repo "
                         + "was not found, or it is private.",
                 reporter.lines().get(1).strip());
+    }
+
+    @Test
+    void aTokenThatGitHubRefusesIsNotNeededForAPublicRepository() {
+        api.answer(RELEASES_PATH, new Response(401, Map.of(), "{\"message\": \"Bad credentials\"}"),
+                Response.ok(releases(api.url() + "/download/server.jar")));
+
+        var reporter = new RecordingReporter();
+        String downloadUrl = fetch(Map.of("GITHUB_TOKEN", TOKEN), reporter);
+
+        assertEquals(api.url() + "/download/server.jar", downloadUrl);
+        assertEquals(List.of(new Request(RELEASES_PATH, "Bearer " + TOKEN), new Request(RELEASES_PATH, null)),
+                api.requests(), "the request must be tried again once, without the token");
+        assertEquals("Error while loading GitHub releases: GitHub API refused the token of the environment variable "
+                        + "GITHUB_TOKEN (HTTP 401): the token is invalid or has expired. Set GITHUB_TOKEN to a valid "
+                        + "token, or unset it." + RETRY,
+                reporter.lines().get(1).strip());
+        assertNoToken(reporter, TOKEN);
+    }
+
+    @Test
+    void aTokenWhichSingleSignOnDoesNotAuthorizeIsNotNeededForAPublicRepository() {
+        api.answer(RELEASES_PATH, new Response(403, Map.of("X-GitHub-SSO", "required; url=" + SSO_URL), ""),
+                Response.ok(releases(api.url() + "/download/server.jar")));
+
+        var reporter = new RecordingReporter();
+        String downloadUrl = fetch(Map.of("GITHUB_TOKEN", TOKEN), reporter);
+
+        assertEquals(api.url() + "/download/server.jar", downloadUrl);
+        assertEquals(List.of(new Request(RELEASES_PATH, "Bearer " + TOKEN), new Request(RELEASES_PATH, null)),
+                api.requests());
+        assertTrue(reporter.lines().get(1).contains("enforces SAML single sign-on"), reporter.output());
+        assertNoToken(reporter, TOKEN);
+    }
+
+    @Test
+    void aTokenWhichLacksAPermissionIsNotNeededForAPublicRepository() {
+        api.answer(RELEASES_PATH, new Response(403, Map.of(),
+                        "{\"message\": \"Resource not accessible by personal access token\"}"),
+                Response.ok(releases(api.url() + "/download/server.jar")));
+
+        var reporter = new RecordingReporter();
+        String downloadUrl = fetch(Map.of("GITHUB_TOKEN", TOKEN), reporter);
+
+        assertEquals(api.url() + "/download/server.jar", downloadUrl);
+        assertEquals(2, api.requests().size(), api.requests().toString());
+        assertEquals("Error while loading GitHub releases: GitHub API refused the token of the environment variable "
+                        + "GITHUB_TOKEN (HTTP 403)." + RETRY,
+                reporter.lines().get(1).strip());
+    }
+
+    @Test
+    void theRateLimitOfATokenLeavesTheRequestToTheLimitWithoutIt() {
+        api.answer(RELEASES_PATH, rateLimit(403, 5000, RESET),
+                Response.ok(releases(api.url() + "/download/server.jar")));
+
+        var reporter = new RecordingReporter();
+        String downloadUrl = fetch(Map.of("GITHUB_TOKEN", TOKEN), reporter);
+
+        assertEquals(api.url() + "/download/server.jar", downloadUrl);
+        assertEquals(List.of(new Request(RELEASES_PATH, "Bearer " + TOKEN), new Request(RELEASES_PATH, null)),
+                api.requests());
+    }
+
+    @Test
+    void aRepositoryNotFoundWithATokenIsAskedForOnceMoreWithoutIt() {
+        api.answer(RELEASES_PATH, error(404));
+
+        var reporter = new RecordingReporter();
+        assertNull(fetch(Map.of("GITHUB_TOKEN", TOKEN), reporter));
+
+        assertEquals(List.of(new Request(RELEASES_PATH, "Bearer " + TOKEN), new Request(RELEASES_PATH, null)),
+                api.requests(), "the request must be tried again once only");
+        assertEquals("Error while loading GitHub releases: GitHub API returned HTTP 404: the repository owner/repo "
+                        + "was not found, or it is private.",
+                reporter.lines().get(2).strip(), "the message must be the one of the request without the token");
+        assertEquals(3, reporter.lines().size(), reporter.output());
+        assertNoToken(reporter, TOKEN);
+    }
+
+    @Test
+    void aRequestWithoutATokenIsNotTriedAgain() {
+        for (var response : List.of(error(401), error(403), error(404), error(500), rateLimit(403, 60, RESET),
+                new Response(403, Map.of("X-GitHub-SSO", "required; url=" + SSO_URL), ""))) {
+            try (var server = new LocalHttpServer()) {
+                server.answer(RELEASES_PATH, response, Response.ok(releases(server.url() + "/download/server.jar")));
+
+                var reporter = new RecordingReporter();
+                assertNull(new GitHubAssetFetcher("owner", "repo", server.url(), name -> null)
+                        .getDownloadUrl(new GitHubAssetFetcher.AssetMatcher("server.jar"), reporter));
+
+                assertEquals(List.of(new Request(RELEASES_PATH, null)), server.requests(),
+                        "HTTP " + response.code() + " without a token must not be tried again");
+                assertFalse(reporter.output().contains(RETRY), reporter.output());
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+        }
+    }
+
+    @Test
+    void aSecondaryRateLimitOfATokenIsNotTriedAgain() {
+        // GitHub asks to wait for the seconds of Retry-After before the next request
+        api.answer(RELEASES_PATH, new Response(403, Map.of("Retry-After", "60", "X-RateLimit-Remaining", "4000"), ""),
+                Response.ok(releases(api.url() + "/download/server.jar")));
+
+        var reporter = new RecordingReporter();
+        assertNull(fetch(Map.of("GITHUB_TOKEN", TOKEN), reporter));
+
+        assertEquals(List.of(new Request(RELEASES_PATH, "Bearer " + TOKEN)), api.requests());
     }
 
     /**

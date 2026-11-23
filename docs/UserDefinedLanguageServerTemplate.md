@@ -845,6 +845,10 @@ When a request to the GitHub API fails, the console says why:
 | `the token lacks the permission ...`                 | the token, as a fine-grained one, hasn't the permissions that GitHub names                                                                                                                                   |
 | `the repository ... was not found, or it is private` | the `owner` or the `repository` of the download is wrong, or the repository is private                                                                                                                       |
 
+When GitHub refuses the token, as for these messages, or the rate limit of the token is reached, LSP4IJ tries the
+request once again without the token, since the releases of a public repository don't need one, and the console says
+so.
+
 #### Maven artifact download
 
 If the DAP/LSP server is published on [Maven Central](https://search.maven.org), you can use the `maven` object in your installer JSON to download the corresponding artifact:
