@@ -258,6 +258,23 @@ public class DAPSetExpressionSessionTest extends HeavyPlatformTestCase {
         assertEquals(Integer.valueOf(FRAME_ID), args.getFrameId());
     }
 
+    public void testSetValueOfAVariableOfAnEarlierStopReportsItAndSendsNothing() throws Exception {
+        debug(new AnswerServer(true, true));
+        var answer = local("answer");
+        assertTrue(modifierWhenShown(answer) instanceof DAPValueModifier);
+
+        // the program runs and stops again, where the DAP server gives the id 1 to the locals again
+        stopAgain();
+        assertEquals(DAPBundle.message("dap.variables.setValue.stale"), setValue(answer, "42"));
+        assertEquals("The DAP server receives no 'setVariable'", List.of(), List.copyOf(server.setVariables));
+
+        // a variable of this stop can be set
+        assertNull("The value is set", setValue(local("answer"), "42"));
+        var args = server.setVariables.poll(BOUND_SECONDS, TimeUnit.SECONDS);
+        assertNotNull("The DAP server receives 'setVariable'", args);
+        assertEquals(LOCALS_REFERENCE, args.getVariablesReference());
+    }
+
     public void testTheErrorOfTheDAPServerIsReported() throws Exception {
         debug(new AnswerServer(true, true));
         server.setExpressionAnswer = args -> CompletableFuture.failedFuture(new ResponseErrorException(

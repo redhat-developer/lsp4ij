@@ -12,6 +12,7 @@ package com.redhat.devtools.lsp4ij.dap.client.variables;
 
 import com.intellij.xdebugger.XExpression;
 import com.intellij.xdebugger.frame.XValueModifier;
+import com.redhat.devtools.lsp4ij.dap.DAPBundle;
 import com.redhat.devtools.lsp4ij.dap.evaluation.DAPDebuggerEvaluator;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -30,6 +31,11 @@ public class DAPValueModifier extends XValueModifier {
 
     @Override
     public void setValue(@NotNull XExpression expression, @NotNull XModificationCallback callback) {
+        if (!value.getStackFrame().isOfTheLastStop()) {
+            // The 'variablesReference' of the variable's parent may name another container since
+            DAPValue.reportWhyItCantBeSet(callback, DAPBundle.message("dap.variables.setValue.stale"));
+            return;
+        }
         String whyItCantBeSet = value.getWhyItCantBeSet(value.getClient().isSupportsSetVariable());
         if (whyItCantBeSet != null) {
             DAPValue.reportWhyItCantBeSet(callback, whyItCantBeSet);
