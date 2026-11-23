@@ -20,8 +20,7 @@ these files, of which only `template.json` is required. LSP4IJ ignores any other
 * [`installer.json`](#installer-descriptor): defines how to check, install, and configure the server.
 * `workspaceFolderSettings.json`: the JSON of the
   [`Workspace Folders` tab](./UserDefinedLanguageServer.md#workspace-folders-tab). LSP4IJ reads it with the template,
-  but the New Language Server dialog doesn't apply it yet: set the workspace folders in the settings of the language
-  server once it is created.
+  and the New Language Server dialog gives it to the language server that it creates.
 * `README.md`: the instructions of the template, which the help button of the New Language Server dialog opens. The
   dialog shows that button only for a template with a `README.md`.
 
@@ -129,7 +128,7 @@ This language server talks LSP over its standard input and output only, so the t
 | `url`                 | the page of the instructions, which the `Server` tab links as `Read the instructions`                                                                                                                                                                                  | `https://github.com/redhat-developer/lsp4ij/tree/main/docs/user-defined-ls/<id>.md`                            |
 | `dev`                 | `true` lists the template only when the IDE runs with `idea.plugin.in.sandbox.mode`, as `runIde` does                                                                                                                                                                  | `false`                                                                                                        |
 | `programArgs`         | the command which starts the language server, by OS, see [Command](#command). Required.                                                                                                                                                                                | none                                                                                                           |
-| `workingDir`          | the working directory. An [exported](./UserDefinedLanguageServer.md#exporting-templates) language server writes it, but the New Language Server dialog doesn't apply it yet.                                                                                           | none                                                                                                           |
+| `workingDir`          | the working directory, which the New Language Server dialog gives the language server it creates. An [exported](./UserDefinedLanguageServer.md#exporting-templates) language server writes it.                                                                         | none                                                                                                           |
 | `env`                 | the environment variables of the `Server` tab: `variables`, an object of names and values, and `includeSystemEnvironmentVariables`, `true` to pass the IDE's environment variables too                                                                                 | without `env`, no variables, and the IDE's are passed; `includeSystemEnvironmentVariables` is `false` when `env` doesn't set it |
 | `fileTypeMappings`    | the files of the language server: each entry has a `fileType`, with the `name` of an IntelliJ file type, file name `patterns`, or both, and the `languageId` of the files                                                                                              | none                                                                                                           |
 | `languageMappings`    | the files of the language server by IntelliJ language: each entry has the `language`, an IntelliJ language id, and the `languageId` of the files                                                                                                                       | none                                                                                                           |
@@ -413,9 +412,12 @@ installation at its first start, as when a file that it serves is opened:
    or failed.
 3. LSP4IJ then starts the language server, also when the `run` failed.
 
-LSP4IJ keeps in the settings of the language server that this first check ran, also when it failed, so that the later
-starts don't check again, also after a restart of the IDE. With `"executeOnStartServer": true`, the installation is
-checked at the first start of the language server in each IDE session. The bundled installers have `false`.
+LSP4IJ keeps in the settings of the language server that this first check ran, so that the later starts don't check
+again, also after a restart of the IDE. An installation which failed, or whose `run` failed, isn't kept: the first start
+of the language server in the next IDE session checks again, and installs the server if the check fails. One that the
+user cancelled is kept, so that the installer doesn't run again by itself. With `"executeOnStartServer": true`, the
+installation is checked at the first start of the language server in each IDE session. The bundled installers have
+`false`.
 
 The installer also runs on request:
 
@@ -461,7 +463,7 @@ server shows this one when `go` isn't installed:
 
 Without `actions`, the task shows the message as an error and fails, and the installation shows no notification of
 its own. With `actions`, the task waits until the user clicks one of them, runs that task, and succeeds or fails as it
-does.
+does. A notification closed without a click ends the task, which then fails.
 
 ### Task exec
 

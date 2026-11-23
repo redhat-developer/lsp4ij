@@ -503,8 +503,8 @@ chosen. Export finds the template by its `id` among the bundled templates, as th
 without a template, created from a [custom template](#custom-template), or whose template LSP4IJ no longer bundles,
 exports no `transports`. A language server which talks over a socket, from a template whose `transports` list only
 `stdio`, exports both, so an import of it also warns that the socket mode of the template isn't one of its transports.
-The New Language Server dialog doesn't apply the `workingDir` of a template yet, so set the working directory again
-after an import.
+The New Language Server dialog gives the language server that it creates from an import the `workingDir` of the
+template.
 
 ![Export Language Servers to a Zip](./images/user-defined-ls/ExportUserDefinedLanguageServer.png)
 
