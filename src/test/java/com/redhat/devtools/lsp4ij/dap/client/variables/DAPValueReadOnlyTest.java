@@ -56,7 +56,8 @@ public class DAPValueReadOnlyTest extends TestCase {
      * with a DAP server which doesn't support 'setExpression'.
      */
     private static boolean canSetValue(boolean supportsSetVariable, Variable variable) {
-        return DAPValue.getSetValueRequest(supportsSetVariable, false, 1, variable, variable) != null;
+        return DAPValue.getSetValueRequest(supportsSetVariable, false, 1, DAPValue.isReadOnly(variable),
+                DAPValue.getAssignableExpression(1, variable)) != null;
     }
 
     private static VariablePresentationHint hint(String... attributes) {

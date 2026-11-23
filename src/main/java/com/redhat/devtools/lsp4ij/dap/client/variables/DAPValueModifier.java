@@ -30,6 +30,11 @@ public class DAPValueModifier extends XValueModifier {
 
     @Override
     public void setValue(@NotNull XExpression expression, @NotNull XModificationCallback callback) {
+        String whyItCantBeSet = value.getWhyItCantBeSet(value.getClient().isSupportsSetVariable());
+        if (whyItCantBeSet != null) {
+            DAPValue.reportWhyItCantBeSet(callback, whyItCantBeSet);
+            return;
+        }
         final var variable = value.getVariable();
         value.getClient()
                 .setVariable(variable.getName(), value.getParentVariablesReference(), expression.getExpression())

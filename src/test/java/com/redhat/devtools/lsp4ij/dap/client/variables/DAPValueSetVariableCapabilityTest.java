@@ -109,7 +109,8 @@ public class DAPValueSetVariableCapabilityTest {
     private DAPValue.SetValueRequest getSetValueRequest(Integer parentVariablesReference, Variable variable) {
         var current = capabilities.get();
         return DAPValue.getSetValueRequest(Boolean.TRUE.equals(current.getSupportsSetVariable()),
-                Boolean.TRUE.equals(current.getSupportsSetExpression()), parentVariablesReference, variable, variable);
+                Boolean.TRUE.equals(current.getSupportsSetExpression()), parentVariablesReference,
+                DAPValue.isReadOnly(variable), DAPValue.getAssignableExpression(parentVariablesReference, variable));
     }
 
     private void enableSetVariable(boolean supported) {

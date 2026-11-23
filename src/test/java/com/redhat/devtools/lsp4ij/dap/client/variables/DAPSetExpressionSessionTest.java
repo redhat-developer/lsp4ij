@@ -37,12 +37,15 @@ import com.intellij.xdebugger.frame.XValueModifier;
 import com.intellij.xdebugger.impl.actions.XDebuggerActions;
 import com.intellij.xdebugger.impl.ui.tree.XDebuggerTree;
 import com.intellij.xdebugger.impl.ui.tree.nodes.XValueNodeImpl;
+import com.redhat.devtools.lsp4ij.dap.DAPBundle;
 import com.redhat.devtools.lsp4ij.dap.DAPDebugProcess;
 import com.redhat.devtools.lsp4ij.dap.DAPDebuggerEditorsProvider;
 import com.redhat.devtools.lsp4ij.dap.DebugMode;
+import com.redhat.devtools.lsp4ij.dap.client.DAPClient;
 import com.redhat.devtools.lsp4ij.dap.client.DAPStackFrame;
 import com.redhat.devtools.lsp4ij.dap.configurations.DAPRunConfiguration;
 import org.eclipse.lsp4j.debug.Capabilities;
+import org.eclipse.lsp4j.debug.CapabilitiesEventArguments;
 import org.eclipse.lsp4j.debug.ConfigurationDoneArguments;
 import org.eclipse.lsp4j.debug.DisconnectArguments;
 import org.eclipse.lsp4j.debug.EvaluateArguments;
@@ -79,6 +82,7 @@ import org.jetbrains.annotations.Nullable;
 
 import javax.swing.Icon;
 import java.io.IOException;
+import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.net.InetAddress;
 import java.net.ServerSocket;
@@ -107,6 +111,8 @@ public class DAPSetExpressionSessionTest extends HeavyPlatformTestCase {
     private static final int LOCALS_REFERENCE = 1;
     private static final int LAZY_REFERENCE = 2;
     private static final int NEW_ANSWER_REFERENCE = 3;
+    private static final int LAZY_READ_ONLY_REFERENCE = 4;
+    private static final int LAZY_WITHOUT_EVALUATE_NAME_REFERENCE = 5;
 
     private AnswerServer server;
     private XDebugSession session;
@@ -283,7 +289,7 @@ public class DAPSetExpressionSessionTest extends HeavyPlatformTestCase {
         debug(new AnswerServer(false, true));
         var size = local("size");
         var node = node(size);
-        assertNull("The lazy variable has no 'evaluateName'", size.getModifier());
+        assertNotNull("\"Set Value…\" is offered for a lazy variable with an 'evaluateName'", modifierWhenShown(size));
 
         resolve(node);
         assertEquals("3", size.getShownVariable().getValue());
@@ -292,9 +298,81 @@ public class DAPSetExpressionSessionTest extends HeavyPlatformTestCase {
 
         var args = server.setExpressions.poll(BOUND_SECONDS, TimeUnit.SECONDS);
         assertNotNull("The DAP server receives 'setExpression'", args);
-        assertEquals("this.size", args.getExpression());
+        assertEquals("The 'evaluateName' of the value is assigned to", "this.size", args.getExpression());
         assertEquals("4", args.getValue());
         assertEquals("The value which the lazy variable shows changes", "4", size.getShownVariable().getValue());
+    }
+
+    public void testSetValueIsNotOfferedForALazyVariableWithoutEvaluateNameEvenOnceItsValueHasOne() throws Exception {
+        debug(new AnswerServer(false, true));
+        var count = local("count");
+        var node = node(count);
+        assertNull("\"Set Value…\" isn't offered for a lazy variable without 'evaluateName'", modifierWhenShown(count));
+
+        resolve(node);
+        assertEquals("5", count.getShownVariable().getValue());
+        // IntelliJ 2026.3 asks once, when it shows the value: the answer is the same in every version
+        assertNull("\"Set Value…\" is still not offered once the value has an 'evaluateName'", count.getModifier());
+        assertFalse(isSetValueEnabled(node));
+    }
+
+    public void testSetValueOfALazyVariableWhoseValueIsReadOnlyReportsIt() throws Exception {
+        debug(new AnswerServer(true, true));
+        var fixed = local("fixed");
+        var node = node(fixed);
+        assertNotNull("\"Set Value…\" is offered for a lazy variable", modifierWhenShown(fixed));
+
+        resolve(node);
+        assertEquals("6", fixed.getShownVariable().getValue());
+        // IntelliJ 2026.3 asks for the modifier again when the value is set: it must still be there
+        assertNotNull("\"Set Value…\" stays offered once the value is read-only", fixed.getModifier());
+        assertEquals(DAPBundle.message("dap.variables.setValue.readOnly"), setValue(fixed, "7"));
+        assertEquals("The DAP server receives no 'setVariable'", List.of(), List.copyOf(server.setVariables));
+        assertEquals("The DAP server receives no 'setExpression'", List.of(), List.copyOf(server.setExpressions));
+    }
+
+    public void testSetValueOfANewValueWhichIsReadOnlyReportsIt() throws Exception {
+        debug(new AnswerServer(true, true));
+        var readOnly = new VariablePresentationHint();
+        readOnly.setAttributes(new String[]{VariablePresentationHintAttributes.READ_ONLY});
+        server.setExpressionAnswer = args -> {
+            var response = new SetExpressionResponse();
+            response.setValue(args.getValue());
+            response.setPresentationHint(readOnly);
+            return CompletableFuture.completedFuture(response);
+        };
+        var result = evaluate("answer");
+        assertNotNull(modifierWhenShown(result));
+        assertNull("The value is set", setValue(result, "42"));
+        assertNotNull("The DAP server receives 'setExpression'", server.setExpressions.poll(BOUND_SECONDS, TimeUnit.SECONDS));
+
+        assertNotNull("\"Set Value…\" stays offered once the new value is read-only", result.getModifier());
+        assertEquals(DAPBundle.message("dap.variables.setValue.readOnly"), setValue(result, "43"));
+        assertEquals("The DAP server receives no other 'setExpression'", List.of(), List.copyOf(server.setExpressions));
+    }
+
+    public void testSetValueOnceTheDAPServerNoLongerSupportsItReportsIt() throws Exception {
+        debug(new AnswerServer(true, true));
+        var answer = local("answer");
+        var result = evaluate("answer");
+        assertTrue(modifierWhenShown(answer) instanceof DAPValueModifier);
+        assertTrue(modifierWhenShown(result) instanceof DAPExpressionModifier);
+
+        var update = new Capabilities();
+        update.setSupportsSetVariable(false);
+        update.setSupportsSetExpression(false);
+        server.sendCapabilities(update);
+        var client = client();
+        PlatformTestUtil.waitWithEventsDispatching("the DAP server turns off setting values",
+                () -> !client.isSupportsSetVariable() && !client.isSupportsSetExpression(), BOUND_SECONDS);
+
+        assertNotNull("\"Set Value…\" stays offered for a variable", answer.getModifier());
+        assertNotNull("\"Set Value…\" stays offered for an Evaluate result", result.getModifier());
+        assertEquals(DAPBundle.message("dap.variables.setValue.unsupported"), setValue(answer, "42"));
+        assertEquals(DAPBundle.message("dap.variables.setValue.unsupported"), setValue(result, "42"));
+        assertEquals("The DAP server receives no 'setVariable'", List.of(), List.copyOf(server.setVariables));
+        assertEquals("The DAP server receives no 'setExpression'", List.of(), List.copyOf(server.setExpressions));
+        assertNull("\"Set Value…\" isn't offered for a value shown since", local("answer").getModifier());
     }
 
     /**
@@ -402,6 +480,26 @@ public class DAPSetExpressionSessionTest extends HeavyPlatformTestCase {
     }
 
     /**
+     * Returns the modifier of the given value as the debugger asks for it when it shows the value. IntelliJ 2026.3 asks
+     * once, with XValue.getModifierAsync(), which IntelliJ 2024.2 doesn't have, and asks getModifier() again when the
+     * value is set.
+     */
+    private static @Nullable XValueModifier modifierWhenShown(@NotNull XValue value) throws Exception {
+        Method getModifierAsync;
+        try {
+            getModifierAsync = XValue.class.getMethod("getModifierAsync");
+        } catch (NoSuchMethodException e) {
+            return value.getModifier();
+        }
+        var modifier = (CompletableFuture<?>) getModifierAsync.invoke(value);
+        return (XValueModifier) modifier.get(BOUND_SECONDS, TimeUnit.SECONDS);
+    }
+
+    private @NotNull DAPClient client() {
+        return ((DAPStackFrame) session.getCurrentStackFrame()).getClient();
+    }
+
+    /**
      * Asks for the value of the lazy variable which the given node shows, as a click on its "Show value" link does.
      */
     private static void resolve(@NotNull XValueNodeImpl node) {
@@ -479,7 +577,9 @@ public class DAPSetExpressionSessionTest extends HeavyPlatformTestCase {
 
     /**
      * A DAP server of a program stopped in the frame 7, whose locals are 'answer' = 41, with the 'evaluateName'
-     * 'frame.answer', and the lazy 'size', whose value 3 has the 'evaluateName' 'this.size'. It evaluates any
+     * 'frame.answer', and three lazy variables: 'size', with the 'evaluateName' 'frame.size', whose value 3 has the
+     * 'evaluateName' 'this.size'; 'fixed', whose value 6 is read-only; and 'count', without 'evaluateName', whose
+     * value 5 has the 'evaluateName' 'this.count'. It evaluates any
      * expression to 41, with the presentation hint and the 'variablesReference' which a test sets, and answers
      * 'setExpression' with the assigned value unless a test answers otherwise.
      */
@@ -521,6 +621,15 @@ public class DAPSetExpressionSessionTest extends HeavyPlatformTestCase {
 
         int getPort() {
             return serverSocket.getLocalPort();
+        }
+
+        /**
+         * Sends the 'capabilities' event with the given capabilities, which change the ones the DAP server has.
+         */
+        void sendCapabilities(@NotNull Capabilities capabilities) {
+            var args = new CapabilitiesEventArguments();
+            args.setCapabilities(capabilities);
+            client.capabilities(args);
         }
 
         void close() throws IOException {
@@ -596,9 +705,17 @@ public class DAPSetExpressionSessionTest extends HeavyPlatformTestCase {
                     lazy.setLazy(true);
                     yield new Variable[]{
                             variable("answer", "41", "frame.answer", 0, null),
-                            variable("size", "(...)", null, LAZY_REFERENCE, lazy)};
+                            variable("size", "(...)", "frame.size", LAZY_REFERENCE, lazy),
+                            variable("fixed", "(...)", "frame.fixed", LAZY_READ_ONLY_REFERENCE, lazy),
+                            variable("count", "(...)", null, LAZY_WITHOUT_EVALUATE_NAME_REFERENCE, lazy)};
                 }
                 case LAZY_REFERENCE -> new Variable[]{variable("size", "3", "this.size", 0, null)};
+                case LAZY_READ_ONLY_REFERENCE -> {
+                    var readOnly = new VariablePresentationHint();
+                    readOnly.setAttributes(new String[]{VariablePresentationHintAttributes.READ_ONLY});
+                    yield new Variable[]{variable("fixed", "6", "this.fixed", 0, readOnly)};
+                }
+                case LAZY_WITHOUT_EVALUATE_NAME_REFERENCE -> new Variable[]{variable("count", "5", "this.count", 0, null)};
                 case NEW_ANSWER_REFERENCE -> new Variable[]{variable("value", "42", "answer.value", 0, null)};
                 default -> new Variable[0];
             });

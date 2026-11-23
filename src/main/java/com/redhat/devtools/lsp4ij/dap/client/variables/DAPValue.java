@@ -12,14 +12,17 @@ package com.redhat.devtools.lsp4ij.dap.client.variables;
 
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.util.ThreeState;
+import com.intellij.util.concurrency.AppExecutorUtil;
 import com.intellij.xdebugger.XSourcePosition;
 import com.intellij.xdebugger.frame.*;
 import com.intellij.xdebugger.frame.presentation.XValuePresentation;
+import com.redhat.devtools.lsp4ij.dap.DAPBundle;
 import com.redhat.devtools.lsp4ij.dap.client.DAPClient;
 import com.redhat.devtools.lsp4ij.dap.client.DAPStackFrame;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import org.eclipse.lsp4j.debug.Variable;
 import org.eclipse.lsp4j.debug.VariablePresentationHintAttributes;
+import org.jetbrains.annotations.Nls;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -41,6 +44,13 @@ public class DAPValue extends XNamedValue {
     private final Icon icon;
     // The variable with the value of a lazy variable, once the user asked for it
     private volatile @Nullable Variable resolved;
+    // Whether "Set Value..." is offered depends on the value as the DAP server described it when the value was created,
+    // and on the capabilities which the DAP server had then: IntelliJ 2026.3 asks once whether a value can be set, when
+    // it shows the value, and asks for its modifier again when the value is set. What changes later, such as the value
+    // of a lazy variable, is checked when the value is set, so that "Set Value..." never does nothing.
+    private final boolean readOnly;
+    private final boolean supportedSetVariable;
+    private final boolean supportedSetExpression;
 
     public DAPValue(@NotNull DAPStackFrame stackFrame,
                     @NotNull Variable variable,
@@ -49,7 +59,11 @@ public class DAPValue extends XNamedValue {
         this.stackFrame = stackFrame;
         this.variable = variable;
         this.parentVariablesReference = parentVariablesReference;
-        this.icon = getClient().getServerDescriptor().getVariableSupport().getIcon(variable);
+        var client = getClient();
+        this.icon = client.getServerDescriptor().getVariableSupport().getIcon(variable);
+        this.readOnly = isReadOnly(variable);
+        this.supportedSetVariable = client.isSupportsSetVariable();
+        this.supportedSetExpression = client.isSupportsSetExpression();
     }
 
     @Override
@@ -99,8 +113,11 @@ public class DAPValue extends XNamedValue {
     @Override
     public XValueModifier getModifier() {
         var client = getClient();
-        var request = getSetValueRequest(client.isSupportsSetVariable(), client.isSupportsSetExpression(),
-                parentVariablesReference, variable, getShownVariable());
+        // A capability which the DAP server turns on later offers "Set Value...", and one which it turns off later
+        // keeps it, so that the modifier which IntelliJ 2026.3 asks for when the value is set is never gone
+        var request = getSetValueRequest(supportedSetVariable || client.isSupportsSetVariable(),
+                supportedSetExpression || client.isSupportsSetExpression(), parentVariablesReference, readOnly,
+                getAssignableExpression(parentVariablesReference, variable));
         if (request instanceof SetValueRequest.SetVariable) {
             return new DAPValueModifier(this);
         }
@@ -132,8 +149,8 @@ public class DAPValue extends XNamedValue {
     }
 
     /**
-     * Returns the DAP request which sets the value of the given variable, or null if it can't be set, as when the DAP
-     * server marks the variable, or the variable which it shows, as read-only:
+     * Returns the DAP request which sets a value, or null if it can't be set, as when the DAP server marks the value as
+     * read-only:
      * <ul>
      *     <li>a variable with the 'variablesReference' of its parent is set with 'setVariable'. As in VS Code, it is
      *     set with 'setExpression' only when the DAP server can't set variables, by assigning to its 'evaluateName',
@@ -145,28 +162,73 @@ public class DAPValue extends XNamedValue {
      *
      * @param supportsSetVariable      true if the DAP server supports the 'setVariable' request.
      * @param supportsSetExpression    true if the DAP server supports the 'setExpression' request.
-     * @param parentVariablesReference the 'variablesReference' of the variable's parent, or null if it has none.
-     * @param variable                 the DAP variable.
-     * @param shown                    the variable which the value shows: the variable with the value of a lazy
-     *                                 variable once the user asked for it, and the variable itself otherwise.
-     * @return the DAP request which sets the value of the given variable, or null if it can't be set.
+     * @param parentVariablesReference the 'variablesReference' of the value's parent, or null if it has none.
+     * @param readOnly                 true if the DAP server marks the value as read-only.
+     * @param expression               the expression which 'setExpression' would assign to: the evaluated expression
+     *                                 of a value without a parent, and the 'evaluateName' of a variable, or null if it
+     *                                 has none.
+     * @return the DAP request which sets the value, or null if it can't be set.
      */
     static @Nullable SetValueRequest getSetValueRequest(boolean supportsSetVariable,
                                                         boolean supportsSetExpression,
                                                         @Nullable Integer parentVariablesReference,
-                                                        @NotNull Variable variable,
-                                                        @NotNull Variable shown) {
-        if (isReadOnly(variable) || isReadOnly(shown)) {
+                                                        boolean readOnly,
+                                                        @Nullable String expression) {
+        if (readOnly) {
             return null;
         }
         if (parentVariablesReference != null && supportsSetVariable) {
             return new SetValueRequest.SetVariable();
         }
-        String expression = parentVariablesReference == null ? variable.getName() : shown.getEvaluateName();
         if (supportsSetExpression && StringUtils.isNotBlank(expression)) {
             return new SetValueRequest.SetExpression(expression);
         }
         return null;
+    }
+
+    /**
+     * Returns the expression which 'setExpression' would assign a new value to: the evaluated expression of a value
+     * without a parent 'variablesReference', such as an Evaluate result, which is its name, and the 'evaluateName' of
+     * a variable, or null if it has none.
+     *
+     * @param parentVariablesReference the 'variablesReference' of the value's parent, or null if it has none.
+     * @param variable                 the DAP variable.
+     * @return the expression which 'setExpression' would assign a new value to, or null if there is none.
+     */
+    static @Nullable String getAssignableExpression(@Nullable Integer parentVariablesReference,
+                                                    @NotNull Variable variable) {
+        return parentVariablesReference == null ? variable.getName() : variable.getEvaluateName();
+    }
+
+    /**
+     * Returns why this value can't be set now although "Set Value..." is offered, or null if it can: the DAP server
+     * no longer supports the request which sets it, or marks the value which this value shows as read-only, such as
+     * the value of a lazy variable once the user asked for it, or the new value of a 'setExpression'.
+     *
+     * @param supported true if the DAP server supports the request which sets this value now.
+     * @return why this value can't be set now, or null if it can.
+     */
+    @Nullable @Nls String getWhyItCantBeSet(boolean supported) {
+        if (!supported) {
+            return DAPBundle.message("dap.variables.setValue.unsupported");
+        }
+        if (isReadOnly(getShownVariable())) {
+            return DAPBundle.message("dap.variables.setValue.readOnly");
+        }
+        return null;
+    }
+
+    /**
+     * Reports why a value can't be set as the error of a DAP server is reported: once "Set Value..." has closed its
+     * editor. SetValueInplaceEditor sets the value before it closes the editor, and shows an error reported meanwhile
+     * on that editor.
+     *
+     * @param callback the callback of "Set Value...".
+     * @param why      why the value can't be set.
+     */
+    static void reportWhyItCantBeSet(@NotNull XValueModifier.XModificationCallback callback,
+                                     @NotNull @Nls String why) {
+        AppExecutorUtil.getAppExecutorService().execute(() -> callback.errorOccurred(why));
     }
 
     /**
