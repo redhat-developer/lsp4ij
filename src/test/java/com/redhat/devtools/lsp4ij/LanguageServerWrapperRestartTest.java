@@ -58,6 +58,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BooleanSupplier;
+import java.util.function.Consumer;
 import java.util.function.Supplier;
 
 /**
@@ -321,12 +322,43 @@ public class LanguageServerWrapperRestartTest extends UsefulTestCase {
         assertNull("the file must not be connected", wrapper.getOpenedDocument(wrapper.toUri(file), false));
     }
 
+    public void testAStartThatAStopReplacesBeforeItsTaskRunsLeavesTheServerStopped() {
+        serverDefinition.failingConnections = 0;
+        var wrapper = new LanguageServerWrapper(myFixture.getProject(), serverDefinition);
+        Disposer.register(getTestRootDisposable(), wrapper);
+
+        // No pooled thread is free yet for the start task, and a stop replaces the start meanwhile
+        List<Runnable> startTasks = new ArrayList<>();
+        withPooledThreadTasks(startTasks::add, () -> {
+            wrapper.start();
+            return null;
+        });
+        assertEquals(1, startTasks.size());
+        wrapper.stop();
+        waitUntil(() -> wrapper.getServerStatus() == ServerStatus.stopped, "the stop should end");
+
+        startTasks.forEach(Runnable::run);
+        assertEquals("the start task that runs late must leave the status of the stop", ServerStatus.stopped,
+                wrapper.getServerStatus());
+        assertEquals("the start task that runs late must not connect to the language server", 0,
+                serverDefinition.connectionCount.get());
+    }
+
     /**
      * Calls the action, running each task which this thread gives {@link Application#executeOnPooledThread(Runnable)}
      * before that call returns, as if a pooled thread ran it at once. For the call, the application is replaced by a
      * proxy which delegates to it.
      */
     private static <T> T runPooledThreadTasksHere(Supplier<T> action) {
+        return withPooledThreadTasks(Runnable::run, action);
+    }
+
+    /**
+     * Calls the action, giving each task which this thread gives {@link Application#executeOnPooledThread(Runnable)}
+     * to the given handler instead of a pooled thread. For the call, the application is replaced by a proxy which
+     * delegates to it.
+     */
+    private static <T> T withPooledThreadTasks(Consumer<Runnable> handler, Supplier<T> action) {
         var application = ApplicationManager.getApplication();
         var thread = Thread.currentThread();
         var inline = new AtomicBoolean(true);
@@ -338,7 +370,7 @@ public class LanguageServerWrapperRestartTest extends UsefulTestCase {
                             && Thread.currentThread() == thread
                             && method.getName().equals("executeOnPooledThread")
                             && method.getParameterTypes()[0] == Runnable.class) {
-                        ((Runnable) args[0]).run();
+                        handler.accept((Runnable) args[0]);
                         return CompletableFuture.completedFuture(null);
                     }
                     try {
