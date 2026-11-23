@@ -1,0 +1,37 @@
+{
+  "id": "erlang-elp",
+  "name": "Erlang Language Platform (ELP)",
+  "programArgs": {
+    "default": "elp server"
+  },
+  "transports": [
+    {
+      "mode": "stdio"
+    }
+  ],
+  "expandConfiguration": true,
+  "fileTypeMappings": [
+    {
+      "fileType": {
+        "name": "Erlang",
+        "patterns": [
+          "*.erl",
+          "*.hrl",
+          "*.escript",
+          "*.app.src",
+          "*.app",
+          "rebar.config",
+          "rebar.config.script",
+          "rebar.lock",
+          "sys.config",
+          "sys.config.src",
+          "sys.ct.config",
+          "sys.shell.config",
+          "*.yrl",
+          "*.xrl"
+        ]
+      },
+      "languageId": "erlang"
+    }
+  ]
+}

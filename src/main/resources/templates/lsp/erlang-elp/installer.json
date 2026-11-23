@@ -1,0 +1,73 @@
+{
+  "id": "erlang-elp-installer",
+  "name": "ELP",
+  "executeOnStartServer": false,
+  "properties": {
+    "serverDist": "$USER_HOME$/.lsp4ij/lsp/erlang-elp"
+  },
+  "check": {
+    "fileExists": {
+      "name": "Check if ELP is installed",
+      "file": {
+        "windows": "${serverDist}/elp.exe",
+        "default": "${serverDist}/elp"
+      },
+      "onSuccess": {
+        "replaceTemplateCommand": {
+          "name": "Configure ELP command",
+          "templateCommand": "elp server",
+          "command": "\"${check.file}\" server"
+        }
+      }
+    }
+  },
+  "run": {
+    "download": {
+      "name": "Download ELP",
+      "github": {
+        "owner": "WhatsApp",
+        "repository": "erlang-language-platform",
+        "prerelease": false,
+        "asset": {
+          "windows": "elp-windows-x86_64-pc-windows-msvc-otp-*.tar.gz",
+          "unix": {
+            "x86_64": "elp-linux-x86_64-unknown-linux-gnu-otp-*.tar.gz",
+            "arm64": "elp-linux-aarch64-unknown-linux-gnu-otp-*.tar.gz"
+          },
+          "mac": {
+            "x86_64": "elp-macos-x86_64-apple-darwin-otp-*.tar.gz",
+            "arm64": "elp-macos-aarch64-apple-darwin-otp-*.tar.gz"
+          }
+        }
+      },
+      "url": {
+        "windows": "https://github.com/WhatsApp/erlang-language-platform/releases/download/2026-11-20/elp-windows-x86_64-pc-windows-msvc-otp-27.3.tar.gz",
+        "unix": {
+          "x86_64": "https://github.com/WhatsApp/erlang-language-platform/releases/download/2026-11-20/elp-linux-x86_64-unknown-linux-gnu-otp-27.3.tar.gz",
+          "arm64": "https://github.com/WhatsApp/erlang-language-platform/releases/download/2026-11-20/elp-linux-aarch64-unknown-linux-gnu-otp-27.3.tar.gz"
+        },
+        "mac": {
+          "x86_64": "https://github.com/WhatsApp/erlang-language-platform/releases/download/2026-11-20/elp-macos-x86_64-apple-darwin-otp-27.3.tar.gz",
+          "arm64": "https://github.com/WhatsApp/erlang-language-platform/releases/download/2026-11-20/elp-macos-aarch64-apple-darwin-otp-27.3.tar.gz"
+        }
+      },
+      "output": {
+        "dir": "${serverDist}",
+        "file": {
+          "name": {
+            "windows": "elp.exe",
+            "default": "elp"
+          },
+          "executable": true
+        }
+      },
+      "onSuccess": {
+        "configureServer": {
+          "name": "Configure ELP command",
+          "command": "\"${output.dir}/${output.file.name}\" server",
+          "update": true
+        }
+      }
+    }
+  }
+}
