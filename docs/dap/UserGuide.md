@@ -412,6 +412,22 @@ the edit apply will consume the
 `Set Value...` isn't available for the result of an expression, as `Evaluate Expression` shows it: the SetVariable
 request names the variable's container, and such a result has none. The variables inside the result can be set.
 
+## Debugged process
+
+When the DAP server tells which process it debugs, with the
+[process](https://microsoft.github.io/debug-adapter-protocol//specification.html#Events_Process) event, as debugpy,
+lldb-dap, Delve, netcoredbg and GDB do, the `Console` tab shows it on a line of its own: its name, usually the path of
+the program, and as far as the event gives them, its PID, `remote` when it doesn't run on the DAP server's computer,
+and whether the DAP server launched it or attached to it.
+
+![Debugged process](./images/DAP_process_event.png)
+
+In launch mode the process of the debug session is the DAP server's own, so this line is where the program's PID
+shows, to attach a profiler to it or to find it in a list of processes. The line of a child session, which the DAP
+server starts with
+[startDebugging](https://microsoft.github.io/debug-adapter-protocol//specification.html#Reverse_Requests_StartDebugging),
+ends with the name of that session.
+
 ## Loaded sources and modules
 
 When the DAP server reports the sources it has loaded (`supportsLoadedSourcesRequest`), the debug tab gets a
