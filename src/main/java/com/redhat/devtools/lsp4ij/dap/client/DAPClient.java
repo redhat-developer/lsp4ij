@@ -71,6 +71,7 @@ import java.util.concurrent.CompletionException;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
@@ -1636,10 +1637,50 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
                 });
         if (refreshThreads) {
             result.thenAccept(threads -> {
-                debugProcess.refreshThreads(threads);
+                debugProcess.refreshThreads(this, threads);
             });
         }
         return result;
+    }
+
+    /**
+     * Terminates the threads with the given IDs, with the 'terminateThreads' request, when the DAP server supports it
+     * (supportsTerminateThreadsRequest). The request is sent off the calling thread, so that the EDT doesn't wait on the
+     * connection. The DAP server then reports the end of each thread with a 'thread' event. A failure is shown in the
+     * console.
+     *
+     * @param threadIds the IDs of the threads to terminate, as this client's DAP server numbers them.
+     * @return the future, completed once the DAP server has answered, or at once when nothing is sent.
+     */
+    public CompletableFuture<@Nullable Void> terminateThreads(@NotNull List<Integer> threadIds) {
+        var server = debugProtocolServer;
+        if (server == null || threadIds.isEmpty() || !isSupportsTerminateThreadsRequest()) {
+            return CompletableFuture.completedFuture(null);
+        }
+        return terminateThreads(server, threadIds, AppExecutorUtil.getAppExecutorService())
+                .exceptionally(error -> {
+                    debugProcess.print(DAPBundle.message("dap.threads.terminate.failed", getCause(error).getMessage()),
+                            ConsoleViewContentType.ERROR_OUTPUT);
+                    return null;
+                });
+    }
+
+    /**
+     * Sends 'terminateThreads' for the given threads, from the given executor: LSP4J writes a request to the
+     * connection on the thread which sends it.
+     *
+     * @param server    the DAP server.
+     * @param threadIds the IDs of the threads to terminate.
+     * @param executor  the executor which sends the request.
+     * @return the future of the DAP server's answer.
+     */
+    static CompletableFuture<@Nullable Void> terminateThreads(@NotNull IDebugProtocolServer server,
+                                                              @NotNull List<Integer> threadIds,
+                                                              @NotNull Executor executor) {
+        var args = new TerminateThreadsArguments();
+        args.setThreadIds(threadIds.stream().mapToInt(Integer::intValue).toArray());
+        return CompletableFuture.supplyAsync(() -> server.terminateThreads(args), executor)
+                .thenCompose(Function.identity());
     }
 
     // Invalidated
@@ -1711,6 +1752,15 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
      */
     public boolean isSupportsTerminateRequest() {
         return Boolean.TRUE.equals(getCapabilities().getSupportsTerminateRequest());
+    }
+
+    /**
+     * Returns true if the debug adapter supports the 'terminateThreads' request and false otherwise.
+     *
+     * @return true if the debug adapter supports the 'terminateThreads' request and false otherwise.
+     */
+    public boolean isSupportsTerminateThreadsRequest() {
+        return Boolean.TRUE.equals(getCapabilities().getSupportsTerminateThreadsRequest());
     }
 
     /**
