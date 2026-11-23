@@ -10,6 +10,7 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.features.documentation;
 
+import com.intellij.lang.LanguageDocumentation;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.progress.util.ProgressIndicatorUtils;
@@ -65,10 +66,11 @@ public class LSPDocumentationTargetProvider implements DocumentationTargetProvid
      * waiting for the language server: IntelliJ also asks for them when it updates Quick Documentation, while the UI
      * thread waits for the update.
      * <p>
-     * In a file without documentation of its own, such as a plain text, TextMate or abstract file type file, a reply
-     * that is not there yet is returned as a target which waits for it in the background. In another file, IntelliJ
-     * shows the file's own documentation only if no provider returns a target, so the reply is waited for
-     * {@link #MAX_HOVER_WAIT_MS} at most; a later reply is used the next time at the same offset.
+     * In a file without documentation of its own, such as a plain text, TextMate or abstract file type file, or a file
+     * whose languages register no documentation provider, a reply that is not there yet is returned as a target which
+     * waits for it in the background. In another file, IntelliJ shows the file's own documentation only if no provider
+     * returns a target, so the reply is waited for {@link #MAX_HOVER_WAIT_MS} at most; a later reply is used the next
+     * time at the same offset.
      */
     @Override
     public @NotNull List<? extends @NotNull DocumentationTarget> documentationTargets(@NotNull PsiFile psiFile, int offset) {
@@ -134,7 +136,18 @@ public class LSPDocumentationTargetProvider implements DocumentationTargetProvid
     private static boolean hasNoDocumentationOfItsOwn(@NotNull PsiFile psiFile) {
         return LSPIJEditorUtils.isPlainTextFile(psiFile)
                 || LSPIJEditorUtils.isTextMateFile(psiFile)
-                || LSPIJEditorUtils.isAbstractFileTypeFile(psiFile);
+                || LSPIJEditorUtils.isAbstractFileTypeFile(psiFile)
+                || registersNoDocumentationProvider(psiFile);
+    }
+
+    /**
+     * Returns true if none of the languages of the given file registers a documentation provider, as a language whose
+     * plugin leaves its documentation to a language server does. The documentation providers of LSP4IJ, which are
+     * registered for any language, are not those of a language.
+     */
+    private static boolean registersNoDocumentationProvider(@NotNull PsiFile psiFile) {
+        return psiFile.getViewProvider().getLanguages().stream()
+                .allMatch(language -> LanguageDocumentation.INSTANCE.allForLanguage(language).isEmpty());
     }
 
     /**
