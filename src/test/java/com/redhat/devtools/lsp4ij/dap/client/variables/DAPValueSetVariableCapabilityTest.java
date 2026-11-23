@@ -11,6 +11,7 @@
 package com.redhat.devtools.lsp4ij.dap.client.variables;
 
 import com.redhat.devtools.lsp4ij.dap.client.DAPCapabilities;
+import com.redhat.devtools.lsp4ij.dap.client.DAPClient;
 import org.eclipse.lsp4j.debug.Capabilities;
 import org.eclipse.lsp4j.debug.CapabilitiesEventArguments;
 import org.eclipse.lsp4j.debug.Variable;
@@ -93,7 +94,8 @@ public class DAPValueSetVariableCapabilityTest {
 
     /**
      * As DAPValue.getModifier() for a variable of the Variables view, which has the 'variablesReference' of its
-     * parent: the client reads 'supportsSetVariable' and 'supportsSetExpression' from its current capabilities.
+     * parent: the client reads 'supportsSetVariable' and 'supportsSetExpression' from its current capabilities, as
+     * DAPClient.isSupportsSetVariable() and DAPClient.isSupportsSetExpression() do.
      */
     private boolean canSetValue(Variable variable) {
         return getSetValueRequest(LOCALS_REFERENCE, variable) != null;
@@ -108,8 +110,8 @@ public class DAPValueSetVariableCapabilityTest {
 
     private DAPValue.SetValueRequest getSetValueRequest(Integer parentVariablesReference, Variable variable) {
         var current = capabilities.get();
-        return DAPValue.getSetValueRequest(Boolean.TRUE.equals(current.getSupportsSetVariable()),
-                Boolean.TRUE.equals(current.getSupportsSetExpression()), parentVariablesReference,
+        return DAPValue.getSetValueRequest(DAPClient.isSupportsSetVariable(current),
+                DAPClient.isSupportsSetExpression(current), parentVariablesReference,
                 DAPValue.isReadOnly(variable), DAPValue.getAssignableExpression(parentVariablesReference, variable));
     }
 

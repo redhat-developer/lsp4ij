@@ -1819,7 +1819,18 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
      * @return true if the debug adapter supports setting a variable to a value and false otherwise.
      */
     public boolean isSupportsSetVariable() {
-        return Boolean.TRUE.equals(getCapabilities().getSupportsSetVariable());
+        return isSupportsSetVariable(getCapabilities());
+    }
+
+    /**
+     * Returns true if the given capabilities of a debug adapter support setting a variable to a value and false
+     * otherwise.
+     *
+     * @param capabilities the capabilities of a debug adapter.
+     * @return true if the given capabilities support setting a variable to a value and false otherwise.
+     */
+    public static boolean isSupportsSetVariable(@NotNull Capabilities capabilities) {
+        return Boolean.TRUE.equals(capabilities.getSupportsSetVariable());
     }
 
     /**
@@ -1829,7 +1840,18 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
      * @return true if the debug adapter supports the 'setExpression' request and false otherwise.
      */
     public boolean isSupportsSetExpression() {
-        return Boolean.TRUE.equals(getCapabilities().getSupportsSetExpression());
+        return isSupportsSetExpression(getCapabilities());
+    }
+
+    /**
+     * Returns true if the given capabilities of a debug adapter support the 'setExpression' request and false
+     * otherwise.
+     *
+     * @param capabilities the capabilities of a debug adapter.
+     * @return true if the given capabilities support the 'setExpression' request and false otherwise.
+     */
+    public static boolean isSupportsSetExpression(@NotNull Capabilities capabilities) {
+        return Boolean.TRUE.equals(capabilities.getSupportsSetExpression());
     }
 
     /**

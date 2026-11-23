@@ -35,6 +35,7 @@ import com.intellij.xdebugger.frame.XValueChildrenList;
 import com.intellij.xdebugger.frame.XValueContainer;
 import com.intellij.xdebugger.frame.XValueModifier;
 import com.intellij.xdebugger.impl.actions.XDebuggerActions;
+import com.intellij.xdebugger.impl.ui.DebuggerUIUtil;
 import com.intellij.xdebugger.impl.ui.tree.XDebuggerTree;
 import com.intellij.xdebugger.impl.ui.tree.nodes.XValueNodeImpl;
 import com.redhat.devtools.lsp4ij.dap.DAPBundle;
@@ -90,6 +91,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
@@ -186,6 +188,59 @@ public class DAPSetExpressionSessionTest extends HeavyPlatformTestCase {
         assertEquals(1, children.size());
         assertEquals("value", children.getName(0));
         assertEquals(Integer.valueOf(NEW_ANSWER_REFERENCE), ((DAPValue) children.getValue(0)).getParentVariablesReference());
+    }
+
+    public void testSetValueOfTheTopValueOfAValuePopupShowsTheNewValueWithItsChildren() throws Exception {
+        debug(new AnswerServer(true, true));
+        server.setExpressionAnswer = args -> {
+            var response = new SetExpressionResponse();
+            response.setValue("Answer{42}");
+            response.setVariablesReference(NEW_ANSWER_REFERENCE);
+            return CompletableFuture.completedFuture(response);
+        };
+        var result = evaluate("answer");
+        // the tree of the value popup of an expression in the editor, whose root is the value (XDebuggerTreeCreator)
+        var tree = new XDebuggerTree(getProject(), new DAPDebuggerEditorsProvider(null, null), null,
+                XDebuggerActions.INSPECT_TREE_POPUP_GROUP, null);
+        Disposer.register(getTestRootDisposable(), tree);
+        var root = new XValueNodeImpl(tree, null, result.getName(), result);
+        tree.setRoot(root, true);
+        assertTrue("The tree of a value popup is outside the session's views", tree.isDetached());
+        assertEquals("41", root.getRawValue());
+        assertTrue(root.isLeaf());
+
+        var errors = new CopyOnWriteArrayList<String>();
+        // As SetValueInplaceEditor.doOKAction, once the user typed a value in "Set Value…" and pressed Enter: the
+        // detached tree is rebuilt, and its root shows the value again
+        DebuggerUIUtil.setTreeNodeValue(root, expression("new Answer(42)"), errors::add);
+        PlatformTestUtil.waitWithEventsDispatching("the popup shows the new value",
+                () -> "Answer{42}".equals(root.getRawValue()), BOUND_SECONDS);
+        assertEquals(List.of(), errors);
+        assertFalse("The new value has children", root.isLeaf());
+    }
+
+    public void testSetValueWithSetExpressionStartsFromTheValueShown() throws Exception {
+        debug(new AnswerServer(false, true));
+        var result = evaluate("answer");
+        assertTrue(result.getModifier() instanceof DAPExpressionModifier);
+        assertEquals("41", initialValueEditorText(result));
+
+        var size = local("size");
+        assertTrue(size.getModifier() instanceof DAPExpressionModifier);
+        var node = node(size);
+        assertEquals("(...)", initialValueEditorText(size));
+        resolve(node);
+        assertEquals("The value of the lazy variable, rather than its placeholder", "3", initialValueEditorText(size));
+    }
+
+    public void testSetValueWithSetVariableStartsFromTheValueShown() throws Exception {
+        debug(new AnswerServer(true, false));
+        var size = local("size");
+        assertTrue(size.getModifier() instanceof DAPValueModifier);
+        var node = node(size);
+        assertEquals("(...)", initialValueEditorText(size));
+        resolve(node);
+        assertEquals("The value of the lazy variable, rather than its placeholder", "3", initialValueEditorText(size));
     }
 
     public void testSetValueOfAnEvaluateResultAsksForTheValueInTheSessionsFormat() throws Exception {
@@ -522,6 +577,18 @@ public class DAPSetExpressionSessionTest extends HeavyPlatformTestCase {
                 XDebuggerActions.VARIABLES_TREE_POPUP_GROUP, null);
         Disposer.register(getTestRootDisposable(), tree);
         return new XValueNodeImpl(tree, null, value.getName(), value);
+    }
+
+    /**
+     * Returns the text with which the editor of "Set Value…" starts for the given value, as SetValueInplaceEditor asks
+     * for it.
+     */
+    private static @Nullable String initialValueEditorText(@NotNull DAPValue value) {
+        XValueModifier modifier = value.getModifier();
+        assertNotNull("\"Set Value…\" is offered", modifier);
+        var text = new CompletableFuture<@Nullable String>();
+        modifier.calculateInitialValueEditorText(text::complete);
+        return PlatformTestUtil.waitForFuture(text, BOUND_SECONDS * 1000L);
     }
 
     /**
