@@ -137,7 +137,8 @@ public class CompletableFutures {
     /**
      * Returns the answers of the language servers merged by the given future of
      * {@link #mergeAnswersInOneFuture(List, CancellationSupport)}: a future which completes as the given one does,
-     * but fails when no language server answered, as there is no answer to show.
+     * but fails when no language server answered, as there is no answer to show. A merged future completed with null,
+     * as a support completes it when no language server can be asked, has no answer either.
      * {@link #awaitWithCheckCanceled(Future)} logs that failure only at the debug level, as there is nothing more to
      * report.
      *
@@ -155,7 +156,7 @@ public class CompletableFutures {
             if (error != null) {
                 // The same failure, or cancellation, as the merged future
                 answers.completeExceptionally(error);
-            } else if (data instanceof NoAnswers) {
+            } else if (isNoAnswer(data)) {
                 answers.completeExceptionally(new NoAnswerException());
             } else {
                 answers.complete(data);
@@ -166,14 +167,28 @@ public class CompletableFutures {
 
     /**
      * Returns true if the given future of {@link #mergeAnswersInOneFuture(List, CancellationSupport)} has completed
-     * without an answer of any language server, and false otherwise.
+     * without an answer of any language server, or with null as no language server could be asked, and false
+     * otherwise.
      *
      * @param merged the future of {@link #mergeAnswersInOneFuture(List, CancellationSupport)}, or null.
      * @return true if the given future has completed without an answer of any language server, and false otherwise.
      */
     @ApiStatus.Internal
     public static boolean isUnanswered(@Nullable CompletableFuture<?> merged) {
-        return isDoneNormally(merged) && merged.getNow(null) instanceof NoAnswers;
+        return isDoneNormally(merged) && isNoAnswer(merged.getNow(null));
+    }
+
+    /**
+     * Returns true if the given data of a merged request holds no answer of a language server: the marked empty list of
+     * {@link #mergeAnswersInOneFuture(List, CancellationSupport)}, or null, with which a support completes the request
+     * when no language server can be asked, and false otherwise. A language server which answers null still adds an
+     * empty list.
+     *
+     * @param data the data of the merged request.
+     * @return true if the given data holds no answer of a language server, and false otherwise.
+     */
+    private static boolean isNoAnswer(@Nullable Object data) {
+        return data == null || data instanceof NoAnswers;
     }
 
     /**

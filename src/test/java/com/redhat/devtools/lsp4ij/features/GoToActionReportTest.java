@@ -38,6 +38,8 @@ import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LSPRequestConstants;
 import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
 import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
+import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
+import com.redhat.devtools.lsp4ij.client.features.LSPImplementationFeature;
 import com.redhat.devtools.lsp4ij.features.declaration.LSPDeclarationParams;
 import com.redhat.devtools.lsp4ij.features.implementation.LSPImplementationParams;
 import com.redhat.devtools.lsp4ij.features.references.LSPReferenceParams;
@@ -79,11 +81,12 @@ import java.util.function.Supplier;
 
 /**
  * Tests that LSP Go to Implementation says that it found nothing only for a request that the language server answered,
- * in the editor of the request, and never in a modal dialog: a cancelled or failed request, or a closed editor, shows
- * nothing (#2093). A language server which answers with an error is still reported as before. Of several language
- * servers, those which answered decide what is shown: nothing is shown only when none of them answered. The public
- * methods of the supports of Go to Implementation, Declaration, Type Definition and References still give an empty
- * list when no language server answered.
+ * in the editor of the request, and never in a modal dialog: a cancelled or failed request, a request that no language
+ * server can be asked, or a closed editor, shows nothing (#2093). A language server which answers with an error is
+ * still reported as before. Of several language servers, those which answered decide what is shown: nothing is shown
+ * only when none of them answered. The public methods of the supports of Go to Implementation, Declaration, Type
+ * Definition and References still give an empty list when no language server answered, and null when none can be
+ * asked.
  */
 public class GoToActionReportTest extends LSPCodeInsightFixtureTestCase {
 
@@ -257,6 +260,27 @@ public class GoToActionReportTest extends LSPCodeInsightFixtureTestCase {
         assertEquals("the error is reported", List.of(ERROR), errors);
     }
 
+    public void testARequestThatNoLanguageServerCanBeAskedShowsNothing() throws Exception {
+        // The other language server supports textDocument/implementation, which enables LSP Go to Implementation, but
+        // its client features don't send it for the file, and the mock language server doesn't support it: no
+        // language server is asked, as when the only one stops just before the request
+        addOtherServer(answering(params -> CompletableFuture.completedFuture(Either.forLeft(List.of()))), false);
+        open(answering(params -> CompletableFuture.completedFuture(Either.forLeft(List.of()))),
+                MockLanguageServer::defaultServerCapabilities);
+        Document document = myFixture.getEditor().getDocument();
+        int offset = TargetElementUtil.adjustOffset(file, document, myFixture.getCaretOffset());
+        var params = new LSPImplementationParams(new TextDocumentIdentifier(), LSPIJUtils.toPosition(offset, document), offset);
+
+        myFixture.performEditorAction("LSP.GotoImplementation");
+        PlatformTestUtil.dispatchAllEventsInIdeEventQueue();
+
+        assertEquals("no language server is asked", 0, implementationRequests.get());
+        assertNothingShown();
+        assertNull("the public method still gives null", LSPFileSupport.getSupport(file).getImplementationSupport()
+                .getImplementations(params)
+                .get(30, TimeUnit.SECONDS));
+    }
+
     public void testTheGoToActionUsesTheRequestOfTheSupport() throws Exception {
         open(params -> CompletableFuture.completedFuture(Either.forLeft(List.of())));
         Document document = myFixture.getEditor().getDocument();
@@ -319,7 +343,12 @@ public class GoToActionReportTest extends LSPCodeInsightFixtureTestCase {
     }
 
     private void open(@NotNull MockTextDocumentService textDocumentService) throws Exception {
-        MockLanguageServer.reset(GoToActionReportTest::capabilities);
+        open(textDocumentService, GoToActionReportTest::capabilities);
+    }
+
+    private void open(@NotNull MockTextDocumentService textDocumentService,
+                      @NotNull Supplier<ServerCapabilities> capabilities) throws Exception {
+        MockLanguageServer.reset(capabilities);
         MockLanguageServer.INSTANCE.setTextDocumentService(textDocumentService);
         file = myFixture.configureByText("main.foo", TEXT);
         fileUri = LSPIJUtils.toUriAsString(file);
@@ -342,7 +371,15 @@ public class GoToActionReportTest extends LSPCodeInsightFixtureTestCase {
     }
 
     private void addOtherServer(@NotNull MockTextDocumentService textDocumentService) {
-        otherServer = new OtherServerDefinition(textDocumentService);
+        addOtherServer(textDocumentService, true);
+    }
+
+    /**
+     * Adds a second language server for the file of the test, with the given text document service, whose client
+     * features send textDocument/implementation for the file only if {@code sendsImplementation}.
+     */
+    private void addOtherServer(@NotNull MockTextDocumentService textDocumentService, boolean sendsImplementation) {
+        otherServer = new OtherServerDefinition(textDocumentService, sendsImplementation);
         LanguageServersRegistry.getInstance().addServerDefinition(myFixture.getProject(), otherServer,
                 List.of(ServerMappingSettings.createFileNamePatternsMappingSettings(List.of("*.foo"), null)));
     }
@@ -478,11 +515,23 @@ public class GoToActionReportTest extends LSPCodeInsightFixtureTestCase {
     private static final class OtherServerDefinition extends MockLanguageServerDefinition {
 
         private final @NotNull MockLanguageServer server;
+        private final boolean sendsImplementation;
 
-        OtherServerDefinition(@NotNull MockTextDocumentService textDocumentService) {
+        OtherServerDefinition(@NotNull MockTextDocumentService textDocumentService, boolean sendsImplementation) {
             super("mock-server-other", true);
             server = new MockLanguageServer(GoToActionReportTest::capabilities);
             server.setTextDocumentService(textDocumentService);
+            this.sendsImplementation = sendsImplementation;
+        }
+
+        @Override
+        public @NotNull LSPClientFeatures createClientFeatures() {
+            return new LSPClientFeatures().setImplementationFeature(new LSPImplementationFeature() {
+                @Override
+                public boolean isEnabled(@NotNull PsiFile file) {
+                    return sendsImplementation;
+                }
+            });
         }
 
         @Override

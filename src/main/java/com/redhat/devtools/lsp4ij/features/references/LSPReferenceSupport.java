@@ -45,7 +45,7 @@ public class LSPReferenceSupport extends AbstractLSPDocumentFeatureSupport<LSPRe
     /**
      * Returns the references that the language servers found, as textDocument/references answers them. A language
      * server which fails, or doesn't answer, adds none: when no language server answers, the future completes with an
-     * empty list.
+     * empty list, and with null when no language server can be asked.
      *
      * @param params the parameters of textDocument/references.
      * @return the references that the language servers found.
@@ -92,6 +92,8 @@ public class LSPReferenceSupport extends AbstractLSPDocumentFeatureSupport<LSPRe
                     // Here languageServers is the list of language servers which matches the given file
                     // and which have reference capability
                     if (languageServers.isEmpty()) {
+                        // No language server can be asked: null, as the public method gave before, which
+                        // getAnsweredReferences doesn't take for an answer
                         return CompletableFuture.completedFuture(null);
                     }
 
