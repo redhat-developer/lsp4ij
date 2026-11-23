@@ -10,14 +10,21 @@ package com.redhat.devtools.lsp4ij;
 import com.intellij.notification.Notification;
 import com.intellij.notification.NotificationType;
 import com.intellij.notification.Notifications;
+import com.intellij.openapi.application.PathManager;
+import com.intellij.openapi.util.Disposer;
+import com.intellij.openapi.vfs.newvfs.impl.VfsRootAccess;
 import com.intellij.testFramework.LightPlatformTestCase;
 import com.intellij.util.ui.UIUtil;
 import com.redhat.devtools.lsp4ij.launching.UserDefinedLanguageServerSettings;
 import com.redhat.devtools.lsp4ij.launching.UserDefinedLanguageServerSettings.UserDefinedLanguageServerItemSettings;
+import com.redhat.devtools.lsp4ij.launching.templates.LanguageServerTemplate;
+import com.redhat.devtools.lsp4ij.launching.templates.LanguageServerTemplateManager;
 import com.redhat.devtools.lsp4ij.launching.ui.UICommandLineUpdater;
+import com.redhat.devtools.lsp4ij.server.definition.launching.TransportSupport;
 import com.redhat.devtools.lsp4ij.server.definition.launching.UserDefinedLanguageServerDefinition;
 import com.redhat.devtools.lsp4ij.server.definition.launching.UserDefinedTransport;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -31,6 +38,8 @@ import java.util.Map;
 public class UICommandLineUpdaterTransportTest extends LightPlatformTestCase {
 
     private static final String SERVER_ID = "installer-transport-test";
+    // No bundled template lists only socket modes, so the tests add one
+    private static final String SOCKET_ONLY_TEMPLATE = "socket-only-test-server";
 
     private UserDefinedLanguageServerItemSettings settings;
     private UserDefinedLanguageServerDefinition definition;
@@ -105,9 +114,68 @@ public class UICommandLineUpdaterTransportTest extends LightPlatformTestCase {
         assertEquals(running, settings.getTransport());
     }
 
+    public void testAnInstallerCommandWithoutThePortKeepsTheSocketOfALanguageServerWhichTalksOnlyOverASocket() {
+        var connect = new UserDefinedTransport(UserDefinedTransport.Mode.START_AND_CONNECT, null, 0);
+        var updater = updater(connect, "server --port ${port}", socketOnlyTemplate());
+
+        updater.setCommandLine("/opt/server/bin/server");
+
+        assertEquals("/opt/server/bin/server", definition.getCommandLine());
+        assertEquals("/opt/server/bin/server", settings.getCommandLine());
+        // over its standard input and output, it couldn't talk at all
+        assertEquals(connect, definition.getTransport());
+        assertEquals(connect, settings.getTransport());
+        // but it can't learn the port which LSP4IJ chooses, and the user is told so
+        UIUtil.dispatchAllInvocationEvents();
+        assertEquals(1, warnings.size());
+        assertEquals(LanguageServerBundle.message("language.server.installer.transport.socket.only"),
+                warnings.get(0).getContent());
+    }
+
+    public void testAFixedPortOfALanguageServerWhichTalksOnlyOverASocketIsKeptWithoutAWarning() {
+        // the command may name the port itself
+        var connect = new UserDefinedTransport(UserDefinedTransport.Mode.START_AND_CONNECT, null, 4389);
+        var updater = updater(connect, "server --port 4389", socketOnlyTemplate());
+
+        updater.setCommandLine("/opt/server/bin/server --port 4389");
+
+        assertEquals("/opt/server/bin/server --port 4389", settings.getCommandLine());
+        assertEquals(connect, definition.getTransport());
+        assertEquals(connect, settings.getTransport());
+        UIUtil.dispatchAllInvocationEvents();
+        assertEmpty(warnings);
+    }
+
+    /**
+     * Adds a template which lists only socket modes to the bundled ones, among which LSP4IJ finds the template of a
+     * language server by its id, until the test ends, and returns its id.
+     */
+    private @NotNull String socketOnlyTemplate() {
+        // The bundled templates are read from the jar of LSP4IJ in the test sandbox, which is outside the roots that a
+        // test may read when the checkout isn't in the user's home directory
+        String templates = PathManager.getResourceRoot(LanguageServerTemplateManager.class, "/templates/lsp");
+        assertNotNull(templates);
+        VfsRootAccess.allowRootAccess(getTestRootDisposable(), templates);
+        var template = new LanguageServerTemplate();
+        template.setId(SOCKET_ONLY_TEMPLATE);
+        template.setName("Socket-only server");
+        template.setSupportedTransports(List.of(
+                new TransportSupport(UserDefinedTransport.Mode.START_AND_CONNECT, "--port ${port}")));
+        var bundled = LanguageServerTemplateManager.getInstance().getTemplates();
+        bundled.add(template);
+        Disposer.register(getTestRootDisposable(), () -> bundled.remove(template));
+        return SOCKET_ONLY_TEMPLATE;
+    }
+
     private @NotNull UICommandLineUpdater updater(@NotNull UserDefinedTransport transport, @NotNull String commandLine) {
+        return updater(transport, commandLine, null);
+    }
+
+    private @NotNull UICommandLineUpdater updater(@NotNull UserDefinedTransport transport, @NotNull String commandLine,
+                                                  @Nullable String templateId) {
         settings = new UserDefinedLanguageServerItemSettings();
         settings.setServerId(SERVER_ID);
+        settings.setTemplateId(templateId);
         settings.setServerName("Installer transport test");
         settings.setCommandLine(commandLine);
         settings.setUserEnvironmentVariables(Map.of());

@@ -15,6 +15,7 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.Arrays;
+import java.util.List;
 
 /**
  * How LSP4IJ talks to a user-defined language server: over the standard input and output of its process, by default,
@@ -141,5 +142,21 @@ public record UserDefinedTransport(@NotNull Mode mode, @Nullable String host, in
     public @NotNull UserDefinedTransport forInstalledCommand(@Nullable String command) {
         boolean startedOverSocket = mode == Mode.START_AND_CONNECT || mode == Mode.START_AND_ACCEPT;
         return startedOverSocket && (command == null || !command.contains(PORT_MACRO)) ? STDIO : this;
+    }
+
+    /**
+     * Returns the transport to use with a command which an installer sets, for a language server whose template lists
+     * the given transports: as {@link #forInstalledCommand(String)}, except that a language server which the template
+     * says talks LSP only over a socket keeps its transport, since it could never talk over its standard input and
+     * output. Its command then needs {@value #PORT_MACRO} for a port which LSP4IJ chooses, as the settings say.
+     *
+     * @param command             the command which the installer sets.
+     * @param supportedTransports the transports which the template of the language server lists, empty if it lists
+     *                            none or isn't known.
+     * @return the transport to use with that command.
+     */
+    public @NotNull UserDefinedTransport forInstalledCommand(@Nullable String command,
+                                                             @NotNull List<TransportSupport> supportedTransports) {
+        return TransportSupport.talksOnlyOverASocket(supportedTransports) ? this : forInstalledCommand(command);
     }
 }

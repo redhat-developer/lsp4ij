@@ -9,6 +9,8 @@ package com.redhat.devtools.lsp4ij.server.definition.launching;
 
 import org.junit.jupiter.api.Test;
 
+import java.util.List;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
@@ -69,6 +71,27 @@ public class UserDefinedTransportTest {
                 assertSame(transport, transport.forInstalledCommand("node server.js --socket=${port}"));
             }
         }
+    }
+
+    @Test
+    void anInstallerCommandWithoutThePortKeepsTheSocketOfALanguageServerWhichTalksOnlyOverASocket() {
+        var socketOnly = List.of(new TransportSupport(UserDefinedTransport.Mode.START_AND_CONNECT, "--port ${port}"),
+                new TransportSupport(UserDefinedTransport.Mode.START_AND_ACCEPT, "--socket=${port}"));
+        var alsoStdio = List.of(new TransportSupport(UserDefinedTransport.Mode.STDIO, "--stdio"),
+                new TransportSupport(UserDefinedTransport.Mode.START_AND_ACCEPT, "--socket=${port}"));
+        for (var mode : new UserDefinedTransport.Mode[]{UserDefinedTransport.Mode.START_AND_CONNECT, UserDefinedTransport.Mode.START_AND_ACCEPT}) {
+            for (int port : new int[]{0, 4389}) {
+                var transport = new UserDefinedTransport(mode, null, port);
+                // over its standard input and output, it couldn't talk at all
+                assertSame(transport, transport.forInstalledCommand("/opt/server/bin/server", socketOnly));
+                assertSame(transport, transport.forInstalledCommand(null, socketOnly));
+                // a template which lists stdio too, or no transports, switches it as before
+                assertSame(UserDefinedTransport.STDIO, transport.forInstalledCommand("node server.js --stdio", alsoStdio));
+                assertSame(UserDefinedTransport.STDIO, transport.forInstalledCommand("node server.js --stdio", List.of()));
+                assertSame(transport, transport.forInstalledCommand("node server.js --socket=${port}", alsoStdio));
+            }
+        }
+        assertSame(UserDefinedTransport.STDIO, UserDefinedTransport.STDIO.forInstalledCommand("/opt/server/bin/server", socketOnly));
     }
 
     @Test

@@ -114,11 +114,7 @@ public class NewLanguageServerDialog extends DialogWrapper {
 
             @Override
             public void setCommandLine(String commandLine) {
-                ApplicationManager.getApplication().invokeLater(() -> {
-                    languageServerPanel.setCommandLine(commandLine);
-                    // The installer's command is written for the standard input and output, unless it takes the port
-                    languageServerPanel.setTransport(languageServerPanel.getTransport().forInstalledCommand(commandLine));
-                });
+                ApplicationManager.getApplication().invokeLater(() -> setInstalledCommandLine(commandLine));
             }
         });
 
@@ -133,6 +129,19 @@ public class NewLanguageServerDialog extends DialogWrapper {
         panel.add(builder.getPanel(), BorderLayout.CENTER);
         panel.setPreferredSize(new Dimension(300, 500));
         return panel;
+    }
+
+    /**
+     * Sets the command which an installer gives the language server, and the transport to use with it: the installer's
+     * command is written for the standard input and output, unless it takes the port, or the template says that the
+     * language server talks LSP only over a socket.
+     *
+     * @param commandLine the command which the installer sets.
+     */
+    void setInstalledCommandLine(@Nullable String commandLine) {
+        languageServerPanel.setCommandLine(commandLine);
+        var supportedTransports = currentTemplate != null ? currentTemplate.getSupportedTransports() : List.<TransportSupport>of();
+        languageServerPanel.setTransport(languageServerPanel.getTransport().forInstalledCommand(commandLine, supportedTransports));
     }
 
     private UIConfiguration createUIConfiguration() {
