@@ -51,8 +51,13 @@ public class DAPDropFrameHandler implements XDropFrameHandler {
         if (server == null) {
             return;
         }
-        restartFrame(server, dapFrame.getFrameId(), debugProcess.getSession(), error ->
-                debugProcess.print(DAPBundle.message("dap.frames.restart.failed", error.getMessage()), ConsoleViewContentType.ERROR_OUTPUT));
+        // The values of the frames of this stop can't be set once the program resumes, unless the frame isn't restarted
+        var client = dapFrame.getClient();
+        int ended = client.endExecutionEpochBeforeResuming();
+        restartFrame(server, dapFrame.getFrameId(), debugProcess.getSession(), error -> {
+            client.resumeRefused(ended);
+            debugProcess.print(DAPBundle.message("dap.frames.restart.failed", error.getMessage()), ConsoleViewContentType.ERROR_OUTPUT);
+        });
     }
 
     /**

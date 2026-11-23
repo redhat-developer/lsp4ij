@@ -52,6 +52,7 @@ import org.eclipse.lsp4j.debug.DisconnectArguments;
 import org.eclipse.lsp4j.debug.EvaluateArguments;
 import org.eclipse.lsp4j.debug.EvaluateResponse;
 import org.eclipse.lsp4j.debug.InitializeRequestArguments;
+import org.eclipse.lsp4j.debug.NextArguments;
 import org.eclipse.lsp4j.debug.Scope;
 import org.eclipse.lsp4j.debug.ScopesArguments;
 import org.eclipse.lsp4j.debug.ScopesResponse;
@@ -328,6 +329,23 @@ public class DAPSetExpressionSessionTest extends HeavyPlatformTestCase {
         var args = server.setVariables.poll(BOUND_SECONDS, TimeUnit.SECONDS);
         assertNotNull("The DAP server receives 'setVariable'", args);
         assertEquals(LOCALS_REFERENCE, args.getVariablesReference());
+    }
+
+    public void testSetValueOnceTheProgramIsResumedReportsItAndSendsNothing() throws Exception {
+        debug(new AnswerServer(true, true));
+        var result = evaluate("answer");
+        var answer = local("answer");
+        assertTrue(modifierWhenShown(result) instanceof DAPExpressionModifier);
+        assertTrue(modifierWhenShown(answer) instanceof DAPValueModifier);
+
+        // Step Over: the program runs, and the DAP server holds back the 'stopped' event which ends the step, so that
+        // the frame id and the 'variablesReference' of the values may already name something else at the new stop
+        session.stepOver(false);
+        assertNotNull("The DAP server receives 'next'", server.nexts.poll(BOUND_SECONDS, TimeUnit.SECONDS));
+        assertEquals(DAPBundle.message("dap.variables.setValue.stale"), setValue(result, "42"));
+        assertEquals(DAPBundle.message("dap.variables.setValue.stale"), setValue(answer, "42"));
+        assertEquals("The DAP server receives no 'setExpression'", List.of(), List.copyOf(server.setExpressions));
+        assertEquals("The DAP server receives no 'setVariable'", List.of(), List.copyOf(server.setVariables));
     }
 
     public void testTheErrorOfTheDAPServerIsReported() throws Exception {
@@ -705,6 +723,7 @@ public class DAPSetExpressionSessionTest extends HeavyPlatformTestCase {
         private final LinkedBlockingQueue<SetVariableArguments> setVariables = new LinkedBlockingQueue<>();
         private final LinkedBlockingQueue<SetExpressionArguments> setExpressions = new LinkedBlockingQueue<>();
         private final LinkedBlockingQueue<Integer> variablesReferences = new LinkedBlockingQueue<>();
+        private final LinkedBlockingQueue<NextArguments> nexts = new LinkedBlockingQueue<>();
         private volatile Function<SetExpressionArguments, CompletableFuture<SetExpressionResponse>> setExpressionAnswer = args -> {
             var response = new SetExpressionResponse();
             response.setValue(args.getValue());
@@ -860,6 +879,13 @@ public class DAPSetExpressionSessionTest extends HeavyPlatformTestCase {
             response.setVariablesReference(evaluateVariablesReference);
             response.setPresentationHint(evaluateHint);
             return CompletableFuture.completedFuture(response);
+        }
+
+        @Override
+        public CompletableFuture<Void> next(NextArguments args) {
+            // The program runs: the 'stopped' event which ends the step is held back
+            nexts.add(args);
+            return CompletableFuture.completedFuture(null);
         }
 
         @Override

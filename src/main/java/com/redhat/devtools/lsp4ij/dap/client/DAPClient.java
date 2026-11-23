@@ -76,7 +76,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.function.UnaryOperator;
@@ -161,9 +160,9 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
     // Whether the loaded sources and modules were asked for. They are asked for at the first stop, and then follow the
     // 'loadedSource' and 'module' events: asking at each stop would get all of them again at each step.
     private final AtomicBoolean loadedSourcesAndModulesAsked = new AtomicBoolean();
-    // The number of the last stop of the program: the frames of each stop have its number (DAPStackFrame), as a debug
-    // adapter may give the id of a frame to another frame at a later stop
-    private final AtomicInteger lastStopNumber = new AtomicInteger();
+    // The execution epoch of the program, which ends whenever the program resumes or stops: the frames of a stop have
+    // its epoch (DAPStackFrame), as their ids, and the references of their values, are valid only until it ends
+    private final DAPExecutionEpoch executionEpoch = new DAPExecutionEpoch();
     // Whether the last request that resumed the program was a step that resumed only its thread. A breakpoint which
     // doesn't suspend then resumes only the stopped thread, so the threads the step kept stopped stay stopped.
     private volatile boolean singleThreadResumed;
@@ -634,7 +633,7 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
 
     @Override
     public void stopped(StoppedEventArguments args) {
-        int stopNumber = lastStopNumber.incrementAndGet();
+        int stopEpoch = executionEpoch.end();
         // "Run to Cursor" ends at this stop, at its temporary breakpoint or anywhere else
         debugProcess.getRunToCursorBreakpoint().stopped();
         var server = getDebugProtocolServer();
@@ -651,7 +650,7 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
                     .findFirst();
             // A thread which the debug adapter doesn't report doesn't suspend the session
             stoppedThread.ifPresent(thread -> getStackFrames(server, threadId)
-                    .thenAcceptAsync(frames -> suspend(server, args, stopNumber, threads, thread, frames)));
+                    .thenAcceptAsync(frames -> suspend(server, args, stopEpoch, threads, thread, frames)));
         });
     }
 
@@ -677,14 +676,14 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
      *
      * @param server        the debug adapter.
      * @param args          the stopped event.
-     * @param stopNumber    the number of the stop.
+     * @param stopEpoch     the execution epoch of the stop.
      * @param threads       the threads the debug adapter reports.
      * @param stoppedThread the thread which stopped.
      * @param frames        the stack frames of the stopped thread, innermost first.
      */
     private void suspend(@NotNull IDebugProtocolServer server,
                          @NotNull StoppedEventArguments args,
-                         int stopNumber,
+                         int stopEpoch,
                          org.eclipse.lsp4j.debug.Thread[] threads,
                          org.eclipse.lsp4j.debug.Thread stoppedThread,
                          StackFrame[] frames) {
@@ -692,12 +691,12 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
             return;
         }
         StackFrame topFrame = frames[0];
-        DAPSuspendContext context = createSuspendContext(stopNumber, threads, stoppedThread, frames);
+        DAPSuspendContext context = createSuspendContext(stopEpoch, threads, stoppedThread, frames);
         var breakpointHandler = debugProcess.getBreakpointHandler();
         XBreakpoint<?> breakpoint = getStopBreakpoint(args, id -> debugProcess.findBreakpointById(server, id), () -> breakpointHandler.findBreakpoint(server, topFrame));
         if (breakpoint != null) {
             breakpointReached(getSession(), server, breakpoint, context, topFrame.getId(), stoppedThread.getId(),
-                    singleThreadResumed ? Boolean.TRUE : null)
+                    singleThreadResumed ? Boolean.TRUE : null, executionEpoch::endBeforeResuming)
                     .exceptionally(this::reportBreakpointFailure);
             if (breakpoint.getSuspendPolicy() != SuspendPolicy.NONE) {
                 showDataBreakpointHint(getProject(), context, args, DAPClient::showInformationHint);
@@ -822,11 +821,11 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
      * context too, which replaces the session's: the threads are read again at each stop, and the sessions of a tree
      * ('startDebugging') share the debug session, so the context of another stop may be another client's.
      */
-    private @NotNull DAPSuspendContext createSuspendContext(int stopNumber,
+    private @NotNull DAPSuspendContext createSuspendContext(int stopEpoch,
                                                            org.eclipse.lsp4j.debug.Thread[] threads,
                                                            org.eclipse.lsp4j.debug.Thread stoppedThread,
                                                            StackFrame[] frames) {
-        var context = new DAPSuspendContext(this, stopNumber);
+        var context = new DAPSuspendContext(this, stopEpoch);
         for (var thread : threads) {
             context.addToExecutionStack(thread, thread.equals(stoppedThread) ? frames : null);
         }
@@ -995,6 +994,7 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
      * @param threadId     the DAP thread which stopped.
      * @param singleThread true to resume only the stopped thread, when a step resumed it alone, and null to resume
      *                     every thread.
+     * @param resuming     runs right before the request which resumes the program is sent.
      * @return the future, completed once the session is told and the program resumed if it must be.
      */
     static CompletableFuture<@Nullable Void> breakpointReached(@NotNull XDebugSession session,
@@ -1003,7 +1003,8 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
                                                                @NotNull XSuspendContext context,
                                                                int frameId,
                                                                int threadId,
-                                                               @Nullable Boolean singleThread) {
+                                                               @Nullable Boolean singleThread,
+                                                               @NotNull Runnable resuming) {
         return evaluateLogExpression(server, breakpoint, frameId)
                 .thenCompose(logged -> {
                     if (session.breakpointReached(breakpoint, logged, context)) {
@@ -1013,6 +1014,7 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
                     ContinueArguments args = new ContinueArguments();
                     args.setThreadId(threadId);
                     args.setSingleThread(singleThread);
+                    resuming.run();
                     return server.continue_(args).thenAccept(response -> {
                     });
                 });
@@ -1308,6 +1310,7 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
         ContinueArguments args = new ContinueArguments();
         args.setThreadId(threadId);
         singleThreadResumed = false;
+        executionEpoch.endBeforeResuming();
         return debugProtocolServer
                 .continue_(args);
     }
@@ -1319,6 +1322,7 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
         }
         var singleThread = singleThreadStep();
         singleThreadResumed = singleThread != null;
+        executionEpoch.endBeforeResuming();
         next(server, threadId, granularity, singleThread);
     }
 
@@ -1348,6 +1352,7 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
         }
         var singleThread = singleThreadStep();
         singleThreadResumed = singleThread != null;
+        executionEpoch.endBeforeResuming();
         stepOut(server, threadId, granularity, singleThread);
     }
 
@@ -1381,6 +1386,7 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
         }
         var singleThread = singleThreadStep();
         singleThreadResumed = singleThread != null;
+        executionEpoch.endBeforeResuming();
         stepIn(server, threadId, targetId, granularity, singleThread);
     }
 
@@ -1582,6 +1588,12 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
     }
 
     // Threads
+
+    @Override
+    public void continued(ContinuedEventArguments args) {
+        // The program runs: the references of the frames of its last stop are out of date
+        executionEpoch.end();
+    }
 
     @Override
     public void thread(ThreadEventArguments args) {
@@ -1804,13 +1816,55 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
     }
 
     /**
-     * Returns the number of the last stop of the program, which the frames of that stop have: each 'stopped' event
-     * gets the next number.
+     * Returns the current execution epoch of the program, which ends whenever the program resumes or stops: the frames
+     * of a stop have its epoch, as their ids, and the references of their values, are valid only until it ends.
      *
-     * @return the number of the last stop of the program, or 0 before the first one.
+     * @return the current execution epoch of the program, 0 before it first stops.
      */
-    public int getLastStopNumber() {
-        return lastStopNumber.get();
+    public int getExecutionEpoch() {
+        return executionEpoch.get();
+    }
+
+    /**
+     * Sends a request which names references of the given execution epoch, such as the id of a stack frame or a
+     * 'variablesReference', if the epoch is still the current one. The check and the sending are atomic against a
+     * request of this client which resumes the program: the request is written before it, or not at all.
+     *
+     * @param epoch   the execution epoch of the references which the request names.
+     * @param request sends the request: it must only write it, as the program can't resume meanwhile.
+     * @param <T>     the type of the response.
+     * @return the future of the response. When the epoch has ended, the request is not sent, and the future fails, after
+     * this method returned, as an error of the debug adapter does, with the message which says that the program has run
+     * since the value was shown.
+     */
+    public <T> @NotNull CompletableFuture<T> sendInExecutionEpoch(int epoch,
+                                                                 @NotNull Supplier<CompletableFuture<T>> request) {
+        var sent = executionEpoch.send(epoch, request);
+        if (sent != null) {
+            return sent;
+        }
+        return CompletableFuture.supplyAsync(() -> {
+            throw new IllegalStateException(DAPBundle.message("dap.variables.setValue.stale"));
+        }, AppExecutorUtil.getAppExecutorService());
+    }
+
+    /**
+     * Ends the current execution epoch before a request of this client which resumes the program is sent.
+     *
+     * @return the execution epoch which ended.
+     */
+    int endExecutionEpochBeforeResuming() {
+        return executionEpoch.endBeforeResuming();
+    }
+
+    /**
+     * Makes the execution epoch which {@link #endExecutionEpochBeforeResuming()} ended the current one again, when the
+     * debug adapter refused to resume the program, unless the epoch has changed since.
+     *
+     * @param ended the execution epoch which {@link #endExecutionEpochBeforeResuming()} ended.
+     */
+    void resumeRefused(int ended) {
+        executionEpoch.resumeRefused(ended);
     }
 
     /**

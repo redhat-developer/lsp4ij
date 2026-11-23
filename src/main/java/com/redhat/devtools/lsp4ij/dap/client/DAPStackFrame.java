@@ -54,7 +54,7 @@ public class DAPStackFrame extends XStackFrame {
 
     private final @NotNull StackFrame stackFrame;
     private final @NotNull DAPClient client;
-    private final int stopNumber;
+    private final int executionEpoch;
     private volatile @Nullable XSourcePosition sourcePosition;
     private @Nullable DisassemblyDeferredSourcePosition disassemblyInstructionSourcePosition;
     private XDebuggerEvaluator evaluator;
@@ -62,20 +62,20 @@ public class DAPStackFrame extends XStackFrame {
 
     public DAPStackFrame(@NotNull DAPClient client,
                          @NotNull StackFrame stackFrame) {
-        this(client, stackFrame, client.getLastStopNumber());
+        this(client, stackFrame, client.getExecutionEpoch());
     }
 
     /**
-     * @param client     the client of the debug adapter.
-     * @param stackFrame the stack frame which the debug adapter sent.
-     * @param stopNumber the number of the stop of the program at which the debug adapter sent the frame.
+     * @param client         the client of the debug adapter.
+     * @param stackFrame     the stack frame which the debug adapter sent.
+     * @param executionEpoch the execution epoch of the stop of the program at which the debug adapter sent the frame.
      */
     public DAPStackFrame(@NotNull DAPClient client,
                          @NotNull StackFrame stackFrame,
-                         int stopNumber) {
+                         int executionEpoch) {
         this.client = client;
         this.stackFrame = stackFrame;
-        this.stopNumber = stopNumber;
+        this.executionEpoch = executionEpoch;
     }
 
     @Override
@@ -277,14 +277,14 @@ public class DAPStackFrame extends XStackFrame {
     }
 
     /**
-     * Returns true if the debug adapter sent this frame at the last stop of the program, and false if the program
-     * stopped again since: the id of the frame may then name another frame, as when a debug adapter numbers the frames
-     * of each stop from 0, as GDB does.
+     * Returns the execution epoch of the stop of the program at which the debug adapter sent this frame: its id, and
+     * the references of its values, are valid only until the epoch ends, when the program resumes or stops again.
+     * A debug adapter may give them to something else at a later stop, as GDB numbers the frames of each stop from 0.
      *
-     * @return true if the debug adapter sent this frame at the last stop of the program, and false otherwise.
+     * @return the execution epoch of the stop of the program at which the debug adapter sent this frame.
      */
-    public boolean isOfTheLastStop() {
-        return stopNumber == client.getLastStopNumber();
+    public int getExecutionEpoch() {
+        return executionEpoch;
     }
 
     /**

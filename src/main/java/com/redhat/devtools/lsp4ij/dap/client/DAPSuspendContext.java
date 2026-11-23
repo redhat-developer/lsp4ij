@@ -26,21 +26,21 @@ import java.util.List;
 public class DAPSuspendContext extends XSuspendContext {
 
     private final @NotNull DAPClient client;
-    private final int stopNumber;
+    private final int executionEpoch;
     private final List<DAPExecutionStack> myExecutionStacks = new LinkedList<>();
     private @Nullable DAPExecutionStack myActiveStack;
 
     public DAPSuspendContext(@NotNull DAPClient client) {
-        this(client, client.getLastStopNumber());
+        this(client, client.getExecutionEpoch());
     }
 
     /**
-     * @param client     the client of the debug adapter.
-     * @param stopNumber the number of the stop of the program which this context describes.
+     * @param client         the client of the debug adapter.
+     * @param executionEpoch the execution epoch of the stop of the program which this context describes.
      */
-    public DAPSuspendContext(@NotNull DAPClient client, int stopNumber) {
+    public DAPSuspendContext(@NotNull DAPClient client, int executionEpoch) {
         this.client = client;
-        this.stopNumber = stopNumber;
+        this.executionEpoch = executionEpoch;
     }
 
     public void addToExecutionStack(@NotNull Thread thread, @Nullable StackFrame[] stackFrames) {
@@ -73,12 +73,12 @@ public class DAPSuspendContext extends XSuspendContext {
     }
 
     /**
-     * Returns the number of the stop of the program which this context describes.
+     * Returns the execution epoch of the stop of the program which this context describes.
      *
-     * @return the number of the stop of the program which this context describes.
+     * @return the execution epoch of the stop of the program which this context describes.
      */
-    public int getStopNumber() {
-        return stopNumber;
+    public int getExecutionEpoch() {
+        return executionEpoch;
     }
 
     public Integer getThreadId() {
