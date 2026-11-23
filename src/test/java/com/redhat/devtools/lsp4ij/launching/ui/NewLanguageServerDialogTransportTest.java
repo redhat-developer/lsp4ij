@@ -7,31 +7,45 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.launching.ui;
 
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import com.intellij.execution.configuration.EnvironmentVariablesComponent;
+import com.intellij.openapi.application.PathManager;
 import com.intellij.openapi.ui.DialogWrapper;
 import com.intellij.openapi.ui.ValidationInfo;
+import com.intellij.openapi.vfs.VfsUtilCore;
+import com.intellij.openapi.vfs.VirtualFile;
+import com.intellij.openapi.vfs.newvfs.impl.VfsRootAccess;
 import com.intellij.testFramework.fixtures.BasePlatformTestCase;
+import com.intellij.ui.components.JBLabel;
 import com.intellij.ui.components.JBRadioButton;
 import com.redhat.devtools.lsp4ij.LanguageServerBundle;
 import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
 import com.redhat.devtools.lsp4ij.launching.templates.LanguageServerTemplate;
+import com.redhat.devtools.lsp4ij.launching.templates.LanguageServerTemplateManager;
 import com.redhat.devtools.lsp4ij.server.definition.launching.TransportSupport;
 import com.redhat.devtools.lsp4ij.server.definition.launching.UserDefinedLanguageServerDefinition;
 import com.redhat.devtools.lsp4ij.server.definition.launching.UserDefinedTransport;
 import com.redhat.devtools.lsp4ij.settings.ui.CommandLineWidget;
 import com.redhat.devtools.lsp4ij.templates.ServerTemplate;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import javax.swing.*;
 import java.awt.*;
 
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.zip.ZipInputStream;
 
 /**
  * Tests the transport in the New Language Server dialog: a template's socket is shown, a language server which runs
- * already needs no command but its port, and the language server it adds has the transport.
+ * already needs no command but its port, the language server it adds has the transport, and an imported export of a
+ * language server has the transports of the template which the language server was created from.
  */
 public class NewLanguageServerDialogTransportTest extends BasePlatformTestCase {
 
@@ -334,6 +348,153 @@ public class NewLanguageServerDialogTransportTest extends BasePlatformTestCase {
         }
     }
 
+    public void testAnImportedExportOfALanguageServerFromATemplateWhichListsOnlyStdioWarnsOfASocket() throws IOException {
+        var exported = export(definition("typescript-language-server", "typescript-language-server --stdio",
+                UserDefinedTransport.STDIO));
+        var template = importTemplate(exported);
+        assertEquals("the transports of the TypeScript template", STDIO_ONLY, template.getSupportedTransports());
+        assertEmpty(template.getProblems());
+
+        var dialog = dialog(template);
+        try {
+            assertTrue(label(dialog, "language.server.transport.stdio.only").isVisible());
+            var socket = radio(dialog, "language.server.transport.socket");
+            assertTrue(socket.isEnabled());
+            assertEmpty(dialog.doValidateAll());
+
+            click(dialog, "language.server.transport.socket");
+            String message = LanguageServerBundle.message("language.server.validation.socket.stdio.only");
+            List<ValidationInfo> warnings = dialog.doValidateAll().stream()
+                    .filter(problem -> message.equals(problem.message))
+                    .toList();
+            assertEquals(2, warnings.size());
+            assertSame(socket, warnings.get(0).component);
+            assertTrue(warnings.stream().allMatch(problem -> problem.warning && problem.okEnabled));
+        } finally {
+            dialog.close(DialogWrapper.CANCEL_EXIT_CODE);
+        }
+    }
+
+    public void testAnImportedExportOfALanguageServerFromATemplateWithASocketModeHasItsHintAndArgument() throws IOException {
+        var template = importTemplate(export(definition("vscode-css-language-server", "node css.js --stdio",
+                UserDefinedTransport.STDIO)));
+        assertEquals("the transports of the CSS template", CSS, template.getSupportedTransports());
+
+        var dialog = dialog(template);
+        try {
+            assertFalse(label(dialog, "language.server.transport.stdio.only").isVisible());
+
+            click(dialog, "language.server.transport.socket");
+
+            assertTrue(labelWithText(dialog, LanguageServerBundle.message("language.server.socket.template.hint",
+                    "--socket=${port}", LanguageServerBundle.message("language.server.socket.startAndAccept"))).isVisible());
+            assertEquals("node css.js --socket=${port}", command(dialog));
+            assertEmpty(dialog.doValidateAll());
+        } finally {
+            dialog.close(DialogWrapper.CANCEL_EXIT_CODE);
+        }
+    }
+
+    public void testAnImportedExportOfALanguageServerOverASocketFromATemplateWhichListsOnlyStdioKeepsTheSocket() throws IOException {
+        var accept = new UserDefinedTransport(UserDefinedTransport.Mode.START_AND_ACCEPT, null, 0);
+        var template = importTemplate(export(definition("typescript-language-server", "my-server --socket=${port}",
+                accept)));
+        assertEquals(accept, template.getTransport());
+        assertEquals(STDIO_ONLY, template.getSupportedTransports());
+        // the export is a template whose socket isn't one of its transports, which LSP4IJ reports when it loads it
+        assertEquals(List.of(LanguageServerBundle.message("language.server.template.socket.mode.not.listed",
+                "startAndAccept")), template.getProblems());
+
+        var dialog = dialog(template);
+        try {
+            assertTrue(radio(dialog, "language.server.transport.socket").isSelected());
+            String message = LanguageServerBundle.message("language.server.validation.socket.stdio.only");
+            List<ValidationInfo> problems = dialog.doValidateAll();
+            assertEquals(2, problems.stream().filter(problem -> message.equals(problem.message)).count());
+            assertTrue(problems.stream().allMatch(problem -> problem.warning && problem.okEnabled));
+        } finally {
+            dialog.close(DialogWrapper.CANCEL_EXIT_CODE);
+        }
+    }
+
+    public void testAnExportOfALanguageServerWithoutATemplateHasNoTransports() throws IOException {
+        assertExportsNoTransports(definition(null, "server --stdio", UserDefinedTransport.STDIO));
+    }
+
+    public void testAnExportOfALanguageServerWhoseTemplateIsGoneHasNoTransports() throws IOException {
+        assertExportsNoTransports(definition("a-template-which-lsp4ij-does-not-have", "server --stdio",
+                UserDefinedTransport.STDIO));
+    }
+
+    private void assertExportsNoTransports(@NotNull UserDefinedLanguageServerDefinition definition) throws IOException {
+        var exported = export(definition);
+        assertFalse(exportedTemplateJson(exported).has("transports"));
+        var template = importTemplate(exported);
+        assertEmpty(template.getSupportedTransports());
+
+        var dialog = dialog(template);
+        try {
+            assertFalse(label(dialog, "language.server.transport.stdio.only").isVisible());
+            click(dialog, "language.server.transport.socket");
+            String message = LanguageServerBundle.message("language.server.validation.socket.stdio.only");
+            assertTrue(dialog.doValidateAll().stream().noneMatch(problem -> message.equals(problem.message)));
+        } finally {
+            dialog.close(DialogWrapper.CANCEL_EXIT_CODE);
+        }
+    }
+
+    /**
+     * Exports the given language server, as the LSP console does, and returns its directory in the zip, unzipped.
+     */
+    private @NotNull VirtualFile export(@NotNull UserDefinedLanguageServerDefinition definition) throws IOException {
+        var tempDir = myFixture.getTempDirFixture();
+        var zip = tempDir.createFile("export.zip");
+        assertEquals(1, templateManager().exportLsTemplates(zip, List.of(definition)));
+        try (var entries = new ZipInputStream(new ByteArrayInputStream(zip.contentsToByteArray()))) {
+            for (var entry = entries.getNextEntry(); entry != null; entry = entries.getNextEntry()) {
+                tempDir.createFile("unzipped/" + entry.getName(), new String(entries.readAllBytes(), StandardCharsets.UTF_8));
+            }
+        }
+        var exported = tempDir.getFile("unzipped/" + definition.getDisplayName());
+        assertNotNull(exported);
+        return exported;
+    }
+
+    /**
+     * Imports the given directory as a custom template, as "Import template..." does.
+     */
+    private @NotNull LanguageServerTemplate importTemplate(@NotNull VirtualFile directory) throws IOException {
+        var template = templateManager().importServerTemplate(directory);
+        assertNotNull(template);
+        return template;
+    }
+
+    /**
+     * Returns the manager of the templates, which reads the bundled templates from the jar of LSP4IJ in the test
+     * sandbox: outside the roots that a test may read when the checkout isn't in the user's home directory.
+     */
+    private @NotNull LanguageServerTemplateManager templateManager() {
+        String templates = PathManager.getResourceRoot(LanguageServerTemplateManager.class, "/templates/lsp");
+        assertNotNull(templates);
+        VfsRootAccess.allowRootAccess(getTestRootDisposable(), templates);
+        return LanguageServerTemplateManager.getInstance();
+    }
+
+    private static @NotNull JsonObject exportedTemplateJson(@NotNull VirtualFile directory) throws IOException {
+        var templateJson = directory.findChild(ServerTemplate.TEMPLATE_FILE_NAME);
+        assertNotNull(templateJson);
+        return JsonParser.parseString(VfsUtilCore.loadText(templateJson)).getAsJsonObject();
+    }
+
+    private static @NotNull UserDefinedLanguageServerDefinition definition(@Nullable String templateId,
+                                                                           @NotNull String command,
+                                                                           @NotNull UserDefinedTransport transport) {
+        var definition = new UserDefinedLanguageServerDefinition("exported", templateId, "Exported", null, null,
+                command, null, Map.of(), false, "", false, "", "", "", "", "", "");
+        definition.setTransport(transport);
+        return definition;
+    }
+
     /**
      * Returns the problems the dialog shows on its fields, without the list of them below the fields.
      */
@@ -392,6 +553,16 @@ public class NewLanguageServerDialogTransportTest extends BasePlatformTestCase {
         return (JBRadioButton) form(dialog).stream()
                 .filter(component -> component instanceof JBRadioButton radio
                         && LanguageServerBundle.message(key).equals(radio.getText()))
+                .findFirst().orElseThrow();
+    }
+
+    private static @NotNull JBLabel label(@NotNull NewLanguageServerDialog dialog, @NotNull String key) {
+        return labelWithText(dialog, LanguageServerBundle.message(key));
+    }
+
+    private static @NotNull JBLabel labelWithText(@NotNull NewLanguageServerDialog dialog, @NotNull String text) {
+        return (JBLabel) form(dialog).stream()
+                .filter(component -> component instanceof JBLabel label && text.equals(label.getText()))
                 .findFirst().orElseThrow();
     }
 

@@ -10,6 +10,9 @@ package com.redhat.devtools.lsp4ij.launching.templates;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
+import com.intellij.openapi.application.PathManager;
+import com.intellij.openapi.vfs.newvfs.impl.VfsRootAccess;
 import com.intellij.testFramework.LightPlatformTestCase;
 import com.redhat.devtools.lsp4ij.LanguageServerBundle;
 import com.redhat.devtools.lsp4ij.server.definition.launching.TransportSupport;
@@ -23,8 +26,8 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Tests the "socket" of a language server template: what an exported user-defined language server writes, and what an
- * imported template reads.
+ * Tests the "socket" and "transports" of a language server template: what an exported user-defined language server
+ * writes, and what an imported template reads.
  */
 public class LanguageServerSocketTemplateTest extends LightPlatformTestCase {
 
@@ -227,6 +230,26 @@ public class LanguageServerSocketTemplateTest extends LightPlatformTestCase {
         assertEquals("server --port ${port}", template.getProgramArgs());
     }
 
+    public void testAnExportedLanguageServerHasTheTransportsOfItsTemplateAsTheTemplateHasThem() throws IOException {
+        // The bundled templates are read from the jar of LSP4IJ in the test sandbox, which is outside the roots that a
+        // test may read when the checkout isn't in the user's home directory
+        String bundledTemplates = PathManager.getResourceRoot(LanguageServerTemplateManager.class, "/templates/lsp");
+        assertNotNull(bundledTemplates);
+        VfsRootAccess.allowRootAccess(getTestRootDisposable(), bundledTemplates);
+        var templates = LanguageServerTemplateManager.getInstance().getTemplates().stream()
+                .filter(template -> !template.getSupportedTransports().isEmpty())
+                .toList();
+        assertContainsElements(templates.stream().map(LanguageServerTemplate::getId).toList(),
+                "typescript-language-server", "vscode-css-language-server", "cpp_ls");
+        for (var template : templates) {
+            var json = GSON.toJsonTree(definition(template.getId(), "server")).getAsJsonObject();
+
+            assertEquals(template.getId(), bundledJson(template.getId()).get("transports"), json.get("transports"));
+            assertEquals(template.getId(), template.getSupportedTransports(),
+                    GSON.fromJson(json, LanguageServerTemplate.class).getSupportedTransports());
+        }
+    }
+
     private static LanguageServerTemplate bundled(String name) throws IOException {
         var json = LanguageServerSocketTemplateTest.class.getResourceAsStream("/templates/lsp/" + name + "/template.json");
         assertNotNull(name, json);
@@ -235,8 +258,20 @@ public class LanguageServerSocketTemplateTest extends LightPlatformTestCase {
         }
     }
 
+    private static JsonObject bundledJson(String name) throws IOException {
+        var json = LanguageServerSocketTemplateTest.class.getResourceAsStream("/templates/lsp/" + name + "/template.json");
+        assertNotNull(name, json);
+        try (var reader = new InputStreamReader(json, StandardCharsets.UTF_8)) {
+            return JsonParser.parseReader(reader).getAsJsonObject();
+        }
+    }
+
     private static UserDefinedLanguageServerDefinition definition(String commandLine) {
-        return new UserDefinedLanguageServerDefinition("id", null, "Server", null, null, commandLine, null,
+        return definition(null, commandLine);
+    }
+
+    private static UserDefinedLanguageServerDefinition definition(String templateId, String commandLine) {
+        return new UserDefinedLanguageServerDefinition("id", templateId, "Server", null, null, commandLine, null,
                 Map.of(), false, "", false, "", "", "", "", "", "");
     }
 }

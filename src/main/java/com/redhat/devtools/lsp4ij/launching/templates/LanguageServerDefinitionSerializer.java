@@ -14,6 +14,7 @@ package com.redhat.devtools.lsp4ij.launching.templates;
 import com.google.gson.*;
 import com.intellij.openapi.fileTypes.FileNameMatcher;
 import com.intellij.openapi.util.Pair;
+import com.redhat.devtools.lsp4ij.server.definition.launching.TransportSupport;
 import com.redhat.devtools.lsp4ij.server.definition.launching.UserDefinedLanguageServerDefinition;
 import com.redhat.devtools.lsp4ij.server.definition.launching.UserDefinedTransport;
 import org.jetbrains.annotations.NotNull;
@@ -49,6 +50,22 @@ public class LanguageServerDefinitionSerializer implements JsonSerializer<UserDe
             }
             socket.addProperty(SOCKET_PORT_JSON_PROPERTY, transport.port());
             userDefinedLSDefinitionJson.add(SOCKET_JSON_PROPERTY, socket);
+        }
+
+        // Transports: the language server keeps only its own, so these are those its template lists, which its
+        // settings apply too
+        var supportedTransports = getSupportedTransports(src);
+        if (!supportedTransports.isEmpty()) {
+            JsonArray transports = new JsonArray();
+            for (var supported : supportedTransports) {
+                JsonObject transportJson = new JsonObject();
+                transportJson.addProperty(TRANSPORT_MODE_JSON_PROPERTY, supported.mode().getId());
+                if (supported.argument() != null) {
+                    transportJson.addProperty(TRANSPORT_ARGUMENT_JSON_PROPERTY, supported.argument());
+                }
+                transports.add(transportJson);
+            }
+            userDefinedLSDefinitionJson.add(TRANSPORTS_JSON_PROPERTY, transports);
         }
 
         JsonArray languageMappings = new JsonArray();
@@ -98,6 +115,20 @@ public class LanguageServerDefinitionSerializer implements JsonSerializer<UserDe
         }
 
         return userDefinedLSDefinitionJson;
+    }
+
+    /**
+     * Returns the transports which the template of the given language server lists. The template is found as the
+     * settings of the language server find it, by its id among the bundled templates, so a language server without a
+     * template, or whose template LSP4IJ doesn't have, has none.
+     */
+    private static @NotNull List<TransportSupport> getSupportedTransports(@NotNull UserDefinedLanguageServerDefinition definition) {
+        String templateId = definition.getTemplateId();
+        if (templateId == null) {
+            return List.of();
+        }
+        var template = LanguageServerTemplateManager.getInstance().findTemplateById(templateId);
+        return template != null ? template.getSupportedTransports() : List.of();
     }
 
     private static @NotNull JsonArray getJsonElements(UserDefinedLanguageServerDefinition src) {
