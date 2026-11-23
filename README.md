@@ -284,7 +284,6 @@ Here are some projects that use LSP4IJ, grouped by the protocol they use it for.
  * [Gleam Pro](https://plugins.jetbrains.com/plugin/33935-gleam-pro)
  * [Go (gopls)](https://github.com/Xefise/jetbrains-go-plugin)
  * [Illuminated Cloud 2](https://plugins.jetbrains.com/plugin/10253-illuminated-cloud-2)
- * [IntelliJ EmmyLua2](https://github.com/EmmyLua/Intellij-EmmyLua2)
  * [Localcord](https://github.com/KaenguruuDev/Localcord-Rider)
  * [Lua Pro](https://plugins.jetbrains.com/plugin/35721-lua-pro)
  * [MC Studio Helper](https://github.com/TartaricAcid/MCStudioHelper)
