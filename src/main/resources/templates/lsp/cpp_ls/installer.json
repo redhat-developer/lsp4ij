@@ -11,6 +11,16 @@
       "file": {
         "windows": "${serverDist}/cpp_ls.exe",
         "default": "${serverDist}/cpp_ls"
+      },
+      "onSuccess": {
+        "replaceTemplateCommand": {
+          "name": "Configure cpp_ls server command",
+          "templateCommand": {
+            "windows": "cpp_ls.exe",
+            "default": "cpp_ls"
+          },
+          "command": "\"${check.file}\""
+        }
       }
     }
   },
