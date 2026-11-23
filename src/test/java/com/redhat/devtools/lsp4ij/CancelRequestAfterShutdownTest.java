@@ -59,6 +59,7 @@ import java.nio.channels.Channels;
 import java.nio.channels.Pipe;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -240,12 +241,16 @@ public class CancelRequestAfterShutdownTest extends UsefulTestCase {
             stopped = server.getServerWrapper().stop();
             awaitRead(connection, "shutdown");
 
-            // The language server asks for its configuration while it shuts down
-            var clients = definition.getServer().getRemoteProxies();
-            var configuration = clients.get(clients.size() - 1)
+            // The language server asks for its configuration while it shuts down, over the connection that it shuts
+            // down: a feature of the editor which asks for the language server meanwhile, as its code vision can,
+            // starts it again over another connection, which gives the language server another client
+            var configuration = connection.client()
                     .configuration(new ConfigurationParams(List.of(new ConfigurationItem())));
             PlatformTestUtil.waitWithEventsDispatching("The language server must get the configuration",
                     configuration::isDone, 10);
+            // A request is also done when it fails, as when it cannot be sent
+            assertFalse("The language server must get the answer to its request",
+                    configuration.isCompletedExceptionally());
         } finally {
             shutdownAnswer.complete(null);
         }
@@ -407,6 +412,7 @@ public class CancelRequestAfterShutdownTest extends UsefulTestCase {
         private final CompletableFuture<Void> shutdownRead = new CompletableFuture<>();
         // The id of the first request of each method that the language server read
         private final Map<String, String> requestIds = new ConcurrentHashMap<>();
+        private LanguageClient client;
         private InputStream clientInput;
         private OutputStream clientOutput;
         private OutputStream serverOutput;
@@ -433,10 +439,20 @@ public class CancelRequestAfterShutdownTest extends UsefulTestCase {
                         .wrapMessages(this::recordingWhatTheServerReads)
                         .create();
                 serverListening = launcher.startListening();
-                server.addRemoteProxy(launcher.getRemoteProxy());
+                client = launcher.getRemoteProxy();
+                server.addRemoteProxy(client);
             } catch (IOException e) {
                 throw new CannotStartProcessException(e);
             }
+        }
+
+        /**
+         * Returns the client of the language server over this connection: a request sent through it is answered over
+         * this connection. The language server gets a client for each of its connections, and a restart gives it
+         * another one.
+         */
+        synchronized @NotNull LanguageClient client() {
+            return Objects.requireNonNull(client, "The connection is not started");
         }
 
         @Override
