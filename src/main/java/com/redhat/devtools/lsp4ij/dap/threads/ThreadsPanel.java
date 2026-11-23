@@ -109,55 +109,76 @@ public class ThreadsPanel extends BorderLayoutPanel implements Disposable, UiDat
     }
 
     /**
-     * Shows the given threads, as threads of the given client's DAP session.
+     * Shows the given threads, as threads of the given client's DAP session. The rows are built on the EDT, from those
+     * it shows: a row keeps the status of a thread only for the same thread of the same session, since the sessions of
+     * a tree ('startDebugging') number their threads each.
      *
      * @param client  the client of the DAP session of the threads, or null if it is not known yet.
      * @param threads the threads.
      */
-    public void refreshThreads(@Nullable DAPClient client, Thread[] threads) {
-        Map<Integer, ThreadInfo> existingById = new HashMap<>();
-        for (ThreadInfo info : model.getItems()) {
-            existingById.put(info.getId(), info);
-        }
-
-        List<ThreadInfo> updated = new ArrayList<>();
-        for (Thread thread : threads) {
-            ThreadInfo info = existingById.getOrDefault(thread.getId(), new ThreadInfo(thread.getId(), thread.getName()));
-            updated.add(info);
-        }
-
+    public void refreshThreads(@Nullable DAPClient client, Thread @Nullable [] threads) {
+        List<Thread> newThreads = threads != null ? List.of(threads) : List.of();
         ApplicationManager.getApplication().invokeLater(() -> {
+            Map<Integer, ThreadInfo> shownById = new HashMap<>();
+            if (client == this.client) {
+                for (ThreadInfo info : model.getItems()) {
+                    shownById.put(info.getId(), info);
+                }
+            }
+            List<ThreadInfo> rows = new ArrayList<>();
+            for (Thread thread : newThreads) {
+                ThreadInfo shown = shownById.get(thread.getId());
+                rows.add(new ThreadInfo(thread.getId(), thread.getName(), shown != null ? shown.getStatus() : null));
+            }
             this.client = client;
-            model.setItems(updated);
+            model.setItems(rows);
         });
     }
 
+    /**
+     * Shows a 'thread' event of the root session.
+     *
+     * @param args the 'thread' event.
+     */
     public void refreshThread(ThreadEventArguments args) {
-        refreshThread(args, true);
+        debugProcess.refreshThread(args);
     }
 
-    private void refreshThread(ThreadEventArguments args, boolean reloadIfMissing) {
-        for (ThreadInfo info : model.getItems()) {
-            if (info.getId() == args.getThreadId()) {
-                info.setStatus(args.getReason());
-                ApplicationManager.getApplication().invokeLater(model::fireTableDataChanged);
+    /**
+     * Shows a 'thread' event of the given client's DAP session, when the panel shows the threads of that session: the
+     * status of the thread, or, for a thread it doesn't show, such as one which started, the threads of that session.
+     *
+     * @param client the client of the DAP session which sent the event, or null if it is not known yet.
+     * @param args   the 'thread' event.
+     */
+    public void refreshThread(@Nullable DAPClient client, ThreadEventArguments args) {
+        ApplicationManager.getApplication().invokeLater(() -> {
+            if (client == null || client != this.client) {
+                // The panel shows the threads of another session, which numbers its threads itself
                 return;
             }
-        }
-
-        if (reloadIfMissing) {
-            debugProcess.getThreads().thenAccept(this::refreshThreads);
-        }
+            List<ThreadInfo> rows = model.getItems();
+            for (int row = 0; row < rows.size(); row++) {
+                ThreadInfo info = rows.get(row);
+                if (info.getId() == args.getThreadId()) {
+                    model.setItem(row, info.withStatus(args.getReason()));
+                    return;
+                }
+            }
+            // Asked off the EDT, as LSP4J writes a request on the thread which sends it
+            ApplicationManager.getApplication().executeOnPooledThread(() -> client.getThreads(true));
+        });
     }
 
     private static class ThreadInfo {
         private final int id;
         private final String name;
-        private String status;
+        private final @Nullable String status;
 
-        public ThreadInfo(int id, String name) {
+        public ThreadInfo(int id, String name, @Nullable String status) {
             this.id = id;
             this.name = name;
+            this.status = status;
         }
 
         public int getId() { return id; }
@@ -166,7 +187,7 @@ public class ThreadsPanel extends BorderLayoutPanel implements Disposable, UiDat
 
         public @Nullable String getStatus() { return status; }
 
-        public void setStatus(@Nullable String status) { this.status = status; }
+        public @NotNull ThreadInfo withStatus(@Nullable String status) { return new ThreadInfo(id, name, status); }
 
         @Override
         public boolean equals(Object obj) {
