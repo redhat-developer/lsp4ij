@@ -605,8 +605,16 @@ public class LanguageServerWrapper implements Disposable {
             Runnable startTask = () -> {
                 try {
                         var initializingContext = context;
-                        // Starting process...
-                        updateStatus(ServerStatus.starting);
+                        // Starting process, unless a stop replaced this start before a pooled thread ran its task: the
+                        // status then stays as the stop left it, since no later step of this start would set it back,
+                        // and the start ends without connecting to the language server
+                        synchronized (this) {
+                            if (isDisposed() || currentInitializingContext != initializingContext) {
+                                startFuture.cancel(false);
+                                return;
+                            }
+                            updateStatus(ServerStatus.starting);
+                        }
 
                         // Initialize LSP traces
                         if (tracing != null) {
