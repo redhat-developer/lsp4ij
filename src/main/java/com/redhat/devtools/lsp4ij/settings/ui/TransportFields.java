@@ -31,8 +31,11 @@ import java.net.InetAddress;
 import java.text.DecimalFormat;
 import java.text.ParseException;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 import static com.redhat.devtools.lsp4ij.LanguageServerBundle.message;
 
@@ -67,7 +70,11 @@ final class TransportFields {
     private final JBLabel attachPortHint = new JBLabel(message("language.server.socket.port.attach.hint"));
     private final JBLabel stdioOnlyHint = new JBLabel(message("language.server.transport.stdio.only"));
     private final JBLabel socketOnlyHint = new JBLabel(message("language.server.transport.socket.only"));
-    private final JBLabel templateSocketHint = new JBLabel();
+    // A hint for each socket mode which the template lists, in the order of the list
+    private final List<JBLabel> templateSocketHints = Arrays.stream(UserDefinedTransport.Mode.values())
+            .filter(mode -> mode != UserDefinedTransport.Mode.STDIO)
+            .map(mode -> new JBLabel())
+            .toList();
     private final JPanel transportRow = row(GAP, stdio, socket);
     // Auto and Fixed have a row of their own, whose gaps hide with them, so the port lines up with the host without them
     private final JPanel portChoice = row(GAP, autoPort, fixedPort);
@@ -86,7 +93,7 @@ final class TransportFields {
         attachPortHint.setForeground(JBUI.CurrentTheme.ContextHelp.FOREGROUND);
         stdioOnlyHint.setForeground(JBUI.CurrentTheme.ContextHelp.FOREGROUND);
         socketOnlyHint.setForeground(JBUI.CurrentTheme.ContextHelp.FOREGROUND);
-        templateSocketHint.setForeground(JBUI.CurrentTheme.ContextHelp.FOREGROUND);
+        templateSocketHints.forEach(hint -> hint.setForeground(JBUI.CurrentTheme.ContextHelp.FOREGROUND));
         typedPortCommits();
         setTransport(UserDefinedTransport.STDIO);
         for (var button : List.of(stdio, socket, attach, startAndConnect, startAndAccept, autoPort, fixedPort)) {
@@ -112,7 +119,7 @@ final class TransportFields {
         builder.addLabeledComponent(socketLabel, attach);
         builder.addLabeledComponent(startAndConnectLabel, startAndConnect);
         builder.addLabeledComponent(startAndAcceptLabel, startAndAccept);
-        builder.addComponent(templateSocketHint, 0);
+        templateSocketHints.forEach(hint -> builder.addComponent(hint, 0));
         builder.addLabeledComponent(hostLabel, host);
         builder.addLabeledComponent(portLabel, portRow);
         builder.addComponent(portHint, 0);
@@ -130,10 +137,10 @@ final class TransportFields {
 
     /**
      * Shows what the template of the language server says of its transports: a hint says that a language server talks
-     * only over its standard input and output, or only over a socket, and another names the mode, and the argument, of
-     * a socket which it supports. Every transport can still be chosen, as a template is also the starting point of a
-     * language server of one's own; a socket for a language server which talks only over its standard input and output,
-     * and the standard input and output for one which talks only over a socket, are warnings of
+     * only over its standard input and output, or only over a socket, and one for each socket mode which it supports
+     * names the mode, and the argument. Every transport can still be chosen, as a template is also the starting point
+     * of a language server of one's own; a socket for a language server which talks only over its standard input and
+     * output, and the standard input and output for one which talks only over a socket, are warnings of
      * {@link #validateForTemplate()}. Without a word from the template, no hint shows.
      *
      * @param supportedTransports the transports which the template lists, empty if it lists none.
@@ -302,15 +309,21 @@ final class TransportFields {
         port.setEnabled(isAttach || fixedPort.isSelected());
         portHint.setVisible(isSocket && !isAttach);
         attachPortHint.setVisible(isAttach && port.getNumber() == 0);
-        var socketSupport = supportedTransports.stream()
-                .filter(transport -> transport.mode() != UserDefinedTransport.Mode.STDIO)
-                .findFirst();
         stdioOnlyHint.setVisible(listsOnlyStdio());
         socketOnlyHint.setVisible(TransportSupport.talksOnlyOverASocket(supportedTransports));
-        socketSupport.ifPresent(transport -> templateSocketHint.setText(transport.argument() != null
-                ? message("language.server.socket.template.hint", transport.argument(), modeButton(transport.mode()).getText())
-                : message("language.server.socket.template.mode.hint", modeButton(transport.mode()).getText())));
-        templateSocketHint.setVisible(isSocket && socketSupport.isPresent());
+        // The first entry of each socket mode, whose argument the command gets
+        List<String> socketHints = supportedTransports.stream()
+                .filter(transport -> transport.mode() != UserDefinedTransport.Mode.STDIO)
+                .collect(Collectors.toMap(TransportSupport::mode, transport -> transport, (first, other) -> first,
+                        LinkedHashMap::new))
+                .values().stream()
+                .map(this::templateSocketHint)
+                .toList();
+        for (int i = 0; i < templateSocketHints.size(); i++) {
+            var hint = templateSocketHints.get(i);
+            hint.setText(i < socketHints.size() ? socketHints.get(i) : "");
+            hint.setVisible(isSocket && i < socketHints.size());
+        }
         var parent = transportRow.getParent();
         if (parent != null) {
             parent.revalidate();
@@ -358,6 +371,16 @@ final class TransportFields {
         String name = text.endsWith(".") ? text.substring(0, text.length() - 1) : text;
         String lastLabel = name.substring(name.lastIndexOf('.') + 1);
         return HOST_NAME.matcher(text).matches() && !lastLabel.chars().allMatch(Character::isDigit);
+    }
+
+    /**
+     * Returns the hint of a socket mode which the template lists: the mode, and the argument of the command for it.
+     */
+    private @NotNull String templateSocketHint(@NotNull TransportSupport transport) {
+        String mode = modeButton(transport.mode()).getText();
+        return transport.argument() != null
+                ? message("language.server.socket.template.hint", transport.argument(), mode)
+                : message("language.server.socket.template.mode.hint", mode);
     }
 
     private @NotNull JBRadioButton modeButton(@NotNull UserDefinedTransport.Mode mode) {
