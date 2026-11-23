@@ -46,7 +46,6 @@ import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import com.redhat.devtools.lsp4ij.settings.ServerTrace;
 import org.eclipse.lsp4j.debug.*;
 import org.eclipse.lsp4j.debug.Module;
-import org.eclipse.lsp4j.debug.launch.DSPLauncher;
 import org.eclipse.lsp4j.debug.services.IDebugProtocolClient;
 import org.eclipse.lsp4j.debug.services.IDebugProtocolServer;
 import org.eclipse.lsp4j.jsonrpc.Launcher;
@@ -480,7 +479,7 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
     protected Launcher<? extends IDebugProtocolServer> createLauncher(UnaryOperator<MessageConsumer> wrapper,
                                                                       InputStream in, OutputStream out,
                                                                       ExecutorService threadPool) {
-        return DSPLauncher.createClientLauncher(this, in, out, threadPool, wrapper);
+        return DAPClientLauncher.create(this, in, out, threadPool, wrapper, this::getCapabilities);
     }
 
     @Override
