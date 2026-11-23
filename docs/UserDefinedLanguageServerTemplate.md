@@ -133,7 +133,7 @@ This language server talks LSP over its standard input and output only, so the t
 | `env`                 | the environment variables of the `Server` tab: `variables`, an object of names and values, and `includeSystemEnvironmentVariables`, `true` to pass the IDE's environment variables too                                                                                 | without `env`, no variables, and the IDE's are passed; `includeSystemEnvironmentVariables` is `false` when `env` doesn't set it |
 | `fileTypeMappings`    | the files of the language server: each entry has a `fileType`, with the `name` of an IntelliJ file type, file name `patterns`, or both, and the `languageId` of the files                                                                                              | none                                                                                                           |
 | `languageMappings`    | the files of the language server by IntelliJ language: each entry has the `language`, an IntelliJ language id, and the `languageId` of the files                                                                                                                       | none                                                                                                           |
-| `socket`              | how LSP4IJ talks to a language server over a TCP socket, see [Socket](#socket)                                                                                                                                                                                         | the standard input and output                                                                                  |
+| `socket`              | how LSP4IJ talks to a language server over a TCP socket, see [Socket](#socket)                                                                                                                                                                                         | the standard input and output, or the first mode of `transports` when it lists only socket modes               |
 | `transports`          | the transports which the language server supports, see [Transports](#transports)                                                                                                                                                                                       | none                                                                                                           |
 | `expandConfiguration` | `true` checks `Expand JSON when configuration is sent to the server`: a name with dots in the `Configuration`, as `"css.validate": true`, is sent as nested objects, `{"css": {"validate": true}}`                                                                      | `false`                                                                                                        |
 | `disablePromotionFor` | plugin ids: while one of these plugins is installed, the banner which suggests the template for a file it supports doesn't show, as the Clojure LSP template does for `com.github.clojure-lsp`                                                                         | none                                                                                                           |
@@ -166,9 +166,9 @@ placeholders `${instanceRoot}` and `${port}`, see [Macro syntax](./UserDefinedLa
 
 #### Socket
 
-`socket` is optional: without it, LSP4IJ talks to the language server over its standard input and output. A language
-server which talks LSP over a TCP socket instead has a `socket`, whose `mode` is one of the
-[transports](./UserDefinedLanguageServer.md#transport):
+`socket` is optional: without it, LSP4IJ talks to the language server over its standard input and output, unless its
+[`transports`](#transports) lists only socket modes. A language server which talks LSP over a TCP socket instead has a
+`socket`, whose `mode` is one of the [transports](./UserDefinedLanguageServer.md#transport):
 
 * `attach`: LSP4IJ attaches to a language server which runs already and listens on `host` (the loopback address by
   default) and `port`.
@@ -206,12 +206,18 @@ does instead:
 `transports` is optional. A template can list the transports which its language server supports, in `transports`,
 each with its `mode` (`stdio` or one of the socket modes above) and the `argument` of the
 command for it. The New Language Server dialog then helps with the transport: for a language server which lists only
-`stdio`, a hint says that it talks LSP only over its standard input and output, and for one which lists a socket mode,
-a hint below the socket modes names the mode and the argument. Every transport can still be chosen, as the template may
-be the starting point of a language server of your own which does talk over a socket: Socket, for a language server
-which lists only `stdio`, gives the warning "The template says this language server talks LSP only over its standard
-input and output", which blocks neither OK nor Apply in the settings of a language server created from the template.
+`stdio`, a hint says that it talks LSP only over its standard input and output, for one which lists only socket modes, a
+hint says that it talks LSP only over a socket, and for one which lists a socket mode, a hint below the socket modes
+names the mode and the argument. Every transport can still be chosen, as the template may be the starting point of a
+language server of your own which does talk over a socket: Socket, for a language server which lists only `stdio`,
+gives the warning "The template says this language server talks LSP only over its standard input and output", which
+blocks neither OK nor Apply in the settings of a language server created from the template.
 Without `transports`, no hint shows.
+
+A language server which lists only socket modes is the other way round: `Standard input and output (stdio)` gives the
+warning "The template says this language server talks LSP only over a socket", which blocks neither OK nor Apply
+either. Without a `socket`, the New Language Server dialog selects `Socket` for it, in the first mode of the list, with
+an `Auto` port, or, for `attach`, no port yet.
 
 | Field      | Value                                                                 | Required |
 |------------|-----------------------------------------------------------------------|----------|
