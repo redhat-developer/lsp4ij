@@ -20,6 +20,7 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.io.BufferedReader;
+import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URI;
@@ -345,14 +346,22 @@ public class GitHubAssetFetcher implements AssetFetcher {
 
         try {
             URL url = URI.create(urlStr).toURL();
-            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-            conn.setRequestMethod("GET");
-            if (token != null) {
-                // HttpURLConnection follows the redirects, and drops the header on a redirect to another host, port or
-                // protocol: the token goes to the GitHub API only
-                conn.setRequestProperty("Authorization", "Bearer " + token.value());
-            }
+            HttpURLConnection conn = get(url, token);
             int responseCode = conn.getResponseCode();
+            if (token != null && isRefused(conn, responseCode)) {
+                // The releases of a public repository don't need a token: one which GitHub refuses, as an expired
+                // one, or whose rate limit is reached, doesn't keep them from installing. A request is tried again
+                // once, and only when it had a token
+                String refused = getErrorMessage(conn, responseCode, token);
+                reporter.setText("Error while loading GitHub releases: ", new GitHubApiError((refused != null
+                        ? refused
+                        : "GitHub API refused the token of the environment variable " + token.variable() + " (HTTP "
+                        + responseCode + ").") + " Trying again without the token."));
+                conn.disconnect();
+                token = null;
+                conn = get(url, null);
+                responseCode = conn.getResponseCode();
+            }
             if (responseCode != 200) {
                 String error = getErrorMessage(conn, responseCode, token);
                 if (error != null) {
@@ -373,6 +382,44 @@ public class GitHubAssetFetcher implements AssetFetcher {
             reporter.setText("Error while loading GitHub releases: ", e);
         }
         return null;
+    }
+
+    /**
+     * Returns a GET request to the given URL of the GitHub API, with the given token, if any.
+     *
+     * @param url   the URL of the GitHub API.
+     * @param token the GitHub token, or null.
+     * @return the connection of the request.
+     * @throws IOException if the connection can't be opened.
+     */
+    private static @NotNull HttpURLConnection get(@NotNull URL url, @Nullable Token token) throws IOException {
+        HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+        conn.setRequestMethod("GET");
+        if (token != null) {
+            // HttpURLConnection follows the redirects, and drops the header on a redirect to another host, port or
+            // protocol: the token goes to the GitHub API only
+            conn.setRequestProperty("Authorization", "Bearer " + token.value());
+        }
+        return conn;
+    }
+
+    /**
+     * Returns true if the GitHub API refused the token of a request with the given response: a 401, as for an expired
+     * token, a 404, as for a token which can't read the repository, or a 403 or 429, as for a token that single
+     * sign-on doesn't authorize, which lacks permissions, or whose rate limit is reached. A secondary rate limit,
+     * whose {@code Retry-After} asks to wait before the next request, isn't.
+     *
+     * @param conn         the connection, with the response of the GitHub API.
+     * @param responseCode the HTTP status code of the response.
+     * @return true if the GitHub API refused the token.
+     */
+    private static boolean isRefused(@NotNull HttpURLConnection conn, int responseCode) {
+        return switch (responseCode) {
+            case HttpURLConnection.HTTP_UNAUTHORIZED, HttpURLConnection.HTTP_NOT_FOUND -> true;
+            case HttpURLConnection.HTTP_FORBIDDEN, 429 -> conn.getHeaderField("Retry-After") == null
+                    || "0".equals(conn.getHeaderField("X-RateLimit-Remaining"));
+            default -> false;
+        };
     }
 
     /**

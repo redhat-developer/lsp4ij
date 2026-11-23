@@ -96,6 +96,26 @@ public class GitHubDownloadTaskTest {
     }
 
     @Test
+    public void testADownloadWhoseTokenGitHubRefusesInstallsWithoutIt() throws Exception {
+        server.answer(RELEASES_PATH, new Response(401, Map.of(), "{\"message\": \"Bad credentials\"}"),
+                Response.ok(releases(server.url() + ASSET_PATH)));
+        server.answer(ASSET_PATH, Response.ok("server"));
+
+        var context = new RecordingContext();
+        boolean installed = createTask(Map.of("GITHUB_TOKEN", TOKEN), null).run(context);
+
+        assertTrue(installed, context.output());
+        assertEquals("server", Files.readString(outputDir.resolve("server.jar")));
+        assertEquals(List.of(new Request(RELEASES_PATH, "Bearer " + TOKEN), new Request(RELEASES_PATH, null),
+                new Request(ASSET_PATH, null)), server.requests());
+        assertTrue(context.errors().stream().anyMatch(error -> error.contains(
+                        "GitHub API refused the token of the environment variable GITHUB_TOKEN (HTTP 401)")
+                        && error.contains(GitHubAssetFetcherTest.RETRY)),
+                "the console must say that the token was refused: " + context.output());
+        assertNoToken(context);
+    }
+
+    @Test
     public void testTheConsoleSaysWhenTheRateLimitResetsAndFallsBackToTheUrl() throws Exception {
         server.answer(RELEASES_PATH, GitHubAssetFetcherTest.rateLimit(403, 60, RESET));
         server.answer(ASSET_PATH, Response.ok("server"));
