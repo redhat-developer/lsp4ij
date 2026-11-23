@@ -56,6 +56,12 @@ public class NestedPlaceholderCompletionTest extends LSPCompletionFixtureTestCas
         assertApplyCompletionItem(0, "test x");
     }
 
+    public void testAPlaceholderThatStartsWithAnEscapedDollarInsertsItsText() {
+        complete("${1:\\$TM_FILENAME_BASE} x$0");
+
+        assertApplyCompletionItem(0, "$TM_FILENAME_BASE x");
+    }
+
     public void testANestedPlaceholderThatIsAVariableGivesItsValueToItsPlaceholder() {
         complete("${1:hello ${2:$TM_FILENAME_BASE}} x$0");
 

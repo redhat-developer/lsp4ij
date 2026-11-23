@@ -31,6 +31,7 @@ class SnippetTemplateSegment {
     private Expression defaultValueExpression;
     private boolean skipOnStart;
     private boolean endVariable;
+    private Integer tabStopIndex;
 
     @NotNull
     static SnippetTemplateSegment textSegment(@NotNull String text) {
@@ -74,6 +75,17 @@ class SnippetTemplateSegment {
     static SnippetTemplateSegment endVariable() {
         SnippetTemplateSegment snippetTemplateSegment = new SnippetTemplateSegment();
         snippetTemplateSegment.endVariable = true;
+        return snippetTemplateSegment;
+    }
+
+    /**
+     * A tab stop, placeholder or choice with the given index, which becomes a variable of the template once the default
+     * of each index is known, as it can come later in the snippet.
+     */
+    @NotNull
+    static SnippetTemplateSegment tabStop(int index) {
+        SnippetTemplateSegment snippetTemplateSegment = new SnippetTemplateSegment();
+        snippetTemplateSegment.tabStopIndex = index;
         return snippetTemplateSegment;
     }
 
@@ -128,5 +140,13 @@ class SnippetTemplateSegment {
 
     boolean isEndVariable() {
         return endVariable;
+    }
+
+    boolean isTabStop() {
+        return tabStopIndex != null;
+    }
+
+    int getTabStopIndex() {
+        return tabStopIndex;
     }
 }
