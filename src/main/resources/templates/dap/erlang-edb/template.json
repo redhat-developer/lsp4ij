@@ -1,0 +1,19 @@
+{
+  "id": "erlang-edb",
+  "name": "Erlang - edb",
+  "launch": {
+    "default": "edb dap"
+  },
+  "fileTypeMappings": [
+    {
+      "fileType": {
+        "name": "Erlang",
+        "patterns": [
+          "*.erl",
+          "*.hrl"
+        ]
+      },
+      "languageId": "erlang"
+    }
+  ]
+}

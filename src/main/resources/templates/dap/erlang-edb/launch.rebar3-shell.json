@@ -1,0 +1,24 @@
+{
+  "type": "erlang-edb",
+  "request": "launch",
+  "name": "Launch rebar3 shell",
+  "runInTerminal": {
+    "kind": "integrated",
+    "title": "rebar3 shell",
+    "cwd": "${workspaceFolder}",
+    "args": [
+      "sh",
+      "-c",
+      "exec $0 \"$@\" --eval=\"$EDB_DAP_DEBUGGEE_INIT\"",
+      "rebar3",
+      "as",
+      "test",
+      "shell"
+    ]
+  },
+  "config": {
+    "nameDomain": "shortnames",
+    "nodeInitCodeInEnvVar": "EDB_DAP_DEBUGGEE_INIT",
+    "timeout": 300
+  }
+}

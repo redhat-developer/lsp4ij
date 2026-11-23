@@ -89,3 +89,8 @@ completes the names of the settings, as `elp.diagnostics.disabled` to turn off s
 The structure of a project, its applications, dependencies and include paths, comes from rebar3, or from a
 [`.elp.toml`](https://whatsapp.github.io/erlang-language-platform/docs/get-started/configure-project/elp-toml/) file
 at its root. See [Configure Your Project](https://whatsapp.github.io/erlang-language-platform/docs/get-started/configure-project/).
+
+## Debugging
+
+ELP is only a language server. To debug Erlang code, you can [configure edb](../dap/user-defined-dap/erlang-edb.md),
+the debugger that ELP's VS Code extension ships, with its DAP template.

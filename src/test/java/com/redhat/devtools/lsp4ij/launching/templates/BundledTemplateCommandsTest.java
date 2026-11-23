@@ -87,7 +87,15 @@ public class BundledTemplateCommandsTest {
             Map.entry("lsp/erlang-elp", ""),
             Map.entry("dap/codelldb", ""),
             Map.entry("dap/perl-dap", ""),
-            Map.entry("dap/vscode-js-debug", "js-debug"));
+            Map.entry("dap/vscode-js-debug", "js-debug"),
+            Map.entry("dap/erlang-edb", ""));
+
+    /**
+     * The OSes, by their key in an installer, on which the server of a template doesn't run, so that its installer
+     * downloads nothing there: edb, whose launcher is a bash script, has no Windows build yet.
+     */
+    private static final Map<String, Set<String>> UNSUPPORTED_OSES = Map.of(
+            "dap/erlang-edb/installer.json", Set.of("windows"));
 
     @Test
     void shRunsTheWholeCommandWhereABundledTemplateUsesIt() throws IOException, URISyntaxException {
@@ -660,7 +668,8 @@ public class BundledTemplateCommandsTest {
      * On macOS on Apple Silicon and on Intel, and on Linux and Windows on x64 and on arm64, the download of an installer
      * has a URL or a GitHub asset, and what an installer takes there by OS and CPU, the asset, the URL and the file of a
      * download and the file that a check looks for, names no other OS, nor a CPU that the platform can't run: Windows and
-     * macOS on arm64 run x64 programs, Linux on arm64 doesn't.
+     * macOS on arm64 run x64 programs, Linux on arm64 doesn't. On an OS of {@link #UNSUPPORTED_OSES}, the download has
+     * neither.
      */
     @Test
     void anInstallerDownloadsItsServerForEachPlatform() throws IOException, URISyntaxException {
@@ -672,6 +681,7 @@ public class BundledTemplateCommandsTest {
             }
             for (Platform platform : PLATFORMS) {
                 String where = file + " (" + platform.name() + ")";
+                boolean unsupported = UNSUPPORTED_OSES.getOrDefault(file, Set.of()).contains(platform.os());
                 for (var task : tasks(json, "check", "run")) {
                     JsonObject body = task.getValue();
                     if (task.getKey().equals("download")) {
@@ -679,6 +689,12 @@ public class BundledTemplateCommandsTest {
                         var github = body.getAsJsonObject("github");
                         String asset = github != null ? platform.get(github, "asset") : null;
                         String url = platform.get(body, "url");
+                        if (unsupported) {
+                            if (asset != null || url != null) {
+                                problems.add(where + ": a download on an OS that the server doesn't support");
+                            }
+                            continue;
+                        }
                         if (asset == null && url == null && !body.has("maven")) {
                             problems.add(where + ": no URL nor asset");
                         }

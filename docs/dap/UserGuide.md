@@ -521,6 +521,7 @@ LSP4IJ provides DAP templates that allow to initialize a given DAP server very q
 - [CodeLLDB](./user-defined-dap/codelldb.md) which allows you to debug `Rust`,`Swift`, etc. files.
 - [Docker: Dockerfile Build Debugging](./user-defined-dap/buildx-dockerfile.md) which allows you to debug the build of a
   `Dockerfile`.
+- [Erlang edb DAP server](./user-defined-dap/erlang-edb.md) which allows you to debug `Erlang` files.
 - [Go Delve DAP server](./user-defined-dap/go-delve.md) which allows you to debug `Go` files.
 - [Julia DAP server](./user-defined-dap/julia.md) which allows you to debug `Julia` files.
 - [Perl DAP server](./user-defined-dap/perl-dap.md) which allows you to debug `Perl` files. 
