@@ -9,6 +9,7 @@ package com.redhat.devtools.lsp4ij;
 
 import com.intellij.openapi.application.ApplicationListener;
 import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.fileEditor.FileDocumentManager;
 import com.intellij.openapi.progress.EmptyProgressIndicator;
 import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.vfs.VirtualFile;
@@ -92,6 +93,21 @@ public class FileOperationRefactoringTest extends LSPCodeInsightFixtureTestCase 
         assertTrue(fileRename.getNewUri(), fileRename.getNewUri().endsWith("/moved.foo"));
         assertEquals("moved.foo", renamed.getName());
         assertEquals("the willRenameFiles edit must be applied once", NEW_TEXT, text(other));
+    }
+
+    public void testRenameRefactoringAppliesTheEditToALoadedDocumentThatTheServerHasNotOpened() throws Exception {
+        var renamed = myFixture.getTempDirFixture().createFile("renamed.foo", "text");
+        var other = myFixture.getTempDirFixture().createFile("other.foo", OLD_TEXT);
+        connect(renamed);
+        // IntelliJ has loaded the document, but the server hasn't opened it, so it reads the file from disk
+        var otherDocument = FileDocumentManager.getInstance().getDocument(other);
+        assertNotNull(otherDocument);
+        answerWillRenameSlowlyWithAnEditTo(other);
+
+        new RenameProcessor(myFixture.getProject(), psiFile(renamed), "moved.foo", false, false).run();
+
+        assertEquals("moved.foo", renamed.getName());
+        assertEquals("the willRenameFiles edit must be applied", NEW_TEXT, otherDocument.getText());
     }
 
     public void testMoveRefactoringAsksTheServerOnceForAllMovedFilesBeforeItsWriteAction() throws Exception {

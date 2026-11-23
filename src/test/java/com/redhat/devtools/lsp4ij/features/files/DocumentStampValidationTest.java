@@ -22,7 +22,8 @@ import java.util.Map;
  * Tests for {@link AbstractLSPFileListener#isDocumentStale(String, Document, Map)}.
  * <p>
  * Verifies that stale workspace edits are detected when target documents have
- * been modified or newly opened after the stamp snapshot was captured.
+ * been modified after the stamp snapshot was captured, or have changes that aren't
+ * saved while the language server, which didn't have them open, reads them from disk.
  */
 public class DocumentStampValidationTest extends BasePlatformTestCase {
 
@@ -52,17 +53,35 @@ public class DocumentStampValidationTest extends BasePlatformTestCase {
                 AbstractLSPFileListener.isDocumentStale(uri, doc, stamps));
     }
 
-    public void testNewlyOpenedDocumentIsStale() {
+    public void testUntrackedDocumentWithoutUnsavedChangesIsNotStale() {
+        var psiFile = myFixture.configureByText("untracked.txt", "new content");
+        Document doc = FileDocumentManager.getInstance().getCachedDocument(psiFile.getVirtualFile());
+        assertNotNull(doc);
+        assertFalse(FileDocumentManager.getInstance().isDocumentUnsaved(doc));
+
+        String uri = "file:///untracked.txt";
+        // This document was not open in the language server when stamps were captured: the server's edit is based on
+        // the file on disk, which the document still matches
+        Map<String, Long> stamps = new HashMap<>();
+        stamps.put("file:///other.txt", 42L);
+
+        assertFalse("Document absent from stamp snapshot without unsaved changes should not be stale",
+                AbstractLSPFileListener.isDocumentStale(uri, doc, stamps));
+    }
+
+    public void testUntrackedDocumentWithUnsavedChangesIsStale() {
         var psiFile = myFixture.configureByText("untracked.txt", "new content");
         Document doc = FileDocumentManager.getInstance().getCachedDocument(psiFile.getVirtualFile());
         assertNotNull(doc);
 
         String uri = "file:///untracked.txt";
-        // Empty stamps: this document was not tracked when stamps were captured
         Map<String, Long> stamps = new HashMap<>();
         stamps.put("file:///other.txt", 42L);
 
-        assertTrue("Document absent from stamp snapshot should be stale",
+        WriteAction.run(() -> doc.setText("modified"));
+        assertTrue(FileDocumentManager.getInstance().isDocumentUnsaved(doc));
+
+        assertTrue("Document absent from stamp snapshot with unsaved changes should be stale",
                 AbstractLSPFileListener.isDocumentStale(uri, doc, stamps));
     }
 

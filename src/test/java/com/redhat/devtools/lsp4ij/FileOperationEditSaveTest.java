@@ -81,6 +81,25 @@ public class FileOperationEditSaveTest extends LSPCodeInsightFixtureTestCase {
         assertEquals(NEW_TEXT, VfsUtilCore.loadText(other));
     }
 
+    public void testWillRenameEditToALoadedDocumentThatTheServerHasNotOpenedIsApplied() throws Exception {
+        var renamed = myFixture.getTempDirFixture().createFile("renamed.foo", "text");
+        var other = myFixture.getTempDirFixture().createFile("other.foo", OLD_TEXT);
+        connect(renamed);
+        // IntelliJ has loaded the document, as when the file was open in an editor before, but the server hasn't
+        // opened it: the server's edit is based on the file on disk, which the document matches
+        var otherDocument = FileDocumentManager.getInstance().getDocument(other);
+        assertNotNull(otherDocument);
+        answerWillRenameWithAnEditTo(other);
+
+        rename(renamed, "moved.foo");
+
+        PlatformTestUtil.waitWithEventsDispatching("the willRenameFiles edit must be applied",
+                () -> NEW_TEXT.equals(otherDocument.getText()), BOUND_SECONDS);
+        PlatformTestUtil.waitWithEventsDispatching("the edited file without an editor must be saved",
+                () -> !FileDocumentManager.getInstance().isDocumentUnsaved(otherDocument), BOUND_SECONDS);
+        assertEquals(NEW_TEXT, VfsUtilCore.loadText(other));
+    }
+
     public void testTheServerIsToldOfTheRenameAfterTheSave() throws Exception {
         var renamed = myFixture.getTempDirFixture().createFile("renamed.foo", "text");
         var other = myFixture.getTempDirFixture().createFile("other.foo", OLD_TEXT);

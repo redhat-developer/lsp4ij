@@ -590,9 +590,9 @@ public abstract class AbstractLSPFileListener implements FileEditorManagerListen
         }
         Long capturedStamp = stamps.get(uri);
         if (capturedStamp == null) {
-            // Document was not open when stamps were captured but is now cached;
-            // we cannot verify the server's assumptions about its content.
-            return true;
+            // The language server didn't have the document open when the stamps were captured, so its edit is based
+            // on the file's content on disk: the edit is stale only if the document has changes that aren't saved
+            return FileDocumentManager.getInstance().isDocumentUnsaved(doc);
         }
         return doc.getModificationStamp() != capturedStamp;
     }
