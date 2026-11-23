@@ -829,8 +829,21 @@ the asset, nor to another host, and the console doesn't show it. The variable mu
 as for the commands of `exec` tasks: set in the shell that starts the IDE, or, for an IDE started from the Dock on
 macOS, in the profile of the login shell, as `~/.zprofile` or `~/.zshrc`. After setting it, restart the IDE.
 
-When the limit is reached, the console says so, and when the limit resets. When GitHub refuses the token, as an expired
-one, the console says so, and names its variable.
+The 5,000 requests an hour are per GitHub user: all the tokens of a user share them. In GitHub Actions, the
+`GITHUB_TOKEN` of a workflow allows 1,000 requests an hour per repository.
+
+A `github` download supports public repositories only: since the token goes with the request to the GitHub API only,
+the assets of a private repository don't download.
+
+When a request to the GitHub API fails, the console says why:
+
+| The console says                                     | Because                                                                                                                                                                                                      |
+|------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `GitHub API rate limit reached`                      | the 60 requests an hour, or those of the token, are used up; the console says when the limit resets                                                                                                          |
+| `GitHub API refused the token ... (HTTP 401)`        | the token is invalid or has expired                                                                                                                                                                          |
+| `... enforces SAML single sign-on`                   | the owner of the repository is an organization which enforces SAML single sign-on, and the token isn't authorized for it; the console shows the link which authorizes it, for an hour, when GitHub gives one |
+| `the token lacks the permission ...`                 | the token, as a fine-grained one, hasn't the permissions that GitHub names                                                                                                                                   |
+| `the repository ... was not found, or it is private` | the `owner` or the `repository` of the download is wrong, or the repository is private                                                                                                                       |
 
 #### Maven artifact download
 

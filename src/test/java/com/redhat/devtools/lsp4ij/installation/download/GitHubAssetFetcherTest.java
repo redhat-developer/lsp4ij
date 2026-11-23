@@ -48,6 +48,10 @@ public class GitHubAssetFetcherTest {
     // 2026-11-23T14:35:07Z, whose seconds aren't 0, which LocalTime#toString would leave out
     static final long RESET = 1795444507L;
 
+    // As in GitHub's documentation: the authorization request has the id of the token, not the token
+    static final String SSO_URL = "https://github.com/orgs/owner/sso?authorization_request="
+            + "AZSCKtL4U8yX1H3sCQIVnVgmjmon5fWxks5YrqhJgah0b2tlbl9pZM4EuMz4";
+
     private LocalHttpServer api;
 
     @BeforeEach
@@ -204,7 +208,12 @@ public class GitHubAssetFetcherTest {
     void theTokenIsNotShownWhenTheRequestFails() {
         for (var response : List.of(error(401), error(403), error(404), error(500),
                 rateLimit(403, 5000, RESET), rateLimit(429, 5000, RESET),
-                new Response(403, Map.of("Retry-After", "60"), ""))) {
+                new Response(403, Map.of("Retry-After", "60"), ""),
+                new Response(403, Map.of("X-GitHub-SSO", "required; url=" + SSO_URL), ""),
+                new Response(403, Map.of("X-GitHub-SSO", "required; url=" + SSO_URL + "&t=" + TOKEN), ""),
+                new Response(403, Map.of("X-GitHub-SSO", "partial-results; organizations=21955855"), ""),
+                new Response(403, Map.of("X-Accepted-GitHub-Permissions", "contents=read"), ""),
+                new Response(404, Map.of("X-Accepted-GitHub-Permissions", "contents=read"), ""))) {
             api.answer(RELEASES_PATH, response);
 
             var reporter = new RecordingReporter();
@@ -292,8 +301,9 @@ public class GitHubAssetFetcherTest {
 
     @Test
     void otherErrorsArePrintedAsBefore() {
-        // A 401 without a token, and a 403 which isn't the rate limit
-        for (var response : List.of(error(401), error(403), error(404), error(500),
+        // A 401 and a 403 without a token, also with the permissions of a token, and a 403 which isn't the rate limit
+        for (var response : List.of(error(401), error(403), error(500),
+                new Response(403, Map.of("X-Accepted-GitHub-Permissions", "contents=read"), ""),
                 new Response(403, Map.of("X-RateLimit-Remaining", "42", "X-RateLimit-Reset", "" + RESET), ""))) {
             api.answer(RELEASES_PATH, response);
 
@@ -305,6 +315,116 @@ public class GitHubAssetFetcherTest {
                             + System.lineSeparator() + "\tat "),
                     reporter.output());
         }
+    }
+
+    @Test
+    void aTokenWhichSingleSignOnDoesNotAuthorizeIsSaidToNeedItsLink() {
+        api.answer(RELEASES_PATH, new Response(403, Map.of("X-GitHub-SSO", "required; url=" + SSO_URL),
+                "{\"message\": \"Resource protected by organization SAML enforcement.\"}"));
+
+        var reporter = new RecordingReporter();
+        assertNull(fetch(Map.of("GITHUB_TOKEN", TOKEN), reporter));
+
+        assertEquals("Error while loading GitHub releases: GitHub API refused the token of the environment variable "
+                        + "GITHUB_TOKEN (HTTP 403): the organization owner enforces SAML single sign-on, and the token "
+                        + "isn't authorized for it. Authorize it at " + SSO_URL
+                        + ", a link which expires after an hour.",
+                reporter.lines().get(1).strip());
+        assertNoToken(reporter, TOKEN);
+    }
+
+    @Test
+    void aTokenWhichSingleSignOnDoesNotAuthorizeForPartialResultsIsSaidToNeedIt() {
+        api.answer(RELEASES_PATH, new Response(403,
+                Map.of("X-GitHub-SSO", "partial-results; organizations=21955855,20582480"), ""));
+
+        var reporter = new RecordingReporter();
+        assertNull(fetch(Map.of("GH_TOKEN", TOKEN), reporter));
+
+        assertEquals("Error while loading GitHub releases: GitHub API refused the token of the environment variable "
+                        + "GH_TOKEN (HTTP 403): the organization owner enforces SAML single sign-on, and the token "
+                        + "isn't authorized for it. Authorize it for owner in the settings of the token on GitHub.",
+                reporter.lines().get(1).strip());
+    }
+
+    @Test
+    void aSingleSignOnLinkWithTheTokenIsNotShown() {
+        api.answer(RELEASES_PATH, new Response(403,
+                Map.of("X-GitHub-SSO", "required; url=" + SSO_URL + "&t=" + TOKEN), ""));
+
+        var reporter = new RecordingReporter();
+        assertNull(fetch(Map.of("GITHUB_TOKEN", TOKEN), reporter));
+
+        assertNoToken(reporter, TOKEN);
+        assertTrue(reporter.lines().get(1).strip().endsWith(
+                "Authorize it for owner in the settings of the token on GitHub."), reporter.output());
+    }
+
+    @Test
+    void aTokenWhichLacksAPermissionIsSaidToLackIt() {
+        api.answer(RELEASES_PATH, new Response(403, Map.of("X-Accepted-GitHub-Permissions", "contents=read"),
+                "{\"message\": \"Resource not accessible by personal access token\"}"));
+
+        var reporter = new RecordingReporter();
+        assertNull(fetch(Map.of("GITHUB_TOKEN", TOKEN), reporter));
+
+        assertEquals("Error while loading GitHub releases: GitHub API refused the token of the environment variable "
+                        + "GITHUB_TOKEN (HTTP 403): the token lacks the permission contents=read.",
+                reporter.lines().get(1).strip());
+        assertNoToken(reporter, TOKEN);
+    }
+
+    @Test
+    void aTokenWhichLacksPermissionsIsSaidToLackEitherSet() {
+        api.answer(RELEASES_PATH, new Response(403, Map.of("X-Accepted-GitHub-Permissions",
+                "pull_requests=read,contents=read; issues=read,contents=read"), ""));
+
+        var reporter = new RecordingReporter();
+        assertNull(fetch(Map.of("GITHUB_TOKEN", TOKEN), reporter));
+
+        assertEquals("Error while loading GitHub releases: GitHub API refused the token of the environment variable "
+                        + "GITHUB_TOKEN (HTTP 403): the token lacks the permissions pull_requests=read and "
+                        + "contents=read, or issues=read and contents=read.",
+                reporter.lines().get(1).strip());
+    }
+
+    @Test
+    void aRepositoryNotFoundWithATokenIsSaidToBeMissingOrPrivate() {
+        api.answer(RELEASES_PATH, error(404));
+
+        var reporter = new RecordingReporter();
+        assertNull(fetch(Map.of("GITHUB_TOKEN", TOKEN), reporter));
+
+        assertEquals("Error while loading GitHub releases: GitHub API returned HTTP 404: the repository owner/repo "
+                        + "was not found, or it is private and the token of the environment variable GITHUB_TOKEN "
+                        + "can't read it.",
+                reporter.lines().get(1).strip());
+        assertNoToken(reporter, TOKEN);
+    }
+
+    @Test
+    void aRepositoryNotFoundWithATokenNamesThePermissionWhichReadsIt() {
+        api.answer(RELEASES_PATH, new Response(404, Map.of("X-Accepted-GitHub-Permissions", "contents=read"), ""));
+
+        var reporter = new RecordingReporter();
+        assertNull(fetch(Map.of("GITHUB_TOKEN", TOKEN), reporter));
+
+        assertEquals("Error while loading GitHub releases: GitHub API returned HTTP 404: the repository owner/repo "
+                        + "was not found, or it is private and the token of the environment variable GITHUB_TOKEN "
+                        + "can't read it. Reading it needs the permission contents=read.",
+                reporter.lines().get(1).strip());
+    }
+
+    @Test
+    void aRepositoryNotFoundWithoutATokenIsSaidToBeMissingOrPrivate() {
+        api.answer(RELEASES_PATH, error(404));
+
+        var reporter = new RecordingReporter();
+        assertNull(fetch(Map.of(), reporter));
+
+        assertEquals("Error while loading GitHub releases: GitHub API returned HTTP 404: the repository owner/repo "
+                        + "was not found, or it is private.",
+                reporter.lines().get(1).strip());
     }
 
     /**

@@ -27,9 +27,11 @@ import java.net.URL;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.util.Arrays;
 import java.util.List;
 import java.util.function.Function;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 /**
  * Utility class to fetch the download URL of a GitHub asset from the releases of a given repository.
@@ -151,6 +153,12 @@ public class GitHubAssetFetcher implements AssetFetcher {
     private static final List<String> TOKEN_VARIABLES = List.of("GITHUB_TOKEN", "GH_TOKEN");
 
     private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ofPattern("HH:mm:ss");
+
+    // A permission of X-Accepted-GitHub-Permissions, as contents=read
+    private static final Pattern PERMISSION = Pattern.compile("[a-z_]+=[a-z_]+");
+
+    // The characters of a URL, which a header could otherwise put in the console, as a line break
+    private static final Pattern URL_CHARACTERS = Pattern.compile("[A-Za-z0-9\\-._~:/?#\\[\\]@!$&'()*+,;=%]+");
 
     private final @NotNull String owner;
     private final @NotNull String repository;
@@ -368,27 +376,76 @@ public class GitHubAssetFetcher implements AssetFetcher {
     }
 
     /**
-     * Returns the message which explains the given error of the GitHub API when it's the rate limit, or a token that
-     * GitHub refused, and null otherwise. The GitHub API answers 403 or 429 at the rate limit, with
-     * {@code X-RateLimit-Remaining: 0} and the time when the limit resets, in seconds since the epoch, in
-     * {@code X-RateLimit-Reset}, or, at a secondary rate limit, the seconds to wait in {@code Retry-After}.
+     * Returns the message which explains the given error of the GitHub API when it's the rate limit, a token that
+     * GitHub refused, or a repository that it didn't find, and null otherwise. The message never shows the token.
      *
      * @param conn         the connection, with the response of the GitHub API.
      * @param responseCode the HTTP status code of the response.
      * @param token        the GitHub token of the request, or null.
      * @return the message which explains the error, or null.
      */
-    private static @Nullable String getErrorMessage(@NotNull HttpURLConnection conn,
-                                                    int responseCode,
-                                                    @Nullable Token token) {
+    private @Nullable String getErrorMessage(@NotNull HttpURLConnection conn,
+                                             int responseCode,
+                                             @Nullable Token token) {
         if (responseCode == HttpURLConnection.HTTP_UNAUTHORIZED && token != null) {
             return "GitHub API refused the token of the environment variable " + token.variable()
                     + " (HTTP 401): the token is invalid or has expired. Set " + token.variable()
                     + " to a valid token, or unset it.";
         }
-        if (responseCode != HttpURLConnection.HTTP_FORBIDDEN && responseCode != 429) {
+        if (responseCode == HttpURLConnection.HTTP_FORBIDDEN || responseCode == 429) {
+            String rateLimit = getRateLimitMessage(conn, responseCode, token);
+            if (rateLimit != null) {
+                return rateLimit;
+            }
+        }
+        if (responseCode != HttpURLConnection.HTTP_FORBIDDEN && responseCode != HttpURLConnection.HTTP_NOT_FOUND) {
             return null;
         }
+        // A token which isn't authorized for an organization which enforces SAML single sign-on gets 403 or 404, and
+        // X-GitHub-SSO: "required; url=<the URL which authorizes it>", or "partial-results; organizations=<ids>"
+        String singleSignOn = conn.getHeaderField("X-GitHub-SSO");
+        if (token != null && singleSignOn != null) {
+            String url = getSingleSignOnUrl(singleSignOn, token);
+            return "GitHub API refused the token of the environment variable " + token.variable() + " (HTTP "
+                    + responseCode + "): the organization " + owner + " enforces SAML single sign-on, and the token "
+                    + "isn't authorized for it. "
+                    + (url != null ? "Authorize it at " + url + ", a link which expires after an hour."
+                    : "Authorize it for " + owner + " in the settings of the token on GitHub.");
+        }
+        // As "contents=read", or "pull_requests=read,contents=read; issues=read,contents=read" for two sets of
+        // permissions, either of which is enough
+        List<List<String>> permissions = parsePermissions(conn.getHeaderField("X-Accepted-GitHub-Permissions"));
+        if (responseCode == HttpURLConnection.HTTP_FORBIDDEN) {
+            if (token == null || permissions.isEmpty()) {
+                return null;
+            }
+            return "GitHub API refused the token of the environment variable " + token.variable()
+                    + " (HTTP 403): the token lacks the " + formatPermissions(permissions) + ".";
+        }
+        // GitHub answers 404 for a private repository which the request can't read, so as not to show that it exists
+        String notFound = "GitHub API returned HTTP 404: the repository " + owner + "/" + repository
+                + " was not found, or it is private";
+        if (token == null) {
+            return notFound + ".";
+        }
+        return notFound + " and the token of the environment variable " + token.variable() + " can't read it."
+                + (permissions.isEmpty() ? "" : " Reading it needs the " + formatPermissions(permissions) + ".");
+    }
+
+    /**
+     * Returns the message which explains a 403 or 429 of the GitHub API when it's the rate limit, and null otherwise.
+     * The GitHub API answers 403 or 429 at the rate limit, with {@code X-RateLimit-Remaining: 0} and the time when the
+     * limit resets, in seconds since the epoch, in {@code X-RateLimit-Reset}, or, at a secondary rate limit, the
+     * seconds to wait in {@code Retry-After}.
+     *
+     * @param conn         the connection, with the response of the GitHub API.
+     * @param responseCode the HTTP status code of the response.
+     * @param token        the GitHub token of the request, or null.
+     * @return the message which explains the rate limit, or null.
+     */
+    private static @Nullable String getRateLimitMessage(@NotNull HttpURLConnection conn,
+                                                        int responseCode,
+                                                        @Nullable Token token) {
         boolean exhausted = "0".equals(conn.getHeaderField("X-RateLimit-Remaining"));
         String retryAfter = conn.getHeaderField("Retry-After");
         if (!exhausted && retryAfter == null) {
@@ -416,6 +473,56 @@ public class GitHubAssetFetcher implements AssetFetcher {
                     .append(exhausted ? " limit to 5,000 requests an hour." : " limit.");
         }
         return message.toString();
+    }
+
+    /**
+     * Returns the URL of the given {@code X-GitHub-SSO} header, which authorizes the token for the organization, or
+     * null if it has none, or one which isn't an https URL of the characters of a URL. The URL identifies the
+     * authorization request, not the token; one which has the token isn't returned.
+     */
+    private static @Nullable String getSingleSignOnUrl(@NotNull String singleSignOn, @NotNull Token token) {
+        for (String part : singleSignOn.split(";")) {
+            String url = part.strip();
+            if (url.startsWith("url=")) {
+                url = url.substring("url=".length());
+                return url.startsWith("https://") && URL_CHARACTERS.matcher(url).matches()
+                        && !url.contains(token.value()) ? url : null;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Returns the sets of permissions of the given {@code X-Accepted-GitHub-Permissions} header, any of which is
+     * enough, or an empty list if there is no header, or one which isn't made of permissions such as
+     * {@code contents=read}.
+     */
+    private static @NotNull List<List<String>> parsePermissions(@Nullable String header) {
+        if (header == null) {
+            return List.of();
+        }
+        List<List<String>> sets = Arrays.stream(header.split(";"))
+                .map(set -> Arrays.stream(set.split(","))
+                        .map(String::strip)
+                        .filter(permission -> !permission.isEmpty())
+                        .toList())
+                .filter(set -> !set.isEmpty())
+                .toList();
+        boolean valid = sets.stream()
+                .flatMap(List::stream)
+                .allMatch(permission -> PERMISSION.matcher(permission).matches());
+        return valid ? sets : List.of();
+    }
+
+    /**
+     * Returns the given sets of permissions, as {@code permission contents=read}, or
+     * {@code permissions pull_requests=read and contents=read, or issues=read and contents=read}.
+     */
+    private static @NotNull String formatPermissions(@NotNull List<List<String>> sets) {
+        boolean many = sets.size() > 1 || sets.get(0).size() > 1;
+        return (many ? "permissions " : "permission ") + sets.stream()
+                .map(set -> String.join(" and ", set))
+                .collect(Collectors.joining(", or "));
     }
 
     private static @Nullable Long parseLong(@Nullable String value) {
