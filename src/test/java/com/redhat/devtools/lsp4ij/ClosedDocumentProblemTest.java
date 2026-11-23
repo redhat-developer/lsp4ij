@@ -14,7 +14,9 @@ import com.intellij.openapi.progress.util.ProgressIndicatorUtils;
 import com.intellij.openapi.util.Disposer;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.problems.WolfTheProblemSolver;
+import com.intellij.testFramework.LoggedErrorProcessor;
 import com.intellij.testFramework.PlatformTestUtil;
+import com.redhat.devtools.lsp4ij.client.features.FileUriSupport;
 import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
 import com.redhat.devtools.lsp4ij.client.features.LSPDiagnosticFeature;
 import com.redhat.devtools.lsp4ij.features.diagnostics.LSPDiagnosticUtils;
@@ -29,11 +31,17 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.net.URI;
+import java.util.EnumSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 /**
  * Verifies that the Project view's problem files follow the errors of a file as it opens and closes: LSP4IJ drops the
@@ -153,6 +161,158 @@ public class ClosedDocumentProblemTest extends LSPCodeInsightFixtureTestCase {
         // The clear runs last, as nothing orders it before the report
         waitForProblemReports();
         assertTrue("other.foo must stay a problem file while its closed document has an error", problems.isProblemFile(other));
+    }
+
+    public void testAFileWhoseErrorIsPublishedWhileAClearReportsAnEarlierFileStaysAProblemFileWhenTheClearReachesIt() throws Exception {
+        var problems = problemFiles();
+        var project = myFixture.getProject();
+        var first = myFixture.addFileToProject("first.foo", "first").getVirtualFile();
+        var second = myFixture.addFileToProject("second.foo", "second").getVirtualFile();
+        var third = myFixture.addFileToProject("third.foo", "third").getVirtualFile();
+        // A second server for the files, whose client doesn't report their problems. Each report of a file that no
+        // server holds errors for asks it whether it does: it holds the report of first.foo until it is released, and
+        // tells when third.foo is reported. The wait gives way to a write action, after which the report runs again.
+        var firstHeld = new CountDownLatch(1);
+        var release = new CountDownLatch(1);
+        var thirdReported = new CountDownLatch(1);
+        var observing = new MockLanguageServerDefinition("problem-reports-observed", false) {
+            @Override
+            public @NotNull LSPClientFeatures createClientFeatures() {
+                return new LSPClientFeatures().setDiagnosticFeature(new LSPDiagnosticFeature() {
+                    @Override
+                    public boolean canReportProblem(@NotNull VirtualFile file) {
+                        if (file.equals(first)) {
+                            firstHeld.countDown();
+                            ProgressIndicatorUtils.awaitWithCheckCanceled(release);
+                        } else if (file.equals(third)) {
+                            thirdReported.countDown();
+                        }
+                        return false;
+                    }
+                });
+            }
+        };
+        LanguageServersRegistry.getInstance().addServerDefinition(project, observing,
+                List.of(ServerMappingSettings.createFileNamePatternsMappingSettings(List.of("*.foo"), null)));
+        try {
+            var main = myFixture.configureByText("main.foo", "main");
+            var wrapper = LanguageServiceAccessor.getInstance(project).getLanguageServers(main, null, null)
+                    .get(1, TimeUnit.HOURS).stream().map(LanguageServerItem::getServerWrapper)
+                    .filter(w -> w.getServerDefinition() != observing).findFirst().orElseThrow();
+            try {
+                // A clear of the three files, which reports them in this order. The bounds only end a hang.
+                var fileUris = new LinkedHashSet<>(List.of(wrapper.toUri(first), wrapper.toUri(second), wrapper.toUri(third)));
+                LSPDiagnosticUtils.clearProblem(fileUris, wrapper.getClientFeatures(), project);
+                PlatformTestUtil.waitWithEventsDispatching("the clear must report first.foo",
+                        () -> firstHeld.getCount() == 0, 3600);
+
+                // While the clear reports first.foo, the server publishes an error for the closed document of
+                // second.foo, whose report makes it a problem file
+                var error = new Diagnostic(new Range(new Position(0, 0), new Position(0, 5)), "an error", DiagnosticSeverity.Error, "mock");
+                wrapper.updateDiagnostics(second, LSPDocumentBase.PUBLISH_DIAGNOSTIC_IDENTIFIER, List.of(error), null);
+                PlatformTestUtil.waitWithEventsDispatching("second.foo must be a problem file",
+                        () -> problems.isProblemFile(second), 3600);
+            } finally {
+                release.countDown();
+            }
+
+            // The clear goes on with second.foo, and is done with it once it reports third.foo
+            PlatformTestUtil.waitWithEventsDispatching("the clear must report third.foo",
+                    () -> thirdReported.getCount() == 0, 3600);
+            waitForProblemReports();
+            assertTrue("second.foo must stay a problem file while its closed document has an error", problems.isProblemFile(second));
+        } finally {
+            observing.getServer().waitBeforeTearDown();
+            LanguageServersRegistry.getInstance().removeServerDefinition(project, observing);
+        }
+    }
+
+    public void testAServerThatStopsWithManyClosedDocumentsWithErrorsClearsTheirProblemsOneFileAfterAnother() throws Exception {
+        var problems = problemFiles();
+        var project = myFixture.getProject();
+        // More closed files than IntelliJ lets non-blocking read actions be submitted at once
+        var files = IntStream.range(0, 150)
+                .mapToObj(i -> myFixture.addFileToProject("closed" + i + ".foo", "closed").getVirtualFile())
+                .toList();
+        var fileUris = files.stream()
+                .map(file -> FileUriSupport.DEFAULT.getFileUri(file).toASCIIString())
+                .collect(Collectors.toUnmodifiableSet());
+        // While the server stops, its client counts the files that the clear of its closed documents resolves, and
+        // holds each report of the files until the clear has resolved them all: a report asks each started server,
+        // this one among them, for the URI of the file. A clear that submitted a report of each file as it resolved
+        // it would have them all active at once, as on a busy machine. The wait gives way to a write action.
+        var stopping = new AtomicBoolean();
+        var resolved = new CountDownLatch(files.size());
+        var running = new AtomicInteger();
+        var mostRunning = new AtomicInteger();
+        var stoppingServer = new MockLanguageServerDefinition("stops-with-closed-documents", false) {
+            @Override
+            public @NotNull LSPClientFeatures createClientFeatures() {
+                return new LSPClientFeatures() {
+                    @Override
+                    public @Nullable VirtualFile findFileByUri(@NotNull String fileUri) {
+                        if (stopping.get() && fileUris.contains(fileUri)) {
+                            resolved.countDown();
+                        }
+                        return super.findFileByUri(fileUri);
+                    }
+
+                    @Override
+                    public @Nullable URI getFileUri(@NotNull VirtualFile file) {
+                        if (stopping.get() && files.contains(file)) {
+                            mostRunning.accumulateAndGet(running.incrementAndGet(), Math::max);
+                            try {
+                                ProgressIndicatorUtils.awaitWithCheckCanceled(resolved);
+                            } finally {
+                                running.decrementAndGet();
+                            }
+                        }
+                        return super.getFileUri(file);
+                    }
+                };
+            }
+        };
+        LanguageServersRegistry.getInstance().addServerDefinition(project, stoppingServer,
+                List.of(ServerMappingSettings.createFileNamePatternsMappingSettings(List.of("*.foo"), null)));
+        try {
+            var main = myFixture.configureByText("main.foo", "main");
+            var wrapper = LanguageServiceAccessor.getInstance(project).getLanguageServers(main, null, null)
+                    .get(1, TimeUnit.HOURS).stream().map(LanguageServerItem::getServerWrapper)
+                    .filter(w -> w.getServerDefinition() == stoppingServer).findFirst().orElseThrow();
+
+            // The server's error for each closed file makes it a problem file. Each error is reported before the next
+            // one is published, so that their reports are never many at once
+            var error = new Diagnostic(new Range(new Position(0, 0), new Position(0, 5)), "an error", DiagnosticSeverity.Error, "mock");
+            for (var file : files) {
+                wrapper.updateDiagnostics(file, LSPDocumentBase.PUBLISH_DIAGNOSTIC_IDENTIFIER, List.of(error), null);
+                NonBlockingReadActionImpl.waitForAsyncTaskCompletion();
+            }
+            assertTrue("each closed file must be a problem file", files.stream().allMatch(problems::isProblemFile));
+
+            // The server stops, and its clear runs. An error logged meanwhile, on any thread, is kept rather than
+            // thrown: thrown where the clear submits a report, it would end the clear before it resolves all the files.
+            // The bounds only end a hang.
+            var errors = new ConcurrentLinkedQueue<String>();
+            LoggedErrorProcessor.executeWith(new LoggedErrorProcessor() {
+                @Override
+                public @NotNull Set<Action> processError(@NotNull String category, @NotNull String message,
+                                                         String @NotNull [] details, @Nullable Throwable t) {
+                    errors.add(message);
+                    return EnumSet.of(Action.LOG, Action.STDERR);
+                }
+            }, () -> {
+                stopping.set(true);
+                wrapper.stop().get(1, TimeUnit.HOURS);
+                PlatformTestUtil.waitWithEventsDispatching("no closed file must stay a problem file once the server stops",
+                        () -> files.stream().noneMatch(problems::isProblemFile), 3600);
+                waitForProblemReports();
+            });
+            assertEmpty("no error must be logged as the server stops", errors);
+            assertEquals("the clear must report its files one after another", 1, mostRunning.get());
+        } finally {
+            stoppingServer.getServer().waitBeforeTearDown();
+            LanguageServersRegistry.getInstance().removeServerDefinition(project, stoppingServer);
+        }
     }
 
     public void testAServerThatDoesNotReportAFilesProblemsKeepsNoMarkForItWhenItCloses() throws Exception {
