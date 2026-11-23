@@ -140,7 +140,8 @@ This language server talks LSP over its standard input and output only, so the t
 
 A `fileType` with both a `name` and `patterns` gives two mappings, one for the file type and one for the patterns,
 with the same `languageId`. The banner shows only in a file which IntelliJ opens as plain text, with TextMate, or with a
-file type of your own from the `File Types` settings.
+file type of your own from the `File Types` settings, and which no language server maps: one of yours, from a template
+or not, or one of a plugin, also while it is disabled.
 
 #### Command
 

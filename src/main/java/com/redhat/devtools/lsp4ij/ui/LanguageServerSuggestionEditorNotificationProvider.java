@@ -95,9 +95,9 @@ public class LanguageServerSuggestionEditorNotificationProvider implements Edito
     }
 
     /**
-     * Returns the templates which the banner suggests for the given file, and null if it suggests none: the promotable
-     * templates which match a file that IntelliJ opens as plain text, with TextMate or with a file type of the user, and
-     * which no language server was created from.
+     * Returns the templates which the banner suggests for the given file, and null if it suggests none: for a file that
+     * IntelliJ opens as plain text, with TextMate or with a file type of the user, and that no language server maps, the
+     * promotable templates which match it, and which no language server was created from.
      *
      * @param project     the project.
      * @param virtualFile the file.
@@ -109,6 +109,12 @@ public class LanguageServerSuggestionEditorNotificationProvider implements Edito
         // LSP4IJ should assume that the file is already handled in a first-class manner and the user should not be prompted.
         PsiFile file = LSPIJUtils.getPsiFile(virtualFile, project);
         if (file == null || !(LSPIJEditorUtils.isPlainTextFile(file) || LSPIJEditorUtils.isAbstractFileTypeFile(file) || LSPIJEditorUtils.isTextMateFile(file))) {
+            return null;
+        }
+
+        // A language server maps the file already, of the user or of a plugin, from a template or not, enabled or not:
+        // the file has its server, so no template is suggested for it, as another Erlang template to a user of erlang-ls
+        if (LanguageServersRegistry.getInstance().isFileSupported(virtualFile, project)) {
             return null;
         }
 
@@ -127,6 +133,10 @@ public class LanguageServerSuggestionEditorNotificationProvider implements Edito
         return matchedTemplates.isEmpty() ? null : new Suggestion(matchedTemplates, patterns);
     }
 
+    /**
+     * Returns true if a language server was created from the template of the given id. Its template isn't suggested
+     * again, also for a file that it doesn't map, as when the user removed a mapping of the template from it.
+     */
     private boolean isServerExists(@Nullable String templateId) {
         if (templateId == null) {
             return false;
