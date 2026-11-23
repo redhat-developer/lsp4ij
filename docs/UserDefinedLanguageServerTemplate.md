@@ -124,7 +124,7 @@ This language server talks LSP over its standard input and output only, so the t
 
 | Field                 | Value                                                                                                                                                                                                                                                                  | Default                                                                                                        |
 |-----------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------|
-| `id`                  | the id of the template. A language server created from the template keeps it: the banner which suggests the template for a file it supports stays away while such a language server exists, and the settings of the language server take the `transports` of the bundled template with this id. | none                                                                                                           |
+| `id`                  | the id of the template. A language server created from the template keeps it: the banner which suggests the template for a file it supports stays away while such a language server exists, and the settings and the [export](./UserDefinedLanguageServer.md#exporting-templates) of the language server take the `transports` of the bundled template with this id. | none                                                                                                           |
 | `name`                | the name of the language server                                                                                                                                                                                                                                        | none                                                                                                           |
 | `url`                 | the page of the instructions, which the `Server` tab links as `Read the instructions`                                                                                                                                                                                  | `https://github.com/redhat-developer/lsp4ij/tree/main/docs/user-defined-ls/<id>.md`                            |
 | `dev`                 | `true` lists the template only when the IDE runs with `idea.plugin.in.sandbox.mode`, as `runIde` does                                                                                                                                                                  | `false`                                                                                                        |
@@ -247,15 +247,22 @@ arguments are matched as whole words, and the one which comes last in the comman
 the listed arguments stays as it is, and so does the command when LSP4IJ loads a template or saved settings. The
 settings find the template by its `id` among the bundled templates, so a language server created from a
 [custom template](./UserDefinedLanguageServer.md#custom-template) gets this in the New Language Server dialog only.
+The [export](./UserDefinedLanguageServer.md#exporting-templates) of a language server finds its template in the same
+way, and writes the `transports` of the template: the New Language Server dialog gives an import of the export the
+same hints, warning and arguments as the template. The export of a language server created from a custom template has
+no `transports`.
 
 #### Socket and transports
 
 `socket` and `transports` answer two questions. `socket` is the transport which the New Language Server dialog
 preselects, and which an [exported](./UserDefinedLanguageServer.md#exporting-templates) language server keeps.
 `transports` lists what the language server supports: it changes what the dialog offers and hints, and the argument
-that a change of the transport swaps in the command. A `socket` whose `mode` isn't one of the `transports` is still
-preselected, and the New Language Server dialog warns: "The socket mode ... of the template isn't one of its
-transports". Keep them in line, for instance with the `socket` mode as the socket mode of `transports`.
+that a change of the transport swaps in the command, and an exported language server has the `transports` of its
+bundled template. A `socket` whose `mode` isn't one of the `transports` is still preselected, and the New Language
+Server dialog warns: "The socket mode ... of the template isn't one of its transports". Keep them in line, for instance
+with the `socket` mode as the socket mode of `transports`. The export of a language server which talks over a socket
+that its template doesn't list, as one created from the TypeScript template, has both, and so gives this warning too
+when it's imported.
 
 ## Installer descriptor
 

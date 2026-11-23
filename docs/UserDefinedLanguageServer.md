@@ -493,9 +493,16 @@ The `template.json` of an exported language server has its `name`, its command a
 working directory as `workingDir` when one is set, and its mappings. It has no `id` and no environment variables. The
 `template.json` of a language server which talks over a socket has its
 [`socket`](./UserDefinedLanguageServerTemplate.md#socket): the `mode`, the `port` (0 for `Auto`), and the `host` when
-one is set. Export doesn't write [`transports`](./UserDefinedLanguageServerTemplate.md#transports), since a language
-server keeps only its transport, not the list of its template. The New Language Server dialog doesn't apply the
-`workingDir` of a template yet, so set the working directory again after an import.
+one is set. The `template.json` of a language server created from a bundled template also has the
+[`transports`](./UserDefinedLanguageServerTemplate.md#transports) of that template, which the settings of the language
+server apply too. A language server created from the TypeScript template, for instance, exports `transports` with only
+`stdio`, so the New Language Server dialog shows the same hint for an import of it, and the same warning when Socket is
+chosen. Export finds the template by its `id` among the bundled templates, as the settings do: a language server
+without a template, created from a [custom template](#custom-template), or whose template LSP4IJ no longer bundles,
+exports no `transports`. A language server which talks over a socket, from a template whose `transports` list only
+`stdio`, exports both, so an import of it also warns that the socket mode of the template isn't one of its transports.
+The New Language Server dialog doesn't apply the `workingDir` of a template yet, so set the working directory again
+after an import.
 
 ![Export Language Servers to a Zip](./images/user-defined-ls/ExportUserDefinedLanguageServer.png)
 
