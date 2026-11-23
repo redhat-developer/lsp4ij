@@ -895,8 +895,24 @@ public class DAPDebugProcess extends XDebugProcess implements Disposable {
         threadsPanel.refreshThreads(client, threads);
     }
 
+    /**
+     * Shows a 'thread' event of the root session in the "Threads" panel.
+     *
+     * @param args the 'thread' event.
+     */
     public void refreshThread(ThreadEventArguments args) {
-        threadsPanel.refreshThread(args);
+        refreshThread(parentClient, args);
+    }
+
+    /**
+     * Shows a 'thread' event of the given client's DAP session in the "Threads" panel, when the panel shows the threads
+     * of that session.
+     *
+     * @param client the client of the DAP session which sent the event, or null if it is not known yet.
+     * @param args   the 'thread' event.
+     */
+    public void refreshThread(@Nullable DAPClient client, ThreadEventArguments args) {
+        threadsPanel.refreshThread(client, args);
     }
 
     /**

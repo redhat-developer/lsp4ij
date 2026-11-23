@@ -1491,7 +1491,7 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
 
     @Override
     public void thread(ThreadEventArguments args) {
-        debugProcess.refreshThread(args);
+        debugProcess.refreshThread(this, args);
     }
 
     // Loaded sources and modules

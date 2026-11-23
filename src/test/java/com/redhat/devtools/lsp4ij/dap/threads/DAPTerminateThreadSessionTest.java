@@ -51,6 +51,7 @@ import org.eclipse.lsp4j.debug.ThreadsResponse;
 import org.eclipse.lsp4j.debug.launch.DSPLauncher;
 import org.eclipse.lsp4j.debug.services.IDebugProtocolClient;
 import org.eclipse.lsp4j.debug.services.IDebugProtocolServer;
+import org.eclipse.lsp4j.jsonrpc.RemoteEndpoint;
 import org.jetbrains.annotations.NotNull;
 
 import javax.swing.JTable;
@@ -185,6 +186,66 @@ public class DAPTerminateThreadSessionTest extends HeavyPlatformTestCase {
         child.answerTerminateThreads();
     }
 
+    public void testTheRowsOfAChildSessionAreItsOwnThreads() throws Exception {
+        var root = debug(true);
+        var child = startChildSession(root);
+
+        // Thread 1 is 'main' in the root session, and 'page' in the child session
+        showThreadsOf(child);
+        assertEquals(List.of("page", "worker", "service worker"), getRows());
+        getTable().setRowSelectionInterval(0, 0);
+        terminateThread().actionPerformed(update());
+
+        var args = child.terminateThreads.poll(BOUND_SECONDS, TimeUnit.SECONDS);
+        assertNotNull("The DAP server of the child session receives 'terminateThreads'", args);
+        assertEquals(List.of(Session.MAIN), Arrays.stream(args.getThreadIds()).boxed().toList());
+        assertNull("The root session gets no request", root.terminateThreads.poll(NO_REQUEST_SECONDS, TimeUnit.SECONDS));
+        child.answerTerminateThreads();
+    }
+
+    public void testTheRowsOfTheRootSessionAreItsOwnThreadsAgainAfterThoseOfAChildSession() throws Exception {
+        var root = debug(true);
+        var child = startChildSession(root);
+        showThreadsOf(child);
+        child.sendThreadEvent(ThreadEventArgumentsReason.EXITED, Session.MAIN);
+        PlatformTestUtil.waitWithEventsDispatching(() -> "the Threads panel shows that 'page' exited, not " + getRows(),
+                () -> getRows().get(0).equals("page [exited]"), BOUND_SECONDS);
+
+        // The status of the child session's thread 1 is not that of the root session's thread 1
+        showThreadsOf(root);
+        assertEquals(List.of("main", "worker"), getRows());
+        getTable().setRowSelectionInterval(0, 0);
+        terminateThread().actionPerformed(update());
+
+        var args = root.terminateThreads.poll(BOUND_SECONDS, TimeUnit.SECONDS);
+        assertNotNull("The DAP server of the root session receives 'terminateThreads'", args);
+        assertEquals(List.of(Session.MAIN), Arrays.stream(args.getThreadIds()).boxed().toList());
+        assertNull("The child session gets no request", child.terminateThreads.poll(NO_REQUEST_SECONDS, TimeUnit.SECONDS));
+        root.answerTerminateThreads();
+    }
+
+    public void testAThreadEventOfAnotherSessionDoesNotChangeTheRows() throws Exception {
+        var root = debug(true);
+        var child = startChildSession(root);
+
+        // The panel shows the threads of the root session, and the child session's thread 1 exits
+        child.sendThreadEvent(ThreadEventArgumentsReason.EXITED, Session.MAIN);
+        waitUntilHandled(child);
+
+        assertEquals(List.of("main", "worker"), getRows());
+    }
+
+    public void testAThreadWhichThePanelDoesNotShowReloadsTheThreadsOfItsSession() throws Exception {
+        var root = debug(true);
+        var child = startChildSession(root);
+        showThreadsOf(child);
+
+        child.startThread("web worker");
+
+        PlatformTestUtil.waitWithEventsDispatching(() -> "the Threads panel shows the new thread of the child session, not " + getRows(),
+                () -> getRows().equals(List.of("page", "worker", "service worker", "web worker")), BOUND_SECONDS);
+    }
+
     /**
      * Starts debugging, attached to a new {@link SessionServer}, and returns the root session once the Threads panel
      * shows its threads.
@@ -231,6 +292,36 @@ public class DAPTerminateThreadSessionTest extends HeavyPlatformTestCase {
     private @NotNull JTable getTable() {
         var debugProcess = (DAPDebugProcess) session.getDebugProcess();
         return (JTable) debugProcess.getThreadsPanel().getDefaultFocusedComponent();
+    }
+
+    /**
+     * Makes the given session stop, and waits for the Threads panel to show its threads, as it does at each stop.
+     */
+    private void showThreadsOf(@NotNull Session stopped) {
+        stopped.stop(Session.MAIN);
+        PlatformTestUtil.waitWithEventsDispatching("the Threads panel shows the threads of the session which stopped",
+                () -> getTable().getRowCount() == stopped.threads.size(), BOUND_SECONDS);
+    }
+
+    /**
+     * Returns the text of each row of the Threads panel, as it shows it: the name of the thread and its status.
+     */
+    private @NotNull List<String> getRows() {
+        var table = getTable();
+        return IntStream.range(0, table.getRowCount())
+                .mapToObj(row -> table.prepareRenderer(table.getCellRenderer(row, 0), row, 0).toString())
+                .toList();
+    }
+
+    /**
+     * Waits until the client has handled the messages which the given session sent, and the EDT what they asked of
+     * it: the client handles the messages of a connection one after the other, so once it has answered a request which
+     * the session sends after them, it has handled them.
+     */
+    private static void waitUntilHandled(@NotNull Session sender) {
+        var answer = sender.ping();
+        PlatformTestUtil.waitWithEventsDispatching("the client handles the messages of the session", answer::isDone, BOUND_SECONDS);
+        PlatformTestUtil.dispatchAllInvocationEventsInIdeEventQueue();
     }
 
     private static @NotNull AnAction terminateThread() {
@@ -329,6 +420,7 @@ public class DAPTerminateThreadSessionTest extends HeavyPlatformTestCase {
         private final IDebugProtocolClient client;
         private final boolean supportsTerminateThreads;
         private final List<String> threads;
+        private final RemoteEndpoint remoteEndpoint;
         // Done once the client has closed the connection
         private final Future<Void> listening;
         private final CompletableFuture<Void> configured = new CompletableFuture<>();
@@ -341,10 +433,11 @@ public class DAPTerminateThreadSessionTest extends HeavyPlatformTestCase {
                 @NotNull List<String> threads) throws IOException {
             this.socket = socket;
             this.supportsTerminateThreads = supportsTerminateThreads;
-            this.threads = threads;
+            this.threads = new CopyOnWriteArrayList<>(threads);
             var launcher = DSPLauncher.createServerLauncher(this, socket.getInputStream(), socket.getOutputStream(),
                     executor, consumer -> consumer);
             this.client = launcher.getRemoteProxy();
+            this.remoteEndpoint = launcher.getRemoteEndpoint();
             this.listening = launcher.startListening();
         }
 
@@ -366,6 +459,32 @@ public class DAPTerminateThreadSessionTest extends HeavyPlatformTestCase {
             stopped.setReason(StoppedEventArgumentsReason.BREAKPOINT);
             stopped.setThreadId(threadId);
             client.stopped(stopped);
+        }
+
+        /**
+         * Sends a 'thread' event with the given reason for the given thread.
+         */
+        void sendThreadEvent(@NotNull String reason, int threadId) {
+            var event = new ThreadEventArguments();
+            event.setReason(reason);
+            event.setThreadId(threadId);
+            client.thread(event);
+        }
+
+        /**
+         * Starts a thread with the given name, which 'threads' reports from then on, and sends that it started.
+         */
+        void startThread(@NotNull String name) {
+            threads.add(name);
+            sendThreadEvent(ThreadEventArgumentsReason.STARTED, threads.size());
+        }
+
+        /**
+         * Sends the client a request which it doesn't know, and returns the future of its answer, an error: the client
+         * answers it once it has handled the messages which this session sent before.
+         */
+        CompletableFuture<Object> ping() {
+            return remoteEndpoint.request("lsp4ij/test/ping", null);
         }
 
         /**
