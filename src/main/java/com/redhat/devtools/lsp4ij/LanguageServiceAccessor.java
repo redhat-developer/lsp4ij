@@ -227,6 +227,64 @@ public class LanguageServiceAccessor implements Disposable {
     }
 
     /**
+     * Asks the document matcher of the given mapping whether it matches the given file, asynchronously. A matcher whose
+     * matchAsync throws fails as one whose future fails: the returned future fails with its exception, for
+     * {@link #noMatch(VirtualFile, LanguageServerFileAssociation, Throwable)}. A cancellation, as a
+     * {@link ProcessCanceledException}, cancels the caller, as before, and an {@link Error} is not the failure of one
+     * matcher: both propagate.
+     *
+     * @param file        the file.
+     * @param fileProject the project of the file.
+     * @param mapping     the mapping, which is matched asynchronously.
+     * @return whether the document matcher of the mapping matches the file.
+     */
+    private static @NotNull CompletableFuture<Boolean> matchAsync(@NotNull VirtualFile file,
+                                                                  @NotNull Project fileProject,
+                                                                  @NotNull LanguageServerFileAssociation mapping) {
+        try {
+            return mapping.matchAsync(file, fileProject);
+        } catch (ProcessCanceledException cancellation) {
+            throw cancellation;
+        } catch (CancellationException cancellation) {
+            throw cancellation;
+        } catch (Exception e) {
+            return CompletableFuture.failedFuture(e);
+        }
+    }
+
+    /**
+     * Counts a document matcher that failed to match the given file asynchronously as no match for its definition.
+     * Each mapping of the file is matched on its own, and the failure of one must not take away the other definitions
+     * of the file.
+     * <ul>
+     * <li>A cancellation of the match is no failure, and still cancels the match of the file, as before. An
+     * {@link AbstractDocumentMatcher} cancels its earlier matches of a file when it is asked again, as by several
+     * features at once: a feature whose request is cancelled asks again, while it would keep a result without the
+     * language server of the matcher until the file changes.</li>
+     * <li>An {@link Error} is not the failure of one matcher, but of the JVM or of LSP4IJ: it still fails the
+     * match of the file.</li>
+     * <li>Any other failure is logged as a warning, with the name of the definition, as nothing else reports it.</li>
+     * </ul>
+     *
+     * @param file    the file.
+     * @param mapping the mapping, whose document matcher failed.
+     * @param error   the failure of the matcher.
+     * @return null, as the matcher doesn't match the file.
+     */
+    private static <T> @Nullable T noMatch(@NotNull VirtualFile file,
+                                           @NotNull LanguageServerFileAssociation mapping,
+                                           @NotNull Throwable error) {
+        Throwable cause = error instanceof CompletionException && error.getCause() != null ? error.getCause() : error;
+        if (cause instanceof CancellationException || cause instanceof ProcessCanceledException
+                || cause instanceof Error) {
+            throw error instanceof CompletionException completion ? completion : new CompletionException(error);
+        }
+        LOGGER.warn("Cannot match {} to the language server '{}', as its document matcher failed",
+                file.getUrl(), mapping.getServerDefinition().getDisplayName(), cause);
+        return null;
+    }
+
+    /**
      * Check each project for open files and start an LS if matching one is found and is not started yet
      *
      * @param definitions definition of the language server to match to the wrapper
@@ -1219,14 +1277,17 @@ public class LanguageServiceAccessor implements Disposable {
                 final Set<LanguageServerDefinition> serverDefinitions = Collections.synchronizedSet(new HashSet<>());
                 async = CompletableFuture.allOf(asyncMatchedDefinitions
                                 .stream()
-                                .map(mapping -> mapping
-                                        .matchAsync(file, project)
+                                .map(mapping -> matchAsync(file, project, mapping)
                                         .thenApply(result -> {
                                             if (result) {
                                                 serverDefinitions.add(mapping.getServerDefinition());
                                             }
                                             return null;
                                         })
+                                        // A matcher that fails doesn't match the file, so that the other
+                                        // definitions, matched synchronously or not, still serve it. A cancelled
+                                        // match still cancels the match of the file
+                                        .exceptionally(error -> noMatch(file, mapping, error))
                                 )
                                 .toArray(CompletableFuture[]::new))
                         .thenApply(theVoid -> serverDefinitions);
