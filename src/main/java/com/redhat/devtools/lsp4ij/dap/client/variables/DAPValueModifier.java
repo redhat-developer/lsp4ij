@@ -45,6 +45,8 @@ public class DAPValueModifier extends XValueModifier {
                     variable.setNamedVariables(setVariableResponse.getNamedVariables());
                     variable.setValue(setVariableResponse.getValue());
                     variable.setType(setVariableResponse.getType());
+                    // The new value has its own location, if any, as in VS Code
+                    variable.setValueLocationReference(setVariableResponse.getValueLocationReference());
                     callback.valueModified();
                 })
                 .exceptionally(error -> {

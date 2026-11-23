@@ -1289,7 +1289,12 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
         }
     }
 
-    XDebugSession getSession() {
+    /**
+     * Returns the debug session of this client, which the clients of a tree of DAP sessions ('startDebugging') share.
+     *
+     * @return the debug session of this client.
+     */
+    public XDebugSession getSession() {
         return debugProcess.getSession();
     }
 
@@ -1462,6 +1467,27 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
         StepInTargetsArguments args = new StepInTargetsArguments();
         args.setFrameId(frameId);
         return debugProtocolServer.stepInTargets(args);
+    }
+
+    /**
+     * Asks the DAP server where a location reference which it gave points to, with the 'locations' request, such as
+     * the 'valueLocationReference' of a variable. No capability announces the request: the DAP server answers it for
+     * the references which it gives. The request is sent off the calling thread, so that the EDT doesn't wait on the
+     * connection.
+     *
+     * @param locationReference the location reference which the DAP server gave.
+     * @return the future of the location, which is null when the DAP server answers without one or when the client is
+     * not connected to the DAP server; it fails with the error of the DAP server.
+     */
+    public CompletableFuture<@Nullable LocationsResponse> locations(int locationReference) {
+        var server = debugProtocolServer;
+        if (server == null) {
+            return CompletableFuture.completedFuture(null);
+        }
+        var args = new LocationsArguments();
+        args.setLocationReference(locationReference);
+        return CompletableFuture.supplyAsync(() -> server.locations(args), AppExecutorUtil.getAppExecutorService())
+                .thenCompose(Function.identity());
     }
 
     /**

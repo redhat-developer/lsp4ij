@@ -47,6 +47,17 @@ abstract class DeferredSourcePositionBase implements XSourcePositionEx {
         return resolvedFlow;
     }
 
+    /**
+     * Returns a future which completes once the resolution of this position has ended: with true if the position was
+     * resolved, and with false if it couldn't be, such as when the debug adapter didn't give the text of the source.
+     *
+     * @return a future which completes with true once this position is resolved, and with false once its resolution
+     * has failed.
+     */
+    public final @NotNull CompletableFuture<Boolean> whenResolved() {
+        return resolveFuture.thenApply(unused -> isResolved());
+    }
+
     @Override
     public @NotNull Navigatable createNavigatable(@NotNull Project project) {
         return new DeferredNavigatable(project, this);

@@ -1289,6 +1289,10 @@
             <action id="DAP.TerminateThread"
                     class="com.redhat.devtools.lsp4ij.dap.threads.DAPTerminateThreadAction"/>
         </group>
+        <action id="DAP.JumpToValueSource"
+                class="com.redhat.devtools.lsp4ij.dap.client.variables.DAPJumpToValueSourceAction">
+            <add-to-group group-id="XDebugger.ValueGroup" anchor="after" relative-to-action="XDebugger.JumpToTypeSource"/>
+        </action>
     </actions>
 
 </idea-plugin>

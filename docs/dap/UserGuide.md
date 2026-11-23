@@ -414,6 +414,21 @@ A variable which the DAP server marks as lazy
 such as a property computed by a getter, is shown with a `Show value` link instead of its value, since getting the value
 may run code. Clicking the link asks the DAP server for the value, which then replaces the link and can be expanded.
 
+## Jump to value source
+
+When the DAP server gives a value the location of its source
+([valueLocationReference](https://microsoft.github.io/debug-adapter-protocol//specification.html#Types_Variable)), such
+as the definition of the function which a variable holds, as vscode-js-debug does for a function and lldb-dap for a
+function pointer, the context menu of the Variables and Watches views has `Jump to Value Source`. It asks the DAP server
+where that is, with the [Locations request](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_Locations),
+and opens the source at the line and column of the answer: a source with a path in its file, and one with a
+`sourceReference` in the text that the DAP server gives for it, read-only. VS Code shows such a value as a link.
+
+The result of an expression, as `Evaluate Expression` shows it, and a value set with `Set Value...`, have the location
+which the DAP server gives with them. `Jump to Value Source` is shown only for a value with a location, and is enabled
+while the program is suspended, since the DAP server's reference is valid only until the program resumes. When the DAP
+server answers with an error or without a location, or the file of the location isn't found, a notification says so.
+
 ## Set value
 
 If debug adapter [supports setting a variable to a value](https://microsoft.github.io/debug-adapter-protocol//specification.html#Types_Capabilities),

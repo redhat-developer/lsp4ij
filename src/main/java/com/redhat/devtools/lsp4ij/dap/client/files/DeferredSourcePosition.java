@@ -60,6 +60,22 @@ public abstract class DeferredSourcePosition<T, F extends VirtualFile> extends D
     public DeferredSourcePosition(@NotNull T parameters,
                                   @NotNull F file,
                                   @NotNull DAPClient client) {
+        this(parameters, file, 0, client);
+    }
+
+    /**
+     * Creates a deferred source position, at the given column of the resolved line, that will load and resolve the
+     * position asynchronously.
+     *
+     * @param parameters the parameters required to load the source
+     * @param file       the virtual file associated with this position
+     * @param column     the 0-based column of the position in the resolved line, in characters
+     * @param client     the DAP client used to fetch source or disassembly data
+     */
+    public DeferredSourcePosition(@NotNull T parameters,
+                                  @NotNull F file,
+                                  int column,
+                                  @NotNull DAPClient client) {
         this.file = file;
         this.modificationCount = file.getModificationCount();
 
@@ -73,14 +89,15 @@ public abstract class DeferredSourcePosition<T, F extends VirtualFile> extends D
                         this.line = resolvedLine;
                         // Compute the offset lazily, based on the resolved line.
                         this.offset = NotNullLazyValue.atomicLazy(() -> runCancellableReadAction(() -> {
-                            int column = 0; // Default column to 0 for now, may be extended later
                             Document document = FileDocumentManager.getInstance().getDocument(file);
                             if (document == null) {
                                 return -1;
                             } else {
                                 int l = Math.max(0, resolvedLine);
                                 int c = Math.max(0, column);
-                                int offset = l < document.getLineCount() ? document.getLineStartOffset(l) + c : -1;
+                                // A column past the end of the line stays on the line
+                                int offset = l < document.getLineCount() ?
+                                        Math.min(document.getLineStartOffset(l) + c, document.getLineEndOffset(l)) : -1;
                                 if (offset >= document.getTextLength()) {
                                     offset = document.getTextLength() - 1;
                                 }
