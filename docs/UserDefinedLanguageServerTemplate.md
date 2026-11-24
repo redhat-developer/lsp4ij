@@ -851,6 +851,9 @@ When GitHub refuses the token, as for these messages, or the rate limit of the t
 request once again without the token, since the releases of a public repository don't need one, and the console says
 so.
 
+When a download without `url` fails for one of these reasons, the notification of the failed installation says why
+too.
+
 The IDE's log, `idea.log` (*Help | Show Log in Finder*, *Explorer* or *Files*), has a line for each download, with its
 URL, where the URL comes from and how long it took, and a warning for a rate limit, a refused token or a failed
 download. With `#com.redhat.devtools.lsp4ij.installation` in *Help | Diagnostic Tools | Debug Log Settings*, it also

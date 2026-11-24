@@ -13,12 +13,14 @@ package com.redhat.devtools.lsp4ij.installation.definition.tasks;
 import com.google.gson.JsonObject;
 import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.util.io.FileUtil;
+import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.util.system.CpuArch;
 import com.redhat.devtools.lsp4ij.installation.definition.InstallerContext;
 import com.redhat.devtools.lsp4ij.installation.definition.InstallerTask;
 import com.redhat.devtools.lsp4ij.installation.definition.ServerInstallerDescriptor;
 import com.redhat.devtools.lsp4ij.installation.download.AssetFetcher;
 import com.redhat.devtools.lsp4ij.installation.download.DownloadUtils;
+import com.redhat.devtools.lsp4ij.installation.download.Reporter;
 import com.redhat.devtools.lsp4ij.launching.templates.LanguageServerTemplate;
 import com.redhat.devtools.lsp4ij.server.definition.launching.CommandUtils;
 import org.jetbrains.annotations.NotNull;
@@ -31,9 +33,12 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
@@ -91,6 +96,15 @@ public class DownloadTask extends InstallerTask {
         String downloadUrl = found.url();
         try {
             if (downloadUrl == null) {
+                if (!found.failureReasons().isEmpty()) {
+                    // The asset fetcher said in the console why it gave no URL, as when the rate limit of the GitHub
+                    // API is reached: the notification says it too, instead of asking for a url or a github.asset
+                    // which matches the platform (#2188)
+                    context.addErrorMessage(found.failureReasons().stream()
+                            .map(reason -> "<p>" + StringUtil.escapeXmlEntities(reason) + "</p>")
+                            .collect(Collectors.joining()));
+                    return false;
+                }
                 LOGGER.warn("Installer '{}': no download URL for the OS {} and the architecture {}",
                         installer, LanguageServerTemplate.OS_KEY, CpuArch.CURRENT.name().toLowerCase());
                 // language=html
@@ -253,30 +267,65 @@ public class DownloadTask extends InstallerTask {
 
     private @NotNull DownloadUrl getDownloadUrl(@NotNull InstallerContext context) {
         if (assetFetcherInfo == null) {
-            return new DownloadUrl(downloadUrl, "its 'url'");
+            return new DownloadUrl(downloadUrl, "its 'url'", List.of());
         }
         AssetFetcher assetFetcher = assetFetcherInfo.assetFetcher();
+        var reporter = new FailureReasonsReporter(context, new ArrayList<>());
         String url = assetFetcher.getDownloadUrl(assetFetcherInfo.releaseMatcher(),
                 assetFetcherInfo.assetMatcher(),
-                context);
+                reporter);
         if (url != null) {
-            return new DownloadUrl(url, assetFetcher.getSource());
+            return new DownloadUrl(url, assetFetcher.getSource(), List.of());
         }
         context.print("Cannot retrieve url from 'github/asset', 'maven', fallback to the 'url' JSON property");
         LOGGER.info("Installer '{}': no download URL from {}; falling back to the 'url' of the download: {}",
                 getServerInstallerDeclaration().getName(),
                 assetFetcher.getSource(),
                 downloadUrl != null ? downloadUrl : "none");
-        return new DownloadUrl(downloadUrl, "its 'url', since its 'github' or 'maven' gave none");
+        return new DownloadUrl(downloadUrl, "its 'url', since its 'github' or 'maven' gave none",
+                List.copyOf(reporter.failureReasons()));
     }
 
     /**
      * The URL of a download, and where it comes from, for the log.
      *
-     * @param url    the URL of the download, or null if there is none.
-     * @param source where the URL comes from.
+     * @param url            the URL of the download, or null if there is none.
+     * @param source         where the URL comes from.
+     * @param failureReasons the messages which explain why the asset fetcher gave no URL, as the rate limit of the
+     *                       GitHub API, for the notification, or an empty list if it gave one or didn't explain.
      */
-    private record DownloadUrl(@Nullable String url, @NotNull String source) {
+    private record DownloadUrl(@Nullable String url, @NotNull String source, @NotNull List<String> failureReasons) {
+    }
+
+    /**
+     * Reports to the given context, and adds the failure reasons of an asset fetcher to the given list, which the
+     * notification shows when the download has no URL.
+     *
+     * @param context        the installer context.
+     * @param failureReasons the failure reasons that the asset fetcher reports.
+     */
+    private record FailureReasonsReporter(@NotNull InstallerContext context,
+                                          @NotNull List<String> failureReasons) implements Reporter {
+
+        @Override
+        public void setText(@NotNull String text) {
+            context.setText(text);
+        }
+
+        @Override
+        public void setText(@NotNull String text, @NotNull Exception e) {
+            context.setText(text, e);
+        }
+
+        @Override
+        public void addFailureReason(@NotNull String reason) {
+            failureReasons.add(reason);
+        }
+
+        @Override
+        public void checkCanceled() {
+            context.checkCanceled();
+        }
     }
 
     public record AssetFetcherInfo(@NotNull AssetFetcher assetFetcher,

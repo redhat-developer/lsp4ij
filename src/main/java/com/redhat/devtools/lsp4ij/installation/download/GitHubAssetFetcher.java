@@ -30,6 +30,7 @@ import java.net.URL;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
@@ -363,6 +364,8 @@ public class GitHubAssetFetcher implements AssetFetcher {
         Token token = findToken(reporter);
         reporter.setText("> Loading GitHub releases: " + urlStr
                 + (token != null ? " (with the token of the environment variable " + token.variable() + ")" : ""));
+        // The messages which explain why the releases can't be loaded, reported only if they can't (#2188)
+        List<String> failureReasons = new ArrayList<>();
 
         try {
             URL url = URI.create(urlStr).toURL();
@@ -370,6 +373,7 @@ public class GitHubAssetFetcher implements AssetFetcher {
             HttpURLConnection conn = get(url, token);
             int responseCode = conn.getResponseCode();
             Token refusedToken = null;
+            int refusedCode = 0;
             if (token != null && isRefused(conn, responseCode)) {
                 logRequest(url, token, conn, responseCode, start);
                 // The releases of a public repository don't need a token: one which GitHub refuses, as an expired
@@ -382,11 +386,13 @@ public class GitHubAssetFetcher implements AssetFetcher {
                 }
                 reporter.setText("Error while loading GitHub releases: ",
                         new GitHubApiError(refused + " Trying again without the token."));
+                failureReasons.add(refused);
                 LOGGER.warn("GitHub releases of {}/{}: {}", owner, repository, refused);
                 LOGGER.info("GitHub releases of {}/{}: trying again anonymously, since GitHub refused the token of "
                         + "the environment variable {}", owner, repository, token.variable());
                 conn.disconnect();
                 refusedToken = token;
+                refusedCode = responseCode;
                 token = null;
                 start = System.nanoTime();
                 conn = get(url, null);
@@ -396,6 +402,11 @@ public class GitHubAssetFetcher implements AssetFetcher {
                 logRequest(url, token, conn, responseCode, start);
                 String error = getErrorMessage(conn, responseCode, token);
                 if (error != null) {
+                    // A 404 without the token after one with it isn't reported: the message of the first says more
+                    if (refusedCode != HttpURLConnection.HTTP_NOT_FOUND
+                            || responseCode != HttpURLConnection.HTTP_NOT_FOUND) {
+                        failureReasons.add(error);
+                    }
                     throw new GitHubApiError(error);
                 }
                 throw new RuntimeException("GitHub API returned HTTP " + responseCode);
@@ -422,6 +433,7 @@ public class GitHubAssetFetcher implements AssetFetcher {
             } else {
                 LOGGER.warn("Cannot load the GitHub releases of {}/{}", owner, repository, e);
             }
+            failureReasons.forEach(reporter::addFailureReason);
         }
         return null;
     }
