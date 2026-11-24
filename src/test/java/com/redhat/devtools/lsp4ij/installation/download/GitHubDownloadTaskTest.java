@@ -8,11 +8,18 @@
 package com.redhat.devtools.lsp4ij.installation.download;
 
 import com.intellij.execution.ui.ConsoleViewContentType;
+import com.intellij.notification.Notification;
+import com.intellij.notification.NotificationType;
+import com.intellij.notification.Notifications;
+import com.intellij.openapi.Disposable;
+import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.util.Disposer;
 import com.intellij.openapi.util.io.NioFiles;
 import com.intellij.testFramework.TestApplicationManager;
 import com.redhat.devtools.lsp4ij.installation.definition.InstallerContext;
 import com.redhat.devtools.lsp4ij.installation.definition.InstallerTaskRegistry;
 import com.redhat.devtools.lsp4ij.installation.definition.ServerInstallerDescriptor;
+import com.redhat.devtools.lsp4ij.installation.definition.ServerInstallerManager;
 import com.redhat.devtools.lsp4ij.installation.definition.tasks.DownloadTask;
 import com.redhat.devtools.lsp4ij.installation.download.LocalHttpServer.Request;
 import com.redhat.devtools.lsp4ij.installation.download.LocalHttpServer.Response;
@@ -27,11 +34,15 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.regex.Pattern;
 
 import static com.redhat.devtools.lsp4ij.installation.download.GitHubAssetFetcherTest.RELEASES_PATH;
 import static com.redhat.devtools.lsp4ij.installation.download.GitHubAssetFetcherTest.RESET;
+import static com.redhat.devtools.lsp4ij.installation.download.GitHubAssetFetcherTest.SSO_URL;
 import static com.redhat.devtools.lsp4ij.installation.download.GitHubAssetFetcherTest.TOKEN;
 import static com.redhat.devtools.lsp4ij.installation.download.GitHubAssetFetcherTest.localTime;
 import static com.redhat.devtools.lsp4ij.installation.download.GitHubAssetFetcherTest.releases;
@@ -42,11 +53,19 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * A download task with a {@code github} source sends the GitHub token of the environment to the GitHub API, and not
  * with the download of the asset, and its console never shows the token, and says when the rate limit of the GitHub
- * API resets (#2142).
+ * API resets (#2142). When the download has no {@code url} to fall back to, the notification of the failed installation
+ * says it too (#2188).
  */
 public class GitHubDownloadTaskTest {
 
     private static final String ASSET_PATH = "/download/v1.0/server.jar";
+
+    private static final int TIMEOUT = 30;
+
+    // What the notification says of the rate limit of the GitHub API without a token
+    private static final String RATE_LIMIT = "GitHub API rate limit reached: 60 requests an hour (HTTP 403). It resets "
+            + "at " + localTime(RESET) + " (local time). Setting the environment variable GITHUB_TOKEN of the IDE to a "
+            + "GitHub token raises the limit to 5,000 requests an hour.";
 
     private LocalHttpServer server;
     private Path outputDir;
@@ -132,6 +151,92 @@ public class GitHubDownloadTaskTest {
                                 + "environment variable GITHUB_TOKEN")),
                 "the console must show the rate limit as an error: " + context.output());
         assertTrue(context.output().contains("fallback to the 'url' JSON property"), context.output());
+    }
+
+    @Test
+    public void testTheNotificationOfADownloadWithoutUrlSaysWhenTheRateLimitResets() throws Exception {
+        server.answer(RELEASES_PATH, GitHubAssetFetcherTest.rateLimit(403, 60, RESET));
+
+        var context = new RecordingContext();
+        var notification = install(createTask(Map.of(), null), context);
+
+        assertEquals(NotificationType.ERROR, notification.getType());
+        assertEquals("Installation of <code>test</code> failed.", notification.getTitle());
+        assertEquals("<p>" + RATE_LIMIT + "</p>", notification.getContent());
+        assertTrue(context.errors().stream().anyMatch(error -> error.contains(RATE_LIMIT)),
+                "the console must show the rate limit as before: " + context.output());
+    }
+
+    @Test
+    public void testTheNotificationOfADownloadWhichFallsBackToItsUrlIsUnchanged() throws Exception {
+        server.answer(RELEASES_PATH, GitHubAssetFetcherTest.rateLimit(403, 60, RESET));
+        server.answer(ASSET_PATH, Response.ok("server"));
+
+        var notification = install(createTask(Map.of(), server.url() + ASSET_PATH), new RecordingContext());
+
+        assertEquals(NotificationType.INFORMATION, notification.getType());
+        assertEquals("Installation of <code>test</code> completed successfully.", notification.getTitle());
+        // As before: the one message of the download, which doesn't say what the console says of the rate limit
+        assertTrue(notification.getContent().startsWith("Server has been downloaded correctly in '"),
+                notification.getContent());
+        assertFalse(notification.getContent().contains("rate limit"), notification.getContent());
+    }
+
+    @Test
+    public void testTheNotificationSaysThatGitHubRefusedTheTokenBeforeTheRateLimit() throws Exception {
+        server.answer(RELEASES_PATH, new Response(401, Map.of(), "{\"message\": \"Bad credentials\"}"),
+                GitHubAssetFetcherTest.rateLimit(403, 60, RESET));
+
+        var context = new RecordingContext();
+        var notification = install(createTask(Map.of("GITHUB_TOKEN", TOKEN), null), context);
+
+        assertEquals("<p>GitHub API refused the token of the environment variable GITHUB_TOKEN (HTTP 401): the token "
+                        + "is invalid or has expired. Set GITHUB_TOKEN to a valid token, or unset it.</p>"
+                        + "<p>" + RATE_LIMIT + "</p>",
+                notification.getContent());
+        assertNoToken(context);
+    }
+
+    @Test
+    public void testTheNotificationEscapesTheLinkWhichAuthorizesTheToken() throws Exception {
+        // A link with a second parameter, whose & the HTML of the notification escapes
+        server.answer(RELEASES_PATH,
+                new Response(403, Map.of("X-GitHub-SSO", "required; url=" + SSO_URL + "&organization=owner"), ""),
+                new Response(404, Map.of(), ""));
+
+        var notification = install(createTask(Map.of("GITHUB_TOKEN", TOKEN), null), new RecordingContext());
+
+        assertEquals("<p>GitHub API refused the token of the environment variable GITHUB_TOKEN (HTTP 403): the "
+                        + "organization owner enforces SAML single sign-on, and the token isn&#39;t authorized for it. "
+                        + "Authorize it at " + SSO_URL + "&amp;organization=owner, a link which expires after an "
+                        + "hour.</p><p>GitHub API returned HTTP 404: the repository owner/repo was not found, or it is "
+                        + "private.</p>",
+                notification.getContent());
+    }
+
+    @Test
+    public void testTheNotificationSaysOnceThatTheRepositoryWasNotFound() throws Exception {
+        server.answer(RELEASES_PATH, new Response(404, Map.of(), ""));
+
+        var notification = install(createTask(Map.of("GITHUB_TOKEN", TOKEN), null), new RecordingContext());
+
+        assertEquals("<p>GitHub API returned HTTP 404: the repository owner/repo was not found, or it is private and "
+                        + "the token of the environment variable GITHUB_TOKEN can&#39;t read it.</p>",
+                notification.getContent());
+    }
+
+    @Test
+    public void testTheNotificationOfAnAssetNotFoundIsUnchangedAfterATokenWhichGitHubRefused() throws Exception {
+        // The releases load without the token, and have no asset for the download
+        server.answer(RELEASES_PATH, new Response(401, Map.of(), ""),
+                Response.ok("[{\"tag_name\": \"v1.0\", \"prerelease\": false, \"assets\": []}]"));
+
+        var notification = install(createTask(Map.of("GITHUB_TOKEN", TOKEN), null), new RecordingContext());
+
+        assertEquals(NotificationType.ERROR, notification.getType());
+        assertTrue(notification.getContent().startsWith("<p>Unable to retrieve the download URL for your platform "),
+                notification.getContent());
+        assertFalse(notification.getContent().contains("refused the token"), notification.getContent());
     }
 
     @Test
@@ -234,6 +339,33 @@ public class GitHubDownloadTaskTest {
         var outputInfo = new DownloadTask.OutputInfo(outputDir.toString(), null, false, false);
         var descriptor = new ServerInstallerDescriptor("test", false, new InstallerTaskRegistry());
         return new DownloadTask(null, "download", null, null, url, assetFetcherInfo, outputInfo, descriptor);
+    }
+
+    /**
+     * Installs with an installer whose run is the given download task, as the Installer tab does, and returns the
+     * notification of the installation.
+     */
+    private static @NotNull Notification install(@NotNull DownloadTask task,
+                                                 @NotNull RecordingContext context) throws Exception {
+        var notification = new CompletableFuture<Notification>();
+        Disposable disposable = Disposer.newDisposable();
+        try {
+            ApplicationManager.getApplication().getMessageBus().connect(disposable)
+                    .subscribe(Notifications.TOPIC, new Notifications() {
+                        @Override
+                        public void notify(@NotNull Notification given) {
+                            notification.complete(given);
+                        }
+                    });
+            var installer = task.getServerInstallerDeclaration();
+            installer.setRun(task);
+            ServerInstallerManager.getInstance().install(installer, context);
+            return notification.get(TIMEOUT, TimeUnit.SECONDS);
+        } catch (TimeoutException e) {
+            throw new AssertionError("The installation gave no notification in " + TIMEOUT + " seconds", e);
+        } finally {
+            Disposer.dispose(disposable);
+        }
     }
 
     private static void assertNoToken(@NotNull RecordingContext context) {
