@@ -52,7 +52,7 @@ Current state of [Requests](https://microsoft.github.io/debug-adapter-protocol//
 * ❌ [ReadMemory](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_ReadMemory).
 * ❌ [Restart](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_Restart).
 * ✅ [RestartFrame](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_RestartFrame), with the `supportsRestartFrame` capability and the `canRestart` property of a stack frame (see [user guide](./UserGuide.md#reset-frame)).
-* ❌ [ReverseContinue](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_ReverseContinue).
+* ✅ [ReverseContinue](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_ReverseContinue), with the `supportsStepBack` capability (see [user guide](./UserGuide.md#step-back-and-reverse-continue)).
 * ✅ [Scopes](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_Scopes).
 * ✅ [SetBreakpoints](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_SetBreakpoints) (see [user guide](./UserGuide.md#adding-breakpoint)).
 * ✅ [SetDataBreakpoints](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_SetDataBreakpoints), with the `supportsDataBreakpoints` capability and the [DataBreakpoint](https://microsoft.github.io/debug-adapter-protocol//specification.html#Types_DataBreakpoint) type (see [user guide](./UserGuide.md#data-breakpoints)).
@@ -63,7 +63,7 @@ Current state of [Requests](https://microsoft.github.io/debug-adapter-protocol//
 * ✅ [SetVariable](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_SetVariable).
 * ✅ [Source](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_Source).
 * ✅ [StackTrace](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_StackTrace).
-* ❌ [StepBack](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_StepBack).
+* ✅ [StepBack](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_StepBack), with the `supportsStepBack` capability (see [user guide](./UserGuide.md#step-back-and-reverse-continue)).
 * ✅ [StepIn](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_StepIn).
 * ✅ [StepInTargets](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_StepInTargets).
 * ✅ [StepOut](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_StepOut).

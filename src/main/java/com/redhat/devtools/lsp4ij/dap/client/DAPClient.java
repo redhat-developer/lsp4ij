@@ -56,6 +56,7 @@ import org.eclipse.lsp4j.jsonrpc.messages.ResponseMessage;
 import org.jetbrains.annotations.Nls;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.jetbrains.annotations.PropertyKey;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -79,6 +80,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BooleanSupplier;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.function.UnaryOperator;
@@ -175,6 +177,9 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
     // Whether the last request that resumed the program was a step that resumed only its thread. A breakpoint which
     // doesn't suspend then resumes only the stopped thread, so the threads the step kept stopped stay stopped.
     private volatile boolean singleThreadResumed;
+    // Whether the last request that resumed the program ran it backwards, with 'stepBack' or 'reverseContinue'. A
+    // breakpoint which doesn't suspend then resumes it backwards too, with 'reverseContinue', not forward.
+    private volatile boolean reverseResumed;
     // The last 'process' event of the DAP server, which describes the process it debugs, or null until it sends one
     private volatile @Nullable ProcessEventArguments processEvent;
 
@@ -740,7 +745,8 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
         if (breakpoint != null) {
             Boolean singleThread = singleThreadResumed ? Boolean.TRUE : null;
             breakpointReached(getSession(), server, breakpoint, context, topFrame.getId(), stoppedThread.getId(),
-                    singleThread, () -> beforeResuming(stoppedThread.getId(), singleThread), continued)
+                    singleThread, reverseResumed, () -> beforeResuming(stoppedThread.getId(), singleThread),
+                    continued)
                     .exceptionally(this::reportBreakpointFailure);
             if (breakpoint.getSuspendPolicy() != SuspendPolicy.NONE) {
                 showDataBreakpointHint(getProject(), context, args, DAPClient::showInformationHint);
@@ -1081,6 +1087,31 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
                                                                @Nullable Boolean singleThread,
                                                                @NotNull Runnable resuming,
                                                                @NotNull BooleanSupplier continued) {
+        return breakpointReached(session, server, breakpoint, context, frameId, threadId, singleThread, false, resuming,
+                continued);
+    }
+
+    /**
+     * Tells the session that the program stopped at the given breakpoint, as
+     * {@link #breakpointReached(XDebugSession, IDebugProtocolServer, XBreakpoint, XSuspendContext, int, int, Boolean, Runnable, BooleanSupplier)}
+     * does, and resumes the program in the direction it ran when it stopped there: backwards with 'reverseContinue'
+     * when the last request that resumed it ran it backwards, as Reverse Continue does, and forward with 'continue'
+     * otherwise.
+     *
+     * @param reverse true if the last request that resumed the program ran it backwards ('stepBack',
+     *                'reverseContinue'), and false otherwise.
+     * @see #breakpointReached(XDebugSession, IDebugProtocolServer, XBreakpoint, XSuspendContext, int, int, Boolean, Runnable, BooleanSupplier)
+     */
+    static CompletableFuture<@Nullable Void> breakpointReached(@NotNull XDebugSession session,
+                                                               @NotNull IDebugProtocolServer server,
+                                                               @NotNull XBreakpoint<?> breakpoint,
+                                                               @NotNull XSuspendContext context,
+                                                               int frameId,
+                                                               int threadId,
+                                                               @Nullable Boolean singleThread,
+                                                               boolean reverse,
+                                                               @NotNull Runnable resuming,
+                                                               @NotNull BooleanSupplier continued) {
         return evaluateLogExpression(server, breakpoint, frameId)
                 .thenCompose(logged -> {
                     if (continued.getAsBoolean()) {
@@ -1091,11 +1122,14 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
                         resumeIfContinued(session, context, continued);
                         return CompletableFuture.completedFuture(null);
                     }
-                    // The breakpoint doesn't suspend: resume the program
+                    // The breakpoint doesn't suspend: resume the program, in the direction it ran
+                    resuming.run();
+                    if (reverse) {
+                        return reverseContinue(server, threadId, singleThread);
+                    }
                     ContinueArguments args = new ContinueArguments();
                     args.setThreadId(threadId);
                     args.setSingleThread(singleThread);
-                    resuming.run();
                     return server.continue_(args).thenAccept(response -> {
                     });
                 });
@@ -1396,6 +1430,7 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
         ContinueArguments args = new ContinueArguments();
         args.setThreadId(threadId);
         singleThreadResumed = false;
+        reverseResumed = false;
         beforeResuming(threadId, null);
         return debugProtocolServer
                 .continue_(args);
@@ -1422,6 +1457,7 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
         }
         var singleThread = singleThreadStep();
         singleThreadResumed = singleThread != null;
+        reverseResumed = false;
         beforeResuming(threadId, singleThread);
         next(server, threadId, granularity, singleThread);
     }
@@ -1452,6 +1488,7 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
         }
         var singleThread = singleThreadStep();
         singleThreadResumed = singleThread != null;
+        reverseResumed = false;
         beforeResuming(threadId, singleThread);
         stepOut(server, threadId, granularity, singleThread);
     }
@@ -1486,6 +1523,7 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
         }
         var singleThread = singleThreadStep();
         singleThreadResumed = singleThread != null;
+        reverseResumed = false;
         beforeResuming(threadId, singleThread);
         stepIn(server, threadId, targetId, granularity, singleThread);
     }
@@ -1510,6 +1548,145 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
         args.setGranularity(granularity);
         args.setSingleThread(singleThread);
         server.stepIn(args);
+    }
+
+    /**
+     * Steps the given thread back with 'stepBack', when the debug adapter supports it (supportsStepBack). Once the
+     * debug adapter has answered, the session shows the program running, as after a step, until the 'stopped' event
+     * which follows suspends it where the thread stepped back to. When the debug adapter refuses, as one which has
+     * nothing recorded to step back in does, the console says why and the session stays suspended where it was.
+     *
+     * @param threadId    the thread which steps back.
+     * @param granularity the granularity of the step, or null for the DAP server's default.
+     * @return the future, completed once the debug adapter has answered.
+     */
+    public CompletableFuture<@Nullable Void> stepBack(int threadId, @Nullable SteppingGranularity granularity) {
+        var server = debugProtocolServer;
+        if (server == null) {
+            return CompletableFuture.completedFuture(null);
+        }
+        var singleThread = singleThreadStep();
+        return runBackwards(threadId, singleThread, () -> stepBack(server, threadId, granularity, singleThread),
+                "dap.stepping.stepBack.failed");
+    }
+
+    /**
+     * Sends 'stepBack', Step Back, for the given thread.
+     *
+     * @param server       the DAP server.
+     * @param threadId     the thread which steps back.
+     * @param granularity  the granularity of the step, or null for the DAP server's default.
+     * @param singleThread true to resume only the thread which steps back, and null to resume every thread.
+     * @return the future of the answer of the DAP server.
+     */
+    static CompletableFuture<Void> stepBack(@NotNull IDebugProtocolServer server,
+                                            int threadId,
+                                            @Nullable SteppingGranularity granularity,
+                                            @Nullable Boolean singleThread) {
+        StepBackArguments args = new StepBackArguments();
+        args.setThreadId(threadId);
+        args.setGranularity(granularity);
+        args.setSingleThread(singleThread);
+        return server.stepBack(args);
+    }
+
+    /**
+     * Runs the program backwards with 'reverseContinue', when the debug adapter supports it (supportsStepBack), as
+     * {@link #stepBack(int, SteppingGranularity)} steps back: the 'stopped' event which follows the answer suspends the
+     * session where the program stopped, such as at a breakpoint, and the session stays suspended when the debug
+     * adapter refuses.
+     *
+     * @param threadId the thread of the stop which the program runs backwards from.
+     * @return the future, completed once the debug adapter has answered.
+     */
+    public CompletableFuture<@Nullable Void> reverseContinue(int threadId) {
+        var server = debugProtocolServer;
+        if (server == null) {
+            return CompletableFuture.completedFuture(null);
+        }
+        var singleThread = singleThreadStep();
+        return runBackwards(threadId, singleThread, () -> reverseContinue(server, threadId, singleThread),
+                "dap.stepping.reverseContinue.failed");
+    }
+
+    /**
+     * Sends 'reverseContinue', Reverse Continue, for the given thread.
+     *
+     * @param server       the DAP server.
+     * @param threadId     the thread of the stop which the program runs backwards from.
+     * @param singleThread true to resume only the given thread, and null to resume every thread.
+     * @return the future of the answer of the DAP server.
+     */
+    static CompletableFuture<Void> reverseContinue(@NotNull IDebugProtocolServer server,
+                                                   int threadId,
+                                                   @Nullable Boolean singleThread) {
+        ReverseContinueArguments args = new ReverseContinueArguments();
+        args.setThreadId(threadId);
+        args.setSingleThread(singleThread);
+        return server.reverseContinue(args);
+    }
+
+    /**
+     * Sends a request which runs the program backwards, which IntelliJ doesn't resume the session for as it does for
+     * its own steps. The execution epoch ends before the request is sent, as for a step, and is the current one again
+     * when the debug adapter refuses. The threads show running once the debug adapter has accepted the request.
+     *
+     * @param threadId     the thread of the stop which the program runs backwards from.
+     * @param singleThread the 'singleThread' of the request.
+     * @param request      sends the request.
+     * @param failedKey    the message which the console shows when the debug adapter refuses, with its reason.
+     * @return the future, completed once the debug adapter has answered.
+     */
+    private CompletableFuture<@Nullable Void> runBackwards(int threadId,
+                                                           @Nullable Boolean singleThread,
+                                                           @NotNull Supplier<CompletableFuture<Void>> request,
+                                                           @NotNull @PropertyKey(resourceBundle = DAPBundle.BUNDLE) String failedKey) {
+        var session = getSession();
+        var context = session.getSuspendContext();
+        singleThreadResumed = singleThread != null;
+        reverseResumed = true;
+        int ended = executionEpoch.endBeforeResuming();
+        // The threads run once the debug adapter has accepted the request, right before the session resumes
+        // (resumeWhenAnswered), which then no longer has this suspend context: a refused request leaves them stopped,
+        // and a stop which came meanwhile is newer
+        var accepted = request.get().thenApply(response -> {
+            if (session.getSuspendContext() == context) {
+                updateThreadRunStates(states -> states.resumed(threadId, singleThread != null));
+            }
+            return response;
+        });
+        return resumeWhenAnswered(accepted, session, context, error -> {
+            executionEpoch.resumeRefused(ended);
+            debugProcess.print(DAPBundle.message(failedKey, error.getMessage()), ConsoleViewContentType.ERROR_OUTPUT);
+        });
+    }
+
+    /**
+     * Shows the program running once the debug adapter has accepted a request which resumes it, and which IntelliJ
+     * doesn't resume the session for, such as 'stepBack': {@link XDebugSession#sessionResumed()} clears the views of
+     * the stop as a step does, and the 'stopped' event which follows the answer suspends the session again. When the
+     * debug adapter refuses, the session stays suspended where it was.
+     *
+     * @param request the request which resumes the program.
+     * @param session the debug session.
+     * @param context the suspend context of the session when the request was sent, or null if it was not suspended.
+     * @param refused reports why the debug adapter refused.
+     * @return the future, completed once the debug adapter has answered.
+     */
+    static CompletableFuture<@Nullable Void> resumeWhenAnswered(@NotNull CompletableFuture<?> request,
+                                                                @NotNull XDebugSession session,
+                                                                @Nullable XSuspendContext context,
+                                                                @NotNull Consumer<Throwable> refused) {
+        // Not async: the session runs before the 'stopped' event which follows the answer is handled
+        return request.handle((response, error) -> {
+            if (error != null) {
+                refused.accept(getCause(error));
+            } else if (session.getSuspendContext() == context) {
+                // Unless a 'continued' event resumed it, or a stop suspended it, meanwhile
+                session.sessionResumed();
+            }
+            return null;
+        });
     }
 
     /**
@@ -2184,6 +2361,35 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
      */
     public boolean isSupportsStepInTargetsRequest() {
         return Boolean.TRUE.equals(getCapabilities().getSupportsStepInTargetsRequest());
+    }
+
+    /**
+     * Returns true if the debug adapter supports running the program backwards, with the 'stepBack' and
+     * 'reverseContinue' requests, and false otherwise.
+     *
+     * @return true if the debug adapter supports stepping back and false otherwise.
+     */
+    public boolean isSupportsStepBack() {
+        return Boolean.TRUE.equals(getCapabilities().getSupportsStepBack());
+    }
+
+    /**
+     * Returns true if the debug adapter of this client, or that of a child session, supports running the program
+     * backwards, and false otherwise.
+     *
+     * @return true if the debug adapter of this client, or that of a child session, supports stepping back, and false
+     * otherwise.
+     */
+    public boolean isSupportsStepBackInSessions() {
+        if (isSupportsStepBack()) {
+            return true;
+        }
+        for (DAPClient child : List.copyOf(childrenClient)) {
+            if (child.isSupportsStepBackInSessions()) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
