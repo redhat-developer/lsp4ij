@@ -142,13 +142,17 @@ public class DAPSourceReferencePosition extends DeferredSourcePosition<DAPSource
                                 }
                             }
                             // The document has the text of this answer: it was just written, or an earlier load of the
-                            // same source wrote it
-                            boolean hasText = doc != null && StringUtil.equals(doc.getImmutableCharSequence(), normalized);
+                            // same source wrote it. An empty text is none: the next stack frame of the source asks the
+                            // debug adapter for it again, also when the empty text replaced the one of the source.
+                            boolean hasText = doc != null && !normalized.isEmpty()
+                                    && StringUtil.equals(doc.getImmutableCharSequence(), normalized);
                             if (hasText) {
                                 file.setLoadedSource(client, params.sourceReference());
+                            } else if (doc != null) {
+                                file.clearLoadedSource();
                             }
                             // The document keeps the text as long as no other load writes another one
-                            loadedText = hasText && !normalized.isEmpty() ? file.getWrittenTexts() : -1;
+                            loadedText = hasText ? file.getWrittenTexts() : -1;
                             // Complete the future with the requested line number
                             updatedDoc.complete(params.line());
                         });

@@ -67,10 +67,10 @@ public abstract class DAPFile extends LightVirtualFile {
      */
     private final @NotNull Project project;
     private long sessionId;
-    // The source reference whose text the document has, as the last load of a source reference left it, or null before
-    // the first one. A source reference is valid only in its session, and the file outlives it: a later session, or
-    // another session of the tree ('startDebugging'), may give another text for the same source reference. The client
-    // is weakly referenced, so that the file doesn't keep it.
+    // The source reference whose text the document has, as the last load of a source reference left it, or null if it
+    // has none: before the first load, and after one which got no text. A source reference is valid only in its
+    // session, and the file outlives it: a later session, or another session of the tree ('startDebugging'), may give
+    // another text for the same source reference. The client is weakly referenced, so that the file doesn't keep it.
     private volatile @Nullable LoadedSource loadedSource;
     // The number of texts which loads of source references wrote to the document, each replacing the one it had: the
     // document keeps the text which a load left in it as long as the number stays the same
@@ -103,6 +103,14 @@ public abstract class DAPFile extends LightVirtualFile {
      */
     public void setLoadedSource(@NotNull DAPClient client, int sourceReference) {
         loadedSource = new LoadedSource(new WeakReference<>(client), sourceReference);
+    }
+
+    /**
+     * Says that the document of this file has the text of no source reference, as when the debug adapter gave none: a
+     * stack frame of the source asks for it again.
+     */
+    void clearLoadedSource() {
+        loadedSource = null;
     }
 
     /**
