@@ -213,9 +213,12 @@ public class PromiseToCompletableFutureTest extends BasePlatformTestCase {
         await("the computation didn't fail 3 times", () -> computation.failedRuns() >= 3, future);
 
         future.cancel(true);
+        long cancelled = System.nanoTime();
 
-        assertStays("the computation ran again after the future was cancelled", () -> computation.runs() == 3,
-                Duration.ofMillis(600 + 500));
+        // A retry which started before the cancellation, as when this thread is slow, may still run, but none starts
+        // after it
+        assertStays("the computation ran again after the future was cancelled",
+                () -> computation.runsStartedAfter(cancelled) == 0, Duration.ofMillis(600 + 500));
         assertTrue(future.isCancelled());
     }
 
@@ -404,6 +407,13 @@ public class PromiseToCompletableFutureTest extends BasePlatformTestCase {
 
         int runs() {
             return starts.size();
+        }
+
+        /**
+         * Returns how many runs started after the given time of {@link System#nanoTime()}.
+         */
+        int runsStartedAfter(long nanoTime) {
+            return (int) starts.stream().filter(start -> start - nanoTime > 0).count();
         }
 
         int runsWhileIndexing() {
