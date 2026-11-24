@@ -35,9 +35,10 @@ import static com.redhat.devtools.lsp4ij.dap.DAPIJUtils.getValidFilePath;
 /**
  * The 'locations' request of the location references of a DAP value, such as the 'valueLocationReference' which "Jump
  * to Value Source" opens and the 'declarationLocationReference' which "Jump to Source" opens, and the source position
- * of its answer: a position in a local file, or in the text which the DAP server gives for a source reference.
+ * of its answer: a position in a local file, or in the text which the DAP server gives for a source reference. The
+ * debug console opens the source location of an 'output' event with it too.
  */
-final class DAPLocations {
+public final class DAPLocations {
 
     private DAPLocations() {
     }
@@ -73,9 +74,20 @@ final class DAPLocations {
      * @param location the location which the DAP server answered, or null if it answered none.
      * @return the source of the location if it can be opened, and null otherwise.
      */
-    static @Nullable Source getSource(@Nullable LocationsResponse location) {
+    public static @Nullable Source getSource(@Nullable LocationsResponse location) {
         Source source = location != null ? location.getSource() : null;
-        return source != null && (hasSourceReference(source) || StringUtils.isNotBlank(source.getPath())) ? source : null;
+        return source != null && canBeOpened(source) ? source : null;
+    }
+
+    /**
+     * Returns true if a source which the DAP server gave can be opened, that is if it has a source reference or a path,
+     * and false otherwise.
+     *
+     * @param source the source which the DAP server gave.
+     * @return true if the source has a source reference or a path, and false otherwise.
+     */
+    public static boolean canBeOpened(@NotNull Source source) {
+        return hasSourceReference(source) || StringUtils.isNotBlank(source.getPath());
     }
 
     /**
@@ -111,10 +123,10 @@ final class DAPLocations {
      * @return the future of the position, which is null when the local file of the source is not found, or when the DAP
      * server gives no text for its source reference.
      */
-    static @NotNull CompletableFuture<@Nullable XSourcePosition> getSourcePosition(@NotNull DAPClient client,
-                                                                                  @NotNull Source source,
-                                                                                  @Nullable Integer line,
-                                                                                  @Nullable Integer column) {
+    public static @NotNull CompletableFuture<@Nullable XSourcePosition> getSourcePosition(@NotNull DAPClient client,
+                                                                                         @NotNull Source source,
+                                                                                         @Nullable Integer line,
+                                                                                         @Nullable Integer column) {
         int lineIndex = line != null ? Math.max(line - 1, 0) : 0;
         int columnIndex = column != null ? Math.max(column - 1, 0) : 0;
         if (hasSourceReference(source)) {
@@ -132,7 +144,13 @@ final class DAPLocations {
                 XDebuggerUtil.getInstance().createPosition(file, lineIndex, columnIndex) : null);
     }
 
-    private static boolean hasSourceReference(@NotNull Source source) {
+    /**
+     * Returns true if the given source has a source reference, whose text the DAP server gives, and false otherwise.
+     *
+     * @param source the source which the DAP server gave.
+     * @return true if the source has a source reference, and false otherwise.
+     */
+    public static boolean hasSourceReference(@NotNull Source source) {
         return source.getSourceReference() != null && source.getSourceReference() > 0;
     }
 }

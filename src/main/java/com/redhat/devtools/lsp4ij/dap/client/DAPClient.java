@@ -612,7 +612,14 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
             return;
         }
         // The groups indent the lines, whose ANSI escape sequences are then decoded
-        debugProcess.printOutput(outputDecoder.decode(outputGroups.indent(args), args.getCategory()));
+        var chunks = outputDecoder.decode(outputGroups.indent(args), args.getCategory());
+        // The source location which the DAP server gives the output, if any, is a link after it, as in VS Code
+        var location = DAPOutputLocation.of(this, args);
+        if (location != null) {
+            debugProcess.printOutput(chunks, location.getText(), location);
+        } else {
+            debugProcess.printOutput(chunks);
+        }
     }
 
     /**
