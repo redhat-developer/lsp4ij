@@ -34,6 +34,8 @@ import com.intellij.xdebugger.frame.XValue;
 import com.intellij.xdebugger.frame.XValueChildrenList;
 import com.intellij.xdebugger.frame.XValueContainer;
 import com.redhat.devtools.lsp4ij.dap.DebugMode;
+import com.redhat.devtools.lsp4ij.dap.client.files.DAPFile;
+import com.redhat.devtools.lsp4ij.dap.client.files.DAPSourceReferencePosition;
 import com.redhat.devtools.lsp4ij.dap.configurations.DAPRunConfiguration;
 import org.eclipse.lsp4j.debug.Capabilities;
 import org.eclipse.lsp4j.debug.ConfigurationDoneArguments;
@@ -72,6 +74,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.stream.IntStream;
 
@@ -79,7 +82,8 @@ import java.util.stream.IntStream;
  * Two sources which the debug adapter gives by source reference, with the same name and different texts, in a debug
  * session against a DAP server in the test's process which the session attaches to: the program stops in a frame of
  * each, as two scripts evaluated with {@code eval} are both named {@code <anonymous>}. Each source has its own file,
- * and editor tab, named after the source, with its own text (#2196).
+ * and editor tab, named after the source, with its own text (#2196). A load of a source has its text only while the
+ * document keeps it, and a stack frame asks again for the text of a source which the debug adapter gave none for.
  */
 public class DAPSameNameSourceReferencesSessionTest extends HeavyPlatformTestCase {
 
@@ -98,6 +102,11 @@ public class DAPSameNameSourceReferencesSessionTest extends HeavyPlatformTestCas
             // the second eval
             var zero = 0;
             var second = 2;
+            """;
+    // The text which the debug adapter gives for the first source once it has changed
+    private static final String CHANGED = """
+            // the first eval, changed
+            var first = 10;
             """;
     // The lines of the frames, 1-based as the DAP server gives them
     private static final int FIRST_LINE = 2;
@@ -205,11 +214,70 @@ public class DAPSameNameSourceReferencesSessionTest extends HeavyPlatformTestCas
         assertEquals(List.of(FIRST_REFERENCE, SECOND_REFERENCE), List.copyOf(server.sources));
     }
 
+    public void testALoadOfASourceHasItsTextOnlyWhileTheDocumentKeepsIt() throws Exception {
+        debug();
+        // The first frame got the text of its source
+        var file = (DAPFile) firstPosition().getFile();
+        var client = currentFrame().getClient();
+        var loaded = loadFirst(file, client);
+        assertEquals(FIRST, document(file).getText());
+        assertTrue("The load wrote the text of the source", loaded.isTextLoaded());
+        // A load which gets the same text finds it in the document: both have it
+        var again = loadFirst(file, client);
+        assertTrue("The load found the text of the source", again.isTextLoaded());
+        assertTrue("The document kept the text of the first load", loaded.isTextLoaded());
+
+        // The debug adapter gives another text for the same source reference: the document has it, and no longer the
+        // one of the earlier loads
+        server.texts.put(FIRST_REFERENCE, CHANGED);
+        var changed = loadFirst(file, client);
+        assertEquals(CHANGED, document(file).getText());
+        assertTrue("The load wrote the changed text", changed.isTextLoaded());
+        assertFalse("Another text replaced the one of the first load", loaded.isTextLoaded());
+        assertFalse("Another text replaced the one of the second load", again.isTextLoaded());
+
+        // and no text at all, when the debug adapter gives none
+        server.texts.put(FIRST_REFERENCE, "");
+        var empty = loadFirst(file, client);
+        assertEquals("", document(file).getText());
+        assertFalse("The debug adapter gave no text", empty.isTextLoaded());
+        assertFalse("No text replaced the changed one", changed.isTextLoaded());
+    }
+
+    public void testAStackFrameAsksAgainForTheTextOfItsSourceWhenTheDebugAdapterGaveNone() throws Exception {
+        // The debug adapter has no text for the first source yet
+        var evalServer = new EvalServer();
+        evalServer.texts.put(FIRST_REFERENCE, "");
+        debug(evalServer);
+        var file = (DAPFile) firstPosition().getFile();
+        assertEquals("", document(file).getText());
+        var frame = currentFrame();
+        var client = frame.getClient();
+
+        // It has the text now: a later frame of the source, as the next stop of the program has, asks for it again
+        server.texts.put(FIRST_REFERENCE, FIRST);
+        waitForTextOfLaterFrame(frame);
+
+        // So does a frame after a load which got no text replaced the text which the document had
+        server.texts.put(FIRST_REFERENCE, "");
+        assertFalse("The debug adapter gave no text", loadFirst(file, client).isTextLoaded());
+        assertEquals("", document(file).getText());
+        server.texts.put(FIRST_REFERENCE, FIRST);
+        waitForTextOfLaterFrame(frame);
+    }
+
     /**
      * Starts debugging, attached to a new {@link EvalServer}, and waits for the program to stop.
      */
     private void debug() throws Exception {
-        server = new EvalServer();
+        debug(new EvalServer());
+    }
+
+    /**
+     * Starts debugging, attached to the given {@link EvalServer}, and waits for the program to stop.
+     */
+    private void debug(@NotNull EvalServer server) throws Exception {
+        this.server = server;
         var type = Arrays.stream(ConfigurationType.CONFIGURATION_TYPE_EP.getExtensions())
                 .filter(t -> t.getId().equals("DAPConfiguration")).findFirst().orElseThrow();
         var settings = RunManager.getInstance(getProject()).createConfiguration("evals", type.getConfigurationFactories()[0]);
@@ -262,6 +330,61 @@ public class DAPSameNameSourceReferencesSessionTest extends HeavyPlatformTestCas
 
     private @Nullable Editor selectedEditor() {
         return FileEditorManager.getInstance(getProject()).getSelectedTextEditor();
+    }
+
+    private @NotNull DAPStackFrame currentFrame() {
+        return (DAPStackFrame) session.getCurrentStackFrame();
+    }
+
+    /**
+     * Returns the source position of the current frame, the first one, once it is resolved: once the debug adapter has
+     * answered the request for the text of its source.
+     */
+    private @NotNull XSourcePosition firstPosition() {
+        var position = currentFrame().getSourcePosition();
+        assertNotNull(position);
+        assertEquals(NAME, position.getFile().getName());
+        PlatformTestUtil.waitWithEventsDispatching(() -> "the position of the first frame isn't resolved, it is at "
+                + "line " + position.getLine(), () -> position.getLine() == FIRST_LINE - 1, BOUND_SECONDS);
+        return position;
+    }
+
+    /**
+     * Loads the text of the first source into the given file, as opening the source from the Loaded Sources tab does,
+     * and returns its position once it is resolved.
+     */
+    private @NotNull DAPSourceReferencePosition loadFirst(@NotNull DAPFile file, @NotNull DAPClient client) {
+        var position = new DAPSourceReferencePosition(file, FIRST_REFERENCE, FIRST_LINE - 1, client);
+        var resolved = position.whenResolved();
+        PlatformTestUtil.waitWithEventsDispatching("the load of the first source didn't end", resolved::isDone,
+                BOUND_SECONDS);
+        assertTrue("The position of the first source isn't resolved", resolved.join());
+        return position;
+    }
+
+    /**
+     * Waits until a later stack frame of the first source, of the client of the given frame of it, has the text of the
+     * source, at the line of the frame, and checks that the frame asked the debug adapter for it.
+     */
+    private void waitForTextOfLaterFrame(@NotNull DAPStackFrame frame) {
+        int asked = sourcesOf(FIRST_REFERENCE);
+        var position = new DAPStackFrame(frame.getClient(), frame.getStackFrame()).getSourcePosition();
+        assertNotNull(position);
+        PlatformTestUtil.waitWithEventsDispatching(() -> "a later frame didn't get the text of its source at line "
+                        + (FIRST_LINE - 1) + ", its position is at line " + position.getLine() + ", the debug adapter "
+                        + "was asked for the text of the first source " + sourcesOf(FIRST_REFERENCE) + " times, and "
+                        + "the file has:\n" + document(position.getFile()).getText(),
+                () -> FIRST.equals(document(position.getFile()).getText()) && position.getLine() == FIRST_LINE - 1,
+                BOUND_SECONDS);
+        assertTrue("The later frame asked the debug adapter for the text of its source",
+                sourcesOf(FIRST_REFERENCE) > asked);
+    }
+
+    /**
+     * Returns how many times the debug adapter was asked for the text of the given source reference.
+     */
+    private int sourcesOf(int sourceReference) {
+        return (int) server.sources.stream().filter(reference -> reference == sourceReference).count();
     }
 
     private static @NotNull VirtualFile fileOf(@NotNull Editor editor) {
@@ -390,6 +513,9 @@ public class DAPSameNameSourceReferencesSessionTest extends HeavyPlatformTestCas
         private final ServerSocket serverSocket;
         // The source references of the 'source' requests, in the order received
         private final List<Integer> sources = new CopyOnWriteArrayList<>();
+        // The text which the debug adapter gives for each source reference, which a test may change
+        private final Map<Integer, String> texts = new ConcurrentHashMap<>(Map.of(FIRST_REFERENCE, FIRST,
+                SECOND_REFERENCE, SECOND));
         private volatile IDebugProtocolClient client;
 
         EvalServer() throws IOException {
@@ -500,7 +626,7 @@ public class DAPSameNameSourceReferencesSessionTest extends HeavyPlatformTestCas
         public CompletableFuture<SourceResponse> source(SourceArguments args) {
             sources.add(args.getSourceReference());
             var response = new SourceResponse();
-            response.setContent(args.getSourceReference() == FIRST_REFERENCE ? FIRST : SECOND);
+            response.setContent(texts.get(args.getSourceReference()));
             return CompletableFuture.completedFuture(response);
         }
 
