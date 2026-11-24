@@ -351,7 +351,14 @@ public class DAPStackFrame extends XStackFrame {
     }
 
 
-    private static @NotNull String getValidSourceName(@NotNull Source source) {
+    /**
+     * Returns the name of the file which shows the text of a source with a source reference: the source's name, or
+     * else the name of its path's file, or else its source reference.
+     *
+     * @param source the DAP source.
+     * @return the name of the file which shows the text of the source.
+     */
+    public static @NotNull String getValidSourceName(@NotNull Source source) {
         String sourceName = getSourceNameFromNameOrPath(source);
         if (sourceName != null) {
             return sourceName;

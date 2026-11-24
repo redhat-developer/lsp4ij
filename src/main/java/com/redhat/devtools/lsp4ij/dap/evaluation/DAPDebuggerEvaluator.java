@@ -131,6 +131,8 @@ public class DAPDebuggerEvaluator extends XDebuggerEvaluator {
                     variable.setName(expression);
                     variable.setValue(evaluateResponse.getResult());
                     variable.setType(evaluateResponse.getType());
+                    // "Jump to Value Source" opens the location of the value, as for a variable
+                    variable.setValueLocationReference(evaluateResponse.getValueLocationReference());
                     variable.setVariablesReference(evaluateResponse.getVariablesReference());
                     variable.setNamedVariables(evaluateResponse.getNamedVariables());
                     variable.setIndexedVariables(evaluateResponse.getIndexedVariables());

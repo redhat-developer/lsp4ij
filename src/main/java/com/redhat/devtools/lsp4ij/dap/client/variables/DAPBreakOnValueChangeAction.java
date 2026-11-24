@@ -98,7 +98,7 @@ public class DAPBreakOnValueChangeAction extends AnAction implements DumbAware {
      * @param dataContext the data context of the view.
      * @return the selected value, or null if no value is selected.
      */
-    private static @Nullable XValue getSelectedValue(@NotNull DataContext dataContext) {
+    static @Nullable XValue getSelectedValue(@NotNull DataContext dataContext) {
         if (GET_SELECTED_BACKEND_VALUE != null) {
             try {
                 if (GET_SELECTED_BACKEND_VALUE.invoke(null, dataContext) instanceof XValue value) {

@@ -47,7 +47,24 @@ public class DAPSourceReferencePosition extends DeferredSourcePosition<DAPSource
                                       int sourceReference,
                                       int line,
                                       @NotNull DAPClient client) {
-        super(new SourceParams(sourceReference, line), file, client);
+        this(file, sourceReference, line, 0, client);
+    }
+
+    /**
+     * Creates a deferred source position at a column of a line, based on a DAP sourceReference.
+     *
+     * @param file            the file associated with this position
+     * @param sourceReference the DAP sourceReference to fetch content
+     * @param line            the target line number in the source
+     * @param column          the 0-based target column in the line, in characters
+     * @param client          the DAP client used to communicate with the debug adapter
+     */
+    public DAPSourceReferencePosition(@NotNull DAPFile file,
+                                      int sourceReference,
+                                      int line,
+                                      int column,
+                                      @NotNull DAPClient client) {
+        super(new SourceParams(sourceReference, line), file, column, client);
     }
 
     /**
