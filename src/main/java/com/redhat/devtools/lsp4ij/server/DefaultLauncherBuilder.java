@@ -11,6 +11,7 @@
 package com.redhat.devtools.lsp4ij.server;
 
 import com.redhat.devtools.lsp4ij.JSONUtils;
+import com.redhat.devtools.lsp4ij.LanguageServerWrapper;
 import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
 import com.redhat.devtools.lsp4ij.internal.ExtendedConcurrentMessageProcessor;
 import com.redhat.devtools.lsp4ij.internal.ExtendedStreamMessageProducer;
@@ -37,6 +38,7 @@ import java.util.function.Function;
  *   <li>Uses {@link ExtendedConcurrentMessageProcessor} for error-propagating message processing</li>
  *   <li>Supports integer JSON-RPC IDs via {@link LSPClientFeatures#isUseIntAsJsonRpcId()}</li>
  *   <li>Registers {@link CodeLensOptionsAdapter} for backward compatibility with legacy servers</li>
+ *   <li>Traces the messages that LSP4J can't parse in the LSP console, as the messages that it parses</li>
  * </ul>
  *
  * <p>Subclasses can override {@link #createMessageProducer} to provide a custom
@@ -81,7 +83,7 @@ public class DefaultLauncherBuilder<S extends LanguageServer> extends Launcher.B
         S remoteProxy = createProxy(remoteEndpoint);
 
         // Create the message processor
-        MessageProducer reader = createMessageProducer(input, jsonHandler, remoteEndpoint);
+        MessageProducer reader = createMessageProducer(input, jsonHandler, createMessageIssueHandler(remoteEndpoint));
         MessageConsumer messageConsumer = wrapMessageConsumer(remoteEndpoint);
         ConcurrentMessageProcessor msgProcessor = createMessageProcessor(reader, messageConsumer, remoteProxy);
         ExecutorService execService = executorService != null ? executorService : Executors.newCachedThreadPool();
@@ -105,6 +107,27 @@ public class DefaultLauncherBuilder<S extends LanguageServer> extends Launcher.B
                                                               @NotNull MessageJsonHandler jsonHandler,
                                                               @NotNull MessageIssueHandler issueHandler) {
         return new ExtendedStreamMessageProducer(input, jsonHandler, issueHandler);
+    }
+
+    /**
+     * Creates the handler of the messages that LSP4J can't parse, as a message whose params don't fit their type.
+     * <p>
+     * LSP4J hands such a message to this handler instead of to the message consumer, which traces the messages that
+     * it parses: the handler traces it in the LSP console, with the issues that LSP4J found in it, then lets the
+     * remote endpoint handle it as LSP4J does, which answers a request with an error, fails the request of a
+     * response, and logs a notification (#584).
+     *
+     * @param remoteEndpoint the remote endpoint, which handles the messages that LSP4J can't parse.
+     * @return the handler of the messages that LSP4J can't parse.
+     */
+    private @NotNull MessageIssueHandler createMessageIssueHandler(@NotNull RemoteEndpoint remoteEndpoint) {
+        return (message, issues) -> {
+            LanguageServerWrapper serverWrapper = clientFeatures.getServerWrapper();
+            if (serverWrapper != null) {
+                serverWrapper.logMessageIssues(message, issues, remoteEndpoint);
+            }
+            remoteEndpoint.handle(message, issues);
+        };
     }
 
     @Override

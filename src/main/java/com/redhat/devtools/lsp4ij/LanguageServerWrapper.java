@@ -63,6 +63,7 @@ import org.eclipse.lsp4j.jsonrpc.Launcher;
 import org.eclipse.lsp4j.jsonrpc.MessageConsumer;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
 import org.eclipse.lsp4j.jsonrpc.messages.Message;
+import org.eclipse.lsp4j.jsonrpc.messages.MessageIssue;
 import org.eclipse.lsp4j.jsonrpc.messages.NotificationMessage;
 import org.eclipse.lsp4j.jsonrpc.messages.RequestMessage;
 import org.eclipse.lsp4j.jsonrpc.messages.ResponseMessage;
@@ -1076,6 +1077,24 @@ public class LanguageServerWrapper implements Disposable {
 
     private void logMessage(Message message, MessageConsumer consumer) {
         getLanguageServerLifecycleManager().logLSPMessage(message, consumer, this);
+    }
+
+    /**
+     * Traces the given message of the language server, which LSP4J could not parse: LSP4J hands such a message to its
+     * issue handler instead of to the message consumers, which trace the messages that it parses (#584).
+     *
+     * @param message  the message, as far as LSP4J parsed it.
+     * @param issues   the issues that LSP4J found in the message.
+     * @param consumer the consumer of the messages that LSP4IJ receives.
+     */
+    @ApiStatus.Internal
+    public void logMessageIssues(@NotNull Message message,
+                                 @NotNull List<MessageIssue> issues,
+                                 @NotNull MessageConsumer consumer) {
+        if (isDisposed()) {
+            return;
+        }
+        getLanguageServerLifecycleManager().logLSPMessage(message, issues, consumer, this);
     }
 
     /**
@@ -2711,6 +2730,22 @@ public class LanguageServerWrapper implements Disposable {
      */
     public boolean addTrace(@NotNull Message message,
                             @NotNull MessageConsumer messageConsumer) {
+        return addTrace(message, List.of(), messageConsumer);
+    }
+
+    /**
+     * Add LSP trace in the cached LSP traces, as {@link #addTrace(Message, MessageConsumer)} does, for a message that
+     * LSP4J could not parse for the given issues, or that it parsed if there are none.
+     *
+     * @param message         the LSP request/response message to display in the LSP consle.
+     * @param issues          the issues that LSP4J found in the message, which are empty if it parsed it.
+     * @param messageConsumer the message consumer.
+     * @return true if trace has been add in the LSP cache traces and false otherwise.
+     */
+    @ApiStatus.Internal
+    public boolean addTrace(@NotNull Message message,
+                            @NotNull List<MessageIssue> issues,
+                            @NotNull MessageConsumer messageConsumer) {
         ServerTrace serverTrace = getServerTrace();
         if (serverTrace == ServerTrace.off) {
             return false;
@@ -2720,7 +2755,7 @@ public class LanguageServerWrapper implements Disposable {
             // This case can occur when language server is restarted
             return false;
         }
-        traces.add(new LSPTrace(message, messageConsumer, serverTrace, tracing, Instant.now()));
+        traces.add(new LSPTrace(message, messageConsumer, serverTrace, tracing, Instant.now(), issues));
         if (traceCount.incrementAndGet() > MAX_PENDING_TRACES) {
             pollTraceMessage();
         }
@@ -3251,14 +3286,26 @@ public class LanguageServerWrapper implements Disposable {
         return new LSPFileConnectionInfo(document, text, modificationStamp, languageId, waitForDidOpen);
     }
 
-    // LSP traces
+    // LSP traces; the issues are those that kept LSP4J from parsing the message, and are empty if it parsed it
     public record LSPTrace(@NotNull Message message,
                            @NotNull MessageConsumer messageConsumer,
                            @NotNull ServerTrace serverTrace,
                            @NotNull TracingMessageConsumer tracing,
-                           @NotNull Instant time) {
+                           @NotNull Instant time,
+                           @NotNull List<MessageIssue> issues) {
+
+        public LSPTrace(@NotNull Message message,
+                        @NotNull MessageConsumer messageConsumer,
+                        @NotNull ServerTrace serverTrace,
+                        @NotNull TracingMessageConsumer tracing,
+                        @NotNull Instant time) {
+            this(message, messageConsumer, serverTrace, tracing, time, List.of());
+        }
+
         public String toMessage() {
-            return tracing.log(message, messageConsumer, serverTrace, time);
+            return issues.isEmpty() ?
+                    tracing.log(message, messageConsumer, serverTrace, time) :
+                    tracing.logIssues(message, issues, serverTrace, time);
         }
     }
 

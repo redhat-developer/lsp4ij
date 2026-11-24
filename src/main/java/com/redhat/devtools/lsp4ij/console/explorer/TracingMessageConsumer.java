@@ -26,6 +26,7 @@ import org.eclipse.lsp4j.jsonrpc.RemoteEndpoint;
 import org.eclipse.lsp4j.jsonrpc.json.MessageJsonHandler;
 import org.eclipse.lsp4j.jsonrpc.json.StreamMessageConsumer;
 import org.eclipse.lsp4j.jsonrpc.messages.Message;
+import org.eclipse.lsp4j.jsonrpc.messages.MessageIssue;
 import org.eclipse.lsp4j.jsonrpc.messages.NotificationMessage;
 import org.eclipse.lsp4j.jsonrpc.messages.RequestMessage;
 import org.eclipse.lsp4j.jsonrpc.messages.ResponseMessage;
@@ -35,9 +36,11 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.format.DateTimeFormatter;
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 
 /**
  * Outputs logs in a format that can be parsed by the LSP Inspector.
@@ -99,6 +102,71 @@ public class TracingMessageConsumer {
         } else {
             return String.format("Unknown MessageConsumer type: %s", messageConsumer);
         }
+    }
+
+    /**
+     * Constructs a log string for a given {@link Message} that LSP4IJ received at the given time and that LSP4J could
+     * not parse, with the issues that LSP4J found in it. LSP4J hands such a message to its issue handler instead of to
+     * the message consumers, which trace the messages that it parses (#584).
+     * <p>
+     * The message has what LSP4J read of it: its method and id, and its params or result only if LSP4J kept them.
+     *
+     * @param message     the message, as far as LSP4J parsed it.
+     * @param issues      the issues that LSP4J found in the message.
+     * @param serverTrace the server trace.
+     * @param now         the time when LSP4IJ received the message.
+     * @return the log string.
+     */
+    public String logIssues(Message message, List<MessageIssue> issues, ServerTrace serverTrace, Instant now) {
+        final String date = dateTimeFormatter.format(now);
+        final String received;
+        // The params, result or error that LSP4J kept, which it couldn't read into their type
+        final String content;
+        if (message instanceof RequestMessage requestMessage) {
+            String method = getTracedMethod(requestMessage);
+            String id = requestMessage.getId();
+            // The error response that LSP4J sends to the request shows its method
+            receivedRequests.put(id, new RequestMetadata(method, now));
+            received = String.format("request '%s - (%s)'", method, id);
+            content = getContentTrace("Params", requestMessage.getParams());
+        } else if (message instanceof ResponseMessage responseMessage) {
+            String id = responseMessage.getId();
+            RequestMetadata requestMetadata = sentRequests.remove(id);
+            received = String.format("response '%s - (%s)' in %sms", getMethod(requestMetadata), id,
+                    getLatencyMillis(requestMetadata, now));
+            content = responseMessage.getError() != null ?
+                    getContentTrace("Error", responseMessage.getError()) :
+                    getContentTrace("Result", responseMessage.getResult());
+        } else if (message instanceof NotificationMessage notificationMessage) {
+            received = String.format("notification '%s'", notificationMessage.getMethod());
+            content = getContentTrace("Params", notificationMessage.getParams());
+        } else {
+            received = "message";
+            content = "";
+        }
+        String issuesTrace = issues.stream()
+                .map(TracingMessageConsumer::getIssueTrace)
+                .collect(Collectors.joining("\n"));
+        String trace = String.format("[Trace - %s] Received %s that could not be parsed.\n%s\n", date, received, issuesTrace);
+        if (serverTrace == ServerTrace.messages) {
+            return trace;
+        }
+        return String.format("%s%s\n\n", trace, content);
+    }
+
+    private static String getContentTrace(String label, @Nullable Object content) {
+        return content != null ? String.format("%s: %s\n", label, toJsonString(content)) : "";
+    }
+
+    /**
+     * Returns the trace of the given issue: its text, and the message of its cause, which says what LSP4J couldn't
+     * read, as {@code Expected an int but was 4294967295 at line 1 column 236 path $.params.diagnostics[0].range.end.character}.
+     */
+    private static String getIssueTrace(MessageIssue issue) {
+        Exception cause = issue.getCause();
+        return cause != null && cause.getMessage() != null ?
+                String.format("Issue: %s %s", issue.getText(), cause.getMessage()) :
+                String.format("Issue: %s", issue.getText());
     }
 
     private String consumeMessageSending(Message message, Instant now, String date, ServerTrace serverTrace) {
