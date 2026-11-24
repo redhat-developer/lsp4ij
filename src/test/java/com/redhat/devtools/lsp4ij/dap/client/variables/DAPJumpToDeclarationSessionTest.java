@@ -19,6 +19,7 @@ import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.editor.LogicalPosition;
 import com.intellij.openapi.fileEditor.FileEditorManager;
 import com.intellij.openapi.fileEditor.OpenFileDescriptor;
+import com.intellij.openapi.util.Disposer;
 import com.intellij.openapi.util.io.FileUtil;
 import com.intellij.openapi.vfs.LocalFileSystem;
 import com.intellij.openapi.vfs.VirtualFile;
@@ -32,10 +33,15 @@ import com.intellij.xdebugger.XDebuggerManager;
 import com.intellij.xdebugger.XSourcePosition;
 import com.intellij.xdebugger.frame.XCompositeNode;
 import com.intellij.xdebugger.frame.XDebuggerTreeNodeHyperlink;
+import com.intellij.xdebugger.frame.XFullValueEvaluator.XFullValueEvaluationCallback;
 import com.intellij.xdebugger.frame.XInlineDebuggerDataCallback;
 import com.intellij.xdebugger.frame.XNavigatable;
 import com.intellij.xdebugger.frame.XValueChildrenList;
 import com.intellij.xdebugger.frame.XValueContainer;
+import com.intellij.xdebugger.impl.actions.XDebuggerActions;
+import com.intellij.xdebugger.impl.ui.tree.XDebuggerTree;
+import com.intellij.xdebugger.impl.ui.tree.nodes.XValueNodeImpl;
+import com.redhat.devtools.lsp4ij.dap.DAPDebuggerEditorsProvider;
 import com.redhat.devtools.lsp4ij.dap.DebugMode;
 import com.redhat.devtools.lsp4ij.dap.client.DAPStackFrame;
 import com.redhat.devtools.lsp4ij.dap.configurations.DAPRunConfiguration;
@@ -59,6 +65,7 @@ import org.eclipse.lsp4j.debug.StoppedEventArgumentsReason;
 import org.eclipse.lsp4j.debug.Thread;
 import org.eclipse.lsp4j.debug.ThreadsResponse;
 import org.eclipse.lsp4j.debug.Variable;
+import org.eclipse.lsp4j.debug.VariablePresentationHint;
 import org.eclipse.lsp4j.debug.VariablesArguments;
 import org.eclipse.lsp4j.debug.VariablesResponse;
 import org.eclipse.lsp4j.debug.launch.DSPLauncher;
@@ -72,6 +79,7 @@ import org.jetbrains.annotations.Nullable;
 
 import javax.swing.Icon;
 import java.io.IOException;
+import java.lang.reflect.Proxy;
 import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.nio.file.Files;
@@ -90,7 +98,8 @@ import java.util.stream.IntStream;
  * with the 'locations' request, and opens the source of the answer, a local file or the text of a source reference, at
  * its line and column. Without a reference, when the DAP server fails to answer or answers no location, and for a value
  * of an earlier stop, whose reference is no longer valid, it searches the name of the variable in the file of the frame,
- * as it did before, and as the inline values do.
+ * as it did before, and as the inline values do. On a lazy variable whose value is shown, it opens the declaration of
+ * that value, or else that of the lazy variable.
  */
 public class DAPJumpToDeclarationSessionTest extends HeavyPlatformTestCase {
 
@@ -110,6 +119,13 @@ public class DAPJumpToDeclarationSessionTest extends HeavyPlatformTestCase {
     private static final int GENERATED_SOURCE_REFERENCE = 11;
     // Another source of the same name, generated.js, with another text
     private static final int OTHER_GENERATED_SOURCE_REFERENCE = 12;
+    // The declarations of two lazy variables, and that of the value of the second: the value of the first has none
+    private static final int SUBTOTAL_DECLARATION = 13;
+    private static final int AVERAGE_DECLARATION = 14;
+    private static final int AVERAGE_VALUE_DECLARATION = 15;
+    // The variablesReferences which give the values of the lazy variables
+    private static final int SUBTOTAL_VALUE_REFERENCE = 2;
+    private static final int AVERAGE_VALUE_REFERENCE = 3;
 
     private static final String SUM = """
             // Sums the items of an order
@@ -327,6 +343,36 @@ public class DAPJumpToDeclarationSessionTest extends HeavyPlatformTestCase {
         assertEquals(FRAME_LINE - 1, given.join().getLine());
     }
 
+    public void testJumpToSourceOnALazyVariableOpensItsDeclarationAfterShowValueWhenItsValueHasNone() throws Exception {
+        debug();
+        var subtotal = local("subtotal");
+        assertEquals("Before \"Show value\", the declaration of the lazy variable is opened", 1,
+                jumpToSource(subtotal).getLine());
+
+        showValue(subtotal);
+        assertEquals("42", subtotal.getShownVariable().getValue());
+        var position = jumpToSource(subtotal);
+
+        // the value which the lazy variable shows has no declaration: the DAP server is asked for that of the lazy
+        // variable, rather than the name being searched
+        assertEquals(List.of(SUBTOTAL_DECLARATION, SUBTOTAL_DECLARATION), List.copyOf(server.locations));
+        assertEquals(sumFile, position.getFile());
+        assertEquals(1, position.getLine());
+    }
+
+    public void testJumpToSourceOnALazyVariableOpensTheDeclarationOfItsValueAfterShowValue() throws Exception {
+        debug();
+        var average = local("average");
+        showValue(average);
+
+        var position = jumpToSource(average);
+
+        // the declaration of the value which the lazy variable shows, rather than that of the lazy variable
+        assertEquals(List.of(AVERAGE_VALUE_DECLARATION), List.copyOf(server.locations));
+        assertEquals(sumFile, position.getFile());
+        assertEquals(5, position.getLine());
+    }
+
     /**
      * Starts debugging, attached to a new {@link DeclarationServer}, and waits for the program to stop.
      */
@@ -370,6 +416,31 @@ public class DAPJumpToDeclarationSessionTest extends HeavyPlatformTestCase {
         PlatformTestUtil.waitWithEventsDispatching("Jump to Source gave no position of '" + value.getName() + "'",
                 given::isDone, BOUND_SECONDS);
         return given.join();
+    }
+
+    /**
+     * Asks for the value of the given lazy variable, as a click on its "Show value" link in the Variables view does, and
+     * waits until it is shown.
+     */
+    private void showValue(@NotNull DAPValue value) {
+        var tree = new XDebuggerTree(getProject(), new DAPDebuggerEditorsProvider(null, null), null,
+                XDebuggerActions.VARIABLES_TREE_POPUP_GROUP, null);
+        Disposer.register(getTestRootDisposable(), tree);
+        var node = new XValueNodeImpl(tree, null, value.getName(), value);
+        PlatformTestUtil.waitWithEventsDispatching("the node of '" + value.getName() + "' shows no \"Show value\" link",
+                () -> node.getFullValueEvaluator() != null, BOUND_SECONDS);
+        var evaluated = new CompletableFuture<String>();
+        node.getFullValueEvaluator().startEvaluation((XFullValueEvaluationCallback) Proxy.newProxyInstance(
+                XFullValueEvaluationCallback.class.getClassLoader(), new Class<?>[]{XFullValueEvaluationCallback.class},
+                (proxy, method, args) -> switch (method.getName()) {
+                    case "evaluated" -> evaluated.complete((String) args[0]);
+                    case "errorOccurred" -> evaluated.completeExceptionally(new AssertionError(args[0]));
+                    case "isObsolete" -> false;
+                    case "equals" -> proxy == args[0];
+                    case "hashCode" -> System.identityHashCode(proxy);
+                    default -> null;
+                }));
+        PlatformTestUtil.waitForFuture(evaluated, BOUND_SECONDS * 1000L);
     }
 
     /**
@@ -455,7 +526,8 @@ public class DAPJumpToDeclarationSessionTest extends HeavyPlatformTestCase {
      * 'declarationLocationReference', but one: 'total', whose declaration the DAP server locates in the file, 'order',
      * whose declaration it locates in the text of a source reference, 'tax', whose declaration it locates in the file
      * without a line, 'item', whose declaration it fails to locate, 'discount', whose declaration it locates nowhere,
-     * and 'items', without a 'declarationLocationReference'.
+     * and 'items', without a 'declarationLocationReference'. Two more are lazy, and declared in the file: 'subtotal',
+     * whose value has no 'declarationLocationReference', and 'average', whose value has its own.
      */
     private static class DeclarationServer implements IDebugProtocolServer {
 
@@ -578,14 +650,22 @@ public class DAPJumpToDeclarationSessionTest extends HeavyPlatformTestCase {
         @Override
         public CompletableFuture<VariablesResponse> variables(VariablesArguments args) {
             var response = new VariablesResponse();
-            response.setVariables(args.getVariablesReference() == LOCALS_REFERENCE ? new Variable[]{
-                    variable("items", "Array(3)", null),
-                    variable("discount", "5", DISCOUNT_DECLARATION),
-                    variable("total", "42", TOTAL_DECLARATION),
-                    variable("item", "17", ITEM_DECLARATION),
-                    variable("order", "{}", ORDER_DECLARATION),
-                    variable("tax", "0.2", TAX_DECLARATION)
-            } : new Variable[0]);
+            response.setVariables(switch (args.getVariablesReference()) {
+                case LOCALS_REFERENCE -> new Variable[]{
+                        variable("items", "Array(3)", null),
+                        variable("discount", "5", DISCOUNT_DECLARATION),
+                        variable("total", "42", TOTAL_DECLARATION),
+                        variable("item", "17", ITEM_DECLARATION),
+                        variable("order", "{}", ORDER_DECLARATION),
+                        variable("tax", "0.2", TAX_DECLARATION),
+                        lazyVariable("subtotal", SUBTOTAL_DECLARATION, SUBTOTAL_VALUE_REFERENCE),
+                        lazyVariable("average", AVERAGE_DECLARATION, AVERAGE_VALUE_REFERENCE)
+                };
+                // the variables with the values of the lazy variables
+                case SUBTOTAL_VALUE_REFERENCE -> new Variable[]{variable("subtotal", "42", null)};
+                case AVERAGE_VALUE_REFERENCE -> new Variable[]{variable("average", "14", AVERAGE_VALUE_DECLARATION)};
+                default -> new Variable[0];
+            });
             return CompletableFuture.completedFuture(response);
         }
 
@@ -623,6 +703,27 @@ public class DAPJumpToDeclarationSessionTest extends HeavyPlatformTestCase {
                 case TAX_DECLARATION -> {
                     var location = new LocationsResponse();
                     location.setSource(source());
+                    yield CompletableFuture.completedFuture(location);
+                }
+                case SUBTOTAL_DECLARATION -> {
+                    var location = new LocationsResponse();
+                    location.setSource(source());
+                    location.setLine(2);
+                    location.setColumn(1);
+                    yield CompletableFuture.completedFuture(location);
+                }
+                case AVERAGE_DECLARATION -> {
+                    var location = new LocationsResponse();
+                    location.setSource(source());
+                    location.setLine(8);
+                    location.setColumn(1);
+                    yield CompletableFuture.completedFuture(location);
+                }
+                case AVERAGE_VALUE_DECLARATION -> {
+                    var location = new LocationsResponse();
+                    location.setSource(source());
+                    location.setLine(6);
+                    location.setColumn(5);
                     yield CompletableFuture.completedFuture(location);
                 }
                 case ITEM_DECLARATION -> CompletableFuture.failedFuture(new ResponseErrorException(
@@ -666,6 +767,19 @@ public class DAPJumpToDeclarationSessionTest extends HeavyPlatformTestCase {
             variable.setValue(value);
             variable.setVariablesReference(0);
             variable.setDeclarationLocationReference(declarationLocationReference);
+            return variable;
+        }
+
+        /**
+         * Returns a lazy variable, whose value the DAP server gives as the variable of the given variablesReference.
+         */
+        private static Variable lazyVariable(@NotNull String name, int declarationLocationReference,
+                                             int variablesReference) {
+            var variable = variable(name, "(...)", declarationLocationReference);
+            var lazy = new VariablePresentationHint();
+            lazy.setLazy(true);
+            variable.setPresentationHint(lazy);
+            variable.setVariablesReference(variablesReference);
             return variable;
         }
     }
