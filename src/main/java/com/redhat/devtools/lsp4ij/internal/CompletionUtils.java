@@ -36,6 +36,16 @@ public class CompletionUtils {
 
         TextRange wordRange = LSPIJUtils.getWordRangeAt(document, file, completionOffset);
         if (wordRange != null) {
+            int endOffset = Math.min(completionOffset, document.getTextLength());
+            int startOffset = Math.min(wordRange.getStartOffset(), endOffset);
+            if (containsWhitespace(document.getCharsSequence().subSequence(startOffset, endOffset))) {
+                // The PSI element at the completion offset spans several words, as a comment that a custom PSI keeps
+                // as one token: the completion replaces the word that ends at the completion offset (#447)
+                // ex :
+                // document= ---@diagnostic disable-next-line : u|
+                // we have to return |u as prefix start offset
+                return getWordStartOffset(document, completionOffset);
+            }
             return wordRange.getStartOffset();
         }
 
@@ -47,6 +57,34 @@ public class CompletionUtils {
         // we have to return {| as prefix start offset
 
         return getPrefixStartOffsetWhichMatchesLeftContent(document, completionOffset, insertText);
+    }
+
+    /**
+     * Returns the start offset of the word that ends at the given offset in the given document: the Java identifier
+     * characters before the offset, which IntelliJ completes in a comment or in a plain text file.
+     *
+     * @param document the document.
+     * @param offset   the offset.
+     * @return the start offset of the word that ends at the given offset, which is the offset if there is none.
+     */
+    public static int getWordStartOffset(@NotNull Document document, int offset) {
+        CharSequence chars = document.getCharsSequence();
+        int startOffset = Math.min(offset, chars.length());
+        while (startOffset > 0 && Character.isJavaIdentifierPart(chars.charAt(startOffset - 1))) {
+            startOffset--;
+        }
+        return startOffset;
+    }
+
+    /**
+     * Returns true if the given text contains whitespace, as the text of a comment from its start to the completion
+     * offset, which is then no word to complete, and false otherwise.
+     *
+     * @param text the text.
+     * @return true if the given text contains whitespace and false otherwise.
+     */
+    public static boolean containsWhitespace(@NotNull CharSequence text) {
+        return text.chars().anyMatch(Character::isWhitespace);
     }
 
     @Nullable

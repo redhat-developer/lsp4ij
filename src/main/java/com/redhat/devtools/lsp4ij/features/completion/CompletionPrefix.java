@@ -14,7 +14,9 @@
 package com.redhat.devtools.lsp4ij.features.completion;
 
 import com.intellij.openapi.editor.Document;
+import com.intellij.openapi.util.TextRange;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
+import com.redhat.devtools.lsp4ij.internal.CompletionUtils;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import org.eclipse.lsp4j.CompletionItem;
 import org.eclipse.lsp4j.Position;
@@ -32,13 +34,17 @@ import java.util.Map;
  */
 public class CompletionPrefix {
 
+    private final int completionOffset;
     private final Position completionPos;
     private final Document document;
 
     private final Map<Range, String /* prefix */> prefixCache;
 
+    private @Nullable String wordPrefix;
+
     public CompletionPrefix(int completionOffset, Document document) {
         this.document = document;
+        this.completionOffset = completionOffset;
         this.completionPos = LSPIJUtils.toPosition(completionOffset, document);
         this.prefixCache = new HashMap<>();
     }
@@ -94,6 +100,28 @@ public class CompletionPrefix {
             prefix = prefix.substring(index);
         }
         return prefix;
+    }
+
+    /**
+     * Returns the prefix of a completion item without a text edit, when the given prefix, which IntelliJ computes from
+     * the PSI element at the completion offset, isn't one, and null otherwise.
+     * <p>
+     * The prefix that IntelliJ computes spans whitespace when a custom PSI keeps a whole comment as one token, as
+     * {@code disable-next-line : u}, which matches no completion item. The prefix is then the word that ends at the
+     * completion offset, {@code u}, as IntelliJ completes in a comment, and as VS Code completes an item without a
+     * text edit (#447).
+     *
+     * @param psiPrefix the prefix that IntelliJ computes from the PSI element at the completion offset.
+     * @return the word that ends at the completion offset if the given prefix spans whitespace, and null otherwise.
+     */
+    public @Nullable String getWordPrefix(@NotNull String psiPrefix) {
+        if (!CompletionUtils.containsWhitespace(psiPrefix)) {
+            return null;
+        }
+        if (wordPrefix == null) {
+            wordPrefix = document.getText(new TextRange(CompletionUtils.getWordStartOffset(document, completionOffset), completionOffset));
+        }
+        return wordPrefix;
     }
 
     private static String getAccurateFilterText(@NotNull CompletionItem item) {
