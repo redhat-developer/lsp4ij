@@ -92,8 +92,12 @@ final class DAPExecutionEpoch {
      * accepted one.
      *
      * @param ended the epoch which {@link #endBeforeResuming()} ended.
+     * @return true if the epoch which ended is the current one again, or an epoch before it, which a request sent before
+     * it, such as a Step Back, ended and the debug adapter refused too: the program is where it was when the request
+     * was sent. False if the debug adapter said meanwhile that the program stopped or continued, or a request sent after
+     * it, such as a second Step Back, is pending or was accepted.
      */
-    void resumeRefused(int ended) {
+    boolean resumeRefused(int ended) {
         synchronized (refused) {
             // A 'stopped' or 'continued' event ended the epochs of the requests sent before it for good
             int event = lastEvent.get();
@@ -107,6 +111,7 @@ final class DAPExecutionEpoch {
             while (refused.contains(epoch - 1) && current.compareAndSet(epoch, epoch - 1)) {
                 refused.remove(--epoch);
             }
+            return current.get() <= ended;
         }
     }
 

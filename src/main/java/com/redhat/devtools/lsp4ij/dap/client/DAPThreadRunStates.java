@@ -29,7 +29,7 @@ import java.util.stream.Collectors;
  *     <li>'stopped' stops its thread, or all threads with {@code allThreadsStopped: true};</li>
  *     <li>'continued' runs its thread with {@code allThreadsContinued: false}, and all threads otherwise;</li>
  *     <li>a resume or a step of the session runs all threads, or only the thread which steps for a single-thread step
- *     ('singleThread');</li>
+ *     ('singleThread'), and gives them their run states back when the debug adapter refuses it;</li>
  *     <li>'thread' with the reason 'exited' ends its thread, and with 'started' runs it.</li>
  * </ul>
  * A thread which none of them named has the run state of all threads, which is running until the debug adapter says
@@ -144,6 +144,30 @@ public final class DAPThreadRunStates {
         return singleThread ?
                 withThread(threadId, DAPThreadRunState.RUNNING) :
                 withAllThreads(DAPThreadRunState.RUNNING);
+    }
+
+    /**
+     * Returns the run states once the debug adapter refused a request of the session which resumed the program: the
+     * threads which {@link #resumed(int, boolean)} showed running have the run states which they had before the request
+     * again, unless a newer event changed them since, as when a thread exited. When all threads stopped or continued
+     * since, as the debug adapter said, nothing is restored.
+     *
+     * @param before  the run states before the request.
+     * @param resumed the run states which {@link #resumed(int, boolean)} gave for the request.
+     * @return the new run states, or these when all threads changed since the request.
+     */
+    @NotNull DAPThreadRunStates resumeRefused(@NotNull DAPThreadRunStates before, @NotNull DAPThreadRunStates resumed) {
+        if (allThreads.version() > resumed.version) {
+            return this;
+        }
+        // The run states of before, but those which changed after the request
+        Map<Integer, Entry> restored = new HashMap<>(before.threads);
+        threads.forEach((threadId, entry) -> {
+            if (entry.version() > resumed.version) {
+                restored.put(threadId, entry);
+            }
+        });
+        return new DAPThreadRunStates(version + 1, before.allThreads, restored);
     }
 
     /**

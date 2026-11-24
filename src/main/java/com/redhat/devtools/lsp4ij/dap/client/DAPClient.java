@@ -737,10 +737,23 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
         XBreakpoint<?> breakpoint = getStopBreakpoint(args, id -> debugProcess.findBreakpointById(server, id), () -> breakpointHandler.findBreakpoint(server, topFrame));
         if (breakpoint != null) {
             Boolean singleThread = singleThreadResumed ? Boolean.TRUE : null;
+            boolean reverse = reverseResumed;
+            // Set once the program is resumed at a breakpoint which doesn't suspend
+            var resuming = new AtomicReference<@Nullable Resuming>();
             breakpointReached(getSession(), server, breakpoint, context, topFrame.getId(), stoppedThread.getId(),
-                    singleThread, reverseResumed, () -> beforeResuming(stoppedThread.getId(), singleThread),
+                    singleThread, reverse, () -> resuming.set(beforeResuming(stoppedThread.getId(), singleThread)),
                     continued)
-                    .exceptionally(this::reportBreakpointFailure);
+                    .exceptionally(error -> {
+                        var refused = resuming.get();
+                        if (refused == null) {
+                            return reportBreakpointFailure(error);
+                        }
+                        // The debug adapter refused to resume the program, which is still stopped at the breakpoint:
+                        // the session is suspended there, as at a breakpoint which suspends
+                        runForwardRefused(refused, context, getCause(error), reverse ?
+                                "dap.stepping.reverseContinue.failed" : "dap.stepping.continue.failed");
+                        return null;
+                    });
             if (breakpoint.getSuspendPolicy() != SuspendPolicy.NONE) {
                 showDataBreakpointHint(getProject(), context, args, DAPClient::showInformationHint);
             }
@@ -1042,7 +1055,8 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
     }
 
     private @Nullable Void reportBreakpointFailure(@NotNull Throwable error) {
-        // e.g. the program could not be resumed: say so instead of leaving it stopped silently
+        // e.g. the session could not be told of the stop, before the program was resumed: say so instead of leaving it
+        // stopped silently
         debugProcess.print("Cannot handle the breakpoint: " + getCause(error).getMessage(), ConsoleViewContentType.ERROR_OUTPUT);
         return null;
     }
@@ -1417,16 +1431,39 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
     }
 
     public CompletableFuture<ContinueResponse> continue_(int threadId) {
-        if (debugProtocolServer == null) {
+        return continue_(threadId, null);
+    }
+
+    /**
+     * Resumes the program with 'continue', as Resume Program does, which IntelliJ resumes the session for before it asks
+     * the debug process to. When the debug adapter refuses, the console says why, and the session is suspended again
+     * at the given suspend context, where the program is still stopped (see {@link #runForward}).
+     *
+     * @param threadId the DAP thread of the stop which the program resumes from.
+     * @param context  the suspend context which IntelliJ resumed the session from, or null to leave the session as it
+     *                 is when the debug adapter refuses.
+     * @return the future of the answer of the debug adapter, completed once a refusal is handled.
+     */
+    public CompletableFuture<ContinueResponse> continue_(int threadId, @Nullable XSuspendContext context) {
+        var server = debugProtocolServer;
+        if (server == null) {
             return CompletableFuture.completedFuture(null);
         }
         ContinueArguments args = new ContinueArguments();
         args.setThreadId(threadId);
-        singleThreadResumed = false;
-        reverseResumed = false;
-        beforeResuming(threadId, null);
-        return debugProtocolServer
-                .continue_(args);
+        return runForward(threadId, null, context, () -> server.continue_(args), "dap.stepping.continue.failed");
+    }
+
+    /**
+     * What a request of this client which resumes the program changed right before it was sent
+     * ({@link #beforeResuming(int, Boolean)}), which {@link #runForwardRefused} undoes when the debug adapter refuses
+     * the request.
+     *
+     * @param endedEpoch the execution epoch which ended.
+     * @param before     the run states of the threads before the request.
+     * @param resumed    the run states which show the threads that the request resumes as running.
+     */
+    private record Resuming(int endedEpoch, @NotNull DAPThreadRunStates before, @NotNull DAPThreadRunStates resumed) {
     }
 
     /**
@@ -1437,22 +1474,127 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
      * @param threadId     the DAP thread which the request resumes.
      * @param singleThread true if the request resumes only that thread ('singleThread'), and null if it resumes every
      *                     thread.
+     * @return what changed, which a refusal of the debug adapter undoes.
      */
-    private void beforeResuming(int threadId, @Nullable Boolean singleThread) {
-        executionEpoch.endBeforeResuming();
-        updateThreadRunStates(states -> states.resumed(threadId, singleThread != null));
+    private @NotNull Resuming beforeResuming(int threadId, @Nullable Boolean singleThread) {
+        int ended = executionEpoch.endBeforeResuming();
+        DAPThreadRunStates before;
+        DAPThreadRunStates resumed;
+        do {
+            before = threadRunStates.get();
+            resumed = before.resumed(threadId, singleThread != null);
+        } while (!threadRunStates.compareAndSet(before, resumed));
+        debugProcess.refreshThreadRunStates(this);
+        return new Resuming(ended, before, resumed);
+    }
+
+    /**
+     * Sends a request which runs the program forward from a stop, Resume Program or a step, which IntelliJ resumes the
+     * session for before it asks the debug process to: the session shows the program running while the request is
+     * sent. The execution epoch ends, and the threads which the request resumes show running, before it is sent
+     * ({@link #beforeResuming(int, Boolean)}). When the debug adapter refuses, the program is still stopped where it
+     * was, and {@link #runForwardRefused} suspends the session there again and says why.
+     *
+     * @param threadId     the DAP thread which the request resumes.
+     * @param singleThread the 'singleThread' of the request.
+     * @param context      the suspend context which IntelliJ resumed the session from, or null to leave the session as
+     *                     it is when the debug adapter refuses.
+     * @param request      sends the request.
+     * @param failedKey    the message which the console shows when the debug adapter refuses, with its reason.
+     * @param <T>          the type of the answer.
+     * @return the future of the answer of the debug adapter, completed once a refusal is handled.
+     */
+    private <T> CompletableFuture<T> runForward(int threadId,
+                                                @Nullable Boolean singleThread,
+                                                @Nullable XSuspendContext context,
+                                                @NotNull Supplier<CompletableFuture<T>> request,
+                                                @NotNull @PropertyKey(resourceBundle = DAPBundle.BUNDLE) String failedKey) {
+        singleThreadResumed = singleThread != null;
+        reverseResumed = false;
+        var resuming = beforeResuming(threadId, singleThread);
+        // Not async: a refusal is handled before the events which follow the answer, such as a 'stopped' event
+        return request.get().whenComplete((answer, error) -> {
+            if (error != null) {
+                runForwardRefused(resuming, context, getCause(error), failedKey);
+            }
+        });
+    }
+
+    /**
+     * Handles the refusal of the debug adapter to resume the program, with a request which
+     * {@link #beforeResuming(int, Boolean)} prepared: one which runs it forward, or the 'reverseContinue' which resumes
+     * it at a breakpoint which doesn't suspend once it ran backwards there. The program is still stopped where it was.
+     * The threads which the request resumed get the run states of the stop back, and the execution epoch of the stop is
+     * the current one again, so that the values of the stop can be set, unless a newer event changed them: the debug
+     * adapter said meanwhile that the program stopped, continued, or that a thread exited. A Step Back, Reverse
+     * Continue or Reset Frame which is still pending at the stop keeps its epoch ended until the debug adapter refuses
+     * it too ({@link DAPExecutionEpoch#resumeRefused(int)}). Unless the debug adapter said that the program stopped or
+     * continued, the session is suspended at the given suspend context, unless another stop suspended it meanwhile:
+     * again, as IntelliJ resumed it before it asked for the request, or for the first time at a breakpoint which doesn't
+     * suspend. The console first says why the debug adapter refused.
+     *
+     * @param resuming  what {@link #beforeResuming(int, Boolean)} changed before the request was sent.
+     * @param context   the suspend context where the program is still stopped, or null to leave the session as it is.
+     * @param error     the error which the debug adapter answered.
+     * @param failedKey the message which the console shows, with the reason of the debug adapter.
+     */
+    private void runForwardRefused(@NotNull Resuming resuming,
+                                   @Nullable XSuspendContext context,
+                                   @NotNull Throwable error,
+                                   @NotNull @PropertyKey(resourceBundle = DAPBundle.BUNDLE) String failedKey) {
+        debugProcess.print(DAPBundle.message(failedKey, error.getMessage()), ConsoleViewContentType.ERROR_OUTPUT);
+        updateThreadRunStates(states -> states.resumeRefused(resuming.before(), resuming.resumed()));
+        if (executionEpoch.resumeRefused(resuming.endedEpoch()) && context != null) {
+            // "Run to Cursor" ends at this stop, as at any other, rather than at a later one
+            debugProcess.getRunToCursorBreakpoint().stopped();
+            suspendAgain(getSession(), context);
+        }
+    }
+
+    /**
+     * Suspends the session at the given suspend context, where the program is still stopped since the debug adapter
+     * refused to resume it: IntelliJ resumes the session before it asks for Resume Program or a step, and doesn't
+     * suspend it at a breakpoint which doesn't suspend. Resume Program and the steps then work again, and the frames
+     * and values of the stop are shown. A session which ended, or which another stop suspended meanwhile, is left as it
+     * is.
+     *
+     * @param session the debug session.
+     * @param context the suspend context of the stop where the program is.
+     * @return true if the session is suspended at the given suspend context again, and false otherwise.
+     */
+    static boolean suspendAgain(@NotNull XDebugSession session, @NotNull XSuspendContext context) {
+        if (session.isStopped() || session.getSuspendContext() != null) {
+            return false;
+        }
+        session.positionReached(context);
+        return true;
     }
 
     public void next(int threadId, @Nullable SteppingGranularity granularity) {
+        next(threadId, granularity, null);
+    }
+
+    /**
+     * Steps over with 'next' in the given thread, which IntelliJ resumes the session for before it asks the debug
+     * process to. When the debug adapter refuses, the console says why, and the session is suspended again at the given
+     * suspend context, where the program is still stopped (see {@link #runForward}).
+     *
+     * @param threadId    the thread which steps.
+     * @param granularity the granularity of the step, or null for the DAP server's default.
+     * @param context     the suspend context which IntelliJ resumed the session from, or null to leave the session as
+     *                    it is when the debug adapter refuses.
+     * @return the future of the answer of the debug adapter, completed once a refusal is handled.
+     */
+    public CompletableFuture<Void> next(int threadId,
+                                        @Nullable SteppingGranularity granularity,
+                                        @Nullable XSuspendContext context) {
         var server = debugProtocolServer;
         if (server == null) {
-            return;
+            return CompletableFuture.completedFuture(null);
         }
         var singleThread = singleThreadStep();
-        singleThreadResumed = singleThread != null;
-        reverseResumed = false;
-        beforeResuming(threadId, singleThread);
-        next(server, threadId, granularity, singleThread);
+        return runForward(threadId, singleThread, context, () -> next(server, threadId, granularity, singleThread),
+                "dap.stepping.next.failed");
     }
 
     /**
@@ -1462,28 +1604,44 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
      * @param threadId     the thread which steps.
      * @param granularity  the granularity of the step, or null for the DAP server's default.
      * @param singleThread true to resume only the thread which steps, and null to resume every thread.
+     * @return the future of the answer of the DAP server.
      */
-    static void next(@NotNull IDebugProtocolServer server,
-                     int threadId,
-                     @Nullable SteppingGranularity granularity,
-                     @Nullable Boolean singleThread) {
+    static CompletableFuture<Void> next(@NotNull IDebugProtocolServer server,
+                                        int threadId,
+                                        @Nullable SteppingGranularity granularity,
+                                        @Nullable Boolean singleThread) {
         NextArguments args = new NextArguments();
         args.setThreadId(threadId);
         args.setGranularity(granularity);
         args.setSingleThread(singleThread);
-        server.next(args);
+        return server.next(args);
     }
 
     public void stepOut(int threadId, SteppingGranularity granularity) {
+        stepOut(threadId, granularity, null);
+    }
+
+    /**
+     * Steps out with 'stepOut' in the given thread, which IntelliJ resumes the session for before it asks the debug
+     * process to. When the debug adapter refuses, the console says why, and the session is suspended again at the given
+     * suspend context, where the program is still stopped (see {@link #runForward}).
+     *
+     * @param threadId    the thread which steps.
+     * @param granularity the granularity of the step, or null for the DAP server's default.
+     * @param context     the suspend context which IntelliJ resumed the session from, or null to leave the session as
+     *                    it is when the debug adapter refuses.
+     * @return the future of the answer of the debug adapter, completed once a refusal is handled.
+     */
+    public CompletableFuture<Void> stepOut(int threadId,
+                                           @Nullable SteppingGranularity granularity,
+                                           @Nullable XSuspendContext context) {
         var server = debugProtocolServer;
         if (server == null) {
-            return;
+            return CompletableFuture.completedFuture(null);
         }
         var singleThread = singleThreadStep();
-        singleThreadResumed = singleThread != null;
-        reverseResumed = false;
-        beforeResuming(threadId, singleThread);
-        stepOut(server, threadId, granularity, singleThread);
+        return runForward(threadId, singleThread, context, () -> stepOut(server, threadId, granularity, singleThread),
+                "dap.stepping.stepOut.failed");
     }
 
     /**
@@ -1493,16 +1651,17 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
      * @param threadId     the thread which steps.
      * @param granularity  the granularity of the step, or null for the DAP server's default.
      * @param singleThread true to resume only the thread which steps, and null to resume every thread.
+     * @return the future of the answer of the DAP server.
      */
-    static void stepOut(@NotNull IDebugProtocolServer server,
-                        int threadId,
-                        @Nullable SteppingGranularity granularity,
-                        @Nullable Boolean singleThread) {
+    static CompletableFuture<Void> stepOut(@NotNull IDebugProtocolServer server,
+                                           int threadId,
+                                           @Nullable SteppingGranularity granularity,
+                                           @Nullable Boolean singleThread) {
         StepOutArguments args = new StepOutArguments();
         args.setThreadId(threadId);
         args.setGranularity(granularity);
         args.setSingleThread(singleThread);
-        server.stepOut(args);
+        return server.stepOut(args);
     }
 
     public void stepIn(int threadId, SteppingGranularity granularity) {
@@ -1510,15 +1669,33 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
     }
 
     public void stepIn(int threadId, @Nullable Integer targetId, @Nullable SteppingGranularity granularity) {
+        stepIn(threadId, targetId, granularity, null);
+    }
+
+    /**
+     * Steps into with 'stepIn' in the given thread, as Step Into does, or Smart Step Into with a target, which IntelliJ
+     * resumes the session for before it asks the debug process to. When the debug adapter refuses, the console says
+     * why, and the session is suspended again at the given suspend context, where the program is still stopped (see
+     * {@link #runForward}).
+     *
+     * @param threadId    the thread which steps.
+     * @param targetId    the target to step into, from 'stepInTargets', or null.
+     * @param granularity the granularity of the step, or null for the DAP server's default.
+     * @param context     the suspend context which IntelliJ resumed the session from, or null to leave the session as
+     *                    it is when the debug adapter refuses.
+     * @return the future of the answer of the debug adapter, completed once a refusal is handled.
+     */
+    public CompletableFuture<Void> stepIn(int threadId,
+                                          @Nullable Integer targetId,
+                                          @Nullable SteppingGranularity granularity,
+                                          @Nullable XSuspendContext context) {
         var server = debugProtocolServer;
         if (server == null) {
-            return;
+            return CompletableFuture.completedFuture(null);
         }
         var singleThread = singleThreadStep();
-        singleThreadResumed = singleThread != null;
-        reverseResumed = false;
-        beforeResuming(threadId, singleThread);
-        stepIn(server, threadId, targetId, granularity, singleThread);
+        return runForward(threadId, singleThread, context,
+                () -> stepIn(server, threadId, targetId, granularity, singleThread), "dap.stepping.stepIn.failed");
     }
 
     /**
@@ -1529,18 +1706,19 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
      * @param targetId     the target to step into, from 'stepInTargets', or null.
      * @param granularity  the granularity of the step, or null for the DAP server's default.
      * @param singleThread true to resume only the thread which steps, and null to resume every thread.
+     * @return the future of the answer of the DAP server.
      */
-    static void stepIn(@NotNull IDebugProtocolServer server,
-                       int threadId,
-                       @Nullable Integer targetId,
-                       @Nullable SteppingGranularity granularity,
-                       @Nullable Boolean singleThread) {
+    static CompletableFuture<Void> stepIn(@NotNull IDebugProtocolServer server,
+                                          int threadId,
+                                          @Nullable Integer targetId,
+                                          @Nullable SteppingGranularity granularity,
+                                          @Nullable Boolean singleThread) {
         StepInArguments args = new StepInArguments();
         args.setThreadId(threadId);
         args.setTargetId(targetId);
         args.setGranularity(granularity);
         args.setSingleThread(singleThread);
-        server.stepIn(args);
+        return server.stepIn(args);
     }
 
     /**
