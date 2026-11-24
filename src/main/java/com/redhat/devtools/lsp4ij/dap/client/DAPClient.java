@@ -38,6 +38,7 @@ import com.redhat.devtools.lsp4ij.dap.TransportStreams;
 import com.redhat.devtools.lsp4ij.dap.breakpoints.BreakpointInternalSupport;
 import com.redhat.devtools.lsp4ij.dap.breakpoints.DAPDataBreakpointHandler;
 import com.redhat.devtools.lsp4ij.dap.client.variables.DAPValueFormat;
+import com.redhat.devtools.lsp4ij.dap.console.DAPOutputDecoder;
 import com.redhat.devtools.lsp4ij.dap.descriptors.DebugAdapterDescriptor;
 import com.redhat.devtools.lsp4ij.dap.disassembly.DisassemblyFile;
 import com.redhat.devtools.lsp4ij.dap.runInTerminal.RunInTerminalManager;
@@ -179,6 +180,9 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
     private volatile @Nullable ProcessEventArguments processEvent;
     // The groups of the 'output' events of the DAP server, which the console indents
     private final DAPOutputGroups outputGroups = new DAPOutputGroups();
+    // Decodes the ANSI escape sequences of the 'output' events of this session, whose styles continue from one event
+    // to the next of the same category
+    private final DAPOutputDecoder outputDecoder = new DAPOutputDecoder();
 
     public DAPClient(@NotNull DAPDebugProcess debugProcess,
                      @NotNull Map<String, Object> dapParameters,
@@ -607,7 +611,8 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
             LOGGER.debug("Telemetry of the DAP server: {}", args.getOutput());
             return;
         }
-        debugProcess.printOutput(outputGroups.indent(args), getContentType(args.getCategory()));
+        // The groups indent the lines, whose ANSI escape sequences are then decoded
+        debugProcess.printOutput(outputDecoder.decode(outputGroups.indent(args), args.getCategory()));
     }
 
     /**
@@ -619,20 +624,6 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
      */
     static boolean isTelemetry(@NotNull OutputEventArguments args) {
         return OutputEventArgumentsCategory.TELEMETRY.equals(args.getCategory());
-    }
-
-    private static ConsoleViewContentType getContentType(String category) {
-        if (category != null) {
-            switch (category) {
-                case OutputEventArgumentsCategory.STDERR:
-                    return ConsoleViewContentType.LOG_ERROR_OUTPUT;
-                case OutputEventArgumentsCategory.IMPORTANT:
-                    return ConsoleViewContentType.LOG_VERBOSE_OUTPUT;
-                default:
-                    return ConsoleViewContentType.LOG_INFO_OUTPUT;
-            }
-        }
-        return ConsoleViewContentType.LOG_INFO_OUTPUT;
     }
 
     @Override

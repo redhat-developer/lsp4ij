@@ -65,6 +65,7 @@ import com.redhat.devtools.lsp4ij.dap.client.files.DAPSourceReferencePosition;
 import com.redhat.devtools.lsp4ij.dap.client.variables.DAPValueFormat;
 import com.redhat.devtools.lsp4ij.dap.configurations.DAPCommandLineState;
 import com.redhat.devtools.lsp4ij.dap.console.DAPConsoleView;
+import com.redhat.devtools.lsp4ij.dap.console.DAPOutputDecoder;
 import com.redhat.devtools.lsp4ij.dap.definitions.userdefined.UserDefinedDebugAdapterServerDefinition;
 import com.redhat.devtools.lsp4ij.dap.descriptors.DebugAdapterDescriptor;
 import com.redhat.devtools.lsp4ij.dap.disassembly.DAPAlternativeSourceHandler;
@@ -97,6 +98,7 @@ import org.jetbrains.annotations.Nullable;
 import javax.swing.*;
 import java.io.IOException;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
@@ -589,6 +591,19 @@ public class DAPDebugProcess extends XDebugProcess implements Disposable {
      */
     public void printOutput(@Nullable String output, @NotNull ConsoleViewContentType type) {
         printText(output, type, false, false);
+    }
+
+    /**
+     * Prints the output of a DAP 'output' event to the debug console, which {@link DAPOutputDecoder} decoded into
+     * chunks with the console content type of each, such as the colours of its ANSI escape sequences. The chunks are
+     * printed together, so that no other text of the console comes between them.
+     *
+     * @param chunks the chunks of the output.
+     */
+    public void printOutput(@NotNull List<DAPOutputDecoder.Chunk> chunks) {
+        synchronized (consoleLock) {
+            chunks.forEach(chunk -> printOutput(chunk.text(), chunk.contentType()));
+        }
     }
 
     /**

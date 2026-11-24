@@ -247,6 +247,8 @@ public abstract class DebugAdapterDescriptor implements DebuggableFile {
         args.setSupportsStartDebuggingRequest(true);
         args.setSupportsRunInTerminalRequest(true);
         args.setSupportsInvalidatedEvent(true);
+        // The debug console decodes the ANSI escape sequences of the output (DAPOutputDecoder)
+        args.setSupportsANSIStyling(true);
         return args;
     }
 
