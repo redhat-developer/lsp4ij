@@ -30,6 +30,8 @@ import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.logging.Level;
+
 /**
  * Manages the installation of Language Servers(LSP) and Debug Adapter Protocol (DAP) servers
  * for a given IntelliJ project.
@@ -138,6 +140,7 @@ public class ServerInstallerManager extends InstallerTaskRegistry implements Dis
                         @NotNull InstallerContext context) {
         final var serverInstallerDescriptor = loadInstaller(installerConfigurationContent);
         String installerName = serverInstallerDescriptor.getName();
+        context.setInstallerName(installerName);
         if (!hasTaskToExecute(serverInstallerDescriptor, context.getAction())) {
             // Else the installation would do nothing, and report that it completed successfully (#1229)
             notifyNothingToExecute(installerName, context);
@@ -198,6 +201,12 @@ public class ServerInstallerManager extends InstallerTaskRegistry implements Dis
 
     public boolean install(@NotNull ServerInstallerDescriptor installerDescriptor,
                            @NotNull InstallerContext context) {
+        context.setInstallerName(installerDescriptor.getName());
+        context.log(Level.INFO, switch (context.getAction()) {
+            case CHECK -> "checking the installation";
+            case RUN -> "running the installation";
+            case CHECK_AND_RUN -> "checking and running the installation";
+        });
         var commandUpdater = context.getCommandLineUpdater();
         if (commandUpdater != null) {
             context.putProperty("server.command", commandUpdater.getCommandLine());
@@ -234,6 +243,10 @@ public class ServerInstallerManager extends InstallerTaskRegistry implements Dis
         }
 
         boolean hasError = (checkResult != null && !checkResult) || (checkRun != null && !checkRun);
+        // How the installation ended, as its notification says, for the log
+        context.log(Level.INFO, context.getAction() == InstallerContext.InstallerAction.CHECK
+                ? (hasError ? "the check failed" : "the check passed")
+                : (hasError ? "the installation failed" : "the installation completed successfully"));
         if (context.isShowNotification()) {
             Notification notification = getNotification(installerDescriptor.getName(), context, hasError);
             Notifications.Bus.notify(notification, context.getProject());

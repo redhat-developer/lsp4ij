@@ -28,6 +28,7 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.logging.Level;
 import java.util.regex.Pattern;
 
 import static com.redhat.devtools.lsp4ij.installation.download.GitHubAssetFetcherTest.RELEASES_PATH;
@@ -255,14 +256,16 @@ public class GitHubDownloadTaskTest {
         }
 
         @Override
-        public void print(@Nullable String message, @NotNull ConsoleViewContentType contentType) {
+        public void print(@Nullable String message,
+                          @NotNull ConsoleViewContentType contentType,
+                          @NotNull Level logLevel) {
             if (message != null) {
                 output.add(message);
                 if (contentType == ConsoleViewContentType.ERROR_OUTPUT) {
                     errors.add(message);
                 }
             }
-            super.print(message, contentType);
+            super.print(message, contentType, logLevel);
         }
 
         @NotNull String output() {

@@ -12,6 +12,7 @@ package com.redhat.devtools.lsp4ij.installation.definition.tasks;
 
 import com.intellij.execution.configurations.GeneralCommandLine;
 import com.intellij.execution.process.*;
+import com.intellij.execution.ui.ConsoleViewContentType;
 import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.project.ProjectUtil;
@@ -44,6 +45,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.logging.Level;
 
 /**
  * <pre>
@@ -262,11 +264,11 @@ public class ExecTask extends InstallerTask {
             handler.addProcessListener(new ProcessListener() {
                 @Override
                 public void onTextAvailable(@NotNull ProcessEvent event, @NotNull Key outputType) {
-                    if (outputType == ProcessOutputType.STDERR) {
-                        context.printError(event.getText());
-                    } else {
-                        context.print(event.getText());
-                    }
+                    // The output of the command, which can be long, as that of npm install, is logged at DEBUG only,
+                    // its standard error too, where commands also write their warnings
+                    context.print(event.getText(), outputType == ProcessOutputType.STDERR
+                            ? ConsoleViewContentType.ERROR_OUTPUT
+                            : ConsoleViewContentType.NORMAL_OUTPUT, Level.FINE);
                 }
             });
 

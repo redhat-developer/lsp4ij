@@ -14,6 +14,7 @@ import com.intellij.execution.ui.ConsoleViewContentType;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.logging.Level;
 
 /**
  * Base class for installer task.
@@ -62,7 +63,10 @@ public abstract class InstallerTask {
         // Display step name.
         String message = "\n- Step: " + getName();
         context.print(message, ConsoleViewContentType.LOG_INFO_OUTPUT);
-        if(run(context)) {
+        boolean succeeded = run(context);
+        // For the log only, which has no other line that says how the step ended
+        context.log(Level.INFO, "the step '" + getName() + "' " + (succeeded ? "succeeded" : "failed"));
+        if (succeeded) {
             if (onSuccess != null) {
                 return onSuccess.execute(context);
             }
