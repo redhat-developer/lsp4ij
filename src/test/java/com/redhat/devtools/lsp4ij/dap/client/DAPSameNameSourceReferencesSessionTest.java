@@ -181,9 +181,18 @@ public class DAPSameNameSourceReferencesSessionTest extends HeavyPlatformTestCas
         // The tab of the frame keeps the text of its source: the jump opened another one
         assertEquals("The text of the current frame's source", FIRST, document(firstFile).getText());
         assertNotSame(firstFile, declaration.getFile());
-        // and Show Execution Point shows the frame in it, at its line
+        // and Show Execution Point, once the user selected another frame, shows the frame in it, at its line. The
+        // action makes the frame of the execution point the current one again, and the IDE opens the session's current
+        // position: the test opens it, as the session isn't the current one in tests, but selects no frame itself
+        session.setCurrentStackFrame(stack, framesOf(stack).get(1), false);
         session.showExecutionPoint();
-        var executionPointEditor = show(stack, first, true, FIRST, FIRST_LINE);
+        PlatformTestUtil.waitWithEventsDispatching(() -> "Show Execution Point didn't make the first frame the current "
+                        + "one, the current frame is " + session.getCurrentStackFrame(),
+                () -> session.getCurrentStackFrame() == first, BOUND_SECONDS);
+        var executionPoint = session.getCurrentPosition();
+        assertNotNull(executionPoint);
+        executionPoint.createNavigatable(getProject()).navigate(true);
+        var executionPointEditor = waitForEditor(firstFile, FIRST, FIRST_LINE);
         assertEquals(firstFile, fileOf(executionPointEditor));
         assertTrue(textAtCaret(executionPointEditor).startsWith("var first = 1;"));
     }
