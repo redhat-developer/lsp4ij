@@ -177,6 +177,8 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
     private volatile boolean singleThreadResumed;
     // The last 'process' event of the DAP server, which describes the process it debugs, or null until it sends one
     private volatile @Nullable ProcessEventArguments processEvent;
+    // The groups of the 'output' events of the DAP server, which the console indents
+    private final DAPOutputGroups outputGroups = new DAPOutputGroups();
 
     public DAPClient(@NotNull DAPDebugProcess debugProcess,
                      @NotNull Map<String, Object> dapParameters,
@@ -605,7 +607,7 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
             LOGGER.debug("Telemetry of the DAP server: {}", args.getOutput());
             return;
         }
-        debugProcess.printOutput(args.getOutput(), getContentType(args.getCategory()));
+        debugProcess.printOutput(outputGroups.indent(args), getContentType(args.getCategory()));
     }
 
     /**
