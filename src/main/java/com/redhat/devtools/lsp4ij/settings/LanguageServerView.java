@@ -25,7 +25,7 @@ import com.intellij.openapi.ui.ValidationInfo;
 import com.intellij.openapi.util.Disposer;
 import com.intellij.openapi.util.text.HtmlBuilder;
 import com.intellij.openapi.util.text.HtmlChunk;
-import com.intellij.ui.IdeBorderFactory;
+import com.intellij.ui.components.JBLabel;
 import com.intellij.util.ui.FormBuilder;
 import com.intellij.util.ui.JBUI;
 import com.redhat.devtools.lsp4ij.settings.ui.DescriptionPanel;
@@ -47,7 +47,6 @@ import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.TestOnly;
 
 import javax.swing.*;
-import javax.swing.border.TitledBorder;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -85,12 +84,28 @@ public class LanguageServerView implements Disposable {
         JComponent descriptionPanel = DescriptionPanel.create(languageServerDefinition.getDescription());
         JPanel settingsPanel = createSettings(descriptionPanel, isLaunchConfiguration);
         if (!isLaunchConfiguration) {
-            TitledBorder title = IdeBorderFactory.createTitledBorder(languageServerDefinition.getDisplayName());
-            settingsPanel.setBorder(title);
+            settingsPanel = JBUI.Panels.simplePanel(settingsPanel)
+                    .addToTop(createHeader(languageServerDefinition.getDisplayName()));
         }
         JPanel wrapper = JBUI.Panels.simplePanel(settingsPanel);
         wrapper.setBorder(JBUI.Borders.emptyLeft(10));
         this.myMainPanel = wrapper;
+    }
+
+    /**
+     * Creates the header which names the language server above its settings: a label in the font of the IDE, which
+     * shortens the name with an ellipsis when the view is narrower than it, and shows all of it in its tooltip.
+     *
+     * @param displayName the name of the language server.
+     * @return the header.
+     */
+    private static @NotNull JBLabel createHeader(@NotNull String displayName) {
+        JBLabel header = new JBLabel(displayName);
+        header.setToolTipText(displayName);
+        header.setBorder(JBUI.Borders.empty(4, 0));
+        // The header takes the width of the view, and doesn't keep the view from being narrower than the name
+        header.setMinimumSize(JBUI.emptySize());
+        return header;
     }
 
     static boolean isEquals(String s1, String s2) {
