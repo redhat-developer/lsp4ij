@@ -237,7 +237,12 @@ public class LSPCompletionFeature extends AbstractLSPDocumentFeature {
 
         // Compute the prefix
         var textEditRange = ((LSPCompletionProposal) lookupItem).getTextEditRange();
-        String prefix = textEditRange != null ? completionPrefix.getPrefixFor(textEditRange, item) : null;
+        String prefix = textEditRange != null ?
+                completionPrefix.getPrefixFor(textEditRange, item) :
+                // An item without a text edit completes the text before the caret that it starts with, which the prefix
+                // that IntelliJ computes from the PSI isn't when it spans a whole comment that a custom PSI keeps as one
+                // token (#447)
+                completionPrefix.getWordPrefix(result.getPrefixMatcher().getPrefix(), item);
         if (prefix != null) {
             // Add the IJ completion item (lookup item) by using the computed prefix respecting the language's case-sensitivity
             if (caseSensitive) {
