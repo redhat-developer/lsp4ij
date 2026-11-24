@@ -27,6 +27,7 @@ import com.intellij.openapi.util.NlsContexts;
 import com.intellij.ui.ContextHelpLabel;
 import com.intellij.ui.HyperlinkLabel;
 import com.intellij.ui.PortField;
+import com.intellij.ui.ScrollPaneFactory;
 import com.intellij.ui.components.JBCheckBox;
 import com.intellij.ui.components.JBLabel;
 import com.intellij.ui.components.JBScrollPane;
@@ -151,10 +152,14 @@ public class LanguageServerPanel implements Disposable {
         var tabPanel = new BorderLayoutPanel();
         if (addToTop) {
             tabPanel.addToTop(builder.getPanel());
+            // A tab of fields scrolls when they don't fit, at a large font or in a small LSP console
+            tabbedPane.add(tabTitle, ScrollPaneFactory.createScrollPane(tabPanel, true));
         } else {
+            // A tab whose content fills it, such as a JSON editor, which scrolls itself, is not put in a scroll pane:
+            // a scroll pane around a JSON editor breaks its keyboard navigation (#655)
             tabPanel.addToCenter(builder.getPanel());
+            tabbedPane.add(tabTitle, tabPanel);
         }
-        tabbedPane.add(tabTitle, tabPanel);
         return builder;
     }
 
