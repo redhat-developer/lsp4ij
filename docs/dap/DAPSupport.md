@@ -16,7 +16,7 @@ Current state of [Events](https://microsoft.github.io/debug-adapter-protocol//sp
 * ✅ [LoadedSource](https://microsoft.github.io/debug-adapter-protocol//specification.html#Events_LoadedSource).
 * ❌ [Memory](https://microsoft.github.io/debug-adapter-protocol//specification.html#Events_Memory).
 * ✅ [Module](https://microsoft.github.io/debug-adapter-protocol//specification.html#Events_Module).
-* ✅ [Output](https://microsoft.github.io/debug-adapter-protocol//specification.html#Events_Output).
+* ✅ [Output](https://microsoft.github.io/debug-adapter-protocol//specification.html#Events_Output): the debug console shows the output, except that of the category `telemetry`, which DAP sends to telemetry instead of the client. LSP4IJ logs it at DEBUG.
 * ✅ [Process](https://microsoft.github.io/debug-adapter-protocol//specification.html#Events_Process): the console shows which process the debug adapter debugs, with its PID and how it was started when the event gives them, such as `Debugging process '/path/app' (PID 1234, launched)`; the line of a child session started with `startDebugging` names that session (see [user guide](./UserGuide.md#debugged-process)).
 * ❌ [ProgressEnd](https://microsoft.github.io/debug-adapter-protocol//specification.html#Events_ProgressEnd).
 * ❌ [ProgressStart](https://microsoft.github.io/debug-adapter-protocol//specification.html#Events_ProgressStart).
