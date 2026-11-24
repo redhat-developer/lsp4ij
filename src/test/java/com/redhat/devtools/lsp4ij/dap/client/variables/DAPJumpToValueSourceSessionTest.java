@@ -98,6 +98,7 @@ import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.IntStream;
 
 /**
@@ -488,20 +489,31 @@ public class DAPJumpToValueSourceSessionTest extends HeavyPlatformTestCase {
          * @return the future of the location reference of the next 'locations' request.
          */
         CompletableFuture<Integer> nextLocation() {
-            return CompletableFuture.supplyAsync(() -> take(locations));
+            return CompletableFuture.supplyAsync(() -> take(locations, "locations"));
         }
 
         /**
          * @return the future of the source reference of the next 'source' request.
          */
         CompletableFuture<Integer> nextSource() {
-            return CompletableFuture.supplyAsync(() -> take(sources));
+            return CompletableFuture.supplyAsync(() -> take(sources, "source"));
         }
 
-        private static int take(@NotNull LinkedBlockingQueue<Integer> queue) {
+        /**
+         * Returns the reference of the next request of the given queue, waiting at most as long as the test, so that a
+         * request which never comes fails the future, and frees the thread which waits for it.
+         */
+        private static int take(@NotNull LinkedBlockingQueue<Integer> queue, @NotNull String request) {
             try {
-                return queue.take();
+                Integer reference = queue.poll(BOUND_SECONDS, TimeUnit.SECONDS);
+                if (reference == null) {
+                    throw new AssertionError("The DAP server received no '" + request + "' request within "
+                            + BOUND_SECONDS + " seconds");
+                }
+                return reference;
             } catch (InterruptedException e) {
+                // java.lang's: the Thread of this class is the DAP one
+                java.lang.Thread.currentThread().interrupt();
                 throw new IllegalStateException(e);
             }
         }
