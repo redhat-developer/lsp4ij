@@ -27,6 +27,8 @@ public class DAPSuspendContext extends XSuspendContext {
 
     private final @NotNull DAPClient client;
     private final int executionEpoch;
+    // The DAP thread which stopped, which the selection of another thread in the Frames view doesn't change
+    private final @Nullable Integer stoppedThreadId;
     private final List<DAPExecutionStack> myExecutionStacks = new LinkedList<>();
     private @Nullable DAPExecutionStack myActiveStack;
 
@@ -39,8 +41,18 @@ public class DAPSuspendContext extends XSuspendContext {
      * @param executionEpoch the execution epoch of the stop of the program which this context describes.
      */
     public DAPSuspendContext(@NotNull DAPClient client, int executionEpoch) {
+        this(client, executionEpoch, null);
+    }
+
+    /**
+     * @param client          the client of the debug adapter.
+     * @param executionEpoch  the execution epoch of the stop of the program which this context describes.
+     * @param stoppedThreadId the DAP thread which stopped, or null if it isn't known.
+     */
+    DAPSuspendContext(@NotNull DAPClient client, int executionEpoch, @Nullable Integer stoppedThreadId) {
         this.client = client;
         this.executionEpoch = executionEpoch;
+        this.stoppedThreadId = stoppedThreadId;
     }
 
     public void addToExecutionStack(@NotNull Thread thread, @Nullable StackFrame[] stackFrames) {
@@ -83,5 +95,15 @@ public class DAPSuspendContext extends XSuspendContext {
 
     public Integer getThreadId() {
         return myActiveStack != null ? myActiveStack.getThreadId() : null;
+    }
+
+    /**
+     * Returns the DAP thread which stopped at this suspend context. Unlike {@link #getThreadId()}, the thread of the
+     * active stack, it doesn't change when the Frames view selects another thread.
+     *
+     * @return the DAP thread which stopped at this suspend context, or null if it isn't known.
+     */
+    @Nullable Integer getStoppedThreadId() {
+        return stoppedThreadId;
     }
 }

@@ -825,7 +825,7 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
                                                            org.eclipse.lsp4j.debug.Thread[] threads,
                                                            org.eclipse.lsp4j.debug.Thread stoppedThread,
                                                            StackFrame[] frames) {
-        var context = new DAPSuspendContext(this, stopEpoch);
+        var context = new DAPSuspendContext(this, stopEpoch, stoppedThread.getId());
         for (var thread : threads) {
             context.addToExecutionStack(thread, thread.equals(stoppedThread) ? frames : null);
         }
@@ -1619,6 +1619,71 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
     public void continued(ContinuedEventArguments args) {
         // The program runs: the references of the frames of its last stop are out of date
         executionEpoch.end();
+        continued(getSession(), args, this::getStoppedThreadId, () -> getThreads(true));
+    }
+
+    /**
+     * Shows the program as running when the debug adapter says that it continued, as after a step typed in the Debug
+     * console, which no request of the session caused. The session resumes when it is suspended at a stop of the
+     * client which received the event, and the event continued the thread of that stop. A 'continued' event of another
+     * thread ({@code allThreadsContinued: false}) leaves the session suspended, and shows the threads again.
+     * <p>
+     * The debug adapter isn't asked to resume the program: {@link XDebugSession#sessionResumed()} only clears the views
+     * of the stop, and does nothing when the session isn't suspended, as after a resume or a step of the session itself.
+     *
+     * @param session        the debug session.
+     * @param args           the 'continued' event.
+     * @param stoppedThread  returns the DAP thread which stopped at a suspend context of the client which received the
+     *                       event, and null for no suspend context or one of another client, such as the stop of
+     *                       another session of a tree ('startDebugging').
+     * @param refreshThreads shows the threads of the client again.
+     * @return true if the session resumed and false otherwise.
+     */
+    static boolean continued(@NotNull XDebugSession session,
+                             @NotNull ContinuedEventArguments args,
+                             @NotNull Function<@Nullable XSuspendContext, @Nullable Integer> stoppedThread,
+                             @NotNull Runnable refreshThreads) {
+        if (!session.isSuspended()) {
+            return false;
+        }
+        Integer threadId = stoppedThread.apply(session.getSuspendContext());
+        if (threadId == null) {
+            // The session shows a stop of another client, which this event doesn't continue
+            return false;
+        }
+        if (continues(args, threadId)) {
+            session.sessionResumed();
+            return true;
+        }
+        // Another thread continued, and the thread where the session is suspended stays stopped
+        refreshThreads.run();
+        return false;
+    }
+
+    /**
+     * Returns whether the given 'continued' event continued the given thread: it continued all threads, unless it says
+     * that only its own thread continued ({@code allThreadsContinued: false}).
+     *
+     * @param args     the 'continued' event.
+     * @param threadId the DAP thread.
+     * @return true if the event continued the thread and false otherwise.
+     */
+    static boolean continues(@NotNull ContinuedEventArguments args, int threadId) {
+        return !Boolean.FALSE.equals(args.getAllThreadsContinued()) || args.getThreadId() == threadId;
+    }
+
+    /**
+     * Returns the DAP thread which stopped at the given suspend context, when it is a suspend context of this client.
+     *
+     * @param context the suspend context of the session, or null.
+     * @return the DAP thread which stopped at the given suspend context, and null when it is not a suspend context of
+     * this client.
+     */
+    private @Nullable Integer getStoppedThreadId(@Nullable XSuspendContext context) {
+        // The thread which stopped, not the one which the Frames view selects
+        return context instanceof DAPSuspendContext dapContext && dapContext.getClient() == this
+                ? dapContext.getStoppedThreadId()
+                : null;
     }
 
     @Override
