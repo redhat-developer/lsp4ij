@@ -338,7 +338,9 @@ server's [stopped](https://microsoft.github.io/debug-adapter-protocol//specifica
 session's resumes and steps say. When the DAP server stops a thread without `allThreadsStopped`, the other threads
 stay as they were, running until it says otherwise, as in VS Code. When a thread other than the one where the session
 is suspended continues alone (`allThreadsContinued: false`), the session stays suspended, and the `Frames` view shows
-`Frames not available: the thread is running` for that thread instead of the frames of its stop.
+`Frames not available: the thread is running` for that thread instead of the frames of its stop. When that thread was
+selected, the selection moves to the top frame of the thread where the session is suspended, which the `Variables`
+view, the execution point, `Step` and `Resume` then follow.
 
 ## Reset Frame
 

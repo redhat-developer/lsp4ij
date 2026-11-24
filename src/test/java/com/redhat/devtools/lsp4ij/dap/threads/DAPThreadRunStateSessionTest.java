@@ -36,6 +36,7 @@ import org.eclipse.lsp4j.debug.ContinueResponse;
 import org.eclipse.lsp4j.debug.ContinuedEventArguments;
 import org.eclipse.lsp4j.debug.DisconnectArguments;
 import org.eclipse.lsp4j.debug.InitializeRequestArguments;
+import org.eclipse.lsp4j.debug.NextArguments;
 import org.eclipse.lsp4j.debug.Scope;
 import org.eclipse.lsp4j.debug.ScopesArguments;
 import org.eclipse.lsp4j.debug.ScopesResponse;
@@ -78,7 +79,8 @@ import java.util.stream.Stream;
  * server in the test's process which the session attaches to. Its program has the threads 'main' and 'worker'; 'main'
  * stops, and the DAP server says that all threads stopped. When 'worker' then continues alone
  * ({@code allThreadsContinued: false}), the Threads tab shows it running and 'main' stopped, the Frames view no longer
- * shows the frames of the worker's stop, and the session stays suspended where 'main' stopped.
+ * shows the frames of the worker's stop, and the session stays suspended where 'main' stopped. When the worker was
+ * selected, the selection moves to where 'main' stopped, and a step steps 'main'.
  */
 public class DAPThreadRunStateSessionTest extends HeavyPlatformTestCase {
 
@@ -89,10 +91,12 @@ public class DAPThreadRunStateSessionTest extends HeavyPlatformTestCase {
     private static final int MAIN = 1;
     private static final int WORKER = 2;
     /**
-     * The frame where 'main' stopped, and the frame of 'worker' at that stop.
+     * The frame where 'main' stopped, the frame of 'worker' at that stop, and the frame of 'main' which called the one
+     * where it stopped.
      */
     private static final int MAIN_FRAME = 11;
     private static final int WORKER_FRAME = 12;
+    private static final int MAIN_CALLER_FRAME = 13;
 
     private RunStateServer server;
     private XDebugSession session;
@@ -145,7 +149,7 @@ public class DAPThreadRunStateSessionTest extends HeavyPlatformTestCase {
         // The views of the stop are built again: the Frames view asks again for the frames of the stack which it shows,
         // and forgets those which it kept of the others
         assertTrue("The views of the stop are built again", settingsChanged.get() > 0);
-        assertEquals(List.of(MAIN_FRAME), frameIdsOf(framesOf(getStack("main"))));
+        assertEquals(List.of(MAIN_FRAME, MAIN_CALLER_FRAME), frameIdsOf(framesOf(getStack("main"))));
         assertTrue("The session stays suspended where 'main' stopped", session.isSuspended());
         assertEquals(MAIN_FRAME, currentFrameId());
 
@@ -173,8 +177,44 @@ public class DAPThreadRunStateSessionTest extends HeavyPlatformTestCase {
         var workerFrames = framesOf(worker);
         assertEquals("The frames of the worker, which exited", List.of(), workerFrames.frames());
         assertEquals("Frames not available: the thread has exited", workerFrames.error());
-        assertEquals(List.of(MAIN_FRAME), frameIdsOf(framesOf(getStack("main"))));
+        assertEquals(List.of(MAIN_FRAME, MAIN_CALLER_FRAME), frameIdsOf(framesOf(getStack("main"))));
         assertTrue("The session stays suspended where 'main' stopped", session.isSuspended());
+    }
+
+    public void testTheSelectionMovesToWhereTheSessionStaysSuspendedWhenTheSelectedThreadContinuesAlone() throws Exception {
+        debug();
+        var worker = getStack("worker");
+        var workerFrame = select(worker, 0);
+        assertEquals("Step and Resume act on the worker, which is selected", Integer.valueOf(WORKER), getSuspendContext().getThreadId());
+
+        server.continued(WORKER, false);
+
+        // The current frame is no longer the frame of the worker's stop, but the top frame of 'main', where the session
+        // stays suspended
+        PlatformTestUtil.waitWithEventsDispatching(
+                () -> "the current frame moves to the top frame of 'main', but it is the frame " + currentFrameId(),
+                () -> session.getCurrentStackFrame() != workerFrame && currentFrameId() == MAIN_FRAME, BOUND_SECONDS);
+        var main = getStack("main");
+        assertSame("The current frame", main.getTopFrame(), session.getCurrentStackFrame());
+        assertTrue("The session stays suspended where 'main' stopped", session.isSuspended());
+        assertEquals("Step and Resume act on 'main'", Integer.valueOf(MAIN), getSuspendContext().getThreadId());
+
+        session.stepOver(false);
+        assertEquals("The thread which steps", MAIN, nextThreadId());
+    }
+
+    public void testTheSelectionStaysWhenAThreadWhichIsNotSelectedContinuesAlone() throws Exception {
+        debug();
+        // The frame of 'main' which called the one where it stopped, which isn't the frame where the session is suspended
+        var callerFrame = select(getStack("main"), 1);
+
+        server.continued(WORKER, false);
+        server.waitUntilHandled();
+
+        assertSame("The current frame", callerFrame, session.getCurrentStackFrame());
+        assertTrue("The session stays suspended where 'main' stopped", session.isSuspended());
+        session.stepOver(false);
+        assertEquals("The thread which steps", MAIN, nextThreadId());
     }
 
     public void testTheThreadsTabShowsTheThreadsRunningOnceTheSessionResumesAndAThreadWhichExited() throws Exception {
@@ -223,6 +263,37 @@ public class DAPThreadRunStateSessionTest extends HeavyPlatformTestCase {
                     && getTable().getRowCount() == 2;
         }, BOUND_SECONDS);
         server.waitUntilHandled();
+    }
+
+    private @NotNull DAPSuspendContext getSuspendContext() {
+        return assertInstanceOf(session.getSuspendContext(), DAPSuspendContext.class);
+    }
+
+    /**
+     * Selects the frame of the given execution stack at the given index, as the Frames view does when the user selects
+     * it: the view shows the frames of the stack, which makes it the active stack of the suspend context, whose thread
+     * Step and Resume act on, once they are loaded, and the session gets the frame as its current frame.
+     *
+     * @return the selected frame.
+     */
+    private @NotNull XStackFrame select(@NotNull XExecutionStack stack, int index) {
+        // The first time, the frames are loaded; shown again, as when the views are rebuilt, the stack becomes the
+        // active one
+        framesOf(stack);
+        var frame = framesOf(stack).frames().get(index);
+        session.setCurrentStackFrame(stack, frame, index == 0);
+        PlatformTestUtil.dispatchAllInvocationEventsInIdeEventQueue();
+        assertSame("The current frame", frame, session.getCurrentStackFrame());
+        return frame;
+    }
+
+    /**
+     * Returns the thread of the 'next' request which the DAP server receives.
+     */
+    private int nextThreadId() {
+        PlatformTestUtil.waitWithEventsDispatching("the DAP server receives 'next'", () -> !server.nexts.isEmpty(),
+                BOUND_SECONDS);
+        return server.nexts.remove().getThreadId();
     }
 
     private int currentFrameId() {
@@ -308,8 +379,9 @@ public class DAPThreadRunStateSessionTest extends HeavyPlatformTestCase {
     }
 
     /**
-     * A DAP server of a program with the threads 'main' and 'worker'. Once configured, 'main' stops, and the DAP
-     * server says that all threads stopped. The test says when threads continue, and when a thread exits.
+     * A DAP server of a program with the threads 'main' and 'worker'. Once configured, 'main' stops in a frame which
+     * another one called, and the DAP server says that all threads stopped. The test says when threads continue, and
+     * when a thread exits.
      */
     private static class RunStateServer implements IDebugProtocolServer {
 
@@ -318,6 +390,8 @@ public class DAPThreadRunStateSessionTest extends HeavyPlatformTestCase {
         private final Set<Integer> exitedThreads = ConcurrentHashMap.newKeySet();
         // The 'continue' requests which the server received
         private final LinkedBlockingQueue<ContinueArguments> continues = new LinkedBlockingQueue<>();
+        // The 'next' requests which the server received
+        private final LinkedBlockingQueue<NextArguments> nexts = new LinkedBlockingQueue<>();
         // The server answers 'threads' once it completes
         private volatile CompletableFuture<Void> threadsAnswer = CompletableFuture.completedFuture(null);
         // The client, and the endpoint which sends it requests, once it connected
@@ -427,13 +501,12 @@ public class DAPThreadRunStateSessionTest extends HeavyPlatformTestCase {
 
         @Override
         public CompletableFuture<StackTraceResponse> stackTrace(StackTraceArguments args) {
-            var frame = new StackFrame();
-            frame.setId(args.getThreadId() == MAIN ? MAIN_FRAME : WORKER_FRAME);
-            frame.setName(args.getThreadId() == MAIN ? "run" : "work");
-            frame.setLine(5);
+            var frames = args.getThreadId() == MAIN ?
+                    new StackFrame[]{frame(MAIN_FRAME, "run", 5), frame(MAIN_CALLER_FRAME, "main", 9)} :
+                    new StackFrame[]{frame(WORKER_FRAME, "work", 5)};
             var response = new StackTraceResponse();
-            response.setStackFrames(new StackFrame[]{frame});
-            response.setTotalFrames(1);
+            response.setStackFrames(frames);
+            response.setTotalFrames(frames.length);
             return CompletableFuture.completedFuture(response);
         }
 
@@ -451,8 +524,22 @@ public class DAPThreadRunStateSessionTest extends HeavyPlatformTestCase {
         }
 
         @Override
+        public CompletableFuture<Void> next(NextArguments args) {
+            nexts.add(args);
+            return CompletableFuture.completedFuture(null);
+        }
+
+        @Override
         public CompletableFuture<Void> disconnect(DisconnectArguments args) {
             return CompletableFuture.completedFuture(null);
+        }
+
+        private static StackFrame frame(int id, String name, int line) {
+            var frame = new StackFrame();
+            frame.setId(id);
+            frame.setName(name);
+            frame.setLine(line);
+            return frame;
         }
 
         private static Thread thread(int id, String name) {

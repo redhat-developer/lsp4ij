@@ -1716,7 +1716,48 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
             // The Frames view asks again for the frames of the stack which it shows, and forgets those of the others,
             // such as the frames of the stop of the thread which continued
             getSession().rebuildViews();
+            selectStoppedThread(getSession(), args.getThreadId());
         });
+    }
+
+    /**
+     * Selects the top frame of the thread where the session stays suspended, when the current frame of the session is a
+     * frame of the given thread, which continued alone ({@code allThreadsContinued: false}) while the session stays
+     * suspended where another thread stopped: the Variables view and the execution point follow the stopped thread, and
+     * Step and Resume, which act on the thread of the active stack of the suspend context, act on it instead of on a
+     * thread which runs. A current frame of a thread which is still stopped stays selected.
+     * <p>
+     * The selection moves on the EDT, where the Frames view expects it, unless another stop suspended the session, or
+     * another frame was selected, since the thread continued.
+     *
+     * @param session           the debug session, suspended at a stop of the client which received the event.
+     * @param continuedThreadId the DAP thread which continued alone.
+     */
+    static void selectStoppedThread(@NotNull XDebugSession session, int continuedThreadId) {
+        var currentFrame = session.getCurrentStackFrame();
+        if (!(session.getSuspendContext() instanceof DAPSuspendContext context) || currentFrame == null) {
+            return;
+        }
+        ApplicationManager.getApplication().invokeLater(() -> {
+            if (session.getSuspendContext() != context || session.getCurrentStackFrame() != currentFrame) {
+                // Another stop suspended the session, or another frame was selected, since the thread continued
+                return;
+            }
+            var continuedStack = context.getExecutionStack(continuedThreadId);
+            if (continuedStack == null || !continuedStack.hasStackFrame(currentFrame)) {
+                // The current frame is a frame of a thread which is still stopped
+                return;
+            }
+            Integer stoppedThreadId = context.getStoppedThreadId();
+            var stoppedStack = stoppedThreadId != null ? context.getExecutionStack(stoppedThreadId) : null;
+            var topFrame = stoppedStack != null ? stoppedStack.getTopFrame() : null;
+            if (topFrame == null) {
+                return;
+            }
+            // Step and Resume act on the thread of the active stack
+            context.setActiveExecutionStack(stoppedStack);
+            session.setCurrentStackFrame(stoppedStack, topFrame, true);
+        }, ModalityState.any(), session.getProject().getDisposed());
     }
 
     /**
@@ -1734,7 +1775,8 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
      * @param stoppedThread  returns the DAP thread which stopped at a suspend context of the client which received the
      *                       event, and null for no suspend context or one of another client, such as the stop of
      *                       another session of a tree ('startDebugging').
-     * @param refreshThreads shows the threads of the client again, and the views of the stop.
+     * @param refreshThreads shows the threads of the client again, and the views of the stop, where a selection of the
+     *                       thread which continued moves to the thread of the stop.
      * @return true if the session resumed and false otherwise.
      */
     static boolean continued(@NotNull XDebugSession session,

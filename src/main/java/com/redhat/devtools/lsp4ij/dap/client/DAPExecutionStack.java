@@ -101,6 +101,16 @@ public class DAPExecutionStack extends XExecutionStack {
     }
 
     /**
+     * Returns whether the given frame is one of the frames of this stack, as the Frames view was given them.
+     *
+     * @param frame the stack frame.
+     * @return true if the given frame is one of the frames of this stack, and false otherwise.
+     */
+    synchronized boolean hasStackFrame(@NotNull XStackFrame frame) {
+        return stackFrames != null && stackFrames.stream().anyMatch(stackFrame -> stackFrame == frame);
+    }
+
+    /**
      * Returns why this stack shows no frames once its thread left the stop of its suspend context, as when the debug
      * adapter said that the thread continued alone ('allThreadsContinued: false') while the session stays suspended
      * where another thread stopped, or that it exited: IntelliJ's suspend context keeps the stacks of the threads which
