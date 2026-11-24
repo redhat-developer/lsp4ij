@@ -23,6 +23,7 @@ import com.intellij.util.xmlb.annotations.Attribute;
 import com.intellij.util.xmlb.annotations.Tag;
 import com.redhat.devtools.lsp4ij.LanguageServerFactory;
 import org.jetbrains.annotations.Nls;
+import org.jetbrains.annotations.NonNls;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
@@ -71,9 +72,11 @@ public class ServerExtensionPointBean extends BaseKeyedLazyInstance<LanguageServ
     /**
      * This attribute specifies the resource key in the specified {@link #bundle}.
      * This is another way to specify the {@link #name server name}.
+     * It is a key, not a text shown to the user, so it is {@link NonNls}, and DevKit doesn't check its capitalization
+     * in a {@code plugin.xml}.
      */
     @Attribute("nameKey")
-    @Nls(capitalization = Nls.Capitalization.Title)
+    @NonNls
     public String nameKey;
 
     /**
@@ -85,9 +88,11 @@ public class ServerExtensionPointBean extends BaseKeyedLazyInstance<LanguageServ
     /**
      * This attribute specifies the resource key in the specified {@link #bundle}.
      * This is another way to specify the {@link #description server description}.
+     * It is a key, not a text shown to the user, so it is {@link NonNls}, and DevKit doesn't check its capitalization
+     * in a {@code plugin.xml}.
      */
     @Attribute("descriptionKey")
-    @Nls(capitalization = Nls.Capitalization.Sentence)
+    @NonNls
     public String descriptionKey;
 
     /**
