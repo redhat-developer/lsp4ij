@@ -272,18 +272,21 @@ public class DAPValue extends XNamedValue {
 
     /**
      * Returns the future of the position of the declaration of the variable which this value shows, which "Jump to
-     * Source" opens. When the variable has a 'declarationLocationReference', the DAP server is asked where the
-     * declaration is, with the 'locations' request, off the calling thread, and only while the stop of the value's frame
-     * lasts: the reference is valid only until the program resumes. The name of the variable is searched in the file of
-     * the frame, as for the inline values, when the variable has no reference, when the request fails or the stop has
-     * ended, when the DAP server answers no location which can be opened, and when it doesn't locate the declaration
-     * within {@link #DECLARATION_TIMEOUT_SECONDS} seconds.
+     * Source" opens, or else of the variable itself, such as a lazy variable whose value has no declaration. When the
+     * variable has a 'declarationLocationReference', the DAP server is asked where the declaration is, with the
+     * 'locations' request, off the calling thread, and only while the stop of the value's frame lasts: the reference is
+     * valid only until the program resumes. The name of the variable is searched in the file of the frame, as for the
+     * inline values, when neither variable has a reference, when the request fails or the stop has ended, when the DAP
+     * server answers no location which can be opened, and when it doesn't locate the declaration within
+     * {@link #DECLARATION_TIMEOUT_SECONDS} seconds.
      *
      * @return the future of the position of the declaration of the variable, which is null if neither the DAP server nor
      * the search finds it.
      */
     @NotNull CompletableFuture<@Nullable XSourcePosition> getDeclarationSourcePosition() {
-        Integer reference = getDeclarationLocationReference(getShownVariable());
+        Integer shownReference = getDeclarationLocationReference(getShownVariable());
+        // The value of a lazy variable, which the user asked for, may have no declaration of its own
+        Integer reference = shownReference != null ? shownReference : getDeclarationLocationReference(variable);
         if (reference == null) {
             return getSourcePositionOfName();
         }
