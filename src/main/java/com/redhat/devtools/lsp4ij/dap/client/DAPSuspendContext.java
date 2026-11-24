@@ -89,6 +89,19 @@ public class DAPSuspendContext extends XSuspendContext {
         return myExecutionStacks.toArray(new DAPExecutionStack[0]);
     }
 
+    /**
+     * Returns the execution stack of the given DAP thread, one of those which this suspend context was created with.
+     *
+     * @param threadId the DAP thread.
+     * @return the execution stack of the given DAP thread, or null if this suspend context has none.
+     */
+    @Nullable DAPExecutionStack getExecutionStack(int threadId) {
+        return myExecutionStacks.stream()
+                .filter(stack -> stack.getThreadId() == threadId)
+                .findFirst()
+                .orElse(null);
+    }
+
     public @NotNull DAPClient getClient() {
         return client;
     }
