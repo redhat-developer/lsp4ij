@@ -595,7 +595,24 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
 
     @Override
     public void output(OutputEventArguments args) {
+        if (isTelemetry(args)) {
+            // DAP: "Send the output to telemetry instead of the client". It isn't for the user, and VS Code doesn't
+            // show it either, but whoever diagnoses a DAP server can log it
+            LOGGER.debug("Telemetry of the DAP server: {}", args.getOutput());
+            return;
+        }
         debugProcess.printOutput(args.getOutput(), getContentType(args.getCategory()));
+    }
+
+    /**
+     * Returns whether the given output event is telemetry, which DAP sends to telemetry instead of the client, so that
+     * the debug console doesn't show it.
+     *
+     * @param args the output event.
+     * @return true if the output event has the category 'telemetry', and false otherwise.
+     */
+    static boolean isTelemetry(@NotNull OutputEventArguments args) {
+        return OutputEventArgumentsCategory.TELEMETRY.equals(args.getCategory());
     }
 
     private static ConsoleViewContentType getContentType(String category) {
@@ -605,8 +622,6 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
                     return ConsoleViewContentType.LOG_ERROR_OUTPUT;
                 case OutputEventArgumentsCategory.IMPORTANT:
                     return ConsoleViewContentType.LOG_VERBOSE_OUTPUT;
-                case OutputEventArgumentsCategory.TELEMETRY:
-                    return ConsoleViewContentType.LOG_DEBUG_OUTPUT;
                 default:
                     return ConsoleViewContentType.LOG_INFO_OUTPUT;
             }
