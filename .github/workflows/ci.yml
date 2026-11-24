@@ -60,6 +60,14 @@ jobs:
       # Setup Gradle
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v5
+        with:
+          # Leaves the extracted IDEs, Gradle's artifact transforms of up to 4 GB a job, out of the Actions cache. With
+          # them, the entries that the jobs save on main exceed the repository's 10 GB, and GitHub evicts the other jobs'
+          # downloads, so that each job fetches them again, until Maven Central answers "429 Too Many Requests". Gradle
+          # extracts an IDE again from its cached download, without a network access.
+          gradle-home-cache-excludes: |
+            caches/transforms-4
+            caches/*/transforms
 
       # Run tests
       - name: Run Tests

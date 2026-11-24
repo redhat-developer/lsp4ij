@@ -40,6 +40,11 @@ jobs:
       # Setup Gradle
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v5
+        with:
+          # Leaves the extracted IDEs out of the Actions cache, see ci.yml
+          gradle-home-cache-excludes: |
+            caches/transforms-4
+            caches/*/transforms
 
       # Run Verify Plugin task and IntelliJ Plugin Verifier tool
       - name: Run Plugin Verification tasks
