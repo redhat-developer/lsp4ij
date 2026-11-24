@@ -45,7 +45,7 @@ Current state of [Requests](https://microsoft.github.io/debug-adapter-protocol//
 * ✅ [Initialize](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_Initialize).
 * ✅ [Launch](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_Launch). 
 * ✅ [LoadedSources](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_LoadedSources).
-* ✅ [Locations](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_Locations), for the `valueLocationReference` of a variable or an evaluated expression (see [user guide](./UserGuide.md#jump-to-value-source)).
+* ✅ [Locations](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_Locations), for the `valueLocationReference` of a variable or an evaluated expression, which `Jump to Value Source` opens, and for the `declarationLocationReference` of a variable, which `Jump to Source` opens (see [user guide](./UserGuide.md#jump-to-value-source)).
 * ✅ [Modules](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_Modules).
 * ✅ [Next](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_Next).
 * ✅ [Pause](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_Pause).
