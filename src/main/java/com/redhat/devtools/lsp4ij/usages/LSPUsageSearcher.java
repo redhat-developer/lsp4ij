@@ -38,7 +38,9 @@ import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.stream.Collectors;
 
 import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.awaitWithCheckCanceled;
 import static com.redhat.devtools.lsp4ij.internal.CompletableFutures.isDoneNormally;
@@ -75,7 +77,8 @@ import static com.redhat.devtools.lsp4ij.usages.LSPFindUsagesHandlerFactory.isUs
  * </p>
  * <p>
  * Results are deduplicated to remove overlapping ranges (e.g., when a definition range fully contains
- * a declaration range, only the smaller, more specific range is kept).
+ * a declaration range, only the smaller, more specific range is kept), and to remove a reference or a type
+ * definition at the location of a declaration or a definition, which is that declaration or definition again.
  * </p>
  */
 public class LSPUsageSearcher extends CustomUsageSearcher {
@@ -196,6 +199,7 @@ public class LSPUsageSearcher extends CustomUsageSearcher {
 
                             return false;
                         }));
+                        removeRepeatedDeclarations(filteredUsages);
 
                         for (LSPUsagePsiElement usage : filteredUsages) {
                             processor.process(toUsage(usage));
@@ -215,6 +219,35 @@ public class LSPUsageSearcher extends CustomUsageSearcher {
                 searchScope,
                 reference -> processor.process(new UsageInfo2UsageAdapter(new UsageInfo(reference)))
         );
+    }
+
+    /**
+     * Removes the references and the type definitions at the location of a declaration or a definition from the given
+     * usages.
+     * <p>
+     * Such a usage is the declaration or the definition again: the references include the declaration, as LSP4IJ asks
+     * for them with {@code includeDeclaration}, and the type definition of a type is the type itself. The usage view
+     * merges the usages of a line only within a group of the same usage type, so that it would show the declaration
+     * once as a definition, once as a reference and once as a type definition (#729).
+     * </p>
+     *
+     * @param usages the usages, from which the repeated declarations are removed.
+     */
+    private static void removeRepeatedDeclarations(@NotNull List<LSPUsagePsiElement> usages) {
+        record UsageLocation(@Nullable VirtualFile file, @Nullable TextRange textRange) {
+
+            UsageLocation(@NotNull LSPUsagePsiElement usage) {
+                this(LSPIJUtils.getFile(usage), usage.getTextRange());
+            }
+        }
+        Set<UsageLocation> declarations = usages.stream()
+                .filter(usage -> usage.getKind() == LSPUsagePsiElement.UsageKind.declarations
+                        || usage.getKind() == LSPUsagePsiElement.UsageKind.definitions)
+                .map(UsageLocation::new)
+                .collect(Collectors.toSet());
+        usages.removeIf(usage -> (usage.getKind() == LSPUsagePsiElement.UsageKind.references
+                || usage.getKind() == LSPUsagePsiElement.UsageKind.typeDefinitions)
+                && declarations.contains(new UsageLocation(usage)));
     }
 
     /**
