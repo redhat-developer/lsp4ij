@@ -19,6 +19,7 @@ import com.intellij.openapi.actionSystem.DataKey;
 import com.intellij.openapi.actionSystem.DataSink;
 import com.intellij.openapi.actionSystem.UiDataProvider;
 import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.util.IconLoader;
 import com.intellij.ui.ColoredTableCellRenderer;
 import com.intellij.ui.PopupHandler;
 import com.intellij.ui.ScrollPaneFactory;
@@ -27,11 +28,14 @@ import com.intellij.ui.table.TableView;
 import com.intellij.util.ui.ColumnInfo;
 import com.intellij.util.ui.ListTableModel;
 import com.intellij.util.ui.components.BorderLayoutPanel;
+import com.redhat.devtools.lsp4ij.dap.DAPBundle;
 import com.redhat.devtools.lsp4ij.dap.DAPDebugProcess;
 import com.redhat.devtools.lsp4ij.dap.client.DAPClient;
+import com.redhat.devtools.lsp4ij.dap.client.DAPThreadRunState;
+import com.redhat.devtools.lsp4ij.dap.client.DAPThreadRunStates;
 import org.eclipse.lsp4j.debug.Thread;
 import org.eclipse.lsp4j.debug.ThreadEventArguments;
-import org.eclipse.lsp4j.debug.ThreadEventArgumentsReason;
+import org.jetbrains.annotations.Nls;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -40,7 +44,8 @@ import javax.swing.table.TableCellRenderer;
 import java.util.*;
 
 /**
- * Threads panel which shows DAP threads (name and status), with a context menu of actions on the selected threads.
+ * Threads panel which shows DAP threads (name, and whether the thread runs, is stopped or has exited), with a context
+ * menu of actions on the selected threads.
  */
 public class ThreadsPanel extends BorderLayoutPanel implements Disposable, UiDataProvider {
 
@@ -64,6 +69,9 @@ public class ThreadsPanel extends BorderLayoutPanel implements Disposable, UiDat
      */
     public record SelectedThreads(@NotNull DAPClient client, @NotNull List<Integer> threadIds) {
     }
+
+    // No icon says that a thread exited: the icon of a running thread, disabled
+    private static final @NotNull Icon EXITED_ICON = IconLoader.getDisabledIcon(AllIcons.Debugger.ThreadRunning);
 
     private final ListTableModel<ThreadInfo> model;
     private final TableView<ThreadInfo> table;
@@ -109,9 +117,9 @@ public class ThreadsPanel extends BorderLayoutPanel implements Disposable, UiDat
     }
 
     /**
-     * Shows the given threads, as threads of the given client's DAP session. The rows are built on the EDT, from those
-     * it shows: a row keeps the status of a thread only for the same thread of the same session, since the sessions of
-     * a tree ('startDebugging') number their threads each.
+     * Shows the given threads, as threads of the given client's DAP session, with their run states in that session:
+     * the sessions of a tree ('startDebugging') number their threads each. The rows are built on the EDT, with the run
+     * states which the client has then.
      *
      * @param client  the client of the DAP session of the threads, or null if it is not known yet.
      * @param threads the threads.
@@ -119,19 +127,29 @@ public class ThreadsPanel extends BorderLayoutPanel implements Disposable, UiDat
     public void refreshThreads(@Nullable DAPClient client, Thread @Nullable [] threads) {
         List<Thread> newThreads = threads != null ? List.of(threads) : List.of();
         ApplicationManager.getApplication().invokeLater(() -> {
-            Map<Integer, ThreadInfo> shownById = new HashMap<>();
-            if (client == this.client) {
-                for (ThreadInfo info : model.getItems()) {
-                    shownById.put(info.getId(), info);
-                }
-            }
+            DAPThreadRunStates states = client != null ? client.getThreadRunStates() : DAPThreadRunStates.INITIAL;
             List<ThreadInfo> rows = new ArrayList<>();
             for (Thread thread : newThreads) {
-                ThreadInfo shown = shownById.get(thread.getId());
-                rows.add(new ThreadInfo(thread.getId(), thread.getName(), shown != null ? shown.getStatus() : null));
+                rows.add(new ThreadInfo(thread.getId(), thread.getName(), states.getState(thread.getId())));
             }
             this.client = client;
             model.setItems(rows);
+        });
+    }
+
+    /**
+     * Shows again whether each thread of the given client's DAP session runs, is stopped or has exited, as they
+     * changed, when the panel shows the threads of that session: once the program stopped or continued, as the debug
+     * adapter says, or once the session resumed it. The rows whose run state changed are updated on the EDT, with the
+     * run states which the client has then, and keep their selection.
+     *
+     * @param client the client of the DAP session whose threads changed.
+     */
+    public void refreshThreadRunStates(@NotNull DAPClient client) {
+        ApplicationManager.getApplication().invokeLater(() -> {
+            if (client == this.client) {
+                showThreadRunStates(client);
+            }
         });
     }
 
@@ -146,7 +164,8 @@ public class ThreadsPanel extends BorderLayoutPanel implements Disposable, UiDat
 
     /**
      * Shows a 'thread' event of the given client's DAP session, when the panel shows the threads of that session: the
-     * status of the thread, or, for a thread it doesn't show, such as one which started, the threads of that session.
+     * run state of the thread, such as one which exited, or, for a thread it doesn't show, such as one which started,
+     * the threads of that session.
      *
      * @param client the client of the DAP session which sent the event, or null if it is not known yet.
      * @param args   the 'thread' event.
@@ -157,37 +176,76 @@ public class ThreadsPanel extends BorderLayoutPanel implements Disposable, UiDat
                 // The panel shows the threads of another session, which numbers its threads itself
                 return;
             }
-            List<ThreadInfo> rows = model.getItems();
-            for (int row = 0; row < rows.size(); row++) {
-                ThreadInfo info = rows.get(row);
-                if (info.getId() == args.getThreadId()) {
-                    model.setItem(row, info.withStatus(args.getReason()));
-                    return;
-                }
+            if (model.getItems().stream().anyMatch(info -> info.getId() == args.getThreadId())) {
+                showThreadRunStates(client);
+                return;
             }
             // Asked off the EDT, as LSP4J writes a request on the thread which sends it
             ApplicationManager.getApplication().executeOnPooledThread(() -> client.getThreads(true));
         });
     }
 
+    /**
+     * Updates, on the EDT, the rows whose run state differs from the one which the given client has now.
+     */
+    private void showThreadRunStates(@NotNull DAPClient client) {
+        DAPThreadRunStates states = client.getThreadRunStates();
+        List<ThreadInfo> rows = model.getItems();
+        for (int row = 0; row < rows.size(); row++) {
+            ThreadInfo info = rows.get(row);
+            DAPThreadRunState state = states.getState(info.getId());
+            if (state != info.getState()) {
+                model.setItem(row, info.withState(state));
+            }
+        }
+    }
+
+    /**
+     * Returns the icon of a thread with the given run state.
+     *
+     * @param state the run state of the thread.
+     * @return the icon of a thread with the given run state.
+     */
+    static @NotNull Icon getRunStateIcon(@NotNull DAPThreadRunState state) {
+        return switch (state) {
+            case RUNNING -> AllIcons.Debugger.ThreadRunning;
+            case STOPPED -> AllIcons.Debugger.ThreadSuspended;
+            case EXITED -> EXITED_ICON;
+        };
+    }
+
+    /**
+     * Returns the text which a row shows for a thread with the given run state.
+     *
+     * @param state the run state of the thread.
+     * @return the text which a row shows for a thread with the given run state.
+     */
+    static @NotNull @Nls String getRunStateText(@NotNull DAPThreadRunState state) {
+        return switch (state) {
+            case RUNNING -> DAPBundle.message("dap.threads.state.running");
+            case STOPPED -> DAPBundle.message("dap.threads.state.stopped");
+            case EXITED -> DAPBundle.message("dap.threads.state.exited");
+        };
+    }
+
     private static class ThreadInfo {
         private final int id;
         private final String name;
-        private final @Nullable String status;
+        private final @NotNull DAPThreadRunState state;
 
-        public ThreadInfo(int id, String name, @Nullable String status) {
+        public ThreadInfo(int id, String name, @NotNull DAPThreadRunState state) {
             this.id = id;
             this.name = name;
-            this.status = status;
+            this.state = state;
         }
 
         public int getId() { return id; }
 
         public String getName() { return name; }
 
-        public @Nullable String getStatus() { return status; }
+        public @NotNull DAPThreadRunState getState() { return state; }
 
-        public @NotNull ThreadInfo withStatus(@Nullable String status) { return new ThreadInfo(id, name, status); }
+        public @NotNull ThreadInfo withState(@NotNull DAPThreadRunState state) { return new ThreadInfo(id, name, state); }
 
         @Override
         public boolean equals(Object obj) {
@@ -218,21 +276,11 @@ public class ThreadsPanel extends BorderLayoutPanel implements Disposable, UiDat
                 protected void customizeCellRenderer(@NotNull JTable table, Object value, boolean selected, boolean hasFocus, int row, int column) {
                     if (value instanceof ThreadInfo thread) {
                         append(thread.getName(), SimpleTextAttributes.REGULAR_ATTRIBUTES);
-                        if (thread.getStatus() != null) {
-                            append(" [" + thread.getStatus() + "]", SimpleTextAttributes.GRAYED_ATTRIBUTES);
-                        }
-                        setIcon(getIconForStatus(thread.getStatus()));
+                        append(" [" + getRunStateText(thread.getState()) + "]", SimpleTextAttributes.GRAYED_ATTRIBUTES);
+                        setIcon(getRunStateIcon(thread.getState()));
                     }
                 }
             };
-        }
-
-        private Icon getIconForStatus(@Nullable String status) {
-            if (ThreadEventArgumentsReason.STARTED.equalsIgnoreCase(status)) {
-                return AllIcons.Debugger.ThreadRunning;
-            } else {
-                return AllIcons.Debugger.ThreadSuspended;
-            }
         }
 
     }

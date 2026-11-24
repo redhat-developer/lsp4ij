@@ -190,9 +190,9 @@ public class DAPTerminateThreadSessionTest extends HeavyPlatformTestCase {
         var root = debug(true);
         var child = startChildSession(root);
 
-        // Thread 1 is 'main' in the root session, and 'page' in the child session
+        // Thread 1 is 'main' in the root session, and 'page' in the child session, where it stopped
         showThreadsOf(child);
-        assertEquals(List.of("page", "worker", "service worker"), getRows());
+        assertEquals(List.of("page [stopped]", "worker [running]", "service worker [running]"), getRows());
         getTable().setRowSelectionInterval(0, 0);
         terminateThread().actionPerformed(update());
 
@@ -211,9 +211,9 @@ public class DAPTerminateThreadSessionTest extends HeavyPlatformTestCase {
         PlatformTestUtil.waitWithEventsDispatching(() -> "the Threads panel shows that 'page' exited, not " + getRows(),
                 () -> getRows().get(0).equals("page [exited]"), BOUND_SECONDS);
 
-        // The status of the child session's thread 1 is not that of the root session's thread 1
+        // The run state of the child session's thread 1 is not that of the root session's thread 1
         showThreadsOf(root);
-        assertEquals(List.of("main", "worker"), getRows());
+        assertEquals(List.of("main [stopped]", "worker [running]"), getRows());
         getTable().setRowSelectionInterval(0, 0);
         terminateThread().actionPerformed(update());
 
@@ -232,7 +232,7 @@ public class DAPTerminateThreadSessionTest extends HeavyPlatformTestCase {
         child.sendThreadEvent(ThreadEventArgumentsReason.EXITED, Session.MAIN);
         waitUntilHandled(child);
 
-        assertEquals(List.of("main", "worker"), getRows());
+        assertEquals(List.of("main [running]", "worker [running]"), getRows());
     }
 
     public void testAThreadWhichThePanelDoesNotShowReloadsTheThreadsOfItsSession() throws Exception {
@@ -243,7 +243,8 @@ public class DAPTerminateThreadSessionTest extends HeavyPlatformTestCase {
         child.startThread("web worker");
 
         PlatformTestUtil.waitWithEventsDispatching(() -> "the Threads panel shows the new thread of the child session, not " + getRows(),
-                () -> getRows().equals(List.of("page", "worker", "service worker", "web worker")), BOUND_SECONDS);
+                () -> getRows().equals(List.of("page [stopped]", "worker [running]", "service worker [running]", "web worker [running]")),
+                BOUND_SECONDS);
     }
 
     /**
@@ -304,7 +305,7 @@ public class DAPTerminateThreadSessionTest extends HeavyPlatformTestCase {
     }
 
     /**
-     * Returns the text of each row of the Threads panel, as it shows it: the name of the thread and its status.
+     * Returns the text of each row of the Threads panel, as it shows it: the name of the thread and its run state.
      */
     private @NotNull List<String> getRows() {
         var table = getTable();
