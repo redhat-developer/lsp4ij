@@ -111,6 +111,18 @@ final class DAPExecutionEpoch {
     }
 
     /**
+     * Returns true if the debug adapter said that the program stopped or continued since the given epoch ended before
+     * a request resumed the program: the event is newer than the request.
+     *
+     * @param ended the epoch which {@link #endBeforeResuming()} ended.
+     * @return true if the debug adapter said that the program stopped or continued since the given epoch ended, and
+     * false otherwise.
+     */
+    boolean stoppedOrContinuedSince(int ended) {
+        return lastEvent.get() > ended;
+    }
+
+    /**
      * Sends a request which names references of the given epoch, if it is the current one.
      *
      * @param epoch   the epoch of the references which the request names.

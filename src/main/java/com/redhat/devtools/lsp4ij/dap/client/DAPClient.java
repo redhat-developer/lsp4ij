@@ -1648,9 +1648,10 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
         int ended = executionEpoch.endBeforeResuming();
         // The threads run once the debug adapter has accepted the request, right before the session resumes
         // (resumeWhenAnswered), which then no longer has this suspend context: a refused request leaves them stopped,
-        // and a stop which came meanwhile is newer
+        // and a stop which came meanwhile is newer. The 'stopped' event, which a debug adapter may send before its
+        // answer, ends the execution epoch as it arrives, before the stop has a suspend context
         var accepted = request.get().thenApply(response -> {
-            if (session.getSuspendContext() == context) {
+            if (session.getSuspendContext() == context && !executionEpoch.stoppedOrContinuedSince(ended)) {
                 updateThreadRunStates(states -> states.resumed(threadId, singleThread != null));
             }
             return response;
