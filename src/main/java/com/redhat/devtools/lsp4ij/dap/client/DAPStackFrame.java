@@ -56,6 +56,9 @@ public class DAPStackFrame extends XStackFrame {
     private final @NotNull DAPClient client;
     private final int executionEpoch;
     private final @Nullable Integer threadId;
+    // The version of the run states of the threads at the stop: once the thread of the frame leaves the stop, as when it
+    // continues alone, its references are out of date although the execution epoch goes on for the other threads
+    private final int threadRunStatesVersion;
     private volatile @Nullable XSourcePosition sourcePosition;
     private @Nullable DisassemblyDeferredSourcePosition disassemblyInstructionSourcePosition;
     private XDebuggerEvaluator evaluator;
@@ -87,10 +90,29 @@ public class DAPStackFrame extends XStackFrame {
                          @NotNull StackFrame stackFrame,
                          int executionEpoch,
                          @Nullable Integer threadId) {
+        this(client, stackFrame, executionEpoch, threadId, client.getThreadRunStates().getVersion());
+    }
+
+    /**
+     * @param client                 the client of the debug adapter.
+     * @param stackFrame             the stack frame which the debug adapter sent.
+     * @param executionEpoch         the execution epoch of the stop of the program at which the debug adapter sent the
+     *                               frame.
+     * @param threadId               the ID of the DAP thread whose stack trace the frame is part of, or null if it isn't
+     *                               known.
+     * @param threadRunStatesVersion the version of the run states of the threads at that stop
+     *                               ({@link DAPSuspendContext#getThreadRunStatesVersion()}).
+     */
+    DAPStackFrame(@NotNull DAPClient client,
+                  @NotNull StackFrame stackFrame,
+                  int executionEpoch,
+                  @Nullable Integer threadId,
+                  int threadRunStatesVersion) {
         this.client = client;
         this.stackFrame = stackFrame;
         this.executionEpoch = executionEpoch;
         this.threadId = threadId;
+        this.threadRunStatesVersion = threadRunStatesVersion;
     }
 
     @Override
@@ -310,6 +332,17 @@ public class DAPStackFrame extends XStackFrame {
      */
     public @Nullable Integer getThreadId() {
         return threadId;
+    }
+
+    /**
+     * Returns the version of the run states of the threads at the stop of the program at which the debug adapter sent
+     * this frame: once its thread left that stop since ({@link DAPThreadRunStates#leftStopSince(int, int)}), as when it
+     * continued alone, its id and the references of its values are out of date.
+     *
+     * @return the version of the run states of the threads at the stop of this frame.
+     */
+    int getThreadRunStatesVersion() {
+        return threadRunStatesVersion;
     }
 
     /**

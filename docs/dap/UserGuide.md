@@ -498,7 +498,9 @@ gives, and the variable inside it, which gives the value, can be set.
 `Set Value...` says why it doesn't set a value which it offers when:
 * the program has run since the value was shown, as a result in `Evaluate Expression` once a step has started: the
   value belongs to a stack frame whose id the debug adapter may give to another frame when the program stops again.
-  Evaluate the expression again to set it.
+  Evaluate the expression again to set it. When the debug adapter says that another thread continued alone
+  (`allThreadsContinued: false`), the values of the threads which stay stopped can still be set, and those of the
+  thread which continued can't.
 * the debug adapter marked the value as read-only since it was shown, as the value of a lazy variable once it is shown,
   or no longer supports setting it.
 

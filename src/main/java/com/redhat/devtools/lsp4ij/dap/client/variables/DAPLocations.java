@@ -60,8 +60,8 @@ final class DAPLocations {
                                                                          int reference,
                                                                          @NotNull @Nls String endedMessage) {
         DAPClient client = value.getClient();
-        int epoch = value.getStackFrame().getExecutionEpoch();
-        return CompletableFuture.supplyAsync(() -> client.sendInExecutionEpoch(epoch, () -> client.locations(reference),
+        DAPStackFrame frame = value.getStackFrame();
+        return CompletableFuture.supplyAsync(() -> client.sendInExecutionEpoch(frame, () -> client.locations(reference),
                         endedMessage), AppExecutorUtil.getAppExecutorService())
                 .thenCompose(Function.identity());
     }
