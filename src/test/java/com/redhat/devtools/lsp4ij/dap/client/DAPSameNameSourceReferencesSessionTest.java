@@ -193,10 +193,12 @@ public class DAPSameNameSourceReferencesSessionTest extends HeavyPlatformTestCas
         assertNotNull(position);
         assertEquals(NAME, position.getFile().getName());
         assertNotSame(fileOf(editor), position.getFile());
-        assertEquals(SECOND_LINE - 1, position.getLine());
-        PlatformTestUtil.waitWithEventsDispatching(() -> "the file of the second frame didn't get the text of its source,"
-                + " it has:\n" + document(position.getFile()).getText(),
-                () -> SECOND.equals(document(position.getFile()).getText()), BOUND_SECONDS);
+        // The position resolves its line once the debug adapter has answered the text of its source
+        PlatformTestUtil.waitWithEventsDispatching(() -> "the file of the second frame didn't get the text of its source"
+                + " at line " + (SECOND_LINE - 1) + ", its position is at line " + position.getLine() + " and it has:\n"
+                + document(position.getFile()).getText(),
+                () -> SECOND.equals(document(position.getFile()).getText()) && position.getLine() == SECOND_LINE - 1,
+                BOUND_SECONDS);
 
         // The frame shown keeps its text
         assertEquals(FIRST, editor.getDocument().getText());
