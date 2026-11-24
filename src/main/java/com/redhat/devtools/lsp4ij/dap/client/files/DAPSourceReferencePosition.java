@@ -16,6 +16,7 @@ import com.intellij.openapi.util.text.StringUtil;
 import com.redhat.devtools.lsp4ij.dap.client.DAPClient;
 import org.eclipse.lsp4j.debug.SourceArguments;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.concurrent.CompletableFuture;
 
@@ -37,8 +38,10 @@ public class DAPSourceReferencePosition extends DeferredSourcePosition<DAPSource
     public record SourceParams(@NotNull int sourceReference, int line) {}
 
     // The number of texts written to the document of the file when the last load left the text which the debug adapter
-    // gave for the source in it, or -1 if it left none
-    private volatile long loadedText = -1;
+    // gave for the source in it, or null if it left none. No initializer: the constructor of DeferredSourcePosition
+    // starts the load, and when the debug adapter's answer is already there once the load waits for it, the load ends
+    // in that constructor, before the initializers of this class run, which would reset what it set.
+    private volatile @Nullable Long loadedText;
 
     /**
      * Creates a deferred source position based on a DAP sourceReference.
@@ -82,8 +85,8 @@ public class DAPSourceReferencePosition extends DeferredSourcePosition<DAPSource
      * @return true if the document of the file has the text of the source, and false otherwise.
      */
     public boolean isTextLoaded() {
-        long text = loadedText;
-        return text >= 0 && ((DAPFile) getFile()).getWrittenTexts() == text;
+        Long text = loadedText;
+        return text != null && ((DAPFile) getFile()).getWrittenTexts() == text;
     }
 
     /**
@@ -116,7 +119,7 @@ public class DAPSourceReferencePosition extends DeferredSourcePosition<DAPSource
         return client.getDebugProtocolServer()
                 .source(args)
                 .thenCompose(sourceResponse -> {
-                    loadedText = -1;
+                    loadedText = null;
                     if (sourceResponse != null) {
                         String content = sourceResponse.getContent() != null ? sourceResponse.getContent() : "";
 
@@ -152,7 +155,7 @@ public class DAPSourceReferencePosition extends DeferredSourcePosition<DAPSource
                                 file.clearLoadedSource();
                             }
                             // The document keeps the text as long as no other load writes another one
-                            loadedText = hasText ? file.getWrittenTexts() : -1;
+                            loadedText = hasText ? Long.valueOf(file.getWrittenTexts()) : null;
                             // Complete the future with the requested line number
                             updatedDoc.complete(params.line());
                         });
