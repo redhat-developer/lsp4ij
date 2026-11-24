@@ -314,7 +314,8 @@ class LSPFileListener extends AbstractLSPFileListener {
      * <p>
      * If the file is still open in another editor instance (e.g., via "Split Right"),
      * the event is ignored to ensure {@code textDocument/didClose} is only sent
-     * when the last editor tab for the file is actually closed.
+     * when the last editor tab for the file is actually closed. So is the close of
+     * an editor that moves to another window or tab group, which opens the file again there.
      *
      * @param source the editor source
      * @param file   the closed file
@@ -325,10 +326,16 @@ class LSPFileListener extends AbstractLSPFileListener {
             // The file has been closed from another project, don't send textDocument/didClose
             return;
         }
-        if (source.getAllEditors(file).length > 0) {
+        if (source.getAllEditors(file).length > 0 || source.isFileOpen(file)) {
             // The file has been opened by multiple editors (e.g. via 'Split Right' menu),
             // we ignore the fileClosed event to ensure that a 'textDocument/didClose'
-            // is sent when the last editor of the file has closed.
+            // is sent when the last editor of the file has closed. A new tab group (e.g. just split)
+            // has the file open but no editor of it, while the platform still creates that editor.
+            return;
+        }
+        if (ConnectDocumentToLanguageServerSetupParticipant.isClosingToReopen(file)) {
+            // The editor moves to another window or tab group (e.g. a tab dragged into a detached window), which opens
+            // the file again, maybe only after this event: the file stays open, so it stays connected
             return;
         }
         // Counted before the disconnection, so that a connection asked for before the close does not connect the file

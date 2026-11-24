@@ -14,6 +14,7 @@ import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.fileEditor.FileEditorManager;
 import com.intellij.openapi.fileEditor.FileEditorManagerEvent;
 import com.intellij.openapi.fileEditor.FileEditorManagerListener;
+import com.intellij.openapi.fileEditor.impl.FileEditorManagerImpl;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.project.ProjectManagerListener;
 import com.intellij.openapi.util.Key;
@@ -57,6 +58,18 @@ public class ConnectDocumentToLanguageServerSetupParticipant implements FileEdit
      */
     static void countEditorClose(@NotNull VirtualFile file) {
         file.putUserDataIfAbsent(EDITOR_CLOSES, new AtomicInteger()).incrementAndGet();
+    }
+
+    /**
+     * Returns true if the platform closes an editor of the file only to open the file again in another window or tab
+     * group: a tab dragged into another window, a detached one included, or moved to the opposite tab group. The file
+     * can be in no editor between the close and the open, which can follow later, as a drop into a detached window
+     * opens the file in a coroutine. The file stays open, so such a close neither disconnects it nor counts as a close
+     * of its last editor. {@code FileEditorManagerKeys}, which holds the key in later platforms, is missing in 2024.2.
+     */
+    @SuppressWarnings("deprecation")
+    static boolean isClosingToReopen(@NotNull VirtualFile file) {
+        return Boolean.TRUE.equals(file.getUserData(FileEditorManagerImpl.CLOSING_TO_REOPEN));
     }
 
     /**
@@ -127,7 +140,7 @@ public class ConnectDocumentToLanguageServerSetupParticipant implements FileEdit
 
     @Override
     public void fileClosed(@NotNull FileEditorManager source, @NotNull VirtualFile file) {
-        if (!source.isFileOpen(file)) {
+        if (!source.isFileOpen(file) && !isClosingToReopen(file)) {
             // Counted here, as a language server that is still starting has no file listener to count it
             countEditorClose(file);
         }
