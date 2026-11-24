@@ -17,11 +17,13 @@ import com.intellij.openapi.project.Project;
 import com.redhat.devtools.lsp4ij.LanguageServerWrapper;
 import org.eclipse.lsp4j.jsonrpc.MessageConsumer;
 import org.eclipse.lsp4j.jsonrpc.messages.Message;
+import org.eclipse.lsp4j.jsonrpc.messages.MessageIssue;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Collection;
+import java.util.List;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 /**
@@ -69,13 +71,26 @@ public class LanguageServerLifecycleManager {
     }
 
     public void logLSPMessage(Message message, MessageConsumer consumer, LanguageServerWrapper languageServer) {
+        logLSPMessage(message, List.of(), consumer, languageServer);
+    }
+
+    /**
+     * Traces the given message, which LSP4J could not parse for the given issues, or parsed if there are none, and
+     * tells the listeners about it.
+     *
+     * @param message        the message.
+     * @param issues         the issues that LSP4J found in the message, which are empty if it parsed it.
+     * @param consumer       the message consumer.
+     * @param languageServer the language server.
+     */
+    public void logLSPMessage(Message message, List<MessageIssue> issues, MessageConsumer consumer, LanguageServerWrapper languageServer) {
         if (isDisposed()) {
             return;
         }
         try {
             // The trace is kept even if no LSP console takes it yet, as at the start of the IDE, before the LSP console
             // exists: it shows the trace once it opens (#19)
-            languageServer.addTrace(message, consumer);
+            languageServer.addTrace(message, issues, consumer);
         } catch (Exception e) {
             LOGGER.error("Error while tracing LSP message of the language server '{}'", languageServer.getServerDefinition().getId(), e);
         }

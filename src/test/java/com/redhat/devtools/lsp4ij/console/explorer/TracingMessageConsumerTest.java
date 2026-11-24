@@ -16,21 +16,25 @@ import org.eclipse.lsp4j.jsonrpc.RemoteEndpoint;
 import org.eclipse.lsp4j.jsonrpc.json.MessageJsonHandler;
 import org.eclipse.lsp4j.jsonrpc.json.StreamMessageConsumer;
 import org.eclipse.lsp4j.jsonrpc.messages.Message;
+import org.eclipse.lsp4j.jsonrpc.messages.MessageIssue;
 import org.eclipse.lsp4j.jsonrpc.messages.RequestMessage;
 import org.eclipse.lsp4j.jsonrpc.messages.ResponseMessage;
 import org.junit.jupiter.api.Test;
 
 import java.io.ByteArrayOutputStream;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * The LSP console traces of a {@code workspace/executeCommand} request, and of its response, name the command that
- * it executes, without the verbose level (#284).
+ * it executes, without the verbose level (#284). The trace of a message that LSP4J can't parse shows what kept LSP4J
+ * from parsing it (#584).
  */
 class TracingMessageConsumerTest {
 
@@ -94,6 +98,32 @@ class TracingMessageConsumerTest {
 
         assertTrue(response.contains("Received response '<unknown> - (99)' in ?ms."), response);
         assertEquals(1, response.lines().count(), response);
+    }
+
+    @Test
+    void anUnparsableRequestAndTheErrorResponseToItNameItsMethod() {
+        var issue = new MessageIssue("Message could not be parsed.", -32700,
+                new IllegalStateException("Expected an int but was 4294967295"));
+        String request = tracing.logIssues(request("5", "workspace/applyEdit", null), List.of(issue),
+                ServerTrace.verbose, Instant.now());
+        String response = trace(response("5"), SENDING, ServerTrace.messages);
+
+        assertTrue(request.contains("Received request 'workspace/applyEdit - (5)' that could not be parsed.\n"
+                + "Issue: Message could not be parsed. Expected an int but was 4294967295\n"), request);
+        // LSP4J didn't keep the params, which the trace doesn't show as null
+        assertFalse(request.contains("Params"), request);
+        assertTrue(response.contains("Sending response 'workspace/applyEdit - (5)'."), response);
+    }
+
+    @Test
+    void anUnparsableResponseShowsTheMethodOfItsRequest() {
+        trace(request("8", "textDocument/hover", new JsonObject()), SENDING, ServerTrace.messages);
+        String response = tracing.logIssues(response("8"), List.of(new MessageIssue("JSON document was not fully consumed.")),
+                ServerTrace.messages, Instant.now());
+
+        assertTrue(response.contains("Received response 'textDocument/hover - (8)' in "), response);
+        assertTrue(response.contains("that could not be parsed.\nIssue: JSON document was not fully consumed.\n"), response);
+        assertEquals(2, response.lines().count(), response);
     }
 
     private String trace(Message message, MessageConsumer consumer, ServerTrace serverTrace) {
