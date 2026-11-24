@@ -1,1 +1,2 @@
 com.redhat.devtools.lsp4ij.HangingTestWatchdog
+com.redhat.devtools.lsp4ij.installation.definition.tasks.LockFilesTempFolder
