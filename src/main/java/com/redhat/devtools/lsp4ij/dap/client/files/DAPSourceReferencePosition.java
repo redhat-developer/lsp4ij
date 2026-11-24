@@ -36,10 +36,9 @@ public class DAPSourceReferencePosition extends DeferredSourcePosition<DAPSource
      */
     public record SourceParams(@NotNull int sourceReference, int line) {}
 
-    private final @NotNull DAPClient client;
-    private final int sourceReference;
-    // Whether the last load got the text of the source from the debug adapter
-    private volatile boolean textLoaded;
+    // The number of texts written to the document of the file when the last load left the text which the debug adapter
+    // gave for the source in it, or -1 if it left none
+    private volatile long loadedText = -1;
 
     /**
      * Creates a deferred source position based on a DAP sourceReference.
@@ -71,21 +70,20 @@ public class DAPSourceReferencePosition extends DeferredSourcePosition<DAPSource
                                       int column,
                                       @NotNull DAPClient client) {
         super(new SourceParams(sourceReference, line), file, column, client);
-        this.client = client;
-        this.sourceReference = sourceReference;
     }
 
     /**
      * Returns whether the document of the file has the text which the debug adapter gave for the source when the
-     * position was last resolved: the load wrote it, or an earlier load of the same source did, and no other session,
-     * which gave another text for the same source reference, replaced it since. Without it, as when the debug adapter
-     * gave no text, the position is resolved all the same, at the requested line, in a document whose text isn't that
-     * of the source.
+     * position was last resolved: the load wrote it, or an earlier load of the same source did, and no other load,
+     * which got another text, or none, for the same source reference, in this session or another, replaced it since.
+     * Without it, as when the debug adapter gave no text, the position is resolved all the same, at the requested line,
+     * in a document whose text isn't that of the source.
      *
      * @return true if the document of the file has the text of the source, and false otherwise.
      */
     public boolean isTextLoaded() {
-        return textLoaded && ((DAPFile) getFile()).isLoadedSource(client, sourceReference);
+        long text = loadedText;
+        return text >= 0 && ((DAPFile) getFile()).getWrittenTexts() == text;
     }
 
     /**
@@ -118,7 +116,7 @@ public class DAPSourceReferencePosition extends DeferredSourcePosition<DAPSource
         return client.getDebugProtocolServer()
                 .source(args)
                 .thenCompose(sourceResponse -> {
-                    textLoaded = false;
+                    loadedText = -1;
                     if (sourceResponse != null) {
                         String content = sourceResponse.getContent() != null ? sourceResponse.getContent() : "";
 
@@ -137,6 +135,7 @@ public class DAPSourceReferencePosition extends DeferredSourcePosition<DAPSource
                                     if (!StringUtil.equals(doc.getImmutableCharSequence(), normalized)) {
                                         doc.setReadOnly(false);
                                         doc.setText(normalized);
+                                        file.textWritten();
                                     }
                                 } finally {
                                     doc.setReadOnly(true); // Make the document read-only
@@ -148,7 +147,8 @@ public class DAPSourceReferencePosition extends DeferredSourcePosition<DAPSource
                             if (hasText) {
                                 file.setLoadedSource(client, params.sourceReference());
                             }
-                            textLoaded = hasText && !normalized.isEmpty();
+                            // The document keeps the text as long as no other load writes another one
+                            loadedText = hasText && !normalized.isEmpty() ? file.getWrittenTexts() : -1;
                             // Complete the future with the requested line number
                             updatedDoc.complete(params.line());
                         });

@@ -25,6 +25,7 @@ import org.jetbrains.annotations.Nullable;
 import java.lang.ref.Reference;
 import java.lang.ref.WeakReference;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * Represents a virtual, writable file in IntelliJ for content coming from a DAP client.
@@ -71,6 +72,9 @@ public abstract class DAPFile extends LightVirtualFile {
     // another session of the tree ('startDebugging'), may give another text for the same source reference. The client
     // is weakly referenced, so that the file doesn't keep it.
     private volatile @Nullable LoadedSource loadedSource;
+    // The number of texts which loads of source references wrote to the document, each replacing the one it had: the
+    // document keeps the text which a load left in it as long as the number stays the same
+    private final AtomicLong writtenTexts = new AtomicLong();
 
     public DAPFile(@NlsSafe String name,
                    @NotNull String path,
@@ -116,6 +120,23 @@ public abstract class DAPFile extends LightVirtualFile {
     }
 
     private record LoadedSource(@NotNull Reference<DAPClient> client, int sourceReference) {
+    }
+
+    /**
+     * Says that a load of a source reference wrote a text to the document of this file, which replaced the one it had.
+     */
+    void textWritten() {
+        writtenTexts.incrementAndGet();
+    }
+
+    /**
+     * Returns the number of texts which loads of source references wrote to the document of this file: as long as it
+     * stays the same, the document keeps its text.
+     *
+     * @return the number of texts which loads wrote to the document.
+     */
+    long getWrittenTexts() {
+        return writtenTexts.get();
     }
 
     @Override
