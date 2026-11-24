@@ -99,6 +99,8 @@ public abstract class ServerTemplateManager<T extends ServerTemplate> {
             String resourcePath = new URI(filePart).getSchemeSpecificPart();// get decoded part (i.e. converts %20 to spaces ...)
             // resourcePath looks like /Users/username/Library/Application Support/JetBrains/IDEVersion/plugins/LSP4IJ/lib/instrumented-lsp4ij-version.jar!/templates/
             LOGGER.debug("Templates resources path from uri : {}", resourcePath);
+            // Never refresh here: the template services may be created under the read lock, where a synchronous
+            // refresh isn't allowed. TemplateJarRefreshActivity refreshes a rebuilt JAR in a development build.
             return JarFileSystem.getInstance().findFileByPath(resourcePath);
         } catch (URISyntaxException e) {
             LOGGER.warn(e.getMessage());

@@ -515,6 +515,9 @@
         <applicationService
                 id="com.redhat.devtools.lsp4ij.launching.templates.LanguageServerTemplateManager"
                 serviceImplementation="com.redhat.devtools.lsp4ij.launching.templates.LanguageServerTemplateManager"/>
+        <!-- Refreshes the JAR of the LSP and DAP templates in a development build, so that a rebuilt JAR gives its own templates -->
+        <postStartupActivity
+                implementation="com.redhat.devtools.lsp4ij.templates.TemplateJarRefreshActivity"/>
 
         <!-- LSP project services -->
         <projectService
