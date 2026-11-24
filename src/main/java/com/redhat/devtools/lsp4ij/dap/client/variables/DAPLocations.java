@@ -123,7 +123,8 @@ final class DAPLocations {
             var file = DAPFileRegistry.getInstance().getOrCreateDAPFile(client.getConfigName(),
                     DAPStackFrame.getValidSourceName(source), client.getProject());
             var position = new DAPSourceReferencePosition(file, source.getSourceReference(), lineIndex, columnIndex, client);
-            return position.whenResolved().thenApply(resolved -> resolved ? position : null);
+            // A source whose text the DAP server doesn't give can't be opened: its document would be empty, or stale
+            return position.whenResolved().thenApply(resolved -> resolved && position.isTextLoaded() ? position : null);
         }
         Path path = getValidFilePath(source);
         VirtualFile file = path != null ? LocalSourceFiles.findFile(path) : null;

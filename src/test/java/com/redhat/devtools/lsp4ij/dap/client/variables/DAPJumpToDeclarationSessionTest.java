@@ -108,6 +108,8 @@ public class DAPJumpToDeclarationSessionTest extends HeavyPlatformTestCase {
     private static final int ITEM_DECLARATION = 9;
     private static final int DISCOUNT_DECLARATION = 10;
     private static final int GENERATED_SOURCE_REFERENCE = 11;
+    // Another source of the same name, generated.js, with another text
+    private static final int OTHER_GENERATED_SOURCE_REFERENCE = 12;
 
     private static final String SUM = """
             // Sums the items of an order
@@ -227,6 +229,50 @@ public class DAPJumpToDeclarationSessionTest extends HeavyPlatformTestCase {
         var position = jumpToSource(local("discount"));
 
         assertEquals(List.of(DISCOUNT_DECLARATION), List.copyOf(server.locations));
+        assertEquals(sumFile, position.getFile());
+        assertEquals(FRAME_LINE - 1, position.getLine());
+    }
+
+    public void testJumpToSourceSearchesTheNameWhenTheDAPServerGivesNoTextForTheSourceOfTheDeclaration() throws Exception {
+        debug();
+        server.declaresTotalInTheGeneratedSource = true;
+        server.givesSourceText = false;
+
+        var position = jumpToSource(local("total"));
+
+        assertEquals(List.of(TOTAL_DECLARATION), List.copyOf(server.locations));
+        assertEquals(List.of(GENERATED_SOURCE_REFERENCE), List.copyOf(server.sources));
+        // not the generated source, whose document would be empty, but where the name is last found up to the line of
+        // the frame
+        assertEquals(sumFile, position.getFile());
+        assertEquals(FRAME_LINE - 1, position.getLine());
+    }
+
+    public void testJumpToSourceOpensTheSameSourceReferenceTwice() throws Exception {
+        debug();
+        var first = jumpToSource(local("order"));
+        var second = jumpToSource(local("order"));
+
+        assertEquals(List.of(ORDER_DECLARATION, ORDER_DECLARATION), List.copyOf(server.locations));
+        assertEquals(List.of(GENERATED_SOURCE_REFERENCE, GENERATED_SOURCE_REFERENCE), List.copyOf(server.sources));
+        // the second load finds the document read-only, with the text of the same source, which it doesn't write again
+        assertEquals("generated.js", second.getFile().getName());
+        assertEquals(first.getFile(), second.getFile());
+        assertEquals(1, second.getLine());
+    }
+
+    public void testJumpToSourceSearchesTheNameWhenAnotherSourceOfTheSameNameGaveItsDocumentItsText() throws Exception {
+        debug();
+        assertEquals("generated.js", jumpToSource(local("order")).getFile().getName());
+        // The declaration of 'total' is in another source of the same name, whose file is the same, with another text,
+        // which the read-only document doesn't get
+        server.declaresTotalInTheGeneratedSource = true;
+        server.totalSourceReference = OTHER_GENERATED_SOURCE_REFERENCE;
+
+        var position = jumpToSource(local("total"));
+
+        assertEquals(List.of(GENERATED_SOURCE_REFERENCE, OTHER_GENERATED_SOURCE_REFERENCE), List.copyOf(server.sources));
+        // not a line of the text of the first source, but where the name is last found up to the line of the frame
         assertEquals(sumFile, position.getFile());
         assertEquals(FRAME_LINE - 1, position.getLine());
     }
@@ -421,6 +467,12 @@ public class DAPJumpToDeclarationSessionTest extends HeavyPlatformTestCase {
         private final List<Integer> sources = new CopyOnWriteArrayList<>();
         // false to leave the 'locations' requests unanswered, as a DAP server which hangs
         private volatile boolean answersLocations = true;
+        // true to locate the declaration of 'total' in the text of the generated source, not in the frame's file
+        private volatile boolean declaresTotalInTheGeneratedSource;
+        // The source reference of that generated source
+        private volatile int totalSourceReference = GENERATED_SOURCE_REFERENCE;
+        // false to answer the 'source' requests without a body, so without the text of the source
+        private volatile boolean givesSourceText = true;
         private volatile IDebugProtocolClient client;
 
         DeclarationServer(@NotNull Path sum) throws IOException {
@@ -438,6 +490,18 @@ public class DAPJumpToDeclarationSessionTest extends HeavyPlatformTestCase {
             }, "Declaration DAP server");
             accept.setDaemon(true);
             accept.start();
+        }
+
+        /**
+         * Returns the generated source, whose text the DAP server gives for its source reference, as it has a path
+         * which isn't a local file.
+         */
+        private static Source generatedSource(int sourceReference) {
+            var source = new Source();
+            source.setName("generated.js");
+            source.setPath("<generated>/generated.js");
+            source.setSourceReference(sourceReference);
+            return source;
         }
 
         int getPort() {
@@ -532,6 +596,13 @@ public class DAPJumpToDeclarationSessionTest extends HeavyPlatformTestCase {
             if (!answersLocations) {
                 return new CompletableFuture<>();
             }
+            if (reference == TOTAL_DECLARATION && declaresTotalInTheGeneratedSource) {
+                var location = new LocationsResponse();
+                location.setSource(generatedSource(totalSourceReference));
+                location.setLine(2);
+                location.setColumn(5);
+                return CompletableFuture.completedFuture(location);
+            }
             return switch (reference) {
                 case TOTAL_DECLARATION -> {
                     // 'total' in 'let total = 0;'
@@ -543,13 +614,8 @@ public class DAPJumpToDeclarationSessionTest extends HeavyPlatformTestCase {
                 }
                 case ORDER_DECLARATION -> {
                     // 'order' in 'var order = {};'
-                    var source = new Source();
-                    source.setName("generated.js");
-                    // a path which isn't a local file: the text is the DAP server's
-                    source.setPath("<generated>/generated.js");
-                    source.setSourceReference(GENERATED_SOURCE_REFERENCE);
                     var location = new LocationsResponse();
-                    location.setSource(source);
+                    location.setSource(generatedSource(GENERATED_SOURCE_REFERENCE));
                     location.setLine(2);
                     location.setColumn(5);
                     yield CompletableFuture.completedFuture(location);
@@ -568,8 +634,16 @@ public class DAPJumpToDeclarationSessionTest extends HeavyPlatformTestCase {
         @Override
         public CompletableFuture<SourceResponse> source(SourceArguments args) {
             sources.add(args.getSourceReference());
+            if (!givesSourceText) {
+                // an answer without a body
+                return CompletableFuture.completedFuture(null);
+            }
             var response = new SourceResponse();
-            response.setContent(args.getSourceReference() == GENERATED_SOURCE_REFERENCE ? GENERATED : "");
+            response.setContent(switch (args.getSourceReference()) {
+                case GENERATED_SOURCE_REFERENCE -> GENERATED;
+                case OTHER_GENERATED_SOURCE_REFERENCE -> "// generated again\nvar total = 1;\n";
+                default -> "";
+            });
             return CompletableFuture.completedFuture(response);
         }
 

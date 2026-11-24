@@ -12,6 +12,7 @@ package com.redhat.devtools.lsp4ij.dap.client.files;
 
 import com.intellij.openapi.command.WriteCommandAction;
 import com.intellij.openapi.fileEditor.FileDocumentManager;
+import com.intellij.openapi.util.text.StringUtil;
 import com.redhat.devtools.lsp4ij.dap.client.DAPClient;
 import org.eclipse.lsp4j.debug.SourceArguments;
 import org.jetbrains.annotations.NotNull;
@@ -34,6 +35,9 @@ public class DAPSourceReferencePosition extends DeferredSourcePosition<DAPSource
      * @param line            the initial line number to navigate to after loading
      */
     public record SourceParams(@NotNull int sourceReference, int line) {}
+
+    // Whether the last load got the text of the source from the debug adapter
+    private volatile boolean textLoaded;
 
     /**
      * Creates a deferred source position based on a DAP sourceReference.
@@ -68,6 +72,18 @@ public class DAPSourceReferencePosition extends DeferredSourcePosition<DAPSource
     }
 
     /**
+     * Returns whether the document of the file has the text which the debug adapter gave for the source when the
+     * position was last resolved: the load wrote it, or an earlier load of the same source did. Without it, as when the
+     * debug adapter gave no text, or when another source of the same name gave the document its text, the position is
+     * resolved all the same, at the requested line, in a document whose text isn't that of the source.
+     *
+     * @return true if the document of the file has the text of the source, and false otherwise.
+     */
+    public boolean isTextLoaded() {
+        return textLoaded;
+    }
+
+    /**
      * Asynchronously loads the source content and resolves the line number.
      * <p>
      * If the server returns content, the editor document is updated in a write command action:
@@ -94,6 +110,7 @@ public class DAPSourceReferencePosition extends DeferredSourcePosition<DAPSource
         return client.getDebugProtocolServer()
                 .source(args)
                 .thenCompose(sourceResponse -> {
+                    textLoaded = false;
                     if (sourceResponse != null) {
                         String content = sourceResponse.getContent() != null ? sourceResponse.getContent() : "";
 
@@ -103,12 +120,17 @@ public class DAPSourceReferencePosition extends DeferredSourcePosition<DAPSource
                         // Update the editor document inside a write command action
                         WriteCommandAction.runWriteCommandAction(client.getProject(), () -> {
                             var doc = FileDocumentManager.getInstance().getDocument(getFile());
+                            // Normalize line endings to LF
+                            String normalized = content.replace("\r\n", "\n");
                             if (doc != null && doc.isWritable()) {
-                                // Normalize line endings to LF
-                                String normalized = content.replace("\r\n", "\n");
                                 doc.setText(normalized);
                                 doc.setReadOnly(true); // Make the document read-only
                             }
+                            // The document has the text of this answer: it was just written, or an earlier load of the
+                            // same source wrote it. A source of the same name with another text, whose file is the
+                            // same, finds the read-only text of the earlier one
+                            textLoaded = doc != null && !normalized.isEmpty()
+                                    && StringUtil.equals(doc.getImmutableCharSequence(), normalized);
                             // Complete the future with the requested line number
                             updatedDoc.complete(params.line());
                         });
