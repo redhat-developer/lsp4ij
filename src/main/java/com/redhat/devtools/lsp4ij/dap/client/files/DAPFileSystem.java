@@ -21,13 +21,18 @@ import org.jetbrains.annotations.NotNull;
  * Each {@link DAPFile} is stored in this file system and can be
  * accessed via a virtual URL of the form:
  * <pre>
- *     dap-file:///$projectLocationHash/$configName/$sourceName
+ *     dap-file:///$projectLocationHash/$configName/$sourceReference/$sourceName
+ *     dap-file:///$projectLocationHash/$configName/disassembly
  * </pre>
  * <ul>
  *     <li>{@code $projectLocationHash} is a unique identifier of the project location.</li>
  *     <li>{@code $configName} is the name of the run/debug configuration that produced the disassembly.</li>
- *     <li>{@code $sourceName} is the name of the source reference or "disassembly" if the file is a Disassembly file </li>
+ *     <li>{@code $sourceReference} is the source reference of a source which the debug adapter gives the text of:
+ *     each one has its own file, also when sources share a name.</li>
+ *     <li>{@code $sourceName} is the name of the source.</li>
  * </ul>
+ * The URLs of earlier versions, {@code dap-file:///$projectLocationHash/$configName/$sourceName}, without a source
+ * reference, as persisted breakpoints may have them, are still resolved, to a file of that name.
  * <p>
  * This file system does not correspond to any real files on disk and is
  * used solely for displaying disassembly content in the IDE.
@@ -49,11 +54,15 @@ public class DAPFileSystem extends DummyCachingFileSystem<DAPFile> {
     /**
      * Resolves a virtual file path into a {@link DAPFile}.
      * <p>
-     * The expected path format is "/$projectLocationHash/$configName/$sourceName".
+     * The expected path formats are "/$projectLocationHash/$configName/$sourceReference/$sourceName", for a source
+     * given by source reference, and "/$projectLocationHash/$configName/$sourceName", for the disassembly file, whose
+     * name is "disassembly", or for a file of that name, as earlier versions named the ones of the sources given by
+     * source reference.
      * <p>
-     * Example of a valid path:
+     * Examples of valid paths:
      * <pre>
-     *     "/abc123/MyRunConfiguration"
+     *     "/abc123/MyRunConfiguration/5/&lt;anonymous&gt;"
+     *     "/abc123/MyRunConfiguration/disassembly"
      * </pre>
      * where "abc123" is the projectId and "MyRunConfiguration" is the configName.
      * <p>
@@ -67,14 +76,15 @@ public class DAPFileSystem extends DummyCachingFileSystem<DAPFile> {
         // Remove the leading slash from the virtual path
         String dapFilePath = path.substring(1);
 
-        // Split the path into two components: projectId and configName
-        var result = dapFilePath.split("/");
+        // Split the path into its components: projectId, configName, and sourceReference and sourceName, or sourceName
+        // alone. The name of a source given by source reference is what follows its source reference.
+        var result = dapFilePath.split("/", 4);
 
-        // Expect exactly 2 components; otherwise the path is invalid
         // Example:
         // - "abc123/MyRunConfiguration/disassembly"
-        // - "abc123/MyRunConfiguration/@MySourceName"
-        if (result.length != 3) {
+        // - "abc123/MyRunConfiguration/5/MySourceName"
+        // - "abc123/MyRunConfiguration/MySourceName", as earlier versions named the files of the sources
+        if (result.length < 3 || result[result.length - 1].isEmpty()) {
             return null;
         }
 
@@ -85,13 +95,26 @@ public class DAPFileSystem extends DummyCachingFileSystem<DAPFile> {
             return null;
         }
 
-        // The second component is the name of the run/debug configuration that generated this disassembly
+        // The second component is the name of the run/debug configuration that generated this file
         String configName = result[1];
 
-        // The third component is the name of the source name
-        String sourceName = result[2];
+        if (result.length == 3) {
+            // The third component is the name of the source
+            String sourceName = result[2];
+            // Retrieve or create the corresponding file for this project and configuration
+            return DAPFileRegistry.getInstance().getOrCreateDAPFile(configName, sourceName, project);
+        }
 
-        // Retrieve or create the corresponding DisassemblyFile for this project and configuration
-        return DAPFileRegistry.getInstance().getOrCreateDAPFile(configName, sourceName, project);
+        // The third component is the source reference, and the fourth the name of the source
+        int sourceReference;
+        try {
+            sourceReference = Integer.parseInt(result[2]);
+        } catch (NumberFormatException e) {
+            return null;
+        }
+        if (sourceReference <= 0) {
+            return null;
+        }
+        return DAPFileRegistry.getInstance().getOrCreateDAPFile(configName, sourceReference, result[3], project);
     }
 }

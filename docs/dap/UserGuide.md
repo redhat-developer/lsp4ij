@@ -499,7 +499,9 @@ When the DAP server reports the sources it has loaded (`supportsLoadedSourcesReq
 gives them at the first stop, and as the
 [loadedSource](https://microsoft.github.io/debug-adapter-protocol//specification.html#Events_LoadedSource) event adds,
 changes and removes them. Double-clicking a source, or Enter, opens it: a source with a path in its file, and one with
-a `sourceReference` in the text that the DAP server gives for it, read-only.
+a `sourceReference` in the text that the DAP server gives for it, read-only. A source with a `sourceReference`, from
+here, a stack frame or a jump, opens in an editor tab of its own, named after the source, also when sources share a
+name, as scripts evaluated with `eval` often do.
 
 When the DAP server reports its modules (`supportsModulesRequest`), a `Modules` tab lists each module's name, version
 and path, and whether it is user code, as the

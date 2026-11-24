@@ -22,8 +22,11 @@ import org.jetbrains.annotations.NotNull;
  * <p>
  * The {@link #getPath()} method inherited from {@link DAPFile} has the form:
  * <pre>
- *   $projectLocationHash/$configName/$sourceName
+ *   $projectLocationHash/$configName/$sourceReference/$sourceName
  * </pre>
+ * Each source reference has its own file, named {@code $sourceName}, also when sources share a name, as the scripts
+ * evaluated with {@code eval}, all named {@code <anonymous>}, do. The paths of earlier versions,
+ * {@code $projectLocationHash/$configName/$sourceName}, name a file of that name.
  * The {@link #getUrl()} method inherited from {@link DAPFile} returns:
  * <pre>
  *   dap-file:///$path

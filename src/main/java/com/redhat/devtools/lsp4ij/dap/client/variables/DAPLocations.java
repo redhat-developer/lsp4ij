@@ -121,7 +121,7 @@ final class DAPLocations {
             // The text of a source with a source reference is asked for even if the source has a path, and the position
             // in it is known once the DAP server gave the text
             var file = DAPFileRegistry.getInstance().getOrCreateDAPFile(client.getConfigName(),
-                    DAPStackFrame.getValidSourceName(source), client.getProject());
+                    source.getSourceReference(), DAPStackFrame.getValidSourceName(source), client.getProject());
             var position = new DAPSourceReferencePosition(file, source.getSourceReference(), lineIndex, columnIndex, client);
             // A source whose text the DAP server doesn't give can't be opened: its document would be empty, or stale
             return position.whenResolved().thenApply(resolved -> resolved && position.isTextLoaded() ? position : null);

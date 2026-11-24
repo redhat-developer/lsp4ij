@@ -17,6 +17,7 @@ import com.intellij.execution.runners.ExecutionEnvironmentBuilder;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.editor.LogicalPosition;
+import com.intellij.openapi.fileEditor.FileDocumentManager;
 import com.intellij.openapi.fileEditor.FileEditorManager;
 import com.intellij.openapi.fileEditor.OpenFileDescriptor;
 import com.intellij.openapi.util.io.FileUtil;
@@ -126,6 +127,11 @@ public class DAPJumpToDeclarationSessionTest extends HeavyPlatformTestCase {
     private static final String GENERATED = """
             // generated
             var order = {};
+            """;
+    // The text of the other source of the same name
+    private static final String OTHER_GENERATED = """
+            // generated again
+            var total = 1;
             """;
 
     private VirtualFile sumFile;
@@ -261,20 +267,31 @@ public class DAPJumpToDeclarationSessionTest extends HeavyPlatformTestCase {
         assertEquals(1, second.getLine());
     }
 
-    public void testJumpToSourceSearchesTheNameWhenAnotherSourceOfTheSameNameGaveItsDocumentItsText() throws Exception {
+    public void testJumpToSourceOpensADeclarationInAnotherSourceOfTheSameName() throws Exception {
         debug();
-        assertEquals("generated.js", jumpToSource(local("order")).getFile().getName());
-        // The declaration of 'total' is in another source of the same name, whose file is the same, with another text,
-        // which the read-only document doesn't get
+        var first = jumpToSource(local("order"));
+        assertEquals("generated.js", first.getFile().getName());
+        // The declaration of 'total' is in another source of the same name, with another text, which has a file, and
+        // an editor tab, of its own
         server.declaresTotalInTheGeneratedSource = true;
         server.totalSourceReference = OTHER_GENERATED_SOURCE_REFERENCE;
 
         var position = jumpToSource(local("total"));
 
         assertEquals(List.of(GENERATED_SOURCE_REFERENCE, OTHER_GENERATED_SOURCE_REFERENCE), List.copyOf(server.sources));
-        // not a line of the text of the first source, but where the name is last found up to the line of the frame
-        assertEquals(sumFile, position.getFile());
-        assertEquals(FRAME_LINE - 1, position.getLine());
+        assertEquals("generated.js", position.getFile().getName());
+        assertNotSame(first.getFile(), position.getFile());
+        assertEquals(1, position.getLine());
+        position.createNavigatable(getProject()).navigate(true);
+        var editor = waitForCaret(new LogicalPosition(1, 4));
+        assertEquals(OTHER_GENERATED, editor.getDocument().getText());
+        assertTrue(textAtCaret(editor).startsWith("total = 1"));
+
+        // and the file of the first source keeps its text
+        assertEquals(GENERATED, FileDocumentManager.getInstance().getDocument(first.getFile()).getText());
+        var again = jumpToSource(local("order"));
+        assertEquals(first.getFile(), again.getFile());
+        assertEquals(GENERATED, FileDocumentManager.getInstance().getDocument(again.getFile()).getText());
     }
 
     public void testJumpToSourceSearchesTheNameWhenTheDAPServerDoesNotAnswer() throws Exception {
@@ -641,7 +658,7 @@ public class DAPJumpToDeclarationSessionTest extends HeavyPlatformTestCase {
             var response = new SourceResponse();
             response.setContent(switch (args.getSourceReference()) {
                 case GENERATED_SOURCE_REFERENCE -> GENERATED;
-                case OTHER_GENERATED_SOURCE_REFERENCE -> "// generated again\nvar total = 1;\n";
+                case OTHER_GENERATED_SOURCE_REFERENCE -> OTHER_GENERATED;
                 default -> "";
             });
             return CompletableFuture.completedFuture(response);
