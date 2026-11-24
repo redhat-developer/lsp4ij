@@ -195,6 +195,29 @@ public class GitHubDownloadTaskTest {
     }
 
     @Test
+    public void testTheLogHasNoSecretOfTheUrlOfADownload() throws Exception {
+        server.answer(RELEASES_PATH, GitHubAssetFetcherTest.rateLimit(403, 60, RESET));
+        server.answer(ASSET_PATH, Response.ok("server"), new Response(500, Map.of(), ""));
+        String url = server.url() + ASSET_PATH + "?access_token=" + TOKEN;
+
+        try (var log = new LogRecorder()) {
+            // The fallback to the url of the download, which downloads, and then fails
+            assertTrue(createTask(Map.of(), url).run(new RecordingContext()));
+            assertFalse(createTask(Map.of(), url).run(new RecordingContext()));
+
+            assertFalse(log.output().contains(TOKEN), "The log must not have the token of the URL: " + log.output());
+            var lines = infoAndWarnings(log);
+            String redacted = server.url() + ASSET_PATH + "?access_token=<redacted>";
+            assertTrue(lines.stream().anyMatch(line -> line.endsWith("falling back to the 'url' of the download: "
+                    + redacted)), log.output());
+            assertTrue(lines.stream().anyMatch(line -> line.startsWith("INFO Installer 'test' downloaded "
+                    + redacted + " (6 bytes) in ")), log.output());
+            assertTrue(lines.stream().anyMatch(line -> line.startsWith("WARNING Installer 'test': the download of "
+                    + redacted + " failed\n")), log.output());
+        }
+    }
+
+    @Test
     public void testTheLogWarnsOfAFailedDownload() throws Exception {
         server.answer(RELEASES_PATH, Response.ok(releases(server.url() + ASSET_PATH)));
         server.answer(ASSET_PATH, new Response(500, Map.of(), ""));
