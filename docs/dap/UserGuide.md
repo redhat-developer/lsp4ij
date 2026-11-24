@@ -429,6 +429,15 @@ which the DAP server gives with them. `Jump to Value Source` is shown only for a
 while the program is suspended, since the DAP server's reference is valid only until the program resumes. When the DAP
 server answers with an error or without a location, or the file of the location isn't found, a notification says so.
 
+`Jump to Source` on a variable opens its declaration when the DAP server gives the variable the location of its
+declaration ([declarationLocationReference](https://microsoft.github.io/debug-adapter-protocol//specification.html#Types_Variable)),
+as lldb-dap does: it asks the DAP server where that is, with the Locations request, and opens the source at the line
+and column of the answer, as `Jump to Value Source` does. DAP gives a declaration to a variable only, not to the result
+of an expression. For a variable without one, when the DAP server answers with an error or without a location, or not
+within 3 seconds, and when the program has run since the variable was shown, `Jump to Source` goes, as before, to where
+the name of the variable is found in the file of its stack frame, up to the frame's line. The
+[inline values](#inline-value) are always shown there, never at the declarations.
+
 ## Set value
 
 If debug adapter [supports setting a variable to a value](https://microsoft.github.io/debug-adapter-protocol//specification.html#Types_Capabilities),
