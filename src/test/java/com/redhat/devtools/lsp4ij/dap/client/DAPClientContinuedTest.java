@@ -27,7 +27,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * A 'continued' event shows the program as running: the session resumes when it is suspended at a stop of the client
  * which received the event, and the event continued the thread of that stop. A 'continued' event of another thread
- * leaves the session suspended, and shows the threads again.
+ * leaves the session suspended, and shows the threads again. A stop whose thread continued while the session was
+ * being suspended there doesn't stay suspended.
  */
 public class DAPClientContinuedTest {
 
@@ -95,6 +96,31 @@ public class DAPClientContinuedTest {
         assertTrue(DAPClient.continues(event(OTHER_THREAD, true), STOPPED_THREAD));
         assertTrue(DAPClient.continues(event(STOPPED_THREAD, false), STOPPED_THREAD));
         assertFalse(DAPClient.continues(event(OTHER_THREAD, false), STOPPED_THREAD));
+    }
+
+    @Test
+    void aStopWhichDidNotContinueStaysSuspended() {
+        assertFalse(DAPClient.resumeIfContinued(session(true, ownStop), ownStop, () -> false));
+
+        assertEquals(List.of(), calls);
+    }
+
+    @Test
+    void aStopWhichContinuedWhileTheSessionWasBeingSuspendedResumesTheSession() {
+        // the 'continued' event arrived before the session was suspended at the stop, and found nothing to resume
+        assertTrue(DAPClient.resumeIfContinued(session(true, ownStop), ownStop, () -> true));
+
+        assertEquals(List.of("resumed"), calls);
+    }
+
+    @Test
+    void aStopWhichContinuedLeavesTheSessionAsItIsOnceItIsNoLongerSuspendedThere() {
+        // the 'continued' event resumed the session itself
+        assertTrue(DAPClient.resumeIfContinued(session(false, null), ownStop, () -> true));
+        // another stop suspended the session since
+        assertTrue(DAPClient.resumeIfContinued(session(true, otherClientStop), ownStop, () -> true));
+
+        assertEquals(List.of(), calls);
     }
 
     private @Nullable Integer stoppedThread(@Nullable XSuspendContext context) {
