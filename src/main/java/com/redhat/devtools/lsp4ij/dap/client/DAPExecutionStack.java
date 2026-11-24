@@ -14,10 +14,12 @@ import com.intellij.openapi.util.NlsContexts;
 import com.intellij.util.containers.ContainerUtil;
 import com.intellij.xdebugger.frame.XExecutionStack;
 import com.intellij.xdebugger.frame.XStackFrame;
+import com.redhat.devtools.lsp4ij.dap.DAPBundle;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import org.eclipse.lsp4j.debug.StackFrame;
 import org.eclipse.lsp4j.debug.StackTraceArguments;
 import org.eclipse.lsp4j.debug.Thread;
+import org.jetbrains.annotations.Nls;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -64,6 +66,12 @@ public class DAPExecutionStack extends XExecutionStack {
     @Override
     public void computeStackFrames(int firstFrameIndex,
                                    @NotNull XStackFrameContainer container) {
+        String leftStop = getLeftStopMessage();
+        if (leftStop != null) {
+            // The frames of the stop are out of date, and the debug adapter has none for a thread which runs
+            container.errorOccurred(leftStop);
+            return;
+        }
         if (firstFrameIndex == 0) {
             if (stackFrames != null) {
                 // The DAP stack frames was previously loaded
@@ -90,6 +98,24 @@ public class DAPExecutionStack extends XExecutionStack {
 
     public int getThreadId() {
         return threadId;
+    }
+
+    /**
+     * Returns why this stack shows no frames once its thread left the stop of its suspend context, as when the debug
+     * adapter said that the thread continued alone ('allThreadsContinued: false') while the session stays suspended
+     * where another thread stopped, or that it exited: IntelliJ's suspend context keeps the stacks of the threads which
+     * it was created with.
+     *
+     * @return the message which the Frames view shows instead of the frames, or null while the thread is stopped.
+     */
+    private @Nullable @Nls String getLeftStopMessage() {
+        var states = client.getThreadRunStates();
+        if (!states.leftStopSince(suspendContext.getThreadRunStatesVersion(), threadId)) {
+            return null;
+        }
+        return states.getState(threadId) == DAPThreadRunState.EXITED ?
+                DAPBundle.message("dap.frames.thread.exited") :
+                DAPBundle.message("dap.frames.thread.running");
     }
 
     /**
