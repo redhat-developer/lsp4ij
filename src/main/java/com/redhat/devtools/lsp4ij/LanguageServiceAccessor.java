@@ -1479,6 +1479,17 @@ public class LanguageServiceAccessor implements Disposable {
     }
 
     /**
+     * Returns the modification count of the language servers of the project: it advances when a language server
+     * definition is added or removed, and when a language server changes its status, as when it starts or stops.
+     *
+     * @return the modification count of the language servers of the project.
+     */
+    @ApiStatus.Internal
+    public long getModificationCount() {
+        return modificationTracker.getModificationCount();
+    }
+
+    /**
      * Returns a modification count for a server's file associations, including
      * project-level definition additions/removals and the wrapper's configuration.
      *

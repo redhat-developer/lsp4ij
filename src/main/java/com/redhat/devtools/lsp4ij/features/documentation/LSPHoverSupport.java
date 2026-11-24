@@ -13,6 +13,7 @@ package com.redhat.devtools.lsp4ij.features.documentation;
 import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.LSPRequestConstants;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
+import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
 import com.redhat.devtools.lsp4ij.features.AbstractLSPDocumentFeatureSupport;
 import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
 import org.eclipse.lsp4j.HoverParams;
@@ -45,8 +46,31 @@ public class LSPHoverSupport extends AbstractLSPDocumentFeatureSupport<HoverPara
 
     private Integer previousOffset;
 
+    // The modification count of the language servers of the project when the hover was loaded: a language server
+    // added, removed, started or stopped since may answer, or no longer, so the hover loaded before isn't given again
+    private long serversModificationCount = -1;
+
     public LSPHoverSupport(@NotNull PsiFile file) {
         super(file, true, true);
+    }
+
+    @Override
+    protected synchronized CompletableFuture<List<HoverData>> load(HoverParams params) {
+        // Read before the requests are sent, as the modification stamps are: a language server which starts for this
+        // hover makes the hover out of date for the next one, which then asks it too
+        long modificationCount = getServersModificationCount();
+        var future = super.load(params);
+        serversModificationCount = modificationCount;
+        return future;
+    }
+
+    @Override
+    protected boolean checkValid() {
+        return super.checkValid() && serversModificationCount == getServersModificationCount();
+    }
+
+    private long getServersModificationCount() {
+        return LanguageServiceAccessor.getInstance(getFile().getProject()).getModificationCount();
     }
 
     public CompletableFuture<List<HoverData>> getHover(LSPHoverParams params) {

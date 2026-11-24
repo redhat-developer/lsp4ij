@@ -146,6 +146,20 @@ public class LSPSemanticTokenDocumentationProviderTest extends LSPSemanticTokens
         assertEquals(body, 1, StringUtil.getOccurrenceCount(body, "<hr />"));
     }
 
+    public void testTheHoverAtTheSameOffsetAfterALanguageServerIsAddedHasItsHoverToo() {
+        PsiFile file = openFile();
+        var hover = new Hover(new MarkupContent(MarkupKind.PLAINTEXT, "First line\nSecond line"));
+        String before = UIUtil.getHtmlBody(getHintText(file, hover));
+        assertFalse(before, before.contains("Third line"));
+
+        // The hover of the file at the same offset, unchanged, isn't given again once a language server is added (#2207)
+        addSecondServer(new Hover(new MarkupContent(MarkupKind.PLAINTEXT, "Third line\nFourth line")));
+
+        String body = UIUtil.getHtmlBody(getHintText(file, hover));
+        assertTrue(body, body.contains("First line<br>Second line"));
+        assertTrue(body, body.contains("Third line<br>Fourth line"));
+    }
+
     public void testTheHoverOfALanguageServerWhenTheOtherOneCannotStart() {
         PsiFile file = openFile();
         addSecondServerWhichCannotStart();
