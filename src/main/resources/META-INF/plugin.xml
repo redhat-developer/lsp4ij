@@ -1290,7 +1290,10 @@
         <!-- The context menu of the "Threads" panel of a DAP debug session, installed by ThreadsPanel -->
         <group id="DAP.Threads.Popup">
             <action id="DAP.TerminateThread"
-                    class="com.redhat.devtools.lsp4ij.dap.threads.DAPTerminateThreadAction"/>
+                    class="com.redhat.devtools.lsp4ij.dap.threads.DAPTerminateThreadAction">
+                <!-- Terminates the thread of the selected frame there -->
+                <add-to-group group-id="XDebugger.Frames.Tree.Popup" anchor="last"/>
+            </action>
         </group>
         <action id="DAP.JumpToValueSource"
                 class="com.redhat.devtools.lsp4ij.dap.client.variables.DAPJumpToValueSourceAction">

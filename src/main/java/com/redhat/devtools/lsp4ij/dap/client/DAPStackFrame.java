@@ -55,6 +55,7 @@ public class DAPStackFrame extends XStackFrame {
     private final @NotNull StackFrame stackFrame;
     private final @NotNull DAPClient client;
     private final int executionEpoch;
+    private final @Nullable Integer threadId;
     private volatile @Nullable XSourcePosition sourcePosition;
     private @Nullable DisassemblyDeferredSourcePosition disassemblyInstructionSourcePosition;
     private XDebuggerEvaluator evaluator;
@@ -73,9 +74,23 @@ public class DAPStackFrame extends XStackFrame {
     public DAPStackFrame(@NotNull DAPClient client,
                          @NotNull StackFrame stackFrame,
                          int executionEpoch) {
+        this(client, stackFrame, executionEpoch, null);
+    }
+
+    /**
+     * @param client         the client of the debug adapter.
+     * @param stackFrame     the stack frame which the debug adapter sent.
+     * @param executionEpoch the execution epoch of the stop of the program at which the debug adapter sent the frame.
+     * @param threadId       the ID of the DAP thread whose stack trace the frame is part of, or null if it isn't known.
+     */
+    public DAPStackFrame(@NotNull DAPClient client,
+                         @NotNull StackFrame stackFrame,
+                         int executionEpoch,
+                         @Nullable Integer threadId) {
         this.client = client;
         this.stackFrame = stackFrame;
         this.executionEpoch = executionEpoch;
+        this.threadId = threadId;
     }
 
     @Override
@@ -285,6 +300,16 @@ public class DAPStackFrame extends XStackFrame {
      */
     public int getExecutionEpoch() {
         return executionEpoch;
+    }
+
+    /**
+     * Returns the ID of the DAP thread whose stack trace this frame is part of, as the 'stackTrace' request which
+     * returned it asked for. It is null when the frame was created without it, by a constructor which doesn't take it.
+     *
+     * @return the ID of the DAP thread of this frame, or null if it isn't known.
+     */
+    public @Nullable Integer getThreadId() {
+        return threadId;
     }
 
     /**
