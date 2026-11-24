@@ -99,7 +99,10 @@ public abstract class ServerTemplateManager<T extends ServerTemplate> {
             String resourcePath = new URI(filePart).getSchemeSpecificPart();// get decoded part (i.e. converts %20 to spaces ...)
             // resourcePath looks like /Users/username/Library/Application Support/JetBrains/IDEVersion/plugins/LSP4IJ/lib/instrumented-lsp4ij-version.jar!/templates/
             LOGGER.debug("Templates resources path from uri : {}", resourcePath);
-            return JarFileSystem.getInstance().findFileByPath(resourcePath);
+            // Refresh the JAR content before reading it: after the plugin JAR is rebuilt
+            // at the same path (snapshot or runIde), the VFS cache can still hold the
+            // previous content, so templates would come from a stale cache (see #1949).
+            return JarFileSystem.getInstance().refreshAndFindFileByPath(resourcePath);
         } catch (URISyntaxException e) {
             LOGGER.warn(e.getMessage());
         }
