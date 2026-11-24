@@ -15,19 +15,28 @@ import com.intellij.execution.configurations.ConfigurationType;
 import com.intellij.execution.executors.DefaultDebugExecutor;
 import com.intellij.execution.runners.ExecutionEnvironmentBuilder;
 import com.intellij.openapi.actionSystem.ActionManager;
+import com.intellij.openapi.actionSystem.ActionUpdateThread;
 import com.intellij.openapi.actionSystem.AnAction;
 import com.intellij.openapi.actionSystem.AnActionEvent;
+import com.intellij.openapi.actionSystem.CommonDataKeys;
 import com.intellij.openapi.actionSystem.CustomizedDataContext;
 import com.intellij.openapi.actionSystem.DataContext;
 import com.intellij.openapi.actionSystem.DefaultActionGroup;
+import com.intellij.openapi.actionSystem.impl.SimpleDataContext;
+import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.application.ReadAction;
 import com.intellij.testFramework.HeavyPlatformTestCase;
 import com.intellij.testFramework.PlatformTestUtil;
 import com.intellij.testFramework.TestActionEvent;
 import com.intellij.ui.PopupHandler;
 import com.intellij.xdebugger.XDebugSession;
 import com.intellij.xdebugger.XDebuggerManager;
+import com.intellij.xdebugger.frame.XExecutionStack;
+import com.intellij.xdebugger.frame.XStackFrame;
 import com.redhat.devtools.lsp4ij.dap.DAPDebugProcess;
 import com.redhat.devtools.lsp4ij.dap.DebugMode;
+import com.redhat.devtools.lsp4ij.dap.client.DAPExecutionStack;
+import com.redhat.devtools.lsp4ij.dap.client.DAPStackFrame;
 import com.redhat.devtools.lsp4ij.dap.configurations.DAPRunConfiguration;
 import org.eclipse.lsp4j.debug.Capabilities;
 import org.eclipse.lsp4j.debug.ConfigurationDoneArguments;
@@ -60,6 +69,7 @@ import java.io.IOException;
 import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -70,12 +80,14 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.stream.IntStream;
 
 /**
- * "Terminate Thread" in the context menu of the "Threads" panel, against a DAP server in the test's process which the
- * session attaches to: it is shown when the DAP server supports 'terminateThreads', and sends it with the selected
- * threads, to the DAP session they are threads of, without the EDT waiting for the answer.
+ * "Terminate Thread" in the context menu of the "Threads" panel, and in the one of IntelliJ's Frames view, against a
+ * DAP server in the test's process which the session attaches to: it is shown when the DAP server supports
+ * 'terminateThreads', and sends it with the selected threads, or the thread of the selected frame, to the DAP session
+ * they are threads of, without the EDT waiting for the answer.
  */
 public class DAPTerminateThreadSessionTest extends HeavyPlatformTestCase {
 
@@ -87,6 +99,10 @@ public class DAPTerminateThreadSessionTest extends HeavyPlatformTestCase {
      * How long a test waits for a request which must not come.
      */
     private static final int NO_REQUEST_SECONDS = 2;
+    /**
+     * The context menu of IntelliJ's Frames view (XDebuggerActions.FRAMES_TREE_POPUP_GROUP).
+     */
+    private static final String FRAMES_VIEW_POPUP_GROUP_ID = "XDebugger.Frames.Tree.Popup";
 
     private SessionServer server;
     private XDebugSession session;
@@ -235,6 +251,75 @@ public class DAPTerminateThreadSessionTest extends HeavyPlatformTestCase {
         assertEquals(List.of("main [running]", "worker [running]"), getRows());
     }
 
+    public void testTheContextMenuOfTheFramesViewHasTerminateThread() {
+        var actionManager = ActionManager.getInstance();
+        var group = actionManager.getAction(FRAMES_VIEW_POPUP_GROUP_ID);
+        assertInstanceOf(group, DefaultActionGroup.class);
+        assertContainsElements(Arrays.stream(((DefaultActionGroup) group).getChildActionsOrStubs()).map(actionManager::getId).toList(),
+                DAPTerminateThreadAction.ID);
+    }
+
+    public void testTerminateThreadInTheFramesViewSendsTerminateThreadsWithTheThreadOfTheSelectedFrame() throws Exception {
+        var root = debug(true);
+        // The program stops in main, and the user right-clicks a frame of the worker in the Frames view
+        stopIn(root, Session.MAIN);
+        selectTopFrameOf(Session.WORKER);
+
+        var event = updateInFramesView();
+        assertTrue("The Frames view offers Terminate Thread for the frame of the worker", event.getPresentation().isEnabledAndVisible());
+        terminateThread().actionPerformed(event);
+
+        var args = root.terminateThreads.poll(BOUND_SECONDS, TimeUnit.SECONDS);
+        assertNotNull("The DAP server receives 'terminateThreads'", args);
+        assertEquals(List.of(Session.WORKER), Arrays.stream(args.getThreadIds()).boxed().toList());
+        root.answerTerminateThreads();
+    }
+
+    public void testTerminateThreadInTheFramesViewTerminatesTheThreadInTheSessionOfTheFrame() throws Exception {
+        var root = debug(true);
+        var child = startChildSession(root);
+        // The sessions of a tree share the debug session, which shows the frames of the child session once it stops
+        stopIn(child, Session.MAIN);
+        selectTopFrameOf(Session.WORKER);
+
+        terminateThread().actionPerformed(updateInFramesView());
+
+        var args = child.terminateThreads.poll(BOUND_SECONDS, TimeUnit.SECONDS);
+        assertNotNull("The DAP server of the child session receives 'terminateThreads'", args);
+        assertEquals(List.of(Session.WORKER), Arrays.stream(args.getThreadIds()).boxed().toList());
+        assertNull("The root session gets no request", root.terminateThreads.poll(NO_REQUEST_SECONDS, TimeUnit.SECONDS));
+        child.answerTerminateThreads();
+    }
+
+    public void testTerminateThreadIsNotInTheFramesViewWhenTheDAPServerDoesNotSupportTerminateThreads() throws Exception {
+        var root = debug(false);
+        stopIn(root, Session.MAIN);
+        selectTopFrameOf(Session.WORKER);
+
+        assertNotOfferedInFramesView(root);
+    }
+
+    public void testTerminateThreadIsNotInTheFramesViewForAFrameOfAnotherDebugger() throws Exception {
+        var root = debug(true);
+        stopIn(root, Session.MAIN);
+        // As the frames of a debugger other than DAP's, which the Frames view shows with the same context menu
+        session.setCurrentStackFrame(executionStackOf(Session.WORKER), new XStackFrame() {
+        }, true);
+
+        assertNotOfferedInFramesView(root);
+    }
+
+    public void testTerminateThreadIsNotInTheFramesViewForAFrameWhichDoesNotKnowItsThread() throws Exception {
+        var root = debug(true);
+        stopIn(root, Session.MAIN);
+        var stack = executionStackOf(Session.WORKER);
+        var frame = (DAPStackFrame) framesOf(stack).get(0);
+        // As a frame which code that extends LSP4IJ creates with a constructor which doesn't take the thread
+        session.setCurrentStackFrame(stack, new DAPStackFrame(frame.getClient(), frame.getStackFrame(), frame.getExecutionEpoch()), true);
+
+        assertNotOfferedInFramesView(root);
+    }
+
     public void testAThreadWhichThePanelDoesNotShowReloadsTheThreadsOfItsSession() throws Exception {
         var root = debug(true);
         var child = startChildSession(root);
@@ -343,6 +428,126 @@ public class DAPTerminateThreadSessionTest extends HeavyPlatformTestCase {
         var event = TestActionEvent.createTestEvent(action, CustomizedDataContext.withSnapshot(DataContext.EMPTY_CONTEXT, panel::uiDataSnapshot));
         action.update(event);
         return event;
+    }
+
+    /**
+     * Makes the given session stop in the given thread, and waits until the debug session is suspended in the top frame
+     * of that thread, as the Frames view then shows it.
+     */
+    private void stopIn(@NotNull Session stopped, int threadId) {
+        stopped.stop(threadId);
+        PlatformTestUtil.waitWithEventsDispatching(
+                () -> "the debug session is suspended in the frame of thread " + threadId + ", not in " + session.getCurrentStackFrame(),
+                () -> session.isSuspended()
+                        && session.getCurrentStackFrame() instanceof DAPStackFrame frame
+                        && frame.getFrameId() == Session.frameId(threadId),
+                BOUND_SECONDS);
+    }
+
+    /**
+     * Returns the execution stack of the given thread at the stop where the debug session is suspended.
+     */
+    private @NotNull DAPExecutionStack executionStackOf(int threadId) {
+        var context = session.getSuspendContext();
+        assertNotNull("the debug session is suspended", context);
+        return Arrays.stream(context.getExecutionStacks())
+                .map(DAPExecutionStack.class::cast)
+                .filter(stack -> stack.getThreadId() == threadId)
+                .findFirst()
+                .orElseThrow(() -> new AssertionError("the stop has no execution stack of thread " + threadId));
+    }
+
+    /**
+     * Returns the frames of the given execution stack, which asks the DAP server for them when the stack is of a thread
+     * other than the one which stopped, as when the Frames view shows that thread.
+     */
+    private static @NotNull List<XStackFrame> framesOf(@NotNull XExecutionStack stack) {
+        var frames = new ArrayList<XStackFrame>();
+        var loaded = new CompletableFuture<List<XStackFrame>>();
+        stack.computeStackFrames(0, new XExecutionStack.XStackFrameContainer() {
+            @Override
+            public void addStackFrames(@NotNull List<? extends XStackFrame> stackFrames, boolean last) {
+                frames.addAll(stackFrames);
+                if (last) {
+                    loaded.complete(List.copyOf(frames));
+                }
+            }
+
+            @Override
+            public void errorOccurred(@NotNull String errorMessage) {
+                loaded.completeExceptionally(new AssertionError(errorMessage));
+            }
+
+            @Override
+            public boolean isObsolete() {
+                return false;
+            }
+        });
+        PlatformTestUtil.waitWithEventsDispatching("the frames of " + stack.getDisplayName() + " load", loaded::isDone, BOUND_SECONDS);
+        var result = loaded.join();
+        assertFalse("the DAP server sent frames of " + stack.getDisplayName(), result.isEmpty());
+        return result;
+    }
+
+    /**
+     * Selects the top frame of the given thread in the Frames view, as a right-click on it does. The Frames view
+     * (XFramesView) selects the frame under the mouse before it shows its context menu, then makes the selected frame
+     * the session's current frame, with the execution stack of its thread, with XDebugSession#setCurrentStackFrame,
+     * which this calls. In the split debugger (2026.x), the backend session does the same when the frontend tells it
+     * the frame.
+     */
+    private void selectTopFrameOf(int threadId) {
+        var stack = executionStackOf(threadId);
+        var frame = framesOf(stack).get(0);
+        session.setCurrentStackFrame(stack, frame, true);
+        assertSame("the selected frame is the current frame of the debug session", frame, session.getCurrentStackFrame());
+    }
+
+    /**
+     * Updates "Terminate Thread" as the context menu of IntelliJ's Frames view does, in the background as the action
+     * asks, with the data which the menu has there:
+     * <ul>
+     *     <li>The frames list (XDebuggerFramesList), the component of the menu, gives no data of the frame: only the
+     *     list itself, under a private key, and the navigatable and the file of the selected frame. Unlike the Threads
+     *     panel, it gives no {@link ThreadsPanel#SELECTED_THREADS}.</li>
+     *     <li>The tab of the debug session above it (XDebugSessionTab) gives {@link XDebugSession#DATA_KEY}, in
+     *     2024.2. In the split debugger (2026.x), the tab gives an internal session proxy instead, and the action takes
+     *     the project's current session, which tests don't have, as no session tab is selected in tests.</li>
+     *     <li>The IDE gives the project.</li>
+     * </ul>
+     * The EDT waits for the update without dispatching events, so that the frame which the test selected stays the
+     * session's current frame until the action is performed. In the split debugger (2026.x) of the tests, the backend
+     * session tells the frontend each frame which it is given, and the frontend's Frames view selects one of its own
+     * frames in turn, on the EDT, which replaces a frame that the view doesn't show.
+     */
+    private @NotNull AnActionEvent updateInFramesView() throws Exception {
+        var action = terminateThread();
+        var context = SimpleDataContext.builder()
+                .add(CommonDataKeys.PROJECT, getProject())
+                .add(XDebugSession.DATA_KEY, session)
+                .build();
+        var event = TestActionEvent.createTestEvent(action, context);
+        assertEquals(ActionUpdateThread.BGT, action.getActionUpdateThread());
+        var updated = ApplicationManager.getApplication().executeOnPooledThread(() -> ReadAction.run(() -> action.update(event)));
+        try {
+            updated.get(BOUND_SECONDS, TimeUnit.SECONDS);
+        } catch (TimeoutException e) {
+            throw new AssertionError("the update of Terminate Thread in the background doesn't end", e);
+        }
+        return event;
+    }
+
+    /**
+     * Asserts that the context menu of the Frames view doesn't offer "Terminate Thread", and that performing it anyway,
+     * as from a shortcut, sends the given session's DAP server no 'terminateThreads'.
+     */
+    private void assertNotOfferedInFramesView(@NotNull Session root) throws Exception {
+        var event = updateInFramesView();
+        assertFalse("The Frames view doesn't show Terminate Thread", event.getPresentation().isVisible());
+        assertFalse("Terminate Thread is disabled in the Frames view", event.getPresentation().isEnabled());
+
+        terminateThread().actionPerformed(event);
+        assertNull("The DAP server gets no 'terminateThreads'", root.terminateThreads.poll(NO_REQUEST_SECONDS, TimeUnit.SECONDS));
     }
 
     /**
@@ -541,7 +746,7 @@ public class DAPTerminateThreadSessionTest extends HeavyPlatformTestCase {
         @Override
         public CompletableFuture<StackTraceResponse> stackTrace(StackTraceArguments args) {
             var frame = new StackFrame();
-            frame.setId(10 + args.getThreadId());
+            frame.setId(frameId(args.getThreadId()));
             frame.setName("run");
             frame.setLine(5);
             var response = new StackTraceResponse();
@@ -560,6 +765,13 @@ public class DAPTerminateThreadSessionTest extends HeavyPlatformTestCase {
         @Override
         public CompletableFuture<Void> disconnect(DisconnectArguments args) {
             return CompletableFuture.completedFuture(null);
+        }
+
+        /**
+         * Returns the ID of the only frame of the given thread, which 'stackTrace' answers.
+         */
+        static int frameId(int threadId) {
+            return 10 + threadId;
         }
 
         private static Thread thread(int id, String name) {
