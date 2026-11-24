@@ -501,7 +501,9 @@ gives them at the first stop, and as the
 changes and removes them. Double-clicking a source, or Enter, opens it: a source with a path in its file, and one with
 a `sourceReference` in the text that the DAP server gives for it, read-only. A source with a `sourceReference`, from
 here, a stack frame or a jump, opens in an editor tab of its own, named after the source, also when sources share a
-name, as scripts evaluated with `eval` often do.
+name, as scripts evaluated with `eval` often do, as long as their `sourceReference`s differ. Two sessions of the same
+run configuration, such as two child sessions started with `startDebugging`, that give the same name and
+`sourceReference` to their sources share one tab, which shows the text loaded last.
 
 When the DAP server reports its modules (`supportsModulesRequest`), a `Modules` tab lists each module's name, version
 and path, and whether it is user code, as the
