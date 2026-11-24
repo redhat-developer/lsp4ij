@@ -18,6 +18,7 @@ import org.eclipse.lsp4j.debug.ContinueArguments;
 import org.eclipse.lsp4j.debug.ContinueResponse;
 import org.eclipse.lsp4j.debug.EvaluateArguments;
 import org.eclipse.lsp4j.debug.EvaluateResponse;
+import org.eclipse.lsp4j.debug.ReverseContinueArguments;
 import org.eclipse.lsp4j.debug.services.IDebugProtocolServer;
 import org.eclipse.lsp4j.jsonrpc.ResponseErrorException;
 import org.eclipse.lsp4j.jsonrpc.messages.ResponseError;
@@ -46,6 +47,7 @@ public class DAPClientBreakpointReachedTest {
     private final List<String> evaluated = new ArrayList<>();
     private final List<Integer> continued = new ArrayList<>();
     private final List<Boolean> continuedSingleThread = new ArrayList<>();
+    private final List<Integer> reverseContinued = new ArrayList<>();
     private final List<String> logged = new ArrayList<>();
     // How many 'continue' requests were sent when the client was told that the program resumes
     private final List<Integer> resumings = new ArrayList<>();
@@ -74,6 +76,19 @@ public class DAPClientBreakpointReachedTest {
         // the threads that the step kept stopped stay stopped
         assertEquals(List.of(7), continued);
         assertEquals(List.of(Boolean.TRUE), continuedSingleThread);
+    }
+
+    @Test
+    void resumesBackwardsWhenTheProgramRanBackwardsToTheBreakpoint() {
+        var server = server(CompletableFuture.completedFuture(result("21")));
+
+        // As at a breakpoint which Reverse Continue reached, of a debug adapter without logpoints
+        DAPClient.breakpointReached(session(false), server, breakpoint("n"), new XSuspendContext() {
+        }, 3, 7, null, true, this::resuming, () -> false).join();
+
+        assertEquals(List.of("21"), logged);
+        assertEquals(List.of(7), reverseContinued, "the program runs on backwards");
+        assertEquals(List.of(), continued, "not forward");
     }
 
     @Test
@@ -202,6 +217,10 @@ public class DAPClientBreakpointReachedTest {
                 continued.add(((ContinueArguments) args[0]).getThreadId());
                 continuedSingleThread.add(((ContinueArguments) args[0]).getSingleThread());
                 yield continuation;
+            }
+            case "reverseContinue" -> {
+                reverseContinued.add(((ReverseContinueArguments) args[0]).getThreadId());
+                yield CompletableFuture.completedFuture(null);
             }
             default -> throw new AssertionError(method);
         });
