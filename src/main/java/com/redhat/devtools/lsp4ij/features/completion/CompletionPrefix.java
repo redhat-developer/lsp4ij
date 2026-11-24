@@ -14,7 +14,9 @@
 package com.redhat.devtools.lsp4ij.features.completion;
 
 import com.intellij.openapi.editor.Document;
+import com.intellij.openapi.util.TextRange;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
+import com.redhat.devtools.lsp4ij.internal.CompletionUtils;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import org.eclipse.lsp4j.CompletionItem;
 import org.eclipse.lsp4j.Position;
@@ -24,6 +26,7 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 
 /**
  * Completion prefix provides the capability to compute the prefix where the completion has been triggered and by using the LSP {@link org.eclipse.lsp4j.TextEdit} information.
@@ -32,6 +35,7 @@ import java.util.Map;
  */
 public class CompletionPrefix {
 
+    private final int completionOffset;
     private final Position completionPos;
     private final Document document;
 
@@ -39,6 +43,7 @@ public class CompletionPrefix {
 
     public CompletionPrefix(int completionOffset, Document document) {
         this.document = document;
+        this.completionOffset = completionOffset;
         this.completionPos = LSPIJUtils.toPosition(completionOffset, document);
         this.prefixCache = new HashMap<>();
     }
@@ -94,6 +99,29 @@ public class CompletionPrefix {
             prefix = prefix.substring(index);
         }
         return prefix;
+    }
+
+    /**
+     * Returns the prefix of the given completion item without a text edit, when the given prefix, which IntelliJ
+     * computes from the PSI element at the completion offset, spans whitespace, and null otherwise.
+     * <p>
+     * The prefix that IntelliJ computes spans whitespace when a custom PSI keeps a whole comment as one token, as
+     * {@code disable-next-line : u}, which matches no completion item (#447). The prefix of the item then starts where
+     * {@link CompletionUtils#getPrefixStartOffsetAfterWhitespace} puts it for the filter text of the item, or else its
+     * label, as the insertion of the item does for its insert text: {@code undefined-g} for {@code undefined-global},
+     * and {@code u} for {@code unused}.
+     *
+     * @param psiPrefix the prefix that IntelliJ computes from the PSI element at the completion offset.
+     * @param item      the completion item.
+     * @return the prefix of the given completion item if the given prefix spans whitespace, and null otherwise.
+     */
+    public @Nullable String getWordPrefix(@NotNull String psiPrefix, @NotNull CompletionItem item) {
+        if (!CompletionUtils.containsWhitespace(psiPrefix)) {
+            return null;
+        }
+        String text = Objects.requireNonNullElse(getAccurateFilterText(item), item.getLabel());
+        int startOffset = CompletionUtils.getPrefixStartOffsetAfterWhitespace(document, completionOffset, text);
+        return document.getText(new TextRange(startOffset, completionOffset));
     }
 
     private static String getAccurateFilterText(@NotNull CompletionItem item) {

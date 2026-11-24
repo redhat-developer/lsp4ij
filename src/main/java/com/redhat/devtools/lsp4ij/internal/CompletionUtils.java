@@ -36,6 +36,17 @@ public class CompletionUtils {
 
         TextRange wordRange = LSPIJUtils.getWordRangeAt(document, file, completionOffset);
         if (wordRange != null) {
+            int endOffset = Math.min(completionOffset, document.getTextLength());
+            int startOffset = Math.min(wordRange.getStartOffset(), endOffset);
+            if (containsWhitespace(document.getCharsSequence().subSequence(startOffset, endOffset))) {
+                // The PSI element at the completion offset spans several words, as a comment that a custom PSI keeps
+                // as one token: the completion replaces the text after the last whitespace that it starts with (#447)
+                // ex :
+                // insertText= 'undefined-global'
+                // document= ---@diagnostic disable-next-line : undefined-g|
+                // we have to return |undefined-g as prefix start offset
+                return getPrefixStartOffsetAfterWhitespace(document, completionOffset, insertText);
+            }
             return wordRange.getStartOffset();
         }
 
@@ -47,6 +58,58 @@ public class CompletionUtils {
         // we have to return {| as prefix start offset
 
         return getPrefixStartOffsetWhichMatchesLeftContent(document, completionOffset, insertText);
+    }
+
+    /**
+     * Returns the start offset of the prefix that the given text completes at the given offset, where the PSI element
+     * at the offset spans whitespace, as a comment that a custom PSI keeps as one token (#447).
+     * <p>
+     * The prefix is the longest end of the text between the last whitespace before the offset and the offset that the
+     * given text starts with, and that doesn't start between two identifier characters: {@code undefined-g} for
+     * {@code undefined-global}, {@code foo.ba} for {@code foo.bar}, and {@code ba} of {@code foo.ba} for {@code bar}.
+     * If there is none, it is the Java identifier characters before the offset, which IntelliJ's prefix matcher then
+     * matches as in any other comment.
+     *
+     * @param document the document.
+     * @param offset   the offset.
+     * @param text     the text of the completion item.
+     * @return the start offset of the prefix that the given text completes at the given offset.
+     */
+    public static int getPrefixStartOffsetAfterWhitespace(@NotNull Document document, int offset, @NotNull String text) {
+        CharSequence chars = document.getCharsSequence();
+        int endOffset = Math.min(offset, chars.length());
+        int tokenStartOffset = endOffset;
+        while (tokenStartOffset > 0 && !Character.isWhitespace(chars.charAt(tokenStartOffset - 1))) {
+            tokenStartOffset--;
+        }
+        String token = chars.subSequence(tokenStartOffset, endOffset).toString();
+        for (int i = 0; i < token.length(); i++) {
+            if (!isInsideWord(token, i) && text.regionMatches(0, token, i, token.length() - i)) {
+                return tokenStartOffset + i;
+            }
+        }
+        int wordStart = token.length();
+        while (wordStart > 0 && Character.isJavaIdentifierPart(token.charAt(wordStart - 1))) {
+            wordStart--;
+        }
+        return tokenStartOffset + wordStart;
+    }
+
+    private static boolean isInsideWord(@NotNull String text, int index) {
+        return index > 0 &&
+                Character.isJavaIdentifierPart(text.charAt(index - 1)) &&
+                Character.isJavaIdentifierPart(text.charAt(index));
+    }
+
+    /**
+     * Returns true if the given text contains whitespace, as the text of a comment from its start to the completion
+     * offset, which is then no word to complete, and false otherwise.
+     *
+     * @param text the text.
+     * @return true if the given text contains whitespace and false otherwise.
+     */
+    public static boolean containsWhitespace(@NotNull CharSequence text) {
+        return text.chars().anyMatch(Character::isWhitespace);
     }
 
     @Nullable
