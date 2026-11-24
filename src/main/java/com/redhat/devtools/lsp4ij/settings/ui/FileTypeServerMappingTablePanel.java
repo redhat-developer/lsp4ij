@@ -42,7 +42,15 @@ public class FileTypeServerMappingTablePanel extends AbstractServerMappingTableP
     }
 
     public FileTypeServerMappingTablePanel(boolean editable) {
-        super(new FileTypeColumn(editable), editable);
+        this(editable, true);
+    }
+
+    /**
+     * @param editable       true if the mappings can be added, removed and edited.
+     * @param withLanguageId true to show the {@code Language Id} column, false for a DAP server, which doesn't use it.
+     */
+    public FileTypeServerMappingTablePanel(boolean editable, boolean withLanguageId) {
+        super(new FileTypeColumn(editable), editable, withLanguageId);
         getTable().getEmptyText().setText(LanguageServerBundle.message("language.server.mappings.fileType.no"));
     }
 

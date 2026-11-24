@@ -19,8 +19,7 @@
           "*.ipy",
           "*.pyt"
         ]
-      },
-      "languageId": "python"
+      }
     }
   ]
 }

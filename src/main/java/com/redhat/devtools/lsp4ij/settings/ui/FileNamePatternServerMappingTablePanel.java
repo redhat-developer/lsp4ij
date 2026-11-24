@@ -32,7 +32,15 @@ public class FileNamePatternServerMappingTablePanel extends AbstractServerMappin
     }
 
     public FileNamePatternServerMappingTablePanel(boolean editable) {
-        super(new FileNamePatternColumn(editable), editable);
+        this(editable, true);
+    }
+
+    /**
+     * @param editable       true if the mappings can be added, removed and edited.
+     * @param withLanguageId true to show the {@code Language Id} column, false for a DAP server, which doesn't use it.
+     */
+    public FileNamePatternServerMappingTablePanel(boolean editable, boolean withLanguageId) {
+        super(new FileNamePatternColumn(editable), editable, withLanguageId);
         getTable().getEmptyText().setText(LanguageServerBundle.message("language.server.mappings.fileNamePattern.no"));
     }
 

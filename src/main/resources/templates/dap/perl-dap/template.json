@@ -27,8 +27,7 @@
           "*.ep",
           "*.i"
         ]
-      },
-      "languageId": "perl"
+      }
     }
   ]
 }
