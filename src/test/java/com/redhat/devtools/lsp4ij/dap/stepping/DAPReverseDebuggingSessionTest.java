@@ -196,6 +196,50 @@ public class DAPReverseDebuggingSessionTest extends HeavyPlatformTestCase {
         waitUntilStoppedAt(2, "where the thread stepped back to");
     }
 
+    public void testReverseContinueRefusedTwiceLeavesTheSessionSuspendedWithTheExecutionEpochOfItsStop() throws Exception {
+        debug(true, true);
+        server.holdsAnswers = true;
+        var context = (DAPSuspendContext) session.getSuspendContext();
+        var client = context.getClient();
+        var reverseContinue = action(DAPReverseContinueAction.ID, "Reverse Continue");
+
+        reverseContinue.actionPerformed(update(reverseContinue));
+        assertInstanceOf(request(), ReverseContinueArguments.class);
+        // The session stays suspended until the DAP server answers, so that Reverse Continue can be performed again
+        assertTrue("Reverse Continue is still enabled while the DAP server hasn't answered",
+                update(reverseContinue).getPresentation().isEnabled());
+        reverseContinue.actionPerformed(update(reverseContinue));
+        assertInstanceOf(request(), ReverseContinueArguments.class);
+        // The DAP server refuses both, in order, and then answers a request which the client handles after them
+        server.answer();
+        server.answer();
+        var threads = client.getDebugProtocolServer().threads();
+        PlatformTestUtil.waitWithEventsDispatching("the DAP server answers 'threads', after it refused both requests",
+                threads::isDone, BOUND_SECONDS);
+
+        assertEquals("The execution epoch of the stop is the current one again: the values of the stop can still be set",
+                context.getExecutionEpoch(), client.getExecutionEpoch());
+        assertSame("The session stays at the stop where it was", context, session.getSuspendContext());
+        assertEquals("The Threads tab still shows the thread stopped", DAPThreadRunState.STOPPED,
+                client.getThreadRunStates().getState(MAIN));
+    }
+
+    public void testAStopWhichTheDAPServerSendsBeforeItAnswersReverseContinueShowsTheThreadStopped() throws Exception {
+        debug(true, false);
+        server.stopsBeforeAnswering = true;
+        var client = ((DAPSuspendContext) session.getSuspendContext()).getClient();
+        var reverseContinue = action(DAPReverseContinueAction.ID, "Reverse Continue");
+
+        reverseContinue.actionPerformed(update(reverseContinue));
+        assertInstanceOf(request(), ReverseContinueArguments.class);
+        waitUntilStoppedAt(2, "where the program stopped running backwards");
+
+        // The answer, which the client handled after the 'stopped' event, doesn't show the thread running, which would
+        // also show "running" instead of its frames in the Frames view of the stop
+        assertEquals("The Threads tab shows the thread which stopped as stopped", DAPThreadRunState.STOPPED,
+                client.getThreadRunStates().getState(MAIN));
+    }
+
     public void testStepBackAndReverseContinueAreHiddenWhenTheDAPServerDoesNotSupportStepBack() throws Exception {
         debug(false, false);
         var stepBack = action(DAPStepBackAction.ID, "Step Back");
@@ -292,7 +336,14 @@ public class DAPReverseDebuggingSessionTest extends HeavyPlatformTestCase {
         private final AtomicInteger stops = new AtomicInteger();
         // The arguments of the requests which resume the program
         private final LinkedBlockingQueue<Object> requests = new LinkedBlockingQueue<>();
+        // The answers to Reverse Continue which the DAP server holds, in the order of the requests
+        private final LinkedBlockingQueue<CompletableFuture<Void>> heldAnswers = new LinkedBlockingQueue<>();
         private volatile IDebugProtocolClient client;
+        // Set by the test: the DAP server answers Reverse Continue only when the test says so (answer())
+        volatile boolean holdsAnswers;
+        // Set by the test: the DAP server sends the 'stopped' event of Reverse Continue before it answers, which DAP
+        // allows, as it orders only the answer to a step before the 'stopped' event
+        volatile boolean stopsBeforeAnswering;
 
         ReversingServer(boolean supportsStepBack, boolean refusesReverseContinue) throws IOException {
             this.supportsStepBack = supportsStepBack;
@@ -318,6 +369,15 @@ public class DAPReverseDebuggingSessionTest extends HeavyPlatformTestCase {
 
         void close() throws IOException {
             serverSocket.close();
+        }
+
+        /**
+         * Gives the answer to the oldest Reverse Continue which the DAP server holds.
+         */
+        void answer() {
+            var answer = heldAnswers.poll();
+            assertNotNull("A Reverse Continue whose answer the DAP server holds", answer);
+            answer.complete(null);
         }
 
         /**
@@ -367,13 +427,24 @@ public class DAPReverseDebuggingSessionTest extends HeavyPlatformTestCase {
 
         @Override
         public CompletableFuture<Void> reverseContinue(ReverseContinueArguments args) {
-            requests.add(args);
-            if (refusesReverseContinue) {
-                // As rdbg answers
-                return CompletableFuture.failedFuture(new ResponseErrorException(
-                        new ResponseError(ResponseErrorCode.RequestFailed, NO_REVERSE_CONTINUE, null)));
+            // As rdbg answers, when it refuses
+            CompletableFuture<Void> answer = refusesReverseContinue ?
+                    CompletableFuture.failedFuture(new ResponseErrorException(
+                            new ResponseError(ResponseErrorCode.RequestFailed, NO_REVERSE_CONTINUE, null))) :
+                    CompletableFuture.completedFuture(null);
+            if (!holdsAnswers) {
+                requests.add(args);
+                if (stopsBeforeAnswering) {
+                    // The program ran back to the start of its recording
+                    stop(StoppedEventArgumentsReason.ENTRY);
+                }
+                return answer;
             }
-            return CompletableFuture.completedFuture(null);
+            // Held before the test sees the request
+            var held = new CompletableFuture<Void>();
+            heldAnswers.add(held);
+            requests.add(args);
+            return held.thenCompose(given -> answer);
         }
 
         @Override
