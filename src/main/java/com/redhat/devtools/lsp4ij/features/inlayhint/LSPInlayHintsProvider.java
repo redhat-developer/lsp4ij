@@ -66,10 +66,37 @@ public class LSPInlayHintsProvider extends AbstractLSPDeclarativeInlayHintsProvi
     private static final HintFormat PARAMETER_HINT_FORMAT =
         TYPE_HINT_FORMAT.withColorKind(HintColorKind.Parameter);
 
+    /**
+     * The padding an inlay hint gets on a side for which its language server asks for padding with
+     * {@link InlayHint#getPaddingLeft() paddingLeft} or {@link InlayHint#getPaddingRight() paddingRight}: a space, as
+     * the margin of a declarative inlay is the same on both sides.
+     */
+    private static final String PADDING = " ";
+
     private static HintFormat getHintFormat(@NotNull InlayHint inlayHint) {
         return inlayHint.getKind() == InlayHintKind.Parameter
                 ? PARAMETER_HINT_FORMAT
                 : TYPE_HINT_FORMAT;
+    }
+
+    /**
+     * Builds the label of the given inlay hint, with the padding its language server asks for before and after it.
+     * The padding is a text of its own, so that it is never shortened with a long label nor clickable.
+     *
+     * @param inlayHint the inlay hint.
+     * @param builder   the builder of the inlay.
+     * @param label     builds the label of the inlay hint.
+     */
+    private static void buildWithPadding(@NotNull InlayHint inlayHint,
+                                         @NotNull PresentationTreeBuilder builder,
+                                         @NotNull Consumer<PresentationTreeBuilder> label) {
+        if (Boolean.TRUE.equals(inlayHint.getPaddingLeft())) {
+            builder.text(PADDING, null);
+        }
+        label.accept(builder);
+        if (Boolean.TRUE.equals(inlayHint.getPaddingRight())) {
+            builder.text(PADDING, null);
+        }
     }
 
     @Override
@@ -143,7 +170,7 @@ public class LSPInlayHintsProvider extends AbstractLSPDeclarativeInlayHintsProvi
                                      @NotNull InlayTreeSink sink) {
         String tooltip = toHtmlTooltip(hintData.inlayHint().getTooltip(), psiFile);
         sink.addPresentation(position, null, tooltip, getHintFormat(hintData.inlayHint()), builder -> {
-            builder.text(label, null);
+            buildWithPadding(hintData.inlayHint(), builder, labelBuilder -> labelBuilder.text(label, null));
             return null;
         });
     }
@@ -179,9 +206,11 @@ public class LSPInlayHintsProvider extends AbstractLSPDeclarativeInlayHintsProvi
         String hintTooltip = toHtmlTooltip(hintData.inlayHint().getTooltip(), psiFile);
         String shownTooltip = hintTooltip != null ? hintTooltip : hasTooltip ? tooltip.toString() : null;
         sink.addPresentation(position, null, shownTooltip, getHintFormat(hintData.inlayHint()), builder -> {
-            for (var build: builds) {
-                build.accept(builder);
-            }
+            buildWithPadding(hintData.inlayHint(), builder, labelBuilder -> {
+                for (var build: builds) {
+                    build.accept(labelBuilder);
+                }
+            });
             return null;
         });
     }
