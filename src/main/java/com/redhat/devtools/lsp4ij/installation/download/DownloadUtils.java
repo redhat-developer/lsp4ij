@@ -23,6 +23,7 @@ import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Locale;
 import java.util.Set;
@@ -114,11 +115,12 @@ public class DownloadUtils {
                 .entryFilter(entry -> {
                     String entryName = entry != null ? entry.name : null;
                     if (entryName == null || entryName.isEmpty()) return false;
-                    entryName = entryName.replace("\\", "/");
-                    String[] parts = entryName.split("/");
-                    if (parts.length > 0) {
-                        topLevel.add(parts[0]);
-                    }
+                    // The top level of ./bin/server, an entry of a tar made of the folder ".", as the one of cpp_ls, is
+                    // bin, and the entry ./ has none: "." is never the root folder of the archive (#2139)
+                    Arrays.stream(entryName.replace("\\", "/").split("/"))
+                            .filter(part -> !part.isEmpty() && !part.equals("."))
+                            .findFirst()
+                            .ifPresent(topLevel::add);
                     return true;
                 })
                 .extract(targetDir);
