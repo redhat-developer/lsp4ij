@@ -9,21 +9,21 @@ Current state of [Events](https://microsoft.github.io/debug-adapter-protocol//sp
 
 * ✅ [Breakpoint](https://microsoft.github.io/debug-adapter-protocol//specification.html#Events_Breakpoint).
 * ✅ [Capabilities](https://microsoft.github.io/debug-adapter-protocol//specification.html#Events_Capabilities): the capabilities that the debug adapter announces after `initialize` update those of its session. The function and data breakpoints are sent again when their support is turned on or off, the exception breakpoint filters when they change, and the instruction breakpoints once the debug adapter supports disassembling.
-* ✅ [Continued](https://microsoft.github.io/debug-adapter-protocol//specification.html#Events_Continued): when the debug adapter says that the program continued, as after a step typed in the Debug console, the session shows it running: the frames and variables of the stop are cleared, Resume and the steps are disabled, and Pause is enabled. A thread which continues alone (`allThreadsContinued: false`) resumes the session only when the session is suspended at that thread; for another thread, the session stays suspended and the `Threads` tab is refreshed. In a tree of sessions started with `startDebugging`, the event of one session doesn't resume a stop of another.
+* ✅ [Continued](https://microsoft.github.io/debug-adapter-protocol//specification.html#Events_Continued): when the debug adapter says that the program continued, as after a step typed in the Debug console, the session shows it running: the frames and variables of the stop are cleared, Resume and the steps are disabled, and Pause is enabled. A thread which continues alone (`allThreadsContinued: false`) resumes the session only when the session is suspended at that thread; for another thread, the session stays suspended, the `Threads` tab shows that thread running, and the `Frames` view shows `Frames not available: the thread is running` instead of its frames. In a tree of sessions started with `startDebugging`, the event of one session doesn't resume a stop of another.
 * ✅ [Exited](https://microsoft.github.io/debug-adapter-protocol//specification.html#Events_Exited): the console shows the exit code of the debugged program when the debug adapter's process ends.
 * ✅ [Initialized](https://microsoft.github.io/debug-adapter-protocol//specification.html#Events_Initialized).
 * ✅ [Invalidated](https://microsoft.github.io/debug-adapter-protocol//specification.html#Events_Invalidated).
 * ✅ [LoadedSource](https://microsoft.github.io/debug-adapter-protocol//specification.html#Events_LoadedSource).
 * ❌ [Memory](https://microsoft.github.io/debug-adapter-protocol//specification.html#Events_Memory).
 * ✅ [Module](https://microsoft.github.io/debug-adapter-protocol//specification.html#Events_Module).
-* ✅ [Output](https://microsoft.github.io/debug-adapter-protocol//specification.html#Events_Output).
+* ✅ [Output](https://microsoft.github.io/debug-adapter-protocol//specification.html#Events_Output): the console indents the lines of a `group` by its nesting level, as VS Code shows the output of `console.group()`. The output of `start` and `startCollapsed` is the header of the group, at the level where the group starts, and the output of `end` is at the outer level. In a tree of sessions started with `startDebugging`, each session has its own groups. A group can't be folded yet, so a `startCollapsed` group is shown expanded. The output of the category `telemetry`, which DAP sends to telemetry instead of the client, isn't shown: LSP4IJ logs it at DEBUG.
 * ✅ [Process](https://microsoft.github.io/debug-adapter-protocol//specification.html#Events_Process): the console shows which process the debug adapter debugs, with its PID and how it was started when the event gives them, such as `Debugging process '/path/app' (PID 1234, launched)`; the line of a child session started with `startDebugging` names that session (see [user guide](./UserGuide.md#debugged-process)).
 * ❌ [ProgressEnd](https://microsoft.github.io/debug-adapter-protocol//specification.html#Events_ProgressEnd).
 * ❌ [ProgressStart](https://microsoft.github.io/debug-adapter-protocol//specification.html#Events_ProgressStart).
 * ❌ [ProgressUpdate](https://microsoft.github.io/debug-adapter-protocol//specification.html#Events_ProgressUpdate).
-* ✅ [Stopped](https://microsoft.github.io/debug-adapter-protocol//specification.html#Events_Stopped).
+* ✅ [Stopped](https://microsoft.github.io/debug-adapter-protocol//specification.html#Events_Stopped): the `Threads` tab shows the thread which stopped as stopped, or all threads with `allThreadsStopped`.
 * ✅ [Terminated](https://microsoft.github.io/debug-adapter-protocol//specification.html#Events_Terminated).
-* ✅ [Thread](https://microsoft.github.io/debug-adapter-protocol//specification.html#Events_Thread).
+* ✅ [Thread](https://microsoft.github.io/debug-adapter-protocol//specification.html#Events_Thread): the `Threads` tab shows a thread which exited as `exited`, and a thread which started as running.
  
 ## Requests
 
@@ -45,7 +45,7 @@ Current state of [Requests](https://microsoft.github.io/debug-adapter-protocol//
 * ✅ [Initialize](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_Initialize).
 * ✅ [Launch](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_Launch). 
 * ✅ [LoadedSources](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_LoadedSources).
-* ✅ [Locations](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_Locations), for the `valueLocationReference` of a variable or an evaluated expression (see [user guide](./UserGuide.md#jump-to-value-source)).
+* ✅ [Locations](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_Locations), for the `valueLocationReference` of a variable or an evaluated expression, which `Jump to Value Source` opens, and for the `declarationLocationReference` of a variable, which `Jump to Source` opens (see [user guide](./UserGuide.md#jump-to-value-source)).
 * ✅ [Modules](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_Modules).
 * ✅ [Next](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_Next).
 * ✅ [Pause](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_Pause).

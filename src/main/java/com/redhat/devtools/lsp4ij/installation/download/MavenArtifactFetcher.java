@@ -16,6 +16,8 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
@@ -30,6 +32,8 @@ import java.util.function.Function;
  * Utility class to fetch the download URL of a Maven artifact from Maven Central.
  */
 public class MavenArtifactFetcher implements AssetFetcher {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(MavenArtifactFetcher.class);
 
     private final @NotNull String groupId;
     private final @NotNull String artifactId;
@@ -73,6 +77,7 @@ public class MavenArtifactFetcher implements AssetFetcher {
             reporter.setText("No matching artifact found....");
         } catch (Exception e) {
             reporter.setText("Error while searching Maven artifacts: ", e);
+            LOGGER.warn("Cannot find the Maven artifact {}:{}", groupId, artifactId, e);
         }
         return null;
     }
@@ -118,6 +123,7 @@ public class MavenArtifactFetcher implements AssetFetcher {
             }
         } catch (Exception e) {
             reporter.setText("Error while loading Maven docs: ", e);
+            LOGGER.warn("Cannot search Maven Central for the artifact {}:{}", groupId, artifactId, e);
         }
         return null;
     }

@@ -25,15 +25,29 @@ import org.eclipse.lsp4j.debug.VariablePresentationHintAttributes;
 import org.jetbrains.annotations.Nls;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.swing.*;
 import java.util.Arrays;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 /**
  * Debug Adapter Protocol (DAP) value.
  */
 public class DAPValue extends XNamedValue {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(DAPValue.class);
+
+    /**
+     * How long "Jump to Source" waits for the DAP server to locate the declaration of a variable, before it searches the
+     * name instead: IntelliJ 2026.3's split debugger waits at most 10 seconds for the position, and a DAP server which
+     * never answers must not leave the user without one.
+     */
+    static final int DECLARATION_TIMEOUT_SECONDS = 3;
 
     @NotNull
     private final DAPStackFrame stackFrame;
@@ -252,7 +266,62 @@ public class DAPValue extends XNamedValue {
 
     @Override
     public void computeSourcePosition(@NotNull XNavigatable navigatable) {
-        setSourcePosition(stackFrame.getSourcePositionFor(variable), navigatable);
+        // "Jump to Source", which may ask for it on the EDT
+        setSourcePosition(getDeclarationSourcePosition(), navigatable);
+    }
+
+    /**
+     * Returns the future of the position of the declaration of the variable which this value shows, which "Jump to
+     * Source" opens. When the variable has a 'declarationLocationReference', the DAP server is asked where the
+     * declaration is, with the 'locations' request, off the calling thread, and only while the stop of the value's frame
+     * lasts: the reference is valid only until the program resumes. The name of the variable is searched in the file of
+     * the frame, as for the inline values, when the variable has no reference, when the request fails or the stop has
+     * ended, when the DAP server answers no location which can be opened, and when it doesn't locate the declaration
+     * within {@link #DECLARATION_TIMEOUT_SECONDS} seconds.
+     *
+     * @return the future of the position of the declaration of the variable, which is null if neither the DAP server nor
+     * the search finds it.
+     */
+    @NotNull CompletableFuture<@Nullable XSourcePosition> getDeclarationSourcePosition() {
+        Integer reference = getDeclarationLocationReference(getShownVariable());
+        if (reference == null) {
+            return getSourcePositionOfName();
+        }
+        DAPClient client = getClient();
+        return DAPLocations.locate(this, reference, DAPBundle.message("dap.variables.declaration.stale"))
+                .thenComposeAsync(location -> DAPLocations.getSourcePosition(client, location),
+                        AppExecutorUtil.getAppExecutorService())
+                .orTimeout(DECLARATION_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+                .exceptionally(error -> {
+                    Throwable cause = error instanceof CompletionException && error.getCause() != null ?
+                            error.getCause() : error;
+                    LOGGER.warn("Cannot locate the declaration of '{}', its name is searched instead: {}", getName(),
+                            cause instanceof TimeoutException ?
+                                    "no answer within " + DECLARATION_TIMEOUT_SECONDS + " seconds" : cause.getMessage());
+                    return null;
+                })
+                .thenCompose(position -> position != null ?
+                        CompletableFuture.completedFuture(position) : getSourcePositionOfName());
+    }
+
+    /**
+     * Returns the 'declarationLocationReference' of the given variable, or null if it has none. As in VS Code, 0 is no
+     * reference.
+     *
+     * @param variable the DAP variable.
+     * @return the 'declarationLocationReference' of the variable, or null if it has none.
+     */
+    static @Nullable Integer getDeclarationLocationReference(@NotNull Variable variable) {
+        Integer reference = variable.getDeclarationLocationReference();
+        return reference != null && reference > 0 ? reference : null;
+    }
+
+    /**
+     * Returns the future of the position of the variable's name in the file of the frame, as the language servers of
+     * the file or its highlighter find it.
+     */
+    private @NotNull CompletableFuture<@Nullable XSourcePosition> getSourcePositionOfName() {
+        return stackFrame.getSourcePositionFor(variable);
     }
 
     /**
@@ -274,7 +343,9 @@ public class DAPValue extends XNamedValue {
     @NotNull
     @Override
     public ThreeState computeInlineDebuggerData(@NotNull XInlineDebuggerDataCallback callback) {
-        computeSourcePosition(callback::computed);
+        // The value is shown where the name of the variable is, never at its declaration: a 'locations' request for
+        // each value shown inline would cost too much
+        setSourcePosition(getSourcePositionOfName(), callback::computed);
         return ThreeState.YES;
     }
 

@@ -77,6 +77,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BooleanSupplier;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -168,11 +169,16 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
     // The 'continued' events of the debug adapter: a stop which one of them continued while it was handled doesn't
     // suspend the session
     private final DAPContinuedEvents continuedEvents = new DAPContinuedEvents();
+    // Whether each thread runs, is stopped or has exited, which the Threads tab shows: immutable run states, which the
+    // events of the debug adapter and the requests of the session which resume the program swap
+    private final AtomicReference<DAPThreadRunStates> threadRunStates = new AtomicReference<>(DAPThreadRunStates.INITIAL);
     // Whether the last request that resumed the program was a step that resumed only its thread. A breakpoint which
     // doesn't suspend then resumes only the stopped thread, so the threads the step kept stopped stay stopped.
     private volatile boolean singleThreadResumed;
     // The last 'process' event of the DAP server, which describes the process it debugs, or null until it sends one
     private volatile @Nullable ProcessEventArguments processEvent;
+    // The groups of the 'output' events of the DAP server, which the console indents
+    private final DAPOutputGroups outputGroups = new DAPOutputGroups();
 
     public DAPClient(@NotNull DAPDebugProcess debugProcess,
                      @NotNull Map<String, Object> dapParameters,
@@ -595,7 +601,24 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
 
     @Override
     public void output(OutputEventArguments args) {
-        debugProcess.printOutput(args.getOutput(), getContentType(args.getCategory()));
+        if (isTelemetry(args)) {
+            // DAP: "Send the output to telemetry instead of the client". It isn't for the user, and VS Code doesn't
+            // show it either, but whoever diagnoses a DAP server can log it
+            LOGGER.debug("Telemetry of the DAP server: {}", args.getOutput());
+            return;
+        }
+        debugProcess.printOutput(outputGroups.indent(args), getContentType(args.getCategory()));
+    }
+
+    /**
+     * Returns whether the given output event is telemetry, which DAP sends to telemetry instead of the client, so that
+     * the debug console doesn't show it.
+     *
+     * @param args the output event.
+     * @return true if the output event has the category 'telemetry', and false otherwise.
+     */
+    static boolean isTelemetry(@NotNull OutputEventArguments args) {
+        return OutputEventArgumentsCategory.TELEMETRY.equals(args.getCategory());
     }
 
     private static ConsoleViewContentType getContentType(String category) {
@@ -605,8 +628,6 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
                     return ConsoleViewContentType.LOG_ERROR_OUTPUT;
                 case OutputEventArgumentsCategory.IMPORTANT:
                     return ConsoleViewContentType.LOG_VERBOSE_OUTPUT;
-                case OutputEventArgumentsCategory.TELEMETRY:
-                    return ConsoleViewContentType.LOG_DEBUG_OUTPUT;
                 default:
                     return ConsoleViewContentType.LOG_INFO_OUTPUT;
             }
@@ -641,6 +662,9 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
         int stopEpoch = executionEpoch.end();
         // Taken as the event arrives: a 'continued' event which arrives while the stop is handled ends the stop
         int continuedMark = continuedEvents.mark();
+        // The Threads tab shows the thread which stopped, or all threads, as stopped. The Frames view of the stop shows
+        // no frames for a thread which leaves it after this version, as when it continues alone
+        int threadRunStatesVersion = updateThreadRunStates(states -> states.stopped(args)).getVersion();
         // "Run to Cursor" ends at this stop, at its temporary breakpoint or anywhere else
         debugProcess.getRunToCursorBreakpoint().stopped();
         var server = getDebugProtocolServer();
@@ -658,7 +682,8 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
                     .findFirst();
             // A thread which the debug adapter doesn't report doesn't suspend the session
             stoppedThread.ifPresent(thread -> getStackFrames(server, threadId)
-                    .thenAcceptAsync(frames -> suspend(server, args, stopEpoch, continued, threads, thread, frames)));
+                    .thenAcceptAsync(frames -> suspend(server, args, stopEpoch, threadRunStatesVersion, continued,
+                            threads, thread, frames)));
         });
     }
 
@@ -685,17 +710,20 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
      * When the debug adapter said that the stopped thread continued since it stopped, the stop is over, and the session
      * isn't suspended there.
      *
-     * @param server        the debug adapter.
-     * @param args          the stopped event.
-     * @param stopEpoch     the execution epoch of the stop.
-     * @param continued     returns whether the debug adapter said that the stopped thread continued since it stopped.
-     * @param threads       the threads the debug adapter reports.
-     * @param stoppedThread the thread which stopped.
-     * @param frames        the stack frames of the stopped thread, innermost first.
+     * @param server                 the debug adapter.
+     * @param args                   the stopped event.
+     * @param stopEpoch              the execution epoch of the stop.
+     * @param threadRunStatesVersion the version of the run states of the threads at the stop.
+     * @param continued              returns whether the debug adapter said that the stopped thread continued since it
+     *                               stopped.
+     * @param threads                the threads the debug adapter reports.
+     * @param stoppedThread          the thread which stopped.
+     * @param frames                 the stack frames of the stopped thread, innermost first.
      */
     private void suspend(@NotNull IDebugProtocolServer server,
                          @NotNull StoppedEventArguments args,
                          int stopEpoch,
+                         int threadRunStatesVersion,
                          @NotNull BooleanSupplier continued,
                          org.eclipse.lsp4j.debug.Thread[] threads,
                          org.eclipse.lsp4j.debug.Thread stoppedThread,
@@ -708,12 +736,13 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
             return;
         }
         StackFrame topFrame = frames[0];
-        DAPSuspendContext context = createSuspendContext(stopEpoch, threads, stoppedThread, frames);
+        DAPSuspendContext context = createSuspendContext(stopEpoch, threadRunStatesVersion, threads, stoppedThread, frames);
         var breakpointHandler = debugProcess.getBreakpointHandler();
         XBreakpoint<?> breakpoint = getStopBreakpoint(args, id -> debugProcess.findBreakpointById(server, id), () -> breakpointHandler.findBreakpoint(server, topFrame));
         if (breakpoint != null) {
+            Boolean singleThread = singleThreadResumed ? Boolean.TRUE : null;
             breakpointReached(getSession(), server, breakpoint, context, topFrame.getId(), stoppedThread.getId(),
-                    singleThreadResumed ? Boolean.TRUE : null, executionEpoch::endBeforeResuming, continued)
+                    singleThread, () -> beforeResuming(stoppedThread.getId(), singleThread), continued)
                     .exceptionally(this::reportBreakpointFailure);
             if (breakpoint.getSuspendPolicy() != SuspendPolicy.NONE) {
                 showDataBreakpointHint(getProject(), context, args, DAPClient::showInformationHint);
@@ -862,13 +891,16 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
      * Returns a new suspend context of this client, with an execution stack per thread: the stopped thread's has the
      * frames it stopped in, and the others' are computed when shown. A stop while the session is suspended gets a new
      * context too, which replaces the session's: the threads are read again at each stop, and the sessions of a tree
-     * ('startDebugging') share the debug session, so the context of another stop may be another client's.
+     * ('startDebugging') share the debug session, so the context of another stop may be another client's. The stack
+     * of a thread which leaves the stop after the given version of the run states of the threads, as when it continues
+     * alone, shows no frames.
      */
     private @NotNull DAPSuspendContext createSuspendContext(int stopEpoch,
+                                                           int threadRunStatesVersion,
                                                            org.eclipse.lsp4j.debug.Thread[] threads,
                                                            org.eclipse.lsp4j.debug.Thread stoppedThread,
                                                            StackFrame[] frames) {
-        var context = new DAPSuspendContext(this, stopEpoch, stoppedThread.getId());
+        var context = new DAPSuspendContext(this, stopEpoch, stoppedThread.getId(), threadRunStatesVersion);
         for (var thread : threads) {
             context.addToExecutionStack(thread, thread.equals(stoppedThread) ? frames : null);
         }
@@ -1366,9 +1398,23 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
         ContinueArguments args = new ContinueArguments();
         args.setThreadId(threadId);
         singleThreadResumed = false;
-        executionEpoch.endBeforeResuming();
+        beforeResuming(threadId, null);
         return debugProtocolServer
                 .continue_(args);
+    }
+
+    /**
+     * Runs right before a request of this client which resumes the program is sent, such as Resume, a step, or the
+     * resume of a breakpoint which doesn't suspend: ends the execution epoch, and shows the threads which the request
+     * resumes as running. Done before the request, so that the 'stopped' event which follows it finds them running.
+     *
+     * @param threadId     the DAP thread which the request resumes.
+     * @param singleThread true if the request resumes only that thread ('singleThread'), and null if it resumes every
+     *                     thread.
+     */
+    private void beforeResuming(int threadId, @Nullable Boolean singleThread) {
+        executionEpoch.endBeforeResuming();
+        updateThreadRunStates(states -> states.resumed(threadId, singleThread != null));
     }
 
     public void next(int threadId, @Nullable SteppingGranularity granularity) {
@@ -1378,7 +1424,7 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
         }
         var singleThread = singleThreadStep();
         singleThreadResumed = singleThread != null;
-        executionEpoch.endBeforeResuming();
+        beforeResuming(threadId, singleThread);
         next(server, threadId, granularity, singleThread);
     }
 
@@ -1408,7 +1454,7 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
         }
         var singleThread = singleThreadStep();
         singleThreadResumed = singleThread != null;
-        executionEpoch.endBeforeResuming();
+        beforeResuming(threadId, singleThread);
         stepOut(server, threadId, granularity, singleThread);
     }
 
@@ -1442,7 +1488,7 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
         }
         var singleThread = singleThreadStep();
         singleThreadResumed = singleThread != null;
-        executionEpoch.endBeforeResuming();
+        beforeResuming(threadId, singleThread);
         stepIn(server, threadId, targetId, granularity, singleThread);
     }
 
@@ -1671,14 +1717,23 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
         executionEpoch.end();
         // Recorded before the session is looked at: a stop which is handled meanwhile then sees it (see suspend)
         continuedEvents.continued(args);
-        continued(getSession(), args, this::getStoppedThreadId, () -> getThreads(true));
+        // The Threads tab shows the thread which continued, or all threads, as running. Before the session is looked
+        // at: the Frames view then shows no frames for a thread which continued alone
+        updateThreadRunStates(states -> states.continued(args));
+        continued(getSession(), args, this::getStoppedThreadId, () -> {
+            getThreads(true);
+            // The Frames view asks again for the frames of the stack which it shows, and forgets those of the others,
+            // such as the frames of the stop of the thread which continued
+            getSession().rebuildViews();
+        });
     }
 
     /**
      * Shows the program as running when the debug adapter says that it continued, as after a step typed in the Debug
      * console, which no request of the session caused. The session resumes when it is suspended at a stop of the
      * client which received the event, and the event continued the thread of that stop. A 'continued' event of another
-     * thread ({@code allThreadsContinued: false}) leaves the session suspended, and shows the threads again.
+     * thread ({@code allThreadsContinued: false}) leaves the session suspended, and shows the threads again, and the
+     * views of the stop, where that thread has no frames any more.
      * <p>
      * The debug adapter isn't asked to resume the program: {@link XDebugSession#sessionResumed()} only clears the views
      * of the stop, and does nothing when the session isn't suspended, as after a resume or a step of the session itself.
@@ -1688,7 +1743,7 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
      * @param stoppedThread  returns the DAP thread which stopped at a suspend context of the client which received the
      *                       event, and null for no suspend context or one of another client, such as the stop of
      *                       another session of a tree ('startDebugging').
-     * @param refreshThreads shows the threads of the client again.
+     * @param refreshThreads shows the threads of the client again, and the views of the stop.
      * @return true if the session resumed and false otherwise.
      */
     static boolean continued(@NotNull XDebugSession session,
@@ -1740,7 +1795,44 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
 
     @Override
     public void thread(ThreadEventArguments args) {
+        // A thread which exited, or started, which the Threads tab shows with the event
+        threadRunStates.updateAndGet(states -> states.thread(args));
         debugProcess.refreshThread(this, args);
+    }
+
+    /**
+     * Returns the version of the run states of the threads at the stop where the session is suspended, when it is a
+     * stop of this client.
+     *
+     * @param otherwise the version to return when the session isn't suspended at a stop of this client.
+     * @return the version of the run states at the stop where the session is suspended, or the given one.
+     */
+    private int getSuspendedStopVersion(int otherwise) {
+        var session = getSession();
+        return session != null && session.getSuspendContext() instanceof DAPSuspendContext context
+                && context.getClient() == this ? context.getThreadRunStatesVersion() : otherwise;
+    }
+
+    /**
+     * Returns whether each thread of the DAP session of this client runs, is stopped or has exited, as its debug
+     * adapter and the requests of the session which resume the program said so far.
+     *
+     * @return the run states of the threads of the DAP session of this client.
+     */
+    public @NotNull DAPThreadRunStates getThreadRunStates() {
+        return threadRunStates.get();
+    }
+
+    /**
+     * Changes the run states of the threads, and shows them in the Threads tab.
+     *
+     * @param change returns the new run states from the current ones.
+     * @return the new run states.
+     */
+    private @NotNull DAPThreadRunStates updateThreadRunStates(@NotNull UnaryOperator<DAPThreadRunStates> change) {
+        var states = threadRunStates.updateAndGet(change);
+        debugProcess.refreshThreadRunStates(this);
+        return states;
     }
 
     // Loaded sources and modules
@@ -1813,6 +1905,8 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
         if (debugProtocolServer == null) {
             return CompletableFuture.completedFuture(EMPTY_THREADS);
         }
+        // The run states which the answer can see: a thread which changes after the request isn't forgotten
+        int askedAtVersion = threadRunStates.get().getVersion();
         var result = debugProtocolServer
                 .threads()
                 .thenApply(response -> {
@@ -1823,6 +1917,13 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
                 });
         if (refreshThreads) {
             result.thenAccept(threads -> {
+                // The Threads tab shows these threads: the run states of the others, such as those which exited, go
+                List<Integer> reported = threads != null ?
+                        Arrays.stream(threads).map(org.eclipse.lsp4j.debug.Thread::getId).toList() : List.of();
+                // The run states which changed since the stop where the session is suspended stay too, as that of a
+                // thread which exited since: the stacks of that stop show them
+                int keepChangedAfter = Math.min(askedAtVersion, getSuspendedStopVersion(askedAtVersion));
+                threadRunStates.updateAndGet(states -> states.retain(reported, keepChangedAfter));
                 debugProcess.refreshThreads(this, threads);
             });
         }

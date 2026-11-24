@@ -98,11 +98,14 @@ public class LSPLazyCodeActionIntentionAction implements IntentionAction, DumbAw
             return;
         }
         if (codeAction != null) {
-            if (codeAction.getEdit() == null && codeAction.getCommand() == null
+            if (codeAction.getEdit() == null
                     && languageServer.getClientFeatures().getCodeActionFeature().isResolveCodeActionSupported(file)) {
-                // Unresolved code action "edit" property. Resolve it. The reply arrives after this
-                // intention's command has ended, so capture the documents now: the edit is applied only
-                // to the text it was made for, in a command of its own that Undo reverts.
+                // Unresolved code action "edit" property. Resolve it, also when the code action has a command:
+                // the language server may compute the edit lazily and still give the command to execute after it,
+                // as LSP says ("first the edit is executed and then the command"), and as VS Code resolves it.
+                // The reply arrives after this intention's command has ended, so capture the documents now: the
+                // edit is applied only to the text it was made for, in a command of its own that Undo reverts.
+                // The resolved code action's command is executed after its edit.
                 var snapshot = WorkspaceEditSnapshot.capture(languageServer);
                 if (ApplicationManager.getApplication().isUnitTestMode()) {
                     // In Test mode, collect the resolve code actions synchronously, otherwise tests will fail

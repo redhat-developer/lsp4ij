@@ -13,11 +13,15 @@ package com.redhat.devtools.lsp4ij.installation.definition;
 import com.intellij.execution.ui.ConsoleViewContentType;
 import com.intellij.openapi.progress.ProgressIndicator;
 import com.intellij.openapi.project.Project;
+import com.intellij.util.EnvironmentUtil;
+import com.intellij.util.ExceptionUtil;
 import com.redhat.devtools.lsp4ij.installation.CommandLineUpdater;
 import com.redhat.devtools.lsp4ij.installation.ConsoleProvider;
 import com.redhat.devtools.lsp4ij.installation.download.Reporter;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.PrintWriter;
 import java.io.StringWriter;
@@ -33,7 +37,8 @@ import java.util.logging.Level;
  *
  * <p>This class provides utilities for:</p>
  * <ul>
- *   <li>Logging messages to the IntelliJ console and progress indicator</li>
+ *   <li>Logging messages to the IntelliJ console and progress indicator, and to the IDE's log, whatever consoles are
+ *   registered</li>
  *   <li>Reporting errors and installation status</li>
  *   <li>Storing key-value properties during execution</li>
  *   <li>Updating command lines if required</li>
@@ -53,6 +58,8 @@ public class InstallerContext implements Reporter {
      */
     public static record InstallationStatus(String message, Level level) {}
 
+    private static final Logger LOGGER = LoggerFactory.getLogger(InstallerContext.class);
+
     private final @Nullable Project project;
     private final @NotNull InstallerAction action;
     private @Nullable CommandLineUpdater commandLineUpdater;
@@ -67,6 +74,8 @@ public class InstallerContext implements Reporter {
 
     private boolean showNotification;
     private boolean checkAgainAfterWaiting;
+    // The name of the installer, which the log puts before each line
+    private @Nullable String installerName;
 
     /**
      * Constructs a new {@code InstallerContext}.
@@ -89,6 +98,15 @@ public class InstallerContext implements Reporter {
 
     public @NotNull InstallerAction getAction() {
         return action;
+    }
+
+    /**
+     * Sets the name of the installer which runs with this context, which the IDE's log puts before each line.
+     *
+     * @param installerName the name of the installer.
+     */
+    void setInstallerName(@Nullable String installerName) {
+        this.installerName = installerName;
     }
 
     public void setConsoleProviders(@Nullable Supplier<List<ConsoleProvider>> consoleProviders) {
@@ -227,13 +245,32 @@ public class InstallerContext implements Reporter {
     }
 
     /**
-     * Prints a message to the console with a specified content type.
+     * Prints a message to the console with a specified content type, and writes it to the IDE's log at the level of
+     * its content type: an error as a warning, a step at INFO, and the rest at DEBUG.
      *
      * @param message     the message to print.
      * @param contentType the output content type.
      */
     public void print(@Nullable String message,
                       @NotNull ConsoleViewContentType contentType) {
+        print(message, contentType, getLogLevel(contentType));
+    }
+
+    /**
+     * Prints a message to the consoles with the given content type, and writes it to the IDE's log at the given level,
+     * whatever consoles are registered, as when none is. Each line that an installer prints goes through this method.
+     * <p>
+     * {@link Level#WARNING} and above are logged as warnings, {@link Level#INFO} at INFO, the levels below at DEBUG,
+     * which {@code #com.redhat.devtools.lsp4ij.installation} in Debug Log Settings turns on, and {@link Level#OFF} not
+     * at all. The log gets the message without its values which can be secrets, as a token.
+     *
+     * @param message     the message to print.
+     * @param contentType the output content type.
+     * @param logLevel    the level at which the IDE's log gets the message.
+     */
+    public void print(@Nullable String message,
+                      @NotNull ConsoleViewContentType contentType,
+                      @NotNull Level logLevel) {
         if (message == null) {
             return;
         }
@@ -245,6 +282,52 @@ public class InstallerContext implements Reporter {
         if (progressIndicator != null) {
             progressIndicator.setText2(message);
         }
+        log(logLevel, message);
+    }
+
+    /**
+     * Writes the given message to the IDE's log at the given level, after the name of the installer, without its
+     * values which can be secrets, as {@link #print(String, ConsoleViewContentType, Level)} says.
+     *
+     * @param level   the level at which the IDE's log gets the message.
+     * @param message the message.
+     */
+    void log(@NotNull Level level, @NotNull String message) {
+        if (level.equals(Level.OFF)) {
+            return;
+        }
+        // SEVERE too is logged as a warning: the IDE reports an error of the log as an error of LSP4IJ
+        boolean warning = level.intValue() >= Level.WARNING.intValue();
+        boolean info = !warning && level.intValue() >= Level.INFO.intValue();
+        if (!warning && !info && !LOGGER.isDebugEnabled()) {
+            return;
+        }
+        String line = message.strip();
+        if (line.isEmpty()) {
+            return;
+        }
+        String logged = (installerName != null ? "Installer '" + installerName + "': " : "Installer: ")
+                + SecretRedactor.redact(line, EnvironmentUtil.getEnvironmentMap());
+        if (warning) {
+            LOGGER.warn("{}", logged);
+        } else if (info) {
+            LOGGER.info("{}", logged);
+        } else {
+            LOGGER.debug("{}", logged);
+        }
+    }
+
+    /**
+     * Returns the level at which the IDE's log gets a message of the given content type: a warning for an error, INFO
+     * for a step, as {@code - Step: <name>}, and DEBUG for the rest.
+     */
+    private static @NotNull Level getLogLevel(@NotNull ConsoleViewContentType contentType) {
+        if (contentType == ConsoleViewContentType.ERROR_OUTPUT
+                || contentType == ConsoleViewContentType.LOG_ERROR_OUTPUT
+                || contentType == ConsoleViewContentType.LOG_WARNING_OUTPUT) {
+            return Level.WARNING;
+        }
+        return contentType == ConsoleViewContentType.LOG_INFO_OUTPUT ? Level.INFO : Level.FINE;
     }
 
     /**
@@ -268,9 +351,13 @@ public class InstallerContext implements Reporter {
         print(text);
     }
 
+    /**
+     * Prints the given error of an asset fetcher, as {@link #printError(String, Exception)} does. The IDE's log gets it
+     * at DEBUG only, since the fetcher logs its errors itself, with what it fetched.
+     */
     @Override
     public void setText(@NotNull String text, @NotNull Exception e) {
-        printError(text, e);
+        print(text + ExceptionUtil.getThrowableText(e), ConsoleViewContentType.ERROR_OUTPUT, Level.FINE);
     }
 
     @Override

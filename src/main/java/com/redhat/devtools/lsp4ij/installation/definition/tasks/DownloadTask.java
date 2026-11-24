@@ -11,12 +11,15 @@
 package com.redhat.devtools.lsp4ij.installation.definition.tasks;
 
 import com.google.gson.JsonObject;
+import com.intellij.execution.ui.ConsoleViewContentType;
 import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.util.io.FileUtil;
 import com.intellij.openapi.util.text.StringUtil;
+import com.intellij.util.ExceptionUtil;
 import com.intellij.util.system.CpuArch;
 import com.redhat.devtools.lsp4ij.installation.definition.InstallerContext;
 import com.redhat.devtools.lsp4ij.installation.definition.InstallerTask;
+import com.redhat.devtools.lsp4ij.installation.definition.SecretRedactor;
 import com.redhat.devtools.lsp4ij.installation.definition.ServerInstallerDescriptor;
 import com.redhat.devtools.lsp4ij.installation.download.AssetFetcher;
 import com.redhat.devtools.lsp4ij.installation.download.DownloadUtils;
@@ -38,6 +41,7 @@ import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
+import java.util.logging.Level;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -82,9 +86,21 @@ public class DownloadTask extends InstallerTask {
     }
 
     private static String extractFileName(String url) {
-        int slash = url.lastIndexOf('/');
-        if (slash < 0 || slash == url.length() - 1) return "";
-        return url.substring(slash + 1);
+        // The query and the fragment of the URL, as a token, aren't part of the name: a '?' can't be in a file name on
+        // Windows, and an archive is recognized by the extension of its name (#2206)
+        int end = url.length();
+        int query = url.indexOf('?');
+        if (query >= 0) {
+            end = query;
+        }
+        int fragment = url.indexOf('#');
+        if (fragment >= 0 && fragment < end) {
+            end = fragment;
+        }
+        String path = url.substring(0, end);
+        int slash = path.lastIndexOf('/');
+        if (slash < 0 || slash == path.length() - 1) return "";
+        return path.substring(slash + 1);
     }
 
     @Override
@@ -114,7 +130,8 @@ public class DownloadTask extends InstallerTask {
                         or <a href="https://github.com/redhat-developer/lsp4ij/blob/main/docs/UserDefinedLanguageServerTemplate.md#github-asset-download">github.asset</a>
                         in your <code>installer.json</code>, matching your OS and architecture.</p>
                         """.formatted(LanguageServerTemplate.OS_KEY, CpuArch.CURRENT.name().toLowerCase());
-                context.printError(htmlError, true);
+                printLoggedError(htmlError, context);
+                context.addErrorMessage(htmlError);
                 return false;
             }
             context.print("> Downloading asset: " + downloadUrl);
@@ -122,9 +139,9 @@ public class DownloadTask extends InstallerTask {
             // Extract filename from URL
             String originFileName = extractFileName(downloadUrl);
             if (originFileName.isEmpty()) {
-                context.printError("Cannot extract file name from URL.");
+                printLoggedError("Cannot extract file name from URL.", context);
                 LOGGER.warn("Installer '{}': cannot extract the file name from the download URL {}", installer,
-                        downloadUrl);
+                        SecretRedactor.redact(downloadUrl));
                 return false;
             }
 
@@ -136,7 +153,8 @@ public class DownloadTask extends InstallerTask {
             DownloadUtils.download(downloadUrl, downloadedAsset, context.getProgressIndicator());
             LOGGER.info("Installer '{}' downloaded {} ({} bytes) in {} ms; its URL comes from {} ({} ms)",
                     installer,
-                    downloadUrl,
+                    // A URL can hold a secret, as a token in its query or a password in its user info
+                    SecretRedactor.redact(downloadUrl),
                     Files.size(downloadedAsset),
                     TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - downloadStart),
                     found.source(),
@@ -215,7 +233,8 @@ public class DownloadTask extends InstallerTask {
                             was not found in the downloaded archive at <code>%s</code>.</p>
                             <p>Please update the <code>output.file.name</code> section of your <code>installer.json</code> to correctly match your OS and architecture.</p>
                             """.formatted(outputFileName, LanguageServerTemplate.OS_KEY, CpuArch.CURRENT.name().toLowerCase(), outputDir.toString());
-                    context.printError(htmlError, true);
+                    printLoggedError(htmlError, context);
+                    context.addErrorMessage(htmlError);
                     LOGGER.warn("Installer '{}': the file {} of output.file.name isn't in {}", installer,
                             outputFileName, outputDir);
                     return false;
@@ -234,10 +253,23 @@ public class DownloadTask extends InstallerTask {
             return false;
         } catch (Exception e) {
             context.addErrorMessage("Download server failed: " + e.getMessage());
-            context.printError("Download server failed: ", e);
-            LOGGER.warn("Installer '{}': the download of {} failed", installer, downloadUrl, e);
+            printLoggedError("Download server failed: " + ExceptionUtil.getThrowableText(e), context);
+            // The text of the exception, with its stack, can have the URL too
+            LOGGER.warn("Installer '{}': the download of {} failed\n{}", installer, SecretRedactor.redact(downloadUrl),
+                    SecretRedactor.redact(ExceptionUtil.getThrowableText(e)));
             return false;
         }
+    }
+
+    /**
+     * Prints the given error, which this task logs itself, with what it downloaded: the IDE's log gets the printed
+     * error at DEBUG only, so that it doesn't have it twice.
+     *
+     * @param error   the error.
+     * @param context the installer context.
+     */
+    private static void printLoggedError(@NotNull String error, @NotNull InstallerContext context) {
+        context.print(error, ConsoleViewContentType.ERROR_OUTPUT, Level.FINE);
     }
 
     /**
@@ -281,7 +313,7 @@ public class DownloadTask extends InstallerTask {
         LOGGER.info("Installer '{}': no download URL from {}; falling back to the 'url' of the download: {}",
                 getServerInstallerDeclaration().getName(),
                 assetFetcher.getSource(),
-                downloadUrl != null ? downloadUrl : "none");
+                downloadUrl != null ? SecretRedactor.redact(downloadUrl) : "none");
         return new DownloadUrl(downloadUrl, "its 'url', since its 'github' or 'maven' gave none",
                 List.copyOf(reporter.failureReasons()));
     }

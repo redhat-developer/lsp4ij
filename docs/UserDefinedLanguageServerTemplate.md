@@ -442,6 +442,13 @@ A debug adapter checks its installation before its first debug session in each I
 `executeOnStartServer` says: a console, `DAP Debugger (initializing)`, shows the `check`, and the `run` if the check
 fails, and the debug session then starts. The `Installer` tab of the debug session has the links of the LSP console.
 
+The IDE's log, `idea.log` (*Help | Show Log in Finder*, *Explorer* or *Files*), has what an installer does, also when no
+console shows it, as when the installer runs at the start of a language server whose console was never opened: the
+start and the result of the installation and of each step, and the errors as warnings. With
+`#com.redhat.devtools.lsp4ij.installation` in *Help | Diagnostic Tools | Debug Log Settings*, it also has the rest of
+what the console shows, as the commands of the `exec` tasks and their output. The log has `<redacted>` instead of a
+value which can be a secret, as a token, an `Authorization` header or the password of a URL.
+
 ### Task showMessage
 
 Shows a notification, as in the `onFail` of a check which finds that a tool is missing. The check of the Go language

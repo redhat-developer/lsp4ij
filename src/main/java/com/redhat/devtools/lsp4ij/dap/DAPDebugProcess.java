@@ -927,6 +927,16 @@ public class DAPDebugProcess extends XDebugProcess implements Disposable {
     }
 
     /**
+     * Shows in the "Threads" panel whether each thread of the given client's DAP session runs, is stopped or has
+     * exited, as they changed, when the panel shows the threads of that session.
+     *
+     * @param client the client of the DAP session whose threads changed.
+     */
+    public void refreshThreadRunStates(@NotNull DAPClient client) {
+        threadsPanel.refreshThreadRunStates(client);
+    }
+
+    /**
      * Shows the sources which the DAP server of the given client reports as loaded, in the "Loaded Sources" tab, which
      * is added the first time.
      *

@@ -53,6 +53,8 @@ public class DAPExpressionModifierTest {
                 variable.getPresentationHint().getAttributes());
         assertEquals("0x2a", variable.getMemoryReference());
         assertEquals(Integer.valueOf(5), variable.getValueLocationReference());
+        // The response has no 'declarationLocationReference': the variable is still declared where it was
+        assertEquals(Integer.valueOf(3), variable.getDeclarationLocationReference());
     }
 
     @Test
@@ -86,6 +88,7 @@ public class DAPExpressionModifierTest {
         variable.setPresentationHint(new VariablePresentationHint());
         variable.setMemoryReference("0x29");
         variable.setValueLocationReference(4);
+        variable.setDeclarationLocationReference(3);
         return variable;
     }
 }

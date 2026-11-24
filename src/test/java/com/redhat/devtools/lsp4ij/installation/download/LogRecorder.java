@@ -23,7 +23,7 @@ import java.util.logging.Logger;
  * {@code #com.redhat.devtools.lsp4ij.installation} in Debug Log Settings. LSP4IJ logs with SLF4J, which IntelliJ binds
  * to java.util.logging.
  */
-final class LogRecorder implements AutoCloseable {
+public final class LogRecorder implements AutoCloseable {
 
     private static final String CATEGORY = "com.redhat.devtools.lsp4ij.installation";
 
@@ -51,7 +51,7 @@ final class LogRecorder implements AutoCloseable {
         }
     };
 
-    LogRecorder() {
+    public LogRecorder() {
         logger.setLevel(Level.ALL);
         logger.addHandler(handler);
     }
@@ -59,11 +59,11 @@ final class LogRecorder implements AutoCloseable {
     /**
      * Returns the records, as {@code INFO message}, with the stack trace of their exception, if any.
      */
-    @NotNull List<String> lines() {
+    public @NotNull List<String> lines() {
         return List.copyOf(lines);
     }
 
-    @NotNull String output() {
+    public @NotNull String output() {
         return String.join("\n", lines);
     }
 

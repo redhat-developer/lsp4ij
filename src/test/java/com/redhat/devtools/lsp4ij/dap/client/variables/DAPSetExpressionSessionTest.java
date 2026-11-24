@@ -512,9 +512,13 @@ public class DAPSetExpressionSessionTest extends HeavyPlatformTestCase {
      */
     private void stopAgain() {
         var stopped = session.getSuspendContext();
+        var frame = session.getCurrentStackFrame();
         server.stop();
+        // The session takes the new suspend context before it makes a frame of it the current one: until then, the
+        // current frame is still the one of the earlier stop, whose values are out of date
         PlatformTestUtil.waitWithEventsDispatching("the program stops again", () ->
-                session.getSuspendContext() != stopped && session.getCurrentStackFrame() instanceof DAPStackFrame,
+                session.getSuspendContext() != stopped
+                        && session.getCurrentStackFrame() instanceof DAPStackFrame current && current != frame,
                 BOUND_SECONDS);
     }
 

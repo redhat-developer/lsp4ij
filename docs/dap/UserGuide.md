@@ -307,8 +307,8 @@ supports single thread execution requests (`supportsSingleThreadExecutionRequest
 session's toolbar have `Step Only the Current Thread`, as the Java debugger's `Resume only the current thread`
 option. When it is selected, `Step Over`, `Step Into`, `Smart Step Into` and `Step Out` send
 [singleThread](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_Next), so the DAP server
-resumes only the thread that steps while the other threads stay stopped. `Resume Program` still resumes every thread.
-The choice holds for the debug session.
+resumes only the thread that steps while the other threads stay stopped, as the `Threads` tab shows. `Resume Program`
+still resumes every thread. The choice holds for the debug session.
 
 ### Terminate a thread
 
@@ -328,6 +328,15 @@ server started with
 [startDebugging](https://microsoft.github.io/debug-adapter-protocol//specification.html#Reverse_Requests_StartDebugging),
 and `Terminate Thread` terminates them in that session. For a DAP server which doesn't support the request, as
 debugpy, vscode-js-debug and Delve don't, the menu item isn't shown.
+
+Each row of the `Threads` tab shows whether its thread is `running`, `stopped` or `exited`, with its icon, as the DAP
+server's [stopped](https://microsoft.github.io/debug-adapter-protocol//specification.html#Events_Stopped),
+[continued](https://microsoft.github.io/debug-adapter-protocol//specification.html#Events_Continued) and
+[thread](https://microsoft.github.io/debug-adapter-protocol//specification.html#Events_Thread) events and the
+session's resumes and steps say. When the DAP server stops a thread without `allThreadsStopped`, the other threads
+stay as they were, running until it says otherwise, as in VS Code. When a thread other than the one where the session
+is suspended continues alone (`allThreadsContinued: false`), the session stays suspended, and the `Frames` view shows
+`Frames not available: the thread is running` for that thread instead of the frames of its stop.
 
 ## Reset Frame
 
@@ -424,6 +433,15 @@ The result of an expression, as `Evaluate Expression` shows it, and a value set 
 which the DAP server gives with them. `Jump to Value Source` is shown only for a value with a location, and is enabled
 while the program is suspended, since the DAP server's reference is valid only until the program resumes. When the DAP
 server answers with an error or without a location, or the file of the location isn't found, a notification says so.
+
+`Jump to Source` on a variable opens its declaration when the DAP server gives the variable the location of its
+declaration ([declarationLocationReference](https://microsoft.github.io/debug-adapter-protocol//specification.html#Types_Variable)),
+as lldb-dap does: it asks the DAP server where that is, with the Locations request, and opens the source at the line
+and column of the answer, as `Jump to Value Source` does. DAP gives a declaration to a variable only, not to the result
+of an expression. For a variable without one, when the DAP server answers with an error or without a location, or not
+within 3 seconds, and when the program has run since the variable was shown, `Jump to Source` goes, as before, to where
+the name of the variable is found in the file of its stack frame, up to the frame's line. The
+[inline values](#inline-value) are always shown there, never at the declarations.
 
 ## Set value
 

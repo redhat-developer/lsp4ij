@@ -207,6 +207,18 @@ public class DAPJumpToValueSourceSessionTest extends HeavyPlatformTestCase {
         assertEquals(List.of(), notifications);
     }
 
+    public void testJumpToValueSourceReportsASourceReferenceWhoseTextTheDAPServerDoesNotGive() throws Exception {
+        debug();
+        server.givesSourceText = false;
+        action().actionPerformed(update(node(local("generated"))));
+
+        assertEquals(Integer.valueOf(GENERATED_LOCATION), PlatformTestUtil.waitForFuture(server.nextLocation(), BOUND_SECONDS * 1000L));
+        assertEquals(Integer.valueOf(GENERATED_SOURCE_REFERENCE), PlatformTestUtil.waitForFuture(server.nextSource(), BOUND_SECONDS * 1000L));
+        var expected = DAPBundle.message("dap.variables.valueSource.notFound", "generated", "<generated>/generated.js");
+        PlatformTestUtil.waitWithEventsDispatching("the source without text is reported", () -> notifications.contains(expected), BOUND_SECONDS);
+        assertNull("No empty document is opened", FileEditorManager.getInstance(getProject()).getSelectedTextEditor());
+    }
+
     public void testJumpToValueSourceIsNotOfferedForAValueWithoutAValueLocationReference() throws Exception {
         debug();
         var event = update(node(local("count")));
@@ -477,6 +489,8 @@ public class DAPJumpToValueSourceSessionTest extends HeavyPlatformTestCase {
         private final ServerSocket serverSocket;
         private final LinkedBlockingQueue<Integer> locations = new LinkedBlockingQueue<>();
         private final LinkedBlockingQueue<Integer> sources = new LinkedBlockingQueue<>();
+        // false to answer the 'source' requests without a body, so without the text of the source
+        private volatile boolean givesSourceText = true;
         private volatile IDebugProtocolClient client;
 
         CallbackServer(@NotNull Path handlers) throws IOException {
@@ -658,6 +672,10 @@ public class DAPJumpToValueSourceSessionTest extends HeavyPlatformTestCase {
         @Override
         public CompletableFuture<SourceResponse> source(SourceArguments args) {
             sources.add(args.getSourceReference());
+            if (!givesSourceText) {
+                // an answer without a body
+                return CompletableFuture.completedFuture(null);
+            }
             var response = new SourceResponse();
             response.setContent(args.getSourceReference() == GENERATED_SOURCE_REFERENCE ? GENERATED : "");
             return CompletableFuture.completedFuture(response);

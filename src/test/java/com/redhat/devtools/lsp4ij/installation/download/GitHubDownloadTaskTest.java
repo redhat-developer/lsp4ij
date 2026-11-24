@@ -38,6 +38,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.logging.Level;
 import java.util.regex.Pattern;
 
 import static com.redhat.devtools.lsp4ij.installation.download.GitHubAssetFetcherTest.RELEASES_PATH;
@@ -240,6 +241,22 @@ public class GitHubDownloadTaskTest {
     }
 
     @Test
+    public void testTheFileOfADownloadWhoseUrlHasAQueryIsNamedAfterItsPath() throws Exception {
+        server.answer(RELEASES_PATH, GitHubAssetFetcherTest.rateLimit(403, 60, RESET));
+        server.answer(ASSET_PATH, Response.ok("server"));
+        var context = new RecordingContext();
+
+        // The query, here with a token, isn't part of the name of the file, which a '?' can't be in on Windows
+        boolean installed = createTask(Map.of(), server.url() + ASSET_PATH + "?access_token=" + TOKEN + "#top").run(context);
+
+        assertTrue(installed, context.output());
+        try (var files = Files.list(outputDir)) {
+            assertEquals(List.of("server.jar"), files.map(file -> file.getFileName().toString()).toList());
+        }
+        assertEquals("server", Files.readString(outputDir.resolve("server.jar")));
+    }
+
+    @Test
     public void testTheLogHasOneLinePerDownloadWithWhereItsUrlComesFrom() throws Exception {
         server.answer(RELEASES_PATH, Response.ok(releases(server.url() + ASSET_PATH)));
         server.answer(ASSET_PATH, Response.ok("server"));
@@ -295,6 +312,29 @@ public class GitHubDownloadTaskTest {
                     + " (6 bytes) in "), lines.get(2));
             assertTrue(lines.get(2).contains(
                     "; its URL comes from its 'url', since its 'github' or 'maven' gave none ("), lines.get(2));
+        }
+    }
+
+    @Test
+    public void testTheLogHasNoSecretOfTheUrlOfADownload() throws Exception {
+        server.answer(RELEASES_PATH, GitHubAssetFetcherTest.rateLimit(403, 60, RESET));
+        server.answer(ASSET_PATH, Response.ok("server"), new Response(500, Map.of(), ""));
+        String url = server.url() + ASSET_PATH + "?access_token=" + TOKEN;
+
+        try (var log = new LogRecorder()) {
+            // The fallback to the url of the download, which downloads, and then fails
+            assertTrue(createTask(Map.of(), url).run(new RecordingContext()));
+            assertFalse(createTask(Map.of(), url).run(new RecordingContext()));
+
+            assertFalse(log.output().contains(TOKEN), "The log must not have the token of the URL: " + log.output());
+            var lines = infoAndWarnings(log);
+            String redacted = server.url() + ASSET_PATH + "?access_token=<redacted>";
+            assertTrue(lines.stream().anyMatch(line -> line.endsWith("falling back to the 'url' of the download: "
+                    + redacted)), log.output());
+            assertTrue(lines.stream().anyMatch(line -> line.startsWith("INFO Installer 'test' downloaded "
+                    + redacted + " (6 bytes) in ")), log.output());
+            assertTrue(lines.stream().anyMatch(line -> line.startsWith("WARNING Installer 'test': the download of "
+                    + redacted + " failed\n")), log.output());
         }
     }
 
@@ -387,14 +427,16 @@ public class GitHubDownloadTaskTest {
         }
 
         @Override
-        public void print(@Nullable String message, @NotNull ConsoleViewContentType contentType) {
+        public void print(@Nullable String message,
+                          @NotNull ConsoleViewContentType contentType,
+                          @NotNull Level logLevel) {
             if (message != null) {
                 output.add(message);
                 if (contentType == ConsoleViewContentType.ERROR_OUTPUT) {
                     errors.add(message);
                 }
             }
-            super.print(message, contentType);
+            super.print(message, contentType, logLevel);
         }
 
         @NotNull String output() {
