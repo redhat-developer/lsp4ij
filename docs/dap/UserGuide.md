@@ -51,10 +51,6 @@ A file matches when one of the mappings applies to it. There are three kinds of 
   A file type your IDE doesn't know is shown as `(Unknown)`.
 - `File name patterns`: patterns for the file name, such as `*.go` or `go.mod`. They work in every IDE.
 
-The `Language Id` column is free text. Language servers use this value as the LSP
-[TextDocumentItem#languageId](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocumentItem),
-and the LSP specification lists the common values there. DAP servers don't use it, so you can leave it empty here.
-
 ### Configuration tab
 
 The `Configuration` tab to specify the working directory and the file you want to run/debug:

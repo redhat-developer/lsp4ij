@@ -31,6 +31,8 @@ import java.util.*;
  *     <li>a tab which show list of file type mappings.</li>
  *     <li>a tab which show list of file name pattern mappings.</li>
  * </ul>
+ * <p>
+ * Unlike the mappings of a language server, they have no {@code Language Id} column: a DAP server doesn't use it.
  */
 public class DAPServerMappingsPanel {
 
@@ -60,19 +62,19 @@ public class DAPServerMappingsPanel {
     }
 
     private void createLanguageMappingsContent(JBTabbedPane tabbedPane, boolean editable) {
-        languageMappingsPanel = new LanguageServerMappingTablePanel(editable);
+        languageMappingsPanel = new LanguageServerMappingTablePanel(editable, false);
         languageMappingsPanel.addChangeHandler(() -> updateTabTitleAt(LANGUAGE_TAB_INDEX));
         tabbedPane.add(DAPBundle.message("dap.settings.editor.mappings.language"), languageMappingsPanel);
     }
 
     private void createFileTypeMappingsContent(JBTabbedPane tabbedPane, boolean editable) {
-        fileTypeMappingsPanel = new FileTypeServerMappingTablePanel(editable);
+        fileTypeMappingsPanel = new FileTypeServerMappingTablePanel(editable, false);
         fileTypeMappingsPanel.addChangeHandler(() -> updateTabTitleAt(FILE_TYPE_TAB_INDEX));
         tabbedPane.add(DAPBundle.message("dap.settings.editor.mappings.fileType"), fileTypeMappingsPanel);
     }
 
     private void createFileNamePatternMappingsContent(JBTabbedPane tabbedPane, boolean editable) {
-        fileNamePatternMappingsPanel = new FileNamePatternServerMappingTablePanel(editable);
+        fileNamePatternMappingsPanel = new FileNamePatternServerMappingTablePanel(editable, false);
         fileNamePatternMappingsPanel.addChangeHandler(() -> updateTabTitleAt(FILE_NAME_PATTERN_TAB_INDEX));
         tabbedPane.add(DAPBundle.message("dap.settings.editor.mappings.fileNamePattern"), fileNamePatternMappingsPanel);
     }
@@ -98,8 +100,7 @@ public class DAPServerMappingsPanel {
         //    "patterns": [
         //      "*.less"
         //    ]
-        //  },
-        //  "languageId": "less"
+        //  }
         //}
 
         // Collect them by following this strategy:

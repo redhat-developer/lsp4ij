@@ -802,7 +802,7 @@ public class BundledTemplateCommandsTest {
     /**
      * A file type that a template names goes to one language: in an IDE which has a file type of that name, LSP4IJ maps
      * the file type, and not the patterns of the mapping, so the shell scripts of a mapping named Scala would go to the
-     * Scala files.
+     * Scala files. A DAP template gives no language, see {@link #aDapTemplateGivesItsMappingsNoLanguageId()}.
      */
     @Test
     void aFileTypeOfATemplateGoesToOneLanguage() throws IOException, URISyntaxException {
@@ -810,7 +810,7 @@ public class BundledTemplateCommandsTest {
         List<String> problems = new ArrayList<>();
         forEachFileTypeMapping((file, fileType, languageId) -> {
             var name = fileType.get("name");
-            if (name == null) {
+            if (name == null || languageId == null) {
                 return;
             }
             String previous = languages.putIfAbsent(file + ": " + name.getAsString(), languageId);
@@ -820,6 +820,28 @@ public class BundledTemplateCommandsTest {
         });
         assertTrue(languages.size() > 50, "the file types of the templates: " + languages);
         assertEquals(List.of(), problems, "name the file type of each language of a template");
+    }
+
+    /**
+     * The mappings of a DAP template have no language ID: a language server receives it in {@code textDocument/didOpen},
+     * but a DAP server doesn't use it, and the Mappings tab of a DAP server doesn't show it (#1837). A mapping of a
+     * language server template has one.
+     */
+    @Test
+    void aDapTemplateGivesItsMappingsNoLanguageId() throws IOException, URISyntaxException {
+        List<String> dapMappings = new ArrayList<>();
+        List<String> problems = new ArrayList<>();
+        forEachFileTypeMapping((file, fileType, languageId) -> {
+            boolean dap = file.startsWith("dap/");
+            if (dap) {
+                dapMappings.add(file + ": " + fileType);
+            }
+            if (dap == (languageId != null)) {
+                problems.add(file + ": " + fileType + " has " + (dap ? "the language ID " + languageId : "no language ID"));
+            }
+        });
+        assertTrue(dapMappings.size() > 10, "the mappings of the DAP templates: " + dapMappings);
+        assertEquals(List.of(), problems, "give a mapping a language ID in a language server template, not in a DAP template");
     }
 
     /**
@@ -924,11 +946,12 @@ public class BundledTemplateCommandsTest {
 
     @FunctionalInterface
     private interface FileTypeMappingConsumer {
-        void accept(@NotNull String file, @NotNull JsonObject fileType, @NotNull String languageId);
+        void accept(@NotNull String file, @NotNull JsonObject fileType, @Nullable String languageId);
     }
 
     /**
-     * Calls the given consumer with each file type mapping of the bundled templates.
+     * Calls the given consumer with each file type mapping of the bundled templates, and its language ID, which a mapping
+     * of a DAP template doesn't have.
      */
     private static void forEachFileTypeMapping(@NotNull FileTypeMappingConsumer consumer)
             throws IOException, URISyntaxException {
@@ -936,7 +959,9 @@ public class BundledTemplateCommandsTest {
             if (file.endsWith("/template.json") && json.has("fileTypeMappings")) {
                 json.getAsJsonArray("fileTypeMappings").forEach(mapping -> consumer.accept(file,
                         mapping.getAsJsonObject().getAsJsonObject("fileType"),
-                        mapping.getAsJsonObject().get("languageId").getAsString()));
+                        mapping.getAsJsonObject().has("languageId")
+                                ? mapping.getAsJsonObject().get("languageId").getAsString()
+                                : null));
             }
         });
     }

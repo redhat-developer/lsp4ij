@@ -12,8 +12,7 @@
         "patterns": [
           "*.rs"
         ]
-      },
-      "languageId": "rust"
+      }
     },
     {
       "fileType": {
@@ -21,8 +20,7 @@
         "patterns": [
           "*.rast"
         ]
-      },
-      "languageId": "ra_syntax_tree"
+      }
     }
   ]
 }

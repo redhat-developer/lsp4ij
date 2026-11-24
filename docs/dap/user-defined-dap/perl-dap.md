@@ -15,7 +15,7 @@ for its features and its launch and attach parameters.
 
    * the command, `<<insert base directory>>/perl-dap` (`perl-dap.exe` on Windows), which the installer of the
      template sets when it installs the DAP server;
-   * the file mappings, for `*.pl`, `*.pm`, `*.t` and the other Perl files, with the `perl` language id;
+   * the file mappings, for `*.pl`, `*.pm`, `*.t` and the other Perl files;
    * the launch configurations (`Debug Script`, `Debug with Custom Libs`, `Debug with Environment`, `Debug in WSL`) and
      the attach configurations (`Attach by PID`, `Attach by TCP`).
 

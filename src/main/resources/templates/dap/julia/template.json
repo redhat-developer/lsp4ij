@@ -15,8 +15,7 @@
         "patterns": [
           "*.jl"
         ]
-      },
-      "languageId": "julia"
+      }
     }
   ]
 }

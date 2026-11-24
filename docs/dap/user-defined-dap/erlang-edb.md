@@ -27,7 +27,7 @@ for its launch and attach parameters.
 4. Select the `Erlang - edb` template, and click on `OK`. This fills:
 
    * the command, `edb dap`;
-   * the file mappings, for `*.erl` and `*.hrl`, with the `erlang` language id;
+   * the file mappings, for `*.erl` and `*.hrl`;
    * the launch configuration `Launch rebar3 shell`, which edb's README gives: edb asks LSP4IJ to start
      `rebar3 as test shell` in a terminal of the IDE, with the
      [Run In Terminal](../UserGuide.md#run-in-terminal) request, and the shell node then connects to edb.

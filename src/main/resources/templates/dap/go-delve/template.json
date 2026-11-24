@@ -15,8 +15,7 @@
         "patterns": [
           "*.go"
         ]
-      },
-      "languageId": "go"
+      }
     },
     {
       "fileType": {
@@ -24,8 +23,7 @@
         "patterns": [
           "go.mod"
         ]
-      },
-      "languageId": "go.mod"
+      }
     },
     {
       "fileType": {
@@ -33,8 +31,7 @@
         "patterns": [
           "go.work"
         ]
-      },
-      "languageId": "go.work"
+      }
     },
     {
       "fileType": {
@@ -42,8 +39,7 @@
         "patterns": [
           "go.sum"
         ]
-      },
-      "languageId": "go.sum"
+      }
     },
     {
       "fileType": {
@@ -52,8 +48,7 @@
           "*.tmpl",
           "*.gotmpl"
         ]
-      },
-      "languageId": "gotmpl"
+      }
     }
   ]
 }

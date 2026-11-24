@@ -39,10 +39,22 @@ public abstract class AbstractServerMappingTablePanel extends BorderLayoutPanel 
     private final List<Runnable> myChangeHandlers = ContainerUtil.createConcurrentList();
 
     public AbstractServerMappingTablePanel(ColumnInfo<ServerMappingSettings, String> columnId, boolean editable) {
-        ListTableModel<ServerMappingSettings> model = new ListTableModel<>(
-                new ColumnInfo<?, ?>[]{columnId, new LanguageIdColumn(editable)},
-                new ArrayList<>(),
-                0);
+        this(columnId, editable, true);
+    }
+
+    /**
+     * @param columnId       the column of the language, file type or file name patterns of a mapping.
+     * @param editable       true if the mappings can be added, removed and edited.
+     * @param withLanguageId true to show the {@code Language Id} column, which a language server receives as the
+     *                       {@code languageId} of {@code textDocument/didOpen}; false for a DAP server, which doesn't use it.
+     */
+    public AbstractServerMappingTablePanel(ColumnInfo<ServerMappingSettings, String> columnId,
+                                           boolean editable,
+                                           boolean withLanguageId) {
+        ColumnInfo<?, ?>[] columns = withLanguageId
+                ? new ColumnInfo<?, ?>[]{columnId, new LanguageIdColumn(editable)}
+                : new ColumnInfo<?, ?>[]{columnId};
+        ListTableModel<ServerMappingSettings> model = new ListTableModel<>(columns, new ArrayList<>(), 0);
         table = new TableView<>(model);
         table.setColumnSelectionAllowed(true);
 
