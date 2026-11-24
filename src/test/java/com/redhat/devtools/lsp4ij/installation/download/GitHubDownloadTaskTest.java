@@ -136,6 +136,22 @@ public class GitHubDownloadTaskTest {
     }
 
     @Test
+    public void testTheFileOfADownloadWhoseUrlHasAQueryIsNamedAfterItsPath() throws Exception {
+        server.answer(RELEASES_PATH, GitHubAssetFetcherTest.rateLimit(403, 60, RESET));
+        server.answer(ASSET_PATH, Response.ok("server"));
+        var context = new RecordingContext();
+
+        // The query, here with a token, isn't part of the name of the file, which a '?' can't be in on Windows
+        boolean installed = createTask(Map.of(), server.url() + ASSET_PATH + "?access_token=" + TOKEN + "#top").run(context);
+
+        assertTrue(installed, context.output());
+        try (var files = Files.list(outputDir)) {
+            assertEquals(List.of("server.jar"), files.map(file -> file.getFileName().toString()).toList());
+        }
+        assertEquals("server", Files.readString(outputDir.resolve("server.jar")));
+    }
+
+    @Test
     public void testTheLogHasOneLinePerDownloadWithWhereItsUrlComesFrom() throws Exception {
         server.answer(RELEASES_PATH, Response.ok(releases(server.url() + ASSET_PATH)));
         server.answer(ASSET_PATH, Response.ok("server"));

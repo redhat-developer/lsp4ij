@@ -81,9 +81,21 @@ public class DownloadTask extends InstallerTask {
     }
 
     private static String extractFileName(String url) {
-        int slash = url.lastIndexOf('/');
-        if (slash < 0 || slash == url.length() - 1) return "";
-        return url.substring(slash + 1);
+        // The query and the fragment of the URL, as a token, aren't part of the name: a '?' can't be in a file name on
+        // Windows, and an archive is recognized by the extension of its name (#2206)
+        int end = url.length();
+        int query = url.indexOf('?');
+        if (query >= 0) {
+            end = query;
+        }
+        int fragment = url.indexOf('#');
+        if (fragment >= 0 && fragment < end) {
+            end = fragment;
+        }
+        String path = url.substring(0, end);
+        int slash = path.lastIndexOf('/');
+        if (slash < 0 || slash == path.length() - 1) return "";
+        return path.substring(slash + 1);
     }
 
     @Override
