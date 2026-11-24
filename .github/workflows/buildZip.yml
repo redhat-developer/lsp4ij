@@ -38,6 +38,11 @@ jobs:
       # Setup Gradle
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v5
+        with:
+          # Leaves the extracted IDEs out of the Actions cache, see ci.yml
+          gradle-home-cache-excludes: |
+            caches/transforms-4
+            caches/*/transforms
 
       # Build plugin
       - name: Build plugin

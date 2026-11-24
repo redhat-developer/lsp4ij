@@ -35,6 +35,11 @@ jobs:
       # Setup Gradle
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v5
+        with:
+          # Leaves the extracted IDEs out of the Actions cache, see ci.yml
+          gradle-home-cache-excludes: |
+            caches/transforms-4
+            caches/*/transforms
 
       # The newest build of the unified IntelliJ IDEA (IU): the current EAP if there is one, else the newest release.
       # From 2025.3 on, the list of releases has only IntelliJ IDEA (IU), so only IU has the newest builds; the IntelliJ
@@ -118,6 +123,11 @@ jobs:
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v5
+        with:
+          # Leaves the extracted IDEs out of the Actions cache, see ci.yml
+          gradle-home-cache-excludes: |
+            caches/transforms-4
+            caches/*/transforms
 
       - name: Build with Gradle
         run: ./gradlew check -PplatformType=IU -PplatformVersion=${{ needs.discover.outputs.version }}
@@ -151,6 +161,11 @@ jobs:
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v5
+        with:
+          # Leaves the extracted IDEs out of the Actions cache, see ci.yml
+          gradle-home-cache-excludes: |
+            caches/transforms-4
+            caches/*/transforms
 
       - name: Build with Gradle
         id: check
