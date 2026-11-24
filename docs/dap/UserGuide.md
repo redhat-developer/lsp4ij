@@ -307,8 +307,8 @@ supports single thread execution requests (`supportsSingleThreadExecutionRequest
 session's toolbar have `Step Only the Current Thread`, as the Java debugger's `Resume only the current thread`
 option. When it is selected, `Step Over`, `Step Into`, `Smart Step Into` and `Step Out` send
 [singleThread](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_Next), so the DAP server
-resumes only the thread that steps while the other threads stay stopped. `Resume Program` still resumes every thread.
-The choice holds for the debug session.
+resumes only the thread that steps while the other threads stay stopped, as the `Threads` tab shows. `Resume Program`
+still resumes every thread. The choice holds for the debug session.
 
 ### Terminate a thread
 
@@ -328,6 +328,15 @@ server started with
 [startDebugging](https://microsoft.github.io/debug-adapter-protocol//specification.html#Reverse_Requests_StartDebugging),
 and `Terminate Thread` terminates them in that session. For a DAP server which doesn't support the request, as
 debugpy, vscode-js-debug and Delve don't, the menu item isn't shown.
+
+Each row of the `Threads` tab shows whether its thread is `running`, `stopped` or `exited`, with its icon, as the DAP
+server's [stopped](https://microsoft.github.io/debug-adapter-protocol//specification.html#Events_Stopped),
+[continued](https://microsoft.github.io/debug-adapter-protocol//specification.html#Events_Continued) and
+[thread](https://microsoft.github.io/debug-adapter-protocol//specification.html#Events_Thread) events and the
+session's resumes and steps say. When the DAP server stops a thread without `allThreadsStopped`, the other threads
+stay as they were, running until it says otherwise, as in VS Code. When a thread other than the one where the session
+is suspended continues alone (`allThreadsContinued: false`), the session stays suspended, and the `Frames` view shows
+`Frames not available: the thread is running` for that thread instead of the frames of its stop.
 
 ## Reset Frame
 
