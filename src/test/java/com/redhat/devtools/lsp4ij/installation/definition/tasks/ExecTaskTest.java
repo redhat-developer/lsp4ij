@@ -9,6 +9,7 @@ package com.redhat.devtools.lsp4ij.installation.definition.tasks;
 
 import com.intellij.openapi.util.io.NioFiles;
 import com.intellij.testFramework.TestApplicationManager;
+import com.intellij.util.SystemProperties;
 import com.redhat.devtools.lsp4ij.installation.definition.InstallerContext;
 import com.redhat.devtools.lsp4ij.installation.definition.InstallerTaskRegistry;
 import com.redhat.devtools.lsp4ij.installation.definition.ServerInstallerDescriptor;
@@ -37,7 +38,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * Tests that the installers of two language servers which install into the same directory, as the CSS and ESLint
  * language servers, which share their npm package, run their commands there one at a time, also in two IDEs, and that
- * the one which waited doesn't install again once the other one installed the server (#1960).
+ * the one which waited doesn't install again once the other one installed the server (#1960). Also tests that the
+ * tests keep the lock files of their working directories, which are temp folders, in a temp folder, and not in
+ * {@code ~/.lsp4ij/locks} (#2140).
  */
 public class ExecTaskTest {
 
@@ -99,6 +102,27 @@ public class ExecTaskTest {
                     "the command must wait until the other IDE leaves the directory");
         } finally {
             otherIDE.destroy();
+            NioFiles.deleteRecursively(directory);
+        }
+    }
+
+    @Test
+    public void testTheTestsKeepTheLockFilesOfTheirWorkingDirectoriesInATempFolderAndNotInTheHomeOfTheUser() throws Exception {
+        Path directory = Files.createTempDirectory("lsp4ij-exec");
+        try {
+            // Whatever its command does, the exec task locks its working directory first, with the lock file
+            var context = new InstallerContext(null, InstallerContext.InstallerAction.RUN);
+            createTask(java("NoSuchProgram"), directory, descriptor()).run(context);
+            Path lockFile = ExecTask.getLockFile(directory);
+            assertTrue(Files.exists(lockFile), "the exec task must lock its working directory with " + lockFile);
+            Path lockFilesOfTheUser = Path.of(SystemProperties.getUserHome(), ".lsp4ij", "locks");
+            assertFalse(lockFile.startsWith(lockFilesOfTheUser),
+                    "the lock files of the tests, whose working directories are temp folders, must not pile up in " +
+                            lockFilesOfTheUser + " (#2140): " + lockFile);
+            Path tempFolder = Path.of(System.getProperty("java.io.tmpdir"));
+            assertTrue(lockFile.startsWith(tempFolder),
+                    "the lock files of the tests must be in a temp folder, in " + tempFolder + ": " + lockFile);
+        } finally {
             NioFiles.deleteRecursively(directory);
         }
     }

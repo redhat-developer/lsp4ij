@@ -26,6 +26,7 @@ import com.redhat.devtools.lsp4ij.server.definition.launching.CommandUtils;
 import com.redhat.devtools.lsp4ij.server.definition.launching.WorkingDirectoryCommandLine;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.jetbrains.annotations.TestOnly;
 import org.jetbrains.annotations.VisibleForTesting;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -41,6 +42,7 @@ import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
@@ -77,6 +79,11 @@ public class ExecTask extends InstallerTask {
      * the installers install, as {@code $USER_HOME$/.lsp4ij/lsp}.
      */
     private static final Path LOCK_FILES_DIR = Path.of(SystemProperties.getUserHome(), ".lsp4ij", "locks");
+
+    /**
+     * The directory of the lock files in the tests, instead of {@link #LOCK_FILES_DIR}, or null outside of them.
+     */
+    private static volatile @Nullable Path testLockFilesDir;
 
     private final @NotNull List<String> command;
     private final @Nullable Integer timeout;
@@ -195,14 +202,25 @@ public class ExecTask extends InstallerTask {
     }
 
     /**
-     * Returns the lock file of the given working directory, in {@link #LOCK_FILES_DIR}.
+     * Returns the lock file of the given working directory, in {@link #LOCK_FILES_DIR}, or in the directory which the
+     * tests gave with {@link #setLockFilesDir(Path)}.
      */
     @VisibleForTesting
     static @NotNull Path getLockFile(@NotNull Path workingDir) {
         Path dir = workingDir.toAbsolutePath().normalize();
         String name = dir.getFileName() != null ? dir.getFileName().toString() : "root";
         UUID id = UUID.nameUUIDFromBytes(dir.toString().getBytes(StandardCharsets.UTF_8));
-        return LOCK_FILES_DIR.resolve(name + "-" + id + ".lock");
+        return Objects.requireNonNullElse(testLockFilesDir, LOCK_FILES_DIR).resolve(name + "-" + id + ".lock");
+    }
+
+    /**
+     * Puts the lock files of the working directories into the given directory instead of {@link #LOCK_FILES_DIR}, for
+     * the tests: their working directories are new temp folders, whose lock files would pile up in the home of the user
+     * (#2140). Null puts them back into {@link #LOCK_FILES_DIR}.
+     */
+    @TestOnly
+    static void setLockFilesDir(@Nullable Path dir) {
+        testLockFilesDir = dir;
     }
 
     /**
