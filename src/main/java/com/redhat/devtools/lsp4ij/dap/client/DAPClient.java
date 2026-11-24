@@ -53,6 +53,7 @@ import org.eclipse.lsp4j.jsonrpc.MessageConsumer;
 import org.eclipse.lsp4j.jsonrpc.messages.ResponseError;
 import org.eclipse.lsp4j.jsonrpc.messages.ResponseMessage;
 
+import org.jetbrains.annotations.Nls;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
@@ -1536,8 +1537,8 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
     /**
      * Asks the DAP server where a location reference which it gave points to, with the 'locations' request, such as
      * the 'valueLocationReference' of a variable. No capability announces the request: the DAP server answers it for
-     * the references which it gives. The request is sent off the calling thread, so that the EDT doesn't wait on the
-     * connection.
+     * the references which it gives. The request is written on the calling thread, as LSP4J writes it, so that
+     * {@link #sendInExecutionEpoch(int, Supplier, String)} can send it: call it off the EDT.
      *
      * @param locationReference the location reference which the DAP server gave.
      * @return the future of the location, which is null when the DAP server answers without one or when the client is
@@ -1550,8 +1551,7 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
         }
         var args = new LocationsArguments();
         args.setLocationReference(locationReference);
-        return CompletableFuture.supplyAsync(() -> server.locations(args), AppExecutorUtil.getAppExecutorService())
-                .thenCompose(Function.identity());
+        return server.locations(args);
     }
 
     /**
@@ -1982,12 +1982,30 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
      */
     public <T> @NotNull CompletableFuture<T> sendInExecutionEpoch(int epoch,
                                                                  @NotNull Supplier<CompletableFuture<T>> request) {
+        return sendInExecutionEpoch(epoch, request, DAPBundle.message("dap.variables.setValue.stale"));
+    }
+
+    /**
+     * Sends a request which names references of the given execution epoch, as
+     * {@link #sendInExecutionEpoch(int, Supplier)} does, with the given message when the epoch has ended.
+     *
+     * @param epoch        the execution epoch of the references which the request names.
+     * @param request      sends the request: it must only write it, as the program can't resume meanwhile.
+     * @param endedMessage the message of the failure of the future when the epoch has ended, which says why the
+     *                     request can't be sent.
+     * @param <T>          the type of the response.
+     * @return the future of the response. When the epoch has ended, the request is not sent, and the future fails, after
+     * this method returned, as an error of the debug adapter does, with the given message.
+     */
+    public <T> @NotNull CompletableFuture<T> sendInExecutionEpoch(int epoch,
+                                                                 @NotNull Supplier<CompletableFuture<T>> request,
+                                                                 @NotNull @Nls String endedMessage) {
         var sent = executionEpoch.send(epoch, request);
         if (sent != null) {
             return sent;
         }
         return CompletableFuture.supplyAsync(() -> {
-            throw new IllegalStateException(DAPBundle.message("dap.variables.setValue.stale"));
+            throw new IllegalStateException(endedMessage);
         }, AppExecutorUtil.getAppExecutorService());
     }
 

@@ -255,6 +255,25 @@ public class DAPJumpToValueSourceSessionTest extends HeavyPlatformTestCase {
         assertEquals(new LogicalPosition(2, 21), editor.getCaretModel().getLogicalPosition());
     }
 
+    public void testJumpToValueSourceOfAnEvaluateResultOfAnEarlierStopSendsNoRequest() throws Exception {
+        debug();
+        var result = evaluate("onClick");
+        var firstStop = session.getSuspendContext();
+        // The program runs and stops again, as after a step, and the Evaluate dialog keeps its result
+        server.stopAgain();
+        PlatformTestUtil.waitWithEventsDispatching("the session shows the next stop",
+                () -> session.isSuspended() && session.getSuspendContext() != firstStop, BOUND_SECONDS);
+
+        action().actionPerformed(update(node(result)));
+
+        var expected = DAPBundle.message("dap.variables.valueSource.failed", result.getName(),
+                DAPBundle.message("dap.variables.valueSource.stale"));
+        PlatformTestUtil.waitWithEventsDispatching("the value of the earlier stop is reported",
+                () -> notifications.contains(expected), BOUND_SECONDS);
+        assertEquals("No 'locations' request names a reference of the earlier stop", List.of(), List.copyOf(server.locations));
+        assertNull("No file is opened", FileEditorManager.getInstance(getProject()).getSelectedTextEditor());
+    }
+
     public void testSetValueGivesTheValueTheLocationReferenceOfTheNewValue() throws Exception {
         debug();
         var count = local("count");
@@ -533,13 +552,19 @@ public class DAPJumpToValueSourceSessionTest extends HeavyPlatformTestCase {
 
         @Override
         public CompletableFuture<Void> configurationDone(ConfigurationDoneArguments args) {
-            return CompletableFuture.completedFuture(null).thenRun(() -> {
-                var stopped = new StoppedEventArguments();
-                stopped.setReason(StoppedEventArgumentsReason.PAUSE);
-                stopped.setThreadId(1);
-                stopped.setAllThreadsStopped(true);
-                client.stopped(stopped);
-            });
+            return CompletableFuture.completedFuture(null).thenRun(this::stopAgain);
+        }
+
+        /**
+         * Says that the program stopped, at once after it is attached, and again when the test says so, as after a
+         * step: the references of the values of an earlier stop are then out of date.
+         */
+        void stopAgain() {
+            var stopped = new StoppedEventArguments();
+            stopped.setReason(StoppedEventArgumentsReason.PAUSE);
+            stopped.setThreadId(1);
+            stopped.setAllThreadsStopped(true);
+            client.stopped(stopped);
         }
 
         @Override

@@ -38,6 +38,7 @@ import org.jetbrains.annotations.Nullable;
 import java.nio.file.Path;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
+import java.util.function.Function;
 
 import static com.redhat.devtools.lsp4ij.dap.DAPIJUtils.getValidFilePath;
 
@@ -111,7 +112,9 @@ public class DAPJumpToValueSourceAction extends AnAction implements DumbAware {
 
     /**
      * Asks the DAP server of the given value where the value's location reference points to, with the 'locations'
-     * request, off the EDT, then opens that source on the EDT, or reports in the debug session why it can't.
+     * request, off the EDT, then opens that source on the EDT, or reports in the debug session why it can't. The
+     * reference of a value of an earlier stop, such as an Evaluate result kept across a step, isn't sent: it is valid only
+     * until the program resumes.
      *
      * @param value     the DAP value, whose client is that of the DAP session which gave the value, such as a child
      *                  session started with 'startDebugging'.
@@ -120,7 +123,12 @@ public class DAPJumpToValueSourceAction extends AnAction implements DumbAware {
     static void jumpToValueSource(@NotNull DAPValue value, int reference) {
         DAPClient client = value.getClient();
         String name = value.getName();
-        client.locations(reference)
+        int epoch = value.getStackFrame().getExecutionEpoch();
+        // A location reference has the lifetime of a 'variablesReference', the stop of the value's frame. Sent off the
+        // EDT, as LSP4J writes a request on the thread which sends it
+        CompletableFuture.supplyAsync(() -> client.sendInExecutionEpoch(epoch, () -> client.locations(reference),
+                        DAPBundle.message("dap.variables.valueSource.stale")), AppExecutorUtil.getAppExecutorService())
+                .thenCompose(Function.identity())
                 .thenComposeAsync(location -> open(client, name, location), AppExecutorUtil.getAppExecutorService())
                 .exceptionally(error -> {
                     report(client, DAPBundle.message("dap.variables.valueSource.failed", name,
