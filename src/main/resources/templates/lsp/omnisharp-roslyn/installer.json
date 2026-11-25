@@ -7,8 +7,9 @@
   },
   "check": {
     "exec": {
-      "name": "Check .NET SDK",
-      "command": "dotnet --version",
+      "name": "Check the .NET SDK 10 or later",
+      "command": "dotnet --list-sdks",
+      "outputMatches": "(?m)^[1-9]\\d+\\.\\d+\\.\\d+\\s",
       "onSuccess": {
         "fileExists": {
           "name": "Check if OmniSharp is installed",
@@ -19,8 +20,9 @@
   },
   "run": {
     "exec": {
-      "name": "Check .NET SDK",
-      "command": "dotnet --version",
+      "name": "Check the .NET SDK 10 or later",
+      "command": "dotnet --list-sdks",
+      "outputMatches": "(?m)^[1-9]\\d+\\.\\d+\\.\\d+\\s",
       "onSuccess": {
         "download": {
           "name": "Download OmniSharp",
@@ -76,10 +78,10 @@
       },
       "onFail": {
         "showMessage": {
-          "name": ".NET SDK not found",
+          "name": ".NET SDK 10 or later not found",
           "content": [
-            "OmniSharp needs the <a href=\"https://dotnet.microsoft.com/download\">.NET SDK</a> to run and to load C# projects, and <code>dotnet --version</code> failed.",
-            "Install the .NET SDK, or the version that the <code>global.json</code> of the project asks for. Make sure <code>dotnet</code> is in your PATH, then restart your IDE."
+            "OmniSharp needs the <a href=\"https://dotnet.microsoft.com/download\">.NET SDK</a> 10 or later to run and to load C# projects, and the installer found none.",
+            "Install the .NET SDK 10 or later, make sure that <code>dotnet</code> is in your PATH, then restart your IDE."
           ]
         }
       }

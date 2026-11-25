@@ -6,10 +6,11 @@ files (`*.cs`) and C# scripts (`*.csx`).
 
 ## Install the language server
 
-1. [Install the .NET SDK](https://dotnet.microsoft.com/download), and make sure that `dotnet` is on your PATH: the
-   command of the template starts OmniSharp with `dotnet`, and OmniSharp loads the projects with the MSBuild of the
-   SDK, which it finds through the `dotnet` on the PATH, or through `DOTNET_ROOT`. OmniSharp 2.0.0 is built for .NET 10,
-   and runs on .NET 10 or a later version. Close and reopen your IDE if you changed the PATH.
+1. [Install the .NET SDK](https://dotnet.microsoft.com/download) 10 or later, and make sure that `dotnet` is on your
+   PATH: the command of the template starts OmniSharp with `dotnet`, and OmniSharp loads the projects with the MSBuild
+   of the SDK, which it finds through the `dotnet` on the PATH, or through `DOTNET_ROOT`. OmniSharp 2.0.0 is built for
+   .NET 10 (`net10.0`), and runs on .NET 10 or a later version, see [The .NET version](#the-net-version). Close and
+   reopen your IDE if you changed the PATH.
 
 2. **Open the New Language Server Dialog**. This can usually be found under the IDE settings related to Language Server
    Protocol (LSP). For more information, refer to the
@@ -30,10 +31,13 @@ files (`*.cs`) and C# scripts (`*.csx`).
 
 The first time the server starts, the installer of the template:
 
-1. checks the .NET SDK with `dotnet --version`, in the folder of the project, so that a `global.json` there selects the
-   SDK, as it does for OmniSharp. Without it, a notification says that OmniSharp needs the .NET SDK, and the installer
-   downloads nothing; once you installed it, restart your IDE, or click **Install if Needed** in the context menu of the
-   language server in the LSP console;
+1. checks that the .NET SDK 10 or later is installed: `dotnet --list-sdks` must print an SDK whose major version has
+   two digits or more, as `10.0.100 [/usr/local/share/dotnet/sdk]`, which its
+   [`outputMatches`](../UserDefinedLanguageServerTemplate.md#output-of-the-command),
+   `(?m)^[1-9]\d+\.\d+\.\d+\s`, says. An SDK has the .NET runtime of its version, so this also checks the runtime
+   that OmniSharp runs on. Without it, a notification, ".NET SDK 10 or later not found", says that OmniSharp needs it,
+   and the installer downloads nothing; once you installed it, restart your IDE, or click **Install if Needed** in the
+   context menu of the language server in the LSP console;
 2. downloads the `omnisharp-<os>-<arch>.zip` asset of the latest
    [OmniSharp release](https://github.com/OmniSharp/omnisharp-roslyn/releases) for your OS and architecture, and
    extracts it into `$USER_HOME$/.lsp4ij/lsp/omnisharp-roslyn`, where the command finds `OmniSharp.dll`. If GitHub
@@ -55,6 +59,19 @@ The releases also have `.tar.gz` assets, builds for musl (Alpine Linux) and Andr
 `omnisharp.http-*` assets, of the HTTP server of OmniSharp, which doesn't talk LSP. To take one of the musl builds, as
 `omnisharp-linux-musl-x64.zip`, change the `asset` of the `Installer` tab before you click **OK**, or later in the
 `Installer` tab of the language server in the LSP console, and click **Run Installation** there.
+
+### The .NET version
+
+The version that the installer checks follows the target framework of OmniSharp: `net10.0` for OmniSharp 2.0.0, whose
+`OmniSharp.runtimeconfig.json` asks for the .NET runtime 10.0 or a later major version. The installer downloads the
+latest OmniSharp release, so if a later release is built for a later .NET, the check of the installer must ask for
+that version: until the template does, change the two `outputMatches` of the `Installer` tab, as to
+`(?m)^(1[2-9]|[2-9]\d|[1-9]\d{2,})\.\d+\.\d+\s` for the .NET SDK 12 or later, with each `\` written `\\` in the
+JSON, before you click **OK**, or later in the `Installer` tab of the language server in the LSP console, and click
+**Run Installation** there.
+
+LSP4IJ 0.30.1 and earlier ignore `outputMatches`: there, the check passes whenever `dotnet --list-sdks` runs, whatever
+SDKs it lists.
 
 ### Install OmniSharp yourself
 
