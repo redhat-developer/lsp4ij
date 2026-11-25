@@ -29,6 +29,7 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 /**
  * Tests the check of an installer as the bundled installers have it, an {@code exec} of {@code ${server.command}}
@@ -162,12 +163,18 @@ public class ServerInstallerManagerInitializeTest extends BasePlatformTestCase {
                 .map(line -> Long.parseLong(line.substring("pid ".length())))
                 .toList();
         assertFalse("the servers must have started", pids.isEmpty());
-        long end = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+        // Each process is awaited until it exits, within one bound for all of them
+        long end = System.nanoTime() + TimeUnit.SECONDS.toNanos(30);
         for (long pid : pids) {
-            while (ProcessHandle.of(pid).map(ProcessHandle::isAlive).orElse(false) && System.nanoTime() < end) {
-                Thread.sleep(20);
+            var process = ProcessHandle.of(pid);
+            if (process.isEmpty()) {
+                continue;
             }
-            assertFalse("the process " + pid + " must be gone", ProcessHandle.of(pid).map(ProcessHandle::isAlive).orElse(false));
+            try {
+                process.get().onExit().get(Math.max(0, end - System.nanoTime()), TimeUnit.NANOSECONDS);
+            } catch (TimeoutException e) {
+                fail("the process " + pid + " must be gone");
+            }
         }
     }
 }

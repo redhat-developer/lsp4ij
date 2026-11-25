@@ -18,21 +18,26 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 
 import java.io.BufferedReader;
+import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.FutureTask;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -52,26 +57,30 @@ public class ExecTaskTest {
     @Test
     public void testTwoInstallersWhichRunACommandInTheSameDirectoryRunThereOneAtATime() throws Exception {
         Path directory = Files.createTempDirectory("lsp4ij-exec");
-        var executor = Executors.newFixedThreadPool(2);
+        // Each command holds the same file until the test releases it, and fails if the other one holds it
+        String held = directory.resolve("installing").toString();
+        Path release = directory.resolve("release");
+        var start = new CountDownLatch(1);
+        List<Installation> installations = IntStream.range(0, 2)
+                .mapToObj(i -> Installation.start(() -> {
+                    start.await();
+                    var context = new InstallerContext(null, InstallerContext.InstallerAction.RUN);
+                    return createTask(java(HoldFile.class.getName(), held, release.toString()), directory, descriptor())
+                            .run(context);
+                }))
+                .toList();
         try {
-            // Each command holds the same file for two seconds, and fails if the other one holds it
-            String held = directory.resolve("installing").toString();
-            var start = new CountDownLatch(1);
-            List<Future<Boolean>> runs = IntStream.range(0, 2)
-                    .mapToObj(i -> executor.submit(() -> {
-                        start.await();
-                        var context = new InstallerContext(null, InstallerContext.InstallerAction.RUN);
-                        return createTask(java(HoldFile.class.getName(), held), directory, descriptor()).run(context);
-                    }))
-                    .toList();
             start.countDown();
+            // While the command of one of them holds the file, the other one waits
+            awaitOneWaits(installations);
+            release(release);
             List<Boolean> results = new ArrayList<>();
-            for (var run : runs) {
-                results.add(run.get(60, TimeUnit.SECONDS));
+            for (var installation : installations) {
+                results.add(installation.result().get(60, TimeUnit.SECONDS));
             }
             assertEquals(List.of(true, true), results, "the two commands must not run in the directory at the same time");
         } finally {
-            executor.shutdownNow();
+            release(release);
             NioFiles.deleteRecursively(directory);
         }
     }
@@ -90,17 +99,26 @@ public class ExecTaskTest {
     public void testAnInstallerWaitsForTheInstallerOfAnotherIDEWhichRunsACommandInTheSameDirectory() throws Exception {
         Path directory = Files.createTempDirectory("lsp4ij-exec");
         String held = directory.resolve("installing").toString();
-        Process otherIDE = new ProcessBuilder(java(HoldLock.class.getName(), ExecTask.getLockFile(directory).toString(), held))
+        Path release = directory.resolve("release");
+        Process otherIDE = new ProcessBuilder(java(HoldLock.class.getName(), ExecTask.getLockFile(directory).toString(), held,
+                release.toString()))
                 .redirectError(ProcessBuilder.Redirect.INHERIT)
                 .start();
         try {
             var output = new BufferedReader(new InputStreamReader(otherIDE.getInputStream(), StandardCharsets.UTF_8));
-            assertEquals("locked", output.readLine(), "the other IDE must hold the lock file of the directory");
+            assertEquals("locked", assertTimeoutPreemptively(Duration.ofSeconds(30), output::readLine,
+                    "the other IDE must start"), "the other IDE must hold the lock file of the directory");
             // The command fails if it runs while the other IDE holds the file
             var context = new InstallerContext(null, InstallerContext.InstallerAction.RUN);
-            assertTrue(createTask(java(HoldFile.class.getName(), held), directory, descriptor()).run(context),
-                    "the command must wait until the other IDE leaves the directory");
+            var installation = Installation.start(() -> createTask(java(HoldFile.class.getName(), held, release.toString()),
+                    directory, descriptor()).run(context));
+            awaitOneWaits(List.of(installation));
+            // The other IDE leaves the directory
+            release(release);
+            assertEquals(0, otherIDE.onExit().get(60, TimeUnit.SECONDS).exitValue(), "the other IDE must leave the directory");
+            assertTrue(installation.result().get(60, TimeUnit.SECONDS), "the command must wait until the other IDE leaves the directory");
         } finally {
+            release(release);
             otherIDE.destroy();
             NioFiles.deleteRecursively(directory);
         }
@@ -134,11 +152,12 @@ public class ExecTaskTest {
      */
     private static boolean installAfterAnotherInstallation(boolean checkAgainAfterWaiting) throws Exception {
         Path directory = Files.createTempDirectory("lsp4ij-exec");
-        var executor = Executors.newSingleThreadExecutor();
+        // The command of the other installation holds the file until the test releases it
+        String held = directory.resolve("installing").toString();
+        Path release = directory.resolve("release");
+        var other = Installation.start(() -> createTask(java(HoldFile.class.getName(), held, release.toString()), directory,
+                descriptor()).run(new InstallerContext(null, InstallerContext.InstallerAction.RUN)));
         try {
-            String held = directory.resolve("installing").toString();
-            Future<Boolean> other = executor.submit(() -> createTask(java(HoldFile.class.getName(), held), directory, descriptor())
-                    .run(new InstallerContext(null, InstallerContext.InstallerAction.RUN)));
             for (long end = System.nanoTime() + TimeUnit.SECONDS.toNanos(30); !Files.exists(Path.of(held)); ) {
                 assertTrue(System.nanoTime() < end, "the other installation must start");
                 Thread.sleep(10);
@@ -149,12 +168,40 @@ public class ExecTaskTest {
             descriptor.setCheck(new FileExistsTask(null, "check", null, null, installed.toString(), descriptor));
             var context = new InstallerContext(null, InstallerContext.InstallerAction.RUN);
             context.setCheckAgainAfterWaiting(checkAgainAfterWaiting);
-            boolean result = createTask(java("NoSuchProgram"), directory, descriptor).run(context);
-            assertTrue(other.get(60, TimeUnit.SECONDS));
-            return result;
+            var installation = Installation.start(() -> createTask(java("NoSuchProgram"), directory, descriptor).run(context));
+            awaitOneWaits(List.of(installation));
+            // The other installation ends
+            release(release);
+            assertTrue(other.result().get(60, TimeUnit.SECONDS), "the other installation must succeed");
+            return installation.result().get(60, TimeUnit.SECONDS);
         } finally {
-            executor.shutdownNow();
+            release(release);
             NioFiles.deleteRecursively(directory);
+        }
+    }
+
+    /**
+     * Waits until one of the given installations waits for the working directory of its exec task, which another
+     * installation holds, and fails if one of them ends first: since the command of the other installation holds the
+     * directory until the test releases it, an installation which ends meanwhile ran its command without waiting.
+     */
+    private static void awaitOneWaits(@NotNull List<Installation> installations) throws InterruptedException {
+        for (long end = System.nanoTime() + TimeUnit.SECONDS.toNanos(30);
+             installations.stream().noneMatch(Installation::waitsForTheWorkingDir); ) {
+            assertTrue(installations.stream().noneMatch(installation -> installation.result().isDone()),
+                    "the installation must wait for the one which holds the working directory, but it ended without waiting");
+            assertTrue(System.nanoTime() < end, "the installation must wait for the one which holds the working directory");
+            Thread.sleep(10);
+        }
+    }
+
+    /**
+     * Releases the commands which hold their file until the given file exists, as {@link HoldFile} and {@link HoldLock}:
+     * the installations which run them end.
+     */
+    private static void release(@NotNull Path release) throws IOException {
+        if (!Files.exists(release)) {
+            Files.createFile(release);
         }
     }
 
@@ -182,5 +229,35 @@ public class ExecTaskTest {
             classes = classes.getParent();
         }
         return Stream.concat(Stream.of(java, "-cp", classes.toString(), mainClass), Stream.of(args)).toList();
+    }
+
+    /**
+     * An installation which runs on its own thread, and its result.
+     *
+     * @param thread the thread of the installation.
+     * @param result the result of the installation.
+     */
+    private record Installation(@NotNull Thread thread, @NotNull Future<Boolean> result) {
+
+        /**
+         * Starts the given installation on a new thread.
+         */
+        static @NotNull Installation start(@NotNull Callable<Boolean> installation) {
+            var result = new FutureTask<>(installation);
+            var thread = new Thread(result, "ExecTaskTest installation");
+            thread.setDaemon(true);
+            thread.start();
+            return new Installation(thread, result);
+        }
+
+        /**
+         * Returns true if the installation waits for the working directory of its exec task, which another one holds,
+         * in this IDE or in another one: an exec task waits for it in {@code ExecTask.await}, and only then.
+         */
+        boolean waitsForTheWorkingDir() {
+            return Arrays.stream(thread.getStackTrace())
+                    .anyMatch(frame -> frame.getClassName().equals(ExecTask.class.getName())
+                            && frame.getMethodName().equals("await"));
+        }
     }
 }
