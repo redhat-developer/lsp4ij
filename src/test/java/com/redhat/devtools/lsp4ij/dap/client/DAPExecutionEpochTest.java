@@ -65,6 +65,17 @@ public class DAPExecutionEpochTest {
     }
 
     @Test
+    void aRequestWhoseReferencesAreNoLongerValidInTheCurrentEpochIsNotSent() {
+        int stop = epoch.end();
+
+        // As the references of a thread which continued alone, while the epoch goes on for the threads which stay stopped
+        assertNull(epoch.send(stop, () -> false, this::setVariable));
+        assertEquals(List.of(), written);
+        assertNotNull(epoch.send(stop, () -> true, this::setVariable));
+        assertEquals(List.of("setVariable"), written);
+    }
+
+    @Test
     void anEpochIsCurrentAgainWhenTheDebugAdapterRefusesToResume() {
         int stop = epoch.end();
         int ended = epoch.endBeforeResuming();

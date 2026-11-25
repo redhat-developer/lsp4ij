@@ -51,8 +51,9 @@ public class DAPExpressionModifier extends XValueModifier {
         String assignedExpression = getAssignedExpression();
         int frameId = frame.getFrameId();
         String newValue = expression.getExpression();
-        // The id of the frame, in which the expression is assigned to, is valid only until the program resumes
-        client.sendInExecutionEpoch(frame.getExecutionEpoch(),
+        // The id of the frame, in which the expression is assigned to, is valid only until the program resumes, or the
+        // thread of the frame continues alone
+        client.sendInExecutionEpoch(frame,
                         () -> client.setExpression(assignedExpression, frameId, newValue))
                 .thenAccept(setExpressionResponse -> {
                     if (setExpressionResponse == null) {

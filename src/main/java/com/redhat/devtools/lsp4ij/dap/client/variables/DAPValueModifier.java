@@ -40,8 +40,9 @@ public class DAPValueModifier extends XValueModifier {
         String name = variable.getName();
         int parentVariablesReference = value.getParentVariablesReference();
         String newValue = expression.getExpression();
-        // The 'variablesReference' of the variable's parent is valid only until the program resumes
-        client.sendInExecutionEpoch(value.getStackFrame().getExecutionEpoch(),
+        // The 'variablesReference' of the variable's parent is valid only until the program resumes, or the thread of
+        // the value's frame continues alone
+        client.sendInExecutionEpoch(value.getStackFrame(),
                         () -> client.setVariable(name, parentVariablesReference, newValue))
                 .thenAccept(setVariableResponse -> {
                     if (setVariableResponse == null) {

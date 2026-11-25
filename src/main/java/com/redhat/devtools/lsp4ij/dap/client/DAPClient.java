@@ -167,7 +167,8 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
     // 'loadedSource' and 'module' events: asking at each stop would get all of them again at each step.
     private final AtomicBoolean loadedSourcesAndModulesAsked = new AtomicBoolean();
     // The execution epoch of the program, which ends whenever the program resumes or stops: the frames of a stop have
-    // its epoch (DAPStackFrame), as their ids, and the references of their values, are valid only until it ends
+    // its epoch (DAPStackFrame), as their ids, and the references of their values, are valid only until it ends, or
+    // until their thread continues alone
     private final DAPExecutionEpoch executionEpoch = new DAPExecutionEpoch();
     // The 'continued' events of the debug adapter: a stop which one of them continued while it was handled doesn't
     // suspend the session
@@ -1891,8 +1892,12 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
 
     @Override
     public void continued(ContinuedEventArguments args) {
-        // The program runs: the references of the frames of its last stop are out of date
-        executionEpoch.end();
+        // The program runs: the references of the frames of its last stop are out of date. When only the thread of the
+        // event continued, only those of the frames of that thread are, as the run states below tell
+        // (sendInExecutionEpoch(DAPStackFrame, ...)): the debug adapters which say so keep those of the stopped threads
+        if (!Boolean.FALSE.equals(args.getAllThreadsContinued())) {
+            executionEpoch.end();
+        }
         // Recorded before the session is looked at: a stop which is handled meanwhile then sees it (see suspend)
         continuedEvents.continued(args);
         // The Threads tab shows the thread which continued, or all threads, as running. Before the session is looked
@@ -2292,7 +2297,9 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
     /**
      * Sends a request which names references of the given execution epoch, such as the id of a stack frame or a
      * 'variablesReference', if the epoch is still the current one. The check and the sending are atomic against a
-     * request of this client which resumes the program: the request is written before it, or not at all.
+     * request of this client which resumes the program: the request is written before it, or not at all. The epoch goes
+     * on when a thread continues alone: the references of a stack frame are sent with
+     * {@link #sendInExecutionEpoch(DAPStackFrame, Supplier)}, which checks its thread too.
      *
      * @param epoch   the execution epoch of the references which the request names.
      * @param request sends the request: it must only write it, as the program can't resume meanwhile.
@@ -2321,7 +2328,56 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
     public <T> @NotNull CompletableFuture<T> sendInExecutionEpoch(int epoch,
                                                                  @NotNull Supplier<CompletableFuture<T>> request,
                                                                  @NotNull @Nls String endedMessage) {
-        var sent = executionEpoch.send(epoch, request);
+        return sentOrEnded(executionEpoch.send(epoch, request), endedMessage);
+    }
+
+    /**
+     * Sends a request which names references of the given stack frame, such as its id or the 'variablesReference' of
+     * one of its values, while they are valid: the execution epoch of the frame is still the current one, and the
+     * thread of the frame hasn't left its stop since, as when the debug adapter said that it continued alone
+     * ({@code allThreadsContinued: false}) while the other threads stay stopped. Both are checked atomically against a
+     * request of this client which resumes the program, as {@link #sendInExecutionEpoch(int, Supplier)} checks the
+     * epoch. A frame which doesn't know its thread is checked against its execution epoch only.
+     *
+     * @param frame   the stack frame whose references the request names, a frame of this client.
+     * @param request sends the request: it must only write it, as the program can't resume meanwhile.
+     * @param <T>     the type of the response.
+     * @return the future of the response. When the references are out of date, the request is not sent, and the future
+     * fails, after this method returned, as an error of the debug adapter does, with the message which says that the
+     * program has run since the value was shown.
+     */
+    public <T> @NotNull CompletableFuture<T> sendInExecutionEpoch(@NotNull DAPStackFrame frame,
+                                                                 @NotNull Supplier<CompletableFuture<T>> request) {
+        return sendInExecutionEpoch(frame, request, DAPBundle.message("dap.variables.setValue.stale"));
+    }
+
+    /**
+     * Sends a request which names references of the given stack frame, as
+     * {@link #sendInExecutionEpoch(DAPStackFrame, Supplier)} does, with the given message when they are out of date.
+     *
+     * @param frame        the stack frame whose references the request names, a frame of this client.
+     * @param request      sends the request: it must only write it, as the program can't resume meanwhile.
+     * @param endedMessage the message of the failure of the future when the references are out of date, which says why
+     *                     the request can't be sent.
+     * @param <T>          the type of the response.
+     * @return the future of the response. When the references are out of date, the request is not sent, and the future
+     * fails, after this method returned, as an error of the debug adapter does, with the given message.
+     */
+    public <T> @NotNull CompletableFuture<T> sendInExecutionEpoch(@NotNull DAPStackFrame frame,
+                                                                 @NotNull Supplier<CompletableFuture<T>> request,
+                                                                 @NotNull @Nls String endedMessage) {
+        Integer threadId = frame.getThreadId();
+        int stop = frame.getThreadRunStatesVersion();
+        return sentOrEnded(executionEpoch.send(frame.getExecutionEpoch(),
+                () -> threadId == null || !threadRunStates.get().leftStopSince(stop, threadId), request), endedMessage);
+    }
+
+    /**
+     * Returns the future of the response of a request which names references of an execution epoch, or one which fails
+     * with the given message when the request was not sent.
+     */
+    private static <T> @NotNull CompletableFuture<T> sentOrEnded(@Nullable CompletableFuture<T> sent,
+                                                                 @NotNull @Nls String endedMessage) {
         if (sent != null) {
             return sent;
         }

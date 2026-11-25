@@ -42,7 +42,8 @@ import java.util.stream.Collectors;
  * the EDT, so that the client swaps them atomically.
  * <p>
  * Each change has a version, which a stop takes as it arrives: {@link #leftStopSince(int, int)} tells whether a thread
- * left that stop since, so that the Frames view no longer shows the frames of its stop.
+ * left that stop since, so that the Frames view no longer shows the frames of its stop, and the values of those frames
+ * can no longer be set.
  */
 public final class DAPThreadRunStates {
 

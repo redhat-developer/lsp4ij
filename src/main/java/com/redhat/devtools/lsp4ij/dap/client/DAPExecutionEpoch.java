@@ -17,6 +17,7 @@ import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.BooleanSupplier;
 import java.util.function.Supplier;
 
 /**
@@ -35,13 +36,26 @@ import java.util.function.Supplier;
  * and Reset Frame leave the session suspended until the debug adapter answers: the epoch of the stop is the current
  * one again only once the debug adapter refused each of them.
  * <p>
+ * A 'continued' event which says that only its thread continued ({@code allThreadsContinued: false}) doesn't end the
+ * epoch: the debug adapters which run a thread alone by themselves, such as java-debug, debugpy and vscode-js-debug,
+ * keep the references of the threads which stay stopped. Only the references of the thread which continued are out of
+ * date, which the client tells by the run states of the threads ({@link DAPThreadRunStates#leftStopSince(int, int)})
+ * with the lock held ({@link #send(int, BooleanSupplier, Supplier)}). Everything else ends the epoch for every thread:
+ * <ul>
+ *     <li>a 'continued' event of all threads;</li>
+ *     <li>any 'stopped' event, as a debug adapter may number the references of each stop from 1 again, as Delve does:
+ *     one with {@code allThreadsStopped: true} ends it even for a thread which never left its stop;</li>
+ *     <li>a request of the client which resumes the program, even one which resumes a single thread ('singleThread'):
+ *     GDB, the debug adapter which supports them, forgets all its references whenever the program resumes.</li>
+ * </ul>
+ * <p>
  * It is a class of its own so that it can be tested without a debug adapter, which a {@link DAPClient} can hardly be.
  */
 final class DAPExecutionEpoch {
 
     private final AtomicInteger current = new AtomicInteger();
-    // The epoch which the last 'stopped' or 'continued' event started: the program ran since the requests which
-    // resumed it before, and no refusal makes their epochs current again
+    // The epoch which the last 'stopped' or 'continued' event which ended an epoch started: the program ran since the
+    // requests which resumed it before, and no refusal makes their epochs current again
     private final AtomicInteger lastEvent = new AtomicInteger();
     // Held only while a request of an epoch is written, and while an epoch ends before a request resumes the program
     private final Object lock = new Object();
@@ -60,9 +74,9 @@ final class DAPExecutionEpoch {
     }
 
     /**
-     * Ends the current epoch because the debug adapter says that the program stopped or continued. The program has
-     * already run by then, so that no lock can order a request before it: the thread which reads the messages of the
-     * debug adapter doesn't wait for a request which another thread writes.
+     * Ends the current epoch because the debug adapter says that the program stopped, or that all its threads
+     * continued. The program has already run by then, so that no lock can order a request before it: the thread which
+     * reads the messages of the debug adapter doesn't wait for a request which another thread writes.
      *
      * @return the new epoch.
      */
@@ -131,8 +145,26 @@ final class DAPExecutionEpoch {
      * @return the future of the response, or null if the epoch has ended and the request was not sent.
      */
     <T> @Nullable CompletableFuture<T> send(int epoch, @NotNull Supplier<CompletableFuture<T>> request) {
+        return send(epoch, () -> true, request);
+    }
+
+    /**
+     * Sends a request which names references of the given epoch, if it is the current one and the references are
+     * still valid in it, as when the thread of a stack frame hasn't continued alone since its stop.
+     *
+     * @param epoch   the epoch of the references which the request names.
+     * @param valid   returns whether the references are still valid in the epoch: called with the lock held, once the
+     *                epoch is known to be the current one.
+     * @param request sends the request: called with the lock held, it must only write the request.
+     * @param <T>     the type of the response.
+     * @return the future of the response, or null if the epoch has ended, or the references are no longer valid, and
+     * the request was not sent.
+     */
+    <T> @Nullable CompletableFuture<T> send(int epoch,
+                                            @NotNull BooleanSupplier valid,
+                                            @NotNull Supplier<CompletableFuture<T>> request) {
         synchronized (lock) {
-            return epoch == current.get() ? request.get() : null;
+            return epoch == current.get() && valid.getAsBoolean() ? request.get() : null;
         }
     }
 }
