@@ -98,6 +98,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -111,7 +112,9 @@ import java.util.stream.IntStream;
  * still be set. The same holds for the 'continue' or the 'reverseContinue' which resumes the program at a breakpoint
  * which doesn't suspend, in the direction it ran, unless the DAP server said meanwhile that the program stopped or
  * continued: the session then follows that newer event. A Reverse Continue which is pending meanwhile, as it leaves the
- * session suspended until the DAP server answers, keeps the stop ended until the DAP server refuses it too.
+ * session suspended until the DAP server answers, keeps the stop ended until the DAP server refuses it too. When two
+ * threads stop alone at such a breakpoint, one after the other before the DAP server answers the first resume, and it
+ * refuses both, in either order, the Threads tab shows both threads stopped.
  */
 public class DAPRefusedResumeSessionTest extends HeavyPlatformTestCase {
 
@@ -120,6 +123,7 @@ public class DAPRefusedResumeSessionTest extends HeavyPlatformTestCase {
      */
     private static final int BOUND_SECONDS = 120;
     private static final int MAIN = 1;
+    private static final int WORKER = 2;
     private static final int LOCALS_REFERENCE = 1000;
     private static final int BREAKPOINT_ID = 7;
     private static final String SERVER_ID = "dap-refused-resume-test";
@@ -290,6 +294,83 @@ public class DAPRefusedResumeSessionTest extends HeavyPlatformTestCase {
         waitUntilSuspendedAgainAt(context, frame, paused, "once the DAP server refused Resume Program too");
         waitForConsoleLine("Cannot resume the program: " + REFUSAL);
         assertStopRestored(context);
+    }
+
+    public void testTwoResumesRefusedAtBreakpointsWhichDoNotSuspendLeaveBothThreadsStopped() throws Exception {
+        assertBothThreadsStoppedOnceBothResumesAreRefused(false);
+    }
+
+    public void testTwoResumesRefusedAtBreakpointsWhichDoNotSuspendNewestFirstLeaveBothThreadsStopped() throws Exception {
+        assertBothThreadsStoppedOnceBothResumesAreRefused(true);
+    }
+
+    public void testAResumeRefusedAtABreakpointWhichDoesNotSuspendWhileANewerOneIsAcceptedLeavesBothThreadsRunning() throws Exception {
+        resumeAtTheBreakpointInEachThreadAlone();
+        var paused = countPauses();
+
+        server.answer(true);
+        waitForConsoleLine("Cannot resume the program: " + REFUSAL);
+        server.answer(false);
+        waitForAnswersSoFar();
+        // The newer request resumed all threads, the one whose resume the DAP server refused too
+        assertFalse("The session isn't suspended: the DAP server accepted the newer resume", session.isSuspended());
+        PlatformTestUtil.waitWithEventsDispatching(() -> "the Threads tab shows both threads running: " + getRows(),
+                () -> getRows().equals(List.of("main [running]", "worker [running]")), BOUND_SECONDS);
+        assertEquals("The times the session paused since the threads stopped at the breakpoint", 0, paused.get());
+    }
+
+    /**
+     * Each thread stops alone at the breakpoint which doesn't suspend, where the client resumes the program, and the
+     * DAP server refuses both requests, the older or the newer one first: both threads are still stopped where they
+     * were, which the Threads tab shows, and the session is suspended where the worker stopped, the newer stop.
+     */
+    private void assertBothThreadsStoppedOnceBothResumesAreRefused(boolean newestFirst) throws Exception {
+        resumeAtTheBreakpointInEachThreadAlone();
+        var paused = countPauses();
+
+        if (newestFirst) {
+            server.answerNewest(true);
+        } else {
+            server.answer(true);
+        }
+        server.answer(true);
+        var refusal = "Cannot resume the program: " + REFUSAL;
+        PlatformTestUtil.waitWithEventsDispatching(() -> "the console shows \"" + refusal + "\" twice, not:\n"
+                        + getConsoleText(),
+                () -> getConsoleText().lines().filter(refusal::equals).count() == 2, BOUND_SECONDS);
+        waitUntilStoppedAt(3, "where the worker stopped, once the DAP server refused both resumes");
+        var context = (DAPSuspendContext) session.getSuspendContext();
+        PlatformTestUtil.waitWithEventsDispatching(() -> "the execution epoch of the stop, "
+                        + context.getExecutionEpoch() + ", is the current one again, not " + client.getExecutionEpoch(),
+                () -> client.getExecutionEpoch() == context.getExecutionEpoch(), BOUND_SECONDS);
+        PlatformTestUtil.waitWithEventsDispatching(() -> "the Threads tab shows both threads stopped: " + getRows(),
+                () -> getRows().equals(List.of("main [stopped]", "worker [stopped]")), BOUND_SECONDS);
+        var states = client.getThreadRunStates();
+        assertEquals(DAPThreadRunState.STOPPED, states.getState(MAIN));
+        assertEquals(DAPThreadRunState.STOPPED, states.getState(WORKER));
+        assertEquals("The times the session paused since the threads stopped at the breakpoint", 1, paused.get());
+    }
+
+    /**
+     * Starts debugging with a breakpoint which doesn't suspend, in a program with the threads 'main' and 'worker', and
+     * resumes the program, which the DAP server accepts. The main thread then stops alone at the breakpoint, where the
+     * client resumes the program, and so does the worker, before the DAP server answers the first resume: it holds the
+     * answers of both until the test gives them.
+     */
+    private void resumeAtTheBreakpointInEachThreadAlone() throws Exception {
+        debug(true);
+        server.withWorker = true;
+        session.resume();
+        assertInstanceOf(request(), ContinueArguments.class);
+        PlatformTestUtil.waitWithEventsDispatching("the session runs once the DAP server accepted Resume Program",
+                () -> !session.isSuspended(), BOUND_SECONDS);
+        server.held.add("continue");
+        server.stopAlone(MAIN);
+        assertEquals("The client resumes the program where the main thread stopped", MAIN,
+                (int) ((ContinueArguments) request()).getThreadId());
+        server.stopAlone(WORKER);
+        assertEquals("The client resumes the program where the worker stopped", WORKER,
+                (int) ((ContinueArguments) request()).getThreadId());
     }
 
     /**
@@ -656,10 +737,11 @@ public class DAPRefusedResumeSessionTest extends HeavyPlatformTestCase {
     }
 
     /**
-     * A DAP server of a program with one thread, 'main', which stops once configured, and then when the test says. At
-     * its n-th stop, counted from 1, the thread is in the frame n, whose locals are 'answer' = 41. It answers the
-     * requests which resume the program that the test names with an error, and can set variables. It supports stepping
-     * back, and answers the requests which the test names only when the test says.
+     * A DAP server of a program with one thread, 'main', or with 'worker' too when the test says, which stops once
+     * configured, and then when the test says: all threads, or one alone at the breakpoint. At its n-th stop, counted
+     * from 1, the thread is in the frame n, whose locals are 'answer' = 41. It answers the requests which resume the
+     * program that the test names with an error, and can set variables. It supports stepping back, and answers the
+     * requests which the test names only when the test says.
      */
     private static class RefusingServer implements IDebugProtocolServer {
 
@@ -675,9 +757,11 @@ public class DAPRefusedResumeSessionTest extends HeavyPlatformTestCase {
         // The 'setBreakpoints' requests
         private final LinkedBlockingQueue<SetBreakpointsArguments> setBreakpoints = new LinkedBlockingQueue<>();
         // The answers which the DAP server holds, in the order of the requests: true to refuse the request
-        private final LinkedBlockingQueue<CompletableFuture<Boolean>> heldAnswers = new LinkedBlockingQueue<>();
+        private final LinkedBlockingDeque<CompletableFuture<Boolean>> heldAnswers = new LinkedBlockingDeque<>();
         private volatile IDebugProtocolClient client;
         private volatile boolean configured;
+        // Set by the test: the program has the thread 'worker' too
+        private volatile boolean withWorker;
         // Set by the test: sends a newer event, such as 'stopped', before the DAP server refuses a request
         private volatile @Nullable Runnable beforeRefusing;
 
@@ -717,11 +801,25 @@ public class DAPRefusedResumeSessionTest extends HeavyPlatformTestCase {
          * Sends that all threads stopped, with the given reason, at the given breakpoints.
          */
         void stop(@NotNull String reason, Integer @Nullable [] hitBreakpointIds) {
+            stop(reason, hitBreakpointIds, MAIN, true);
+        }
+
+        /**
+         * Sends that the given thread stopped alone at the breakpoint, while the other threads run.
+         */
+        void stopAlone(int threadId) {
+            stop(StoppedEventArgumentsReason.BREAKPOINT, new Integer[]{BREAKPOINT_ID}, threadId, false);
+        }
+
+        private void stop(@NotNull String reason,
+                          Integer @Nullable [] hitBreakpointIds,
+                          int threadId,
+                          boolean allThreadsStopped) {
             stops.incrementAndGet();
             var stopped = new StoppedEventArguments();
             stopped.setReason(reason);
-            stopped.setThreadId(MAIN);
-            stopped.setAllThreadsStopped(true);
+            stopped.setThreadId(threadId);
+            stopped.setAllThreadsStopped(allThreadsStopped);
             stopped.setHitBreakpointIds(hitBreakpointIds);
             client.stopped(stopped);
         }
@@ -742,7 +840,18 @@ public class DAPRefusedResumeSessionTest extends HeavyPlatformTestCase {
          * @param refuse true to refuse the request, and false to accept it.
          */
         void answer(boolean refuse) {
-            var answer = heldAnswers.poll();
+            var answer = heldAnswers.pollFirst();
+            assertNotNull("A request whose answer the DAP server holds", answer);
+            answer.complete(refuse);
+        }
+
+        /**
+         * Gives the answer to the newest request whose answer the DAP server holds.
+         *
+         * @param refuse true to refuse the request, and false to accept it.
+         */
+        void answerNewest(boolean refuse) {
+            var answer = heldAnswers.pollLast();
             assertNotNull("A request whose answer the DAP server holds", answer);
             answer.complete(refuse);
         }
@@ -837,12 +946,18 @@ public class DAPRefusedResumeSessionTest extends HeavyPlatformTestCase {
 
         @Override
         public CompletableFuture<ThreadsResponse> threads() {
-            var thread = new Thread();
-            thread.setId(MAIN);
-            thread.setName("main");
             var response = new ThreadsResponse();
-            response.setThreads(new Thread[]{thread});
+            response.setThreads(withWorker ?
+                    new Thread[]{thread(MAIN, "main"), thread(WORKER, "worker")} :
+                    new Thread[]{thread(MAIN, "main")});
             return CompletableFuture.completedFuture(response);
+        }
+
+        private static @NotNull Thread thread(int id, @NotNull String name) {
+            var thread = new Thread();
+            thread.setId(id);
+            thread.setName(name);
+            return thread;
         }
 
         @Override

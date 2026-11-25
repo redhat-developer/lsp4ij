@@ -145,6 +145,104 @@ public class DAPThreadRunStatesTest {
     }
 
     @Test
+    void twoRefusedResumesGiveTheThreadsTheirRunStatesBackInEitherOrder() {
+        var resumes = new TwoResumes();
+
+        // The debug adapter hasn't answered the other request yet, which resumes all threads
+        assertStates(resumes.second.resumeRefused(resumes.mainStop, resumes.first), RUNNING, RUNNING, RUNNING);
+        assertStates(resumes.second.resumeRefused(resumes.workerStop, resumes.second), RUNNING, STOPPED, RUNNING);
+
+        // Once it refused both, both threads are where they stopped, and the other thread, which didn't stop, runs
+        for (var refused : List.of(resumes.refuseFirstThenSecond(), resumes.refuseSecondThenFirst())) {
+            assertStates(refused, STOPPED, STOPPED, RUNNING);
+            assertFalse(refused.leftStopSince(resumes.mainStop.getVersion(), MAIN));
+            assertFalse(refused.leftStopSince(resumes.workerStop.getVersion(), MAIN));
+            assertFalse(refused.leftStopSince(resumes.workerStop.getVersion(), WORKER));
+        }
+    }
+
+    @Test
+    void aRefusedStepDoesNotGiveBackWhatAnOlderRefusedResumeChanged() {
+        // The main thread stops alone before the debug adapter answers Resume, and steps alone from there
+        var stop = allStopped();
+        var resume = stop.resumed(MAIN, false);
+        var mainStop = resume.stopped(stopped(MAIN, false));
+        var step = mainStop.resumed(MAIN, true);
+
+        var resumeThenStep = step.resumeRefused(stop, resume).resumeRefused(mainStop, step);
+        var stepThenResume = step.resumeRefused(mainStop, step).resumeRefused(stop, resume);
+
+        // The debug adapter refused both: no thread ran since all threads stopped
+        assertStates(resumeThenStep, STOPPED, STOPPED, STOPPED);
+        assertStates(stepThenResume, STOPPED, STOPPED, STOPPED);
+    }
+
+    @Test
+    void aRefusedResumeKeepsWhatANewerResumeWhichTheDebugAdapterAcceptedChanged() {
+        var resumes = new TwoResumes();
+
+        // The second resumes all threads, the main thread too
+        assertStates(resumes.second.resumeRefused(resumes.mainStop, resumes.first), RUNNING, RUNNING, RUNNING);
+        // The first resumed all threads, and the worker stopped after it
+        assertStates(resumes.second.resumeRefused(resumes.workerStop, resumes.second), RUNNING, STOPPED, RUNNING);
+    }
+
+    @Test
+    void twoRefusedResumesKeepWhatANewerEventChanged() {
+        var resumes = new TwoResumes();
+
+        // All threads stopped, or continued, after the second request was sent
+        var stoppedAgain = resumes.second.stopped(stopped(WORKER, true));
+        assertSame(stoppedAgain, resumes.refuseFirstThenSecond(stoppedAgain));
+        assertSame(stoppedAgain, resumes.refuseSecondThenFirst(stoppedAgain));
+        var continued = resumes.second.continued(continued(MAIN, null));
+        assertSame(continued, resumes.refuseFirstThenSecond(continued));
+        assertSame(continued, resumes.refuseSecondThenFirst(continued));
+
+        // The main thread continued alone after the second request was sent
+        var mainContinued = resumes.second.continued(continued(MAIN, false));
+        assertStates(resumes.refuseFirstThenSecond(mainContinued), RUNNING, STOPPED, RUNNING);
+        assertStates(resumes.refuseSecondThenFirst(mainContinued), RUNNING, STOPPED, RUNNING);
+    }
+
+    /**
+     * The main thread stops alone, at a breakpoint which doesn't suspend, where the session resumes the program; the
+     * worker then stops alone at such a breakpoint too, where the session resumes the program again, before the debug
+     * adapter answers the first request.
+     */
+    private static final class TwoResumes {
+
+        private final DAPThreadRunStates mainStop = DAPThreadRunStates.INITIAL.stopped(stopped(MAIN, false));
+        private final DAPThreadRunStates first = mainStop.resumed(MAIN, false);
+        private final DAPThreadRunStates workerStop = first.stopped(stopped(WORKER, false));
+        private final DAPThreadRunStates second = workerStop.resumed(WORKER, false);
+
+        @NotNull DAPThreadRunStates refuseFirstThenSecond() {
+            return refuseFirstThenSecond(second);
+        }
+
+        @NotNull DAPThreadRunStates refuseSecondThenFirst() {
+            return refuseSecondThenFirst(second);
+        }
+
+        /**
+         * Returns the given run states, which followed the second request, once the debug adapter refused the first
+         * request, and then the second.
+         */
+        @NotNull DAPThreadRunStates refuseFirstThenSecond(@NotNull DAPThreadRunStates states) {
+            return states.resumeRefused(mainStop, first).resumeRefused(workerStop, second);
+        }
+
+        /**
+         * Returns the given run states, which followed the second request, once the debug adapter refused the second
+         * request, and then the first.
+         */
+        @NotNull DAPThreadRunStates refuseSecondThenFirst(@NotNull DAPThreadRunStates states) {
+            return states.resumeRefused(workerStop, second).resumeRefused(mainStop, first);
+        }
+    }
+
+    @Test
     void aThreadWhichExitedStaysSoWhenAllThreadsStopOrRun() {
         var states = DAPThreadRunStates.INITIAL.thread(thread(ThreadEventArgumentsReason.EXITED, WORKER));
         assertStates(states, RUNNING, EXITED, RUNNING);
