@@ -21,6 +21,7 @@ import com.redhat.devtools.lsp4ij.installation.definition.InstallerTaskRegistry;
 import com.redhat.devtools.lsp4ij.installation.definition.ServerInstallerDescriptor;
 import com.redhat.devtools.lsp4ij.installation.definition.ServerInstallerManager;
 import com.redhat.devtools.lsp4ij.installation.definition.tasks.DownloadTask;
+import com.redhat.devtools.lsp4ij.installation.download.GitHubAccountTokenProvider.AccountToken;
 import com.redhat.devtools.lsp4ij.installation.download.LocalHttpServer.Request;
 import com.redhat.devtools.lsp4ij.installation.download.LocalHttpServer.Response;
 import org.jetbrains.annotations.NotNull;
@@ -38,11 +39,14 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.function.Supplier;
 import java.util.logging.Level;
 import java.util.regex.Pattern;
 
+import static com.redhat.devtools.lsp4ij.installation.download.GitHubAssetFetcherTest.ACCOUNT_TOKEN;
 import static com.redhat.devtools.lsp4ij.installation.download.GitHubAssetFetcherTest.RELEASES_PATH;
 import static com.redhat.devtools.lsp4ij.installation.download.GitHubAssetFetcherTest.RESET;
+import static com.redhat.devtools.lsp4ij.installation.download.GitHubAssetFetcherTest.SETTINGS_RENEWAL;
 import static com.redhat.devtools.lsp4ij.installation.download.GitHubAssetFetcherTest.SSO_URL;
 import static com.redhat.devtools.lsp4ij.installation.download.GitHubAssetFetcherTest.TOKEN;
 import static com.redhat.devtools.lsp4ij.installation.download.GitHubAssetFetcherTest.localTime;
@@ -55,7 +59,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * A download task with a {@code github} source sends the GitHub token of the environment to the GitHub API, and not
  * with the download of the asset, and its console never shows the token, and says when the rate limit of the GitHub
  * API resets (#2142). When the download has no {@code url} to fall back to, the notification of the failed installation
- * says it too (#2188).
+ * says it too, and names where a token that GitHub refused comes from: the environment, the LSP4IJ settings or the
+ * IDE's GitHub account (#2188).
  */
 public class GitHubDownloadTaskTest {
 
@@ -199,6 +204,54 @@ public class GitHubDownloadTaskTest {
                         + "<p>" + HTML_RATE_LIMIT + "</p>",
                 notification.getContent());
         assertNoToken(context);
+    }
+
+    @Test
+    public void testTheNotificationNamesTheTokenOfTheSettingsWhichGitHubRefused() throws Exception {
+        server.answer(RELEASES_PATH, new Response(401, Map.of(), "{\"message\": \"Bad credentials\"}"),
+                GitHubAssetFetcherTest.rateLimit(403, 60, RESET));
+
+        var context = new RecordingContext();
+        var notification = install(createTask(Map.of(), () -> TOKEN, apiUrl -> null, null), context);
+
+        assertEquals("<p>GitHub API refused the token of the LSP4IJ settings (HTTP 401)" + html(SETTINGS_RENEWAL) + "</p>"
+                        + "<p>" + HTML_RATE_LIMIT + "</p>",
+                notification.getContent());
+        assertNoToken(context);
+    }
+
+    @Test
+    public void testTheNotificationNamesTheTokenOfTheAccountWhichGitHubRefused() throws Exception {
+        server.answer(RELEASES_PATH, new Response(401, Map.of(), "{\"message\": \"Bad credentials\"}"),
+                GitHubAssetFetcherTest.rateLimit(403, 60, RESET));
+
+        var context = new RecordingContext();
+        var notification = install(createTask(Map.of(), () -> null,
+                apiUrl -> new AccountToken("octocat", ACCOUNT_TOKEN), null), context);
+
+        assertEquals("<p>GitHub API refused the token of the IDE&#39;s GitHub account octocat (HTTP 401): the token is "
+                        + "invalid or has expired. Log in to the account again in Settings | Version Control | GitHub, "
+                        + "or remove it there.</p><p>" + HTML_RATE_LIMIT + "</p>",
+                notification.getContent());
+        assertFalse(context.output().contains(ACCOUNT_TOKEN), "the console must not show the token");
+        assertFalse(notification.getContent().contains(ACCOUNT_TOKEN), "the notification must not show the token");
+    }
+
+    @Test
+    public void testTheLogSaysThatTheUrlComesFromTheGitHubApiWithTheTokenOfTheAccount() throws Exception {
+        server.answer(RELEASES_PATH, Response.ok(releases(server.url() + ASSET_PATH)));
+        server.answer(ASSET_PATH, Response.ok("server"));
+
+        try (var log = new LogRecorder()) {
+            assertTrue(createTask(Map.of(), () -> null, apiUrl -> new AccountToken("octocat", ACCOUNT_TOKEN), null)
+                    .run(new RecordingContext()));
+
+            assertEquals(List.of(new Request(RELEASES_PATH, "Bearer " + ACCOUNT_TOKEN), new Request(ASSET_PATH, null)),
+                    server.requests(), "only the request to the GitHub API must have the token");
+            assertTrue(infoAndWarnings(log).get(0).contains("; its URL comes from the GitHub API, with the token of the "
+                    + "IDE's GitHub account octocat ("), log.output());
+            assertFalse(log.output().contains(ACCOUNT_TOKEN), "the log must not have the token");
+        }
     }
 
     @Test
@@ -375,7 +428,19 @@ public class GitHubDownloadTaskTest {
      * the given URL, into the output directory.
      */
     private @NotNull DownloadTask createTask(@NotNull Map<String, String> environment, @Nullable String url) {
-        var fetcher = new GitHubAssetFetcher("owner", "repo", server.url(), environment::get);
+        return createTask(environment, () -> null, apiUrl -> null, url);
+    }
+
+    /**
+     * Returns a download task which downloads the asset {@code server.jar} of the latest release of
+     * {@code owner/repo}, which it finds through the local GitHub API with the given environment variables, token of
+     * the LSP4IJ settings and GitHub accounts of the IDE, or else the given URL, into the output directory.
+     */
+    private @NotNull DownloadTask createTask(@NotNull Map<String, String> environment,
+                                             @NotNull Supplier<String> settingsToken,
+                                             @NotNull GitHubAccountTokenProvider accounts,
+                                             @Nullable String url) {
+        var fetcher = new GitHubAssetFetcher("owner", "repo", server.url(), environment::get, settingsToken, accounts);
         var assetFetcherInfo = new DownloadTask.AssetFetcherInfo(fetcher,
                 GitHubAssetFetcher.RELEASE_MATCHER,
                 new GitHubAssetFetcher.AssetMatcher("server.jar"));
