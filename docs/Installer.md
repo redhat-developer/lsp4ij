@@ -49,11 +49,12 @@ It should follow this structure:
 
 LSP4IJ provides built-in tasks:
 
+* [showMessage](#task-showmessage) to show a notification, as when a tool that the server needs is missing,
 * [exec](#task-exec) to execute a command (e.g., `npm install typescript-language-server`),
 * [initialize](#task-initialize) to check that the server starts and answers the `initialize` request,
 * [fileExists](#task-fileexists) to check that a file, as the installed server, exists,
 * [download](#task-download) to retrieve a server from a given URL,
-* [configureServer](#task-configureServer) to set the launch command based on the downloaded files,
+* [configureServer](#task-configureserver) to set the launch command based on the downloaded files,
 * [replaceTemplateCommand](#task-replacetemplatecommand) to set the launch command while the server still has the
   command of its template.
 
@@ -775,7 +776,7 @@ property is `$USER_HOME$/.lsp4ij/lsp/rust-analyzer`:
   fragment, which is then `${output.file.name}`.
 * `file.executable` (optional, `false` by default): `true` makes the file of `file.name` executable.
 
-### Task configureServer
+## Task configureServer
 
 Used to set the server launch command:
 
@@ -793,12 +794,12 @@ Used to set the server launch command:
   [fileExists](#task-fileexists). A command with `${check.file}` that no `fileExists` found a file for is an error, and
   the command of the server stays as it is.
 
-### Task replaceTemplateCommand
+## Task replaceTemplateCommand
 
 **Since LSP4IJ 0.30.2.** An earlier version ignores the task: the server keeps the command of its template, and the
 check still passes, see [Compatibility with earlier versions of LSP4IJ](#compatibility-with-earlier-versions-of-lsp4ij).
 
-Sets the server launch command, as [configureServer](#task-configureServer) does, but only while the server has the
+Sets the server launch command, as [configureServer](#task-configureserver) does, but only while the server has the
 command of its template. In the `onSuccess` of a check, which also runs from *Check installation* in the settings, it
 gives a server created from the template the command of the file that the check found, and leaves a command that the
 user or a download gave the server as it is:
