@@ -328,13 +328,16 @@ public class DAPRefusedResumeSessionTest extends HeavyPlatformTestCase {
         resumeAtTheBreakpointInEachThreadAlone();
         var paused = countPauses();
 
+        var refusal = "Cannot resume the program: " + REFUSAL;
         if (newestFirst) {
             server.answerNewest(true);
         } else {
             server.answer(true);
         }
+        // The first refusal is handled before the second request is answered, so that they come in the order the test
+        // gives, also when the first request's answer was given before the DAP server attached its refusal to it
+        waitForConsoleLine(refusal);
         server.answer(true);
-        var refusal = "Cannot resume the program: " + REFUSAL;
         PlatformTestUtil.waitWithEventsDispatching(() -> "the console shows \"" + refusal + "\" twice, not:\n"
                         + getConsoleText(),
                 () -> getConsoleText().lines().filter(refusal::equals).count() == 2, BOUND_SECONDS);
