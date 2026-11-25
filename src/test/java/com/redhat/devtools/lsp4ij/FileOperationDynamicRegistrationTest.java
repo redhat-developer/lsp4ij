@@ -18,27 +18,35 @@ import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiManager;
 import com.intellij.refactoring.rename.RenameProcessor;
 import com.intellij.testFramework.PlatformTestUtil;
+import com.redhat.devtools.lsp4ij.client.features.LSPCallHierarchyFeature;
+import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
 import com.redhat.devtools.lsp4ij.fixtures.LSPCodeInsightFixtureTestCase;
 import com.redhat.devtools.lsp4ij.mock.MockLanguageServer;
 import com.redhat.devtools.lsp4ij.mock.MockWorkspaceService;
+import com.redhat.devtools.lsp4ij.server.capabilities.CallHierarchyCapabilityRegistry;
 import org.eclipse.lsp4j.CallHierarchyRegistrationOptions;
 import org.eclipse.lsp4j.DidChangeConfigurationParams;
+import org.eclipse.lsp4j.DidChangeWatchedFilesRegistrationOptions;
 import org.eclipse.lsp4j.DocumentFilter;
 import org.eclipse.lsp4j.ExecuteCommandOptions;
 import org.eclipse.lsp4j.FileOperationFilter;
 import org.eclipse.lsp4j.FileOperationOptions;
 import org.eclipse.lsp4j.FileOperationPattern;
 import org.eclipse.lsp4j.FileRename;
+import org.eclipse.lsp4j.FileSystemWatcher;
 import org.eclipse.lsp4j.Registration;
 import org.eclipse.lsp4j.RegistrationParams;
+import org.eclipse.lsp4j.RelativePattern;
 import org.eclipse.lsp4j.RenameFilesParams;
 import org.eclipse.lsp4j.Unregistration;
 import org.eclipse.lsp4j.UnregistrationParams;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.nio.file.Path;
 import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -52,7 +60,8 @@ import java.util.concurrent.atomic.AtomicInteger;
  * the creations, renames and deletions of the files that the filters of its registrations match, until it unregisters
  * them. A registration which the server withdraws while it initializes, before LSP4IJ installs it, is never installed,
  * and one which it withdraws while LSP4IJ installs it is removed once installed, without removing a registration of the
- * same id that the server made since.
+ * same id that the server made since: neither its file system watchers, nor its commands, nor the workspace folders it
+ * turned on.
  */
 public class FileOperationDynamicRegistrationTest extends LSPCodeInsightFixtureTestCase {
 
@@ -300,6 +309,97 @@ public class FileOperationDynamicRegistrationTest extends LSPCodeInsightFixtureT
                 callHierarchy.isCallHierarchySupported(psiManager.findFile(other)));
     }
 
+    public void testAWithdrawnInstallationLeavesTheWatchersOfARegistrationAgainOfItsIdInPlace() throws Exception {
+        var main = myFixture.getTempDirFixture().createFile("main.foo", "");
+        var wrapper = connect(main);
+        var directory = main.getParent().toNioPath();
+        var callHierarchy = holdCallHierarchy(wrapper);
+        var client = MockLanguageServer.INSTANCE.getRemoteProxies().get(0);
+        try {
+            var registered = client.registerCapability(new RegistrationParams(List.of(
+                    new Registration("watchers", "workspace/didChangeWatchedFiles", textFilesIn(directory)),
+                    new Registration("hierarchy", "textDocument/prepareCallHierarchy", callHierarchyOf("**/main.foo")))));
+            // Once LSP4IJ has added the watchers, while it installs the next registration
+            get(callHierarchy.adding, "LSP4IJ must install the registrations up to the call hierarchy");
+            get(client.unregisterCapability(new UnregistrationParams(List.of(new Unregistration("watchers",
+                    "workspace/didChangeWatchedFiles")))), "the client must answer the unregistration");
+            // Equal watchers, which the end of the first installation must not take for its own
+            get(client.registerCapability(new RegistrationParams(List.of(new Registration("watchers",
+                            "workspace/didChangeWatchedFiles", textFilesIn(directory))))),
+                    "the client must answer the registration again");
+            callHierarchy.release.complete(null);
+            get(registered, "the client must answer the first registration");
+        } finally {
+            callHierarchy.release.complete(null);
+        }
+
+        myFixture.getTempDirFixture().createFile("created.txt", "");
+        PlatformTestUtil.waitWithEventsDispatching("the watchers of a registration again of a withdrawn id must stay "
+                + "registered once the first installation ends, and report a change", () -> watched("/created.txt"), 10);
+
+        unregister(new Unregistration("watchers", "workspace/didChangeWatchedFiles"));
+        myFixture.getTempDirFixture().createFile("after.txt", "");
+        awaitTheNotificationsSentSoFar(wrapper);
+        assertFalse("the unregistration of the registration again must remove its watchers", watched("/after.txt"));
+    }
+
+    public void testAWithdrawnInstallationLeavesTheWorkspaceFoldersOfARegistrationAgainOn() throws Exception {
+        var wrapper = connect(myFixture.getTempDirFixture().createFile("main.foo", ""));
+        var callHierarchy = holdCallHierarchy(wrapper);
+        var client = MockLanguageServer.INSTANCE.getRemoteProxies().get(0);
+        try {
+            var registered = client.registerCapability(new RegistrationParams(List.of(
+                    new Registration("folders", "workspace/didChangeWorkspaceFolders"),
+                    new Registration("hierarchy", "textDocument/prepareCallHierarchy", callHierarchyOf("**/main.foo")))));
+            // Once LSP4IJ has turned the workspace folders on, while it installs the next registration
+            get(callHierarchy.adding, "LSP4IJ must install the registrations up to the call hierarchy");
+            get(client.unregisterCapability(new UnregistrationParams(List.of(new Unregistration("folders",
+                    "workspace/didChangeWorkspaceFolders")))), "the client must answer the unregistration");
+            get(client.registerCapability(new RegistrationParams(List.of(new Registration("folders",
+                            "workspace/didChangeWorkspaceFolders")))),
+                    "the client must answer the registration again");
+            callHierarchy.release.complete(null);
+            get(registered, "the client must answer the first registration");
+        } finally {
+            callHierarchy.release.complete(null);
+        }
+        assertTrue("the workspace folders of a registration again must stay on once the first installation ends",
+                supportsWorkspaceFolders(wrapper));
+
+        unregister(new Unregistration("folders", "workspace/didChangeWorkspaceFolders"));
+        assertFalse("the unregistration of the registration again must turn the workspace folders off",
+                supportsWorkspaceFolders(wrapper));
+    }
+
+    public void testAWithdrawnInstallationLeavesTheCommandOfARegistrationAgainOfItsIdInPlace() throws Exception {
+        var wrapper = connect(myFixture.getTempDirFixture().createFile("main.foo", ""));
+        var callHierarchy = holdCallHierarchy(wrapper);
+        var client = MockLanguageServer.INSTANCE.getRemoteProxies().get(0);
+        try {
+            var registered = client.registerCapability(new RegistrationParams(List.of(
+                    new Registration("command", "workspace/executeCommand",
+                            new ExecuteCommandOptions(List.of("dynamic.command"))),
+                    new Registration("hierarchy", "textDocument/prepareCallHierarchy", callHierarchyOf("**/main.foo")))));
+            // Once LSP4IJ has added the command, while it installs the next registration
+            get(callHierarchy.adding, "LSP4IJ must install the registrations up to the call hierarchy");
+            get(client.unregisterCapability(new UnregistrationParams(List.of(new Unregistration("command",
+                    "workspace/executeCommand")))), "the client must answer the unregistration");
+            get(client.registerCapability(new RegistrationParams(List.of(new Registration("command",
+                            "workspace/executeCommand", new ExecuteCommandOptions(List.of("dynamic.command")))))),
+                    "the client must answer the registration again");
+            callHierarchy.release.complete(null);
+            get(registered, "the client must answer the first registration");
+        } finally {
+            callHierarchy.release.complete(null);
+        }
+        assertTrue("the command of a registration again of a withdrawn id must stay once the first installation ends",
+                wrapper.getServerCapabilitiesSync().getExecuteCommandProvider().getCommands().contains("dynamic.command"));
+
+        unregister(new Unregistration("command", "workspace/executeCommand"));
+        assertFalse("the unregistration of the registration again must remove its command",
+                wrapper.getServerCapabilitiesSync().getExecuteCommandProvider().getCommands().contains("dynamic.command"));
+    }
+
     /**
      * Holds the additions to the commands of the server capabilities until the test releases them.
      */
@@ -336,6 +436,47 @@ public class FileOperationDynamicRegistrationTest extends LSPCodeInsightFixtureT
     }
 
     /**
+     * Holds the installation of the call hierarchy registrations until the test releases it. Unlike an addition to the
+     * commands, it waits without locking the language server wrapper, whose lock the installation of a registration
+     * meanwhile takes, as of watchers, commands or workspace folders.
+     */
+    private static HeldCallHierarchy holdCallHierarchy(LanguageServerWrapper wrapper) {
+        var clientFeatures = wrapper.getClientFeatures();
+        var registry = new HeldCallHierarchy(clientFeatures);
+        clientFeatures.setCallHierarchyFeature(new LSPCallHierarchyFeature() {
+            @Override
+            public CallHierarchyCapabilityRegistry getCallHierarchyCapabilityRegistry() {
+                return registry;
+            }
+        });
+        return registry;
+    }
+
+    /**
+     * The call hierarchy registrations, whose installation waits until the test releases it.
+     */
+    private static final class HeldCallHierarchy extends CallHierarchyCapabilityRegistry {
+
+        private final CompletableFuture<Void> adding = new CompletableFuture<>();
+        private final CompletableFuture<Void> release = new CompletableFuture<>();
+
+        private HeldCallHierarchy(LSPClientFeatures clientFeatures) {
+            super(clientFeatures);
+        }
+
+        @Override
+        public @Nullable CallHierarchyRegistrationOptions registerCapability(@NotNull JsonObject registerOptions) {
+            adding.complete(null);
+            try {
+                release.get(30, TimeUnit.SECONDS);
+            } catch (Exception e) {
+                throw new IllegalStateException("the test must release the installation of the call hierarchy", e);
+            }
+            return super.registerCapability(registerOptions);
+        }
+    }
+
+    /**
      * Waits for the future without dispatching the events of the EDT, which could wait for the language server wrapper
      * while a held installation locks it.
      */
@@ -351,6 +492,24 @@ public class FileOperationDynamicRegistrationTest extends LSPCodeInsightFixtureT
         var options = new CallHierarchyRegistrationOptions();
         options.setDocumentSelector(List.of(new DocumentFilter(null, null, Either.forLeft(pattern))));
         return options;
+    }
+
+    private static DidChangeWatchedFilesRegistrationOptions textFilesIn(Path directory) {
+        return new DidChangeWatchedFilesRegistrationOptions(List.of(new FileSystemWatcher(
+                Either.forRight(new RelativePattern(Either.forRight(directory.toUri().toString()), "**/*.txt")))));
+    }
+
+    /**
+     * Returns whether the server was told of a change to the file whose path ends with the given one.
+     */
+    private static boolean watched(String path) {
+        return workspace().getWatchedFileEvents().stream().anyMatch(event -> event.getUri().endsWith(path));
+    }
+
+    private static boolean supportsWorkspaceFolders(LanguageServerWrapper wrapper) {
+        var workspace = wrapper.getServerCapabilitiesSync().getWorkspace();
+        return workspace != null && workspace.getWorkspaceFolders() != null
+                && Boolean.TRUE.equals(workspace.getWorkspaceFolders().getSupported());
     }
 
     private static MockWorkspaceService workspace() {

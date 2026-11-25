@@ -821,6 +821,14 @@ public abstract class AbstractLSPFileListener implements FileEditorManagerListen
     }
 
     /**
+     * Registers new file system watchers with a given ID, in place of those registered with it before, and returns what
+     * unregisters them, unless a later registration of the ID has replaced them, or null if none were registered.
+     */
+    public @Nullable Runnable addFileSystemWatchers(String id, List<FileSystemWatcher> watchers) {
+        return fileSystemWatcherManager.addFileSystemWatchers(id, watchers);
+    }
+
+    /**
      * Unregisters file system watchers associated with the given ID.
      */
     public void unregisterFileSystemWatchers(String id) {

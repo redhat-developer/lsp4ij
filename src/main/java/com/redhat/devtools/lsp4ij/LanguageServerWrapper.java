@@ -220,6 +220,9 @@ public class LanguageServerWrapper implements Disposable {
     private List<String> currentProcessCommandLines;
     private String connectionDescription;
     private boolean initiallySupportsWorkspaceFolders = false;
+    // The dynamic 'workspace/didChangeWorkspaceFolders' registrations of the current server capabilities that hold the
+    // workspace folders on, guarded by this wrapper
+    private int workspaceFoldersRegistrations;
     private FileOperationsManager fileOperationsManager;
     private WorkspaceFolderNotificationManager workspaceFolderNotificationManager;
 
@@ -848,6 +851,7 @@ public class LanguageServerWrapper implements Disposable {
                             syncOptions = createSyncOptions();
                             getClientFeatures().setServerCapabilities(serverCapabilities);
                             this.initiallySupportsWorkspaceFolders = supportsWorkspaceFolders(serverCapabilities);
+                            this.workspaceFoldersRegistrations = 0;
                             initializingContext.languageServer.initialized(new InitializedParams());
                         }
                         return initializingContext;
@@ -2064,12 +2068,9 @@ public class LanguageServerWrapper implements Disposable {
                     if (initiallySupportsWorkspaceFolders) {
                         // Can treat this as a NOP since nothing can disable it dynamically if it was
                         // enabled on initialization.
-                    } else if (supportsWorkspaceFolders(serverCapabilities)) {
-                        LOGGER.warn(
-                                "Dynamic registration of 'workspace/didChangeWorkspaceFolders' ignored. It was already enabled before"); //$NON-NLS-1$);
                     } else {
-                        setWorkspaceFoldersEnablement(true);
-                        installing.put(reg, () -> setWorkspaceFoldersEnablement(false));
+                        registerWorkspaceFolders();
+                        installing.put(reg, this::unregisterWorkspaceFolders);
                     }
                 } else if (LSPNotificationConstants.WORKSPACE_DID_CHANGE_WATCHED_FILES.equals(reg.getMethod())) {
                     // register 'workspace/didChangeWatchedFiles' capability
@@ -2082,8 +2083,9 @@ public class LanguageServerWrapper implements Disposable {
                             if (isDisposed() || registrationContext != currentInitializingContext) {
                                 return;
                             }
-                            fileListener.registerFileSystemWatchers(reg.getId(), options.getWatchers());
-                            installing.put(reg, () -> fileListener.unregisterFileSystemWatchers(reg.getId()));
+                            // Undoes only the watchers of this registration: when the server withdraws it during its
+                            // installation, a registration again of the id can replace them before it is undone
+                            installing.put(reg, fileListener.addFileSystemWatchers(reg.getId(), options.getWatchers()));
                         }
                     } catch (Exception e) {
                         LOGGER.error("Error while getting 'workspace/didChangeWatchedFiles' capability", e);
@@ -2230,6 +2232,26 @@ public class LanguageServerWrapper implements Disposable {
         folders.setSupported(enable);
     }
 
+    /**
+     * Turns the workspace folders on for a dynamic 'workspace/didChangeWorkspaceFolders' registration, until
+     * {@link #unregisterWorkspaceFolders()} has undone each such registration.
+     */
+    synchronized void registerWorkspaceFolders() {
+        workspaceFoldersRegistrations++;
+        setWorkspaceFoldersEnablement(true);
+    }
+
+    /**
+     * Turns the workspace folders off once no dynamic 'workspace/didChangeWorkspaceFolders' registration holds them on.
+     * A registration which the language server withdrew while LSP4IJ installed it is undone only once installed, when
+     * the server can have registered them again.
+     */
+    synchronized void unregisterWorkspaceFolders() {
+        if (--workspaceFoldersRegistrations == 0) {
+            setWorkspaceFoldersEnablement(false);
+        }
+    }
+
     synchronized void registerCommands(@NotNull List<String> newCommands) {
         ServerCapabilities serverCapabilities = this.getServerCapabilitiesSync();
         if (serverCapabilities != null) {
@@ -2240,7 +2262,8 @@ public class LanguageServerWrapper implements Disposable {
             }
             List<String> existingCommands = commandProvider.getCommands();
             for (String newCmd : newCommands) {
-                assert !existingCommands.contains(newCmd) : "Command already registered '" + newCmd + "'"; //$NON-NLS-1$ //$NON-NLS-2$
+                // Can be there already: a registration which the language server withdrew while LSP4IJ installed it
+                // keeps its commands until its installation ends, and the server can register them again meanwhile
                 existingCommands.add(newCmd);
             }
         }
@@ -2268,7 +2291,8 @@ public class LanguageServerWrapper implements Disposable {
             ExecuteCommandOptions commandProvider = serverCapabilities.getExecuteCommandProvider();
             if (commandProvider != null) {
                 List<String> existingCommands = commandProvider.getCommands();
-                existingCommands.removeAll(commands);
+                // Once per registered command: a later registration can have added the same command
+                commands.forEach(existingCommands::remove);
             }
         }
     }
