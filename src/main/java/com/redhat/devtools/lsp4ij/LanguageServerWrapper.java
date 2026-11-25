@@ -171,6 +171,12 @@ public class LanguageServerWrapper implements Disposable {
      */
     private final @NotNull
     Map<String, Runnable> dynamicRegistrations = new HashMap<>();
+    /**
+     * The dynamic registrations that wait for their installation, by id, guarded by {@link #dynamicRegistrations}. The
+     * language server gets its answer before LSP4IJ installs them, which waits until the server is initialized, and can
+     * unregister one meanwhile: the unregistration removes it from here, and its installation then installs nothing.
+     */
+    private final @NotNull Map<String, Registration> pendingRegistrations = new HashMap<>();
     private final LSPFileListener fileListener;
     private final AtomicInteger keepAliveCounter = new AtomicInteger();
     // The starts that connect the open documents again, as a restart does: until then the language server has none,
@@ -2016,8 +2022,22 @@ public class LanguageServerWrapper implements Disposable {
             // A registration from a connection that has stopped, as after a restart
             return;
         }
+        // Recorded before the language server gets its answer, which comes before the installation while the server
+        // initializes: an unregistration meanwhile then withdraws the registration
+        synchronized (dynamicRegistrations) {
+            params.getRegistrations().forEach(reg -> pendingRegistrations.put(reg.getId(), reg));
+        }
         initialization.thenRun(() -> {
+            // The registrations that the language server had not withdrawn when their installation began
+            List<Registration> installing = new ArrayList<>();
             params.getRegistrations().forEach(reg -> {
+                synchronized (dynamicRegistrations) {
+                    if (pendingRegistrations.get(reg.getId()) != reg) {
+                        // Withdrawn by the language server before its installation, which installs nothing
+                        return;
+                    }
+                }
+                installing.add(reg);
                 if (LSPNotificationConstants.WORKSPACE_DID_CHANGE_WORKSPACE_FOLDERS.equals(reg.getMethod())) {
                     // register 'workspace/didChangeWorkspaceFolders' capability
                     assert serverCapabilities != null :
@@ -2137,6 +2157,7 @@ public class LanguageServerWrapper implements Disposable {
                     }
                 }
             });
+            installing.forEach(reg -> endInstallation(reg, registrationContext));
         });
     }
 
@@ -2145,6 +2166,33 @@ public class LanguageServerWrapper implements Disposable {
         synchronized (dynamicRegistrations) {
             assert !dynamicRegistrations.containsKey(regId) : "Registration id is not unique"; //$NON-NLS-1$
             dynamicRegistrations.put(regId, unregistrationHandler);
+        }
+    }
+
+    /**
+     * Ends the installation of a dynamic registration. The language server can have withdrawn it while it was
+     * installed, when its unregistration found nothing to undo yet: what the installation added is then undone here.
+     *
+     * @param reg                 the registration
+     * @param registrationContext the start whose language server asked for the registration
+     */
+    private void endInstallation(@NotNull Registration reg, @NotNull InitializingContext registrationContext) {
+        String regId = reg.getId();
+        Runnable unregistration;
+        synchronized (dynamicRegistrations) {
+            if (pendingRegistrations.get(regId) == reg) {
+                // Not withdrawn
+                pendingRegistrations.remove(regId);
+                return;
+            }
+            if (registrationContext != currentInitializingContext) {
+                // Dropped by a stop, which drops the registrations of its start: the same id can be a later start's
+                return;
+            }
+            unregistration = dynamicRegistrations.remove(regId);
+        }
+        if (unregistration != null) {
+            unregistration.run();
         }
     }
 
@@ -2188,6 +2236,8 @@ public class LanguageServerWrapper implements Disposable {
             synchronized (dynamicRegistrations) {
                 unregisters = dynamicRegistrations.get(id);
                 dynamicRegistrations.remove(id);
+                // A registration that waits for its installation is withdrawn
+                pendingRegistrations.remove(id);
             }
             if (unregisters != null) {
                 unregisters.run();
@@ -2982,7 +3032,10 @@ public class LanguageServerWrapper implements Disposable {
                     this.initializeFuture = null;
                 }
                 this.serverCapabilities = null;
-                this.dynamicRegistrations.clear();
+                synchronized (dynamicRegistrations) {
+                    this.dynamicRegistrations.clear();
+                    this.pendingRegistrations.clear();
+                }
                 // Dropping the registrations does not run their unregistration, so drop the watchers they added
                 fileListener.clearFileSystemWatchers();
                 if (clientFeatures != null) {
