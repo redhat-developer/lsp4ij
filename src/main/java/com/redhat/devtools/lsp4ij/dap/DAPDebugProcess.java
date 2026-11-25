@@ -11,6 +11,7 @@
 package com.redhat.devtools.lsp4ij.dap;
 
 import com.intellij.execution.ExecutionResult;
+import com.intellij.execution.filters.HyperlinkInfo;
 import com.intellij.execution.process.ProcessHandler;
 import com.intellij.execution.ui.ConsoleView;
 import com.intellij.execution.ui.ConsoleViewContentType;
@@ -663,6 +664,44 @@ public class DAPDebugProcess extends XDebugProcess implements Disposable {
     public void printOutput(@NotNull List<DAPOutputDecoder.Chunk> chunks) {
         synchronized (consoleLock) {
             chunks.forEach(chunk -> printOutput(chunk.text(), chunk.contentType()));
+        }
+    }
+
+    /**
+     * Prints the output of a DAP 'output' event to the debug console as {@link #printOutput(List)} does, followed by a
+     * link to the source location which the debug adapter gives the output, as VS Code shows it at the right of the
+     * output. The link is printed before the line end which ends the output, if it ends with one, so that it stays on
+     * the line of the output, apart from its text by a space. The output and the link are printed together, so that no
+     * other text of the console comes between them. An output without text, such as a line end alone, gets no link.
+     *
+     * @param chunks   the chunks of the output.
+     * @param linkText the text of the link, such as the name of the source and the line.
+     * @param link     opens the source location when the link is clicked.
+     */
+    public void printOutput(@NotNull List<DAPOutputDecoder.Chunk> chunks,
+                            @NotNull String linkText,
+                            @NotNull HyperlinkInfo link) {
+        if (chunks.stream().allMatch(chunk -> chunk.text().isBlank())) {
+            printOutput(chunks);
+            return;
+        }
+        var last = chunks.get(chunks.size() - 1);
+        String lastText = last.text();
+        String lineEnd = lastText.endsWith("\r\n") ? "\r\n" : lastText.endsWith("\n") ? "\n" : "";
+        synchronized (consoleLock) {
+            chunks.subList(0, chunks.size() - 1).forEach(chunk -> printOutput(chunk.text(), chunk.contentType()));
+            printOutput(lastText.substring(0, lastText.length() - lineEnd.length()), last.contentType());
+            if (!consoleLineEnded) {
+                printOutput(" ", last.contentType());
+            }
+            consoleLineEnded = false;
+            AppUIUtil.invokeOnEdt(() -> {
+                var consoleView = getSession().getConsoleView();
+                if (consoleView != null) {
+                    consoleView.printHyperlink(linkText, link);
+                }
+            });
+            printOutput(lineEnd, last.contentType());
         }
     }
 
