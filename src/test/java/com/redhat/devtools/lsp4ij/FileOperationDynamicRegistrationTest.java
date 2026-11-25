@@ -21,7 +21,9 @@ import com.intellij.testFramework.PlatformTestUtil;
 import com.redhat.devtools.lsp4ij.fixtures.LSPCodeInsightFixtureTestCase;
 import com.redhat.devtools.lsp4ij.mock.MockLanguageServer;
 import com.redhat.devtools.lsp4ij.mock.MockWorkspaceService;
+import org.eclipse.lsp4j.CallHierarchyRegistrationOptions;
 import org.eclipse.lsp4j.DidChangeConfigurationParams;
+import org.eclipse.lsp4j.DocumentFilter;
 import org.eclipse.lsp4j.FileOperationFilter;
 import org.eclipse.lsp4j.FileOperationOptions;
 import org.eclipse.lsp4j.FileOperationPattern;
@@ -31,6 +33,7 @@ import org.eclipse.lsp4j.RegistrationParams;
 import org.eclipse.lsp4j.RenameFilesParams;
 import org.eclipse.lsp4j.Unregistration;
 import org.eclipse.lsp4j.UnregistrationParams;
+import org.eclipse.lsp4j.jsonrpc.messages.Either;
 import org.jetbrains.annotations.NotNull;
 
 import java.io.IOException;
@@ -43,7 +46,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 /**
  * A language server which announces no file operations in its capabilities, and registers them dynamically, is told of
  * the creations, renames and deletions of the files that the filters of its registrations match, until it unregisters
- * them.
+ * them. A registration which the server withdraws while it initializes, before LSP4IJ installs it, is never installed.
  */
 public class FileOperationDynamicRegistrationTest extends LSPCodeInsightFixtureTestCase {
 
@@ -167,6 +170,50 @@ public class FileOperationDynamicRegistrationTest extends LSPCodeInsightFixtureT
                 askedInWriteAction.join());
         assertEquals("the rename must send workspace/willRenameFiles once", 1, workspace().getWillRenameRequests().size());
         assertEquals("moved.foo", renamed.getName());
+    }
+
+    public void testARegistrationWithdrawnWhileTheServerInitializesIsNotInstalled() throws Exception {
+        var psiManager = PsiManager.getInstance(myFixture.getProject());
+        var main = myFixture.getTempDirFixture().createFile("main.foo", "");
+        var other = myFixture.getTempDirFixture().createFile("other.foo", "");
+        var renamed = myFixture.getTempDirFixture().createFile("renamed.foo", "");
+        var initialize = MockLanguageServer.INSTANCE.holdInitialize();
+        var connecting = LanguageServiceAccessor.getInstance(myFixture.getProject())
+                .getLanguageServers(psiManager.findFile(main), null, null);
+        try {
+            PlatformTestUtil.waitWithEventsDispatching("the server must be initializing",
+                    () -> MockLanguageServer.INSTANCE.getNotifications().contains("initialize"), 30);
+            // LSP4IJ answers while the server initializes, and installs the registrations once it is initialized
+            register(new Registration("will-rename", "workspace/willRenameFiles", FOO_FILES),
+                    new Registration("did-rename", "workspace/didRenameFiles", FOO_FILES),
+                    new Registration("main-call-hierarchy", "textDocument/prepareCallHierarchy", callHierarchyOf("**/main.foo")),
+                    // Installed after the others: once it is, LSP4IJ has dealt with them
+                    new Registration("other-call-hierarchy", "textDocument/prepareCallHierarchy", callHierarchyOf("**/other.foo")));
+            unregister(new Unregistration("will-rename", "workspace/willRenameFiles"),
+                    new Unregistration("did-rename", "workspace/didRenameFiles"),
+                    new Unregistration("main-call-hierarchy", "textDocument/prepareCallHierarchy"));
+        } finally {
+            initialize.complete(null);
+        }
+        var wrapper = connecting.get(30, TimeUnit.SECONDS).get(0).getServerWrapper();
+        var callHierarchy = wrapper.getClientFeatures().getCallHierarchyFeature();
+        PlatformTestUtil.waitWithEventsDispatching("the registration that the server kept must be installed once it is initialized",
+                () -> callHierarchy.isCallHierarchySupported(psiManager.findFile(other)), 10);
+
+        rename(renamed, "moved.foo");
+        awaitTheNotificationsSentSoFar(wrapper);
+        assertEquals("a rename must not send workspace/willRenameFiles for a registration withdrawn while the server initialized",
+                0, workspace().getWillRenameRequests().size());
+        assertEquals("a rename must not send workspace/didRenameFiles for a registration withdrawn while the server initialized",
+                0, workspace().getDidRenameNotifications().size());
+        assertFalse("call hierarchy must not be supported for a registration withdrawn while the server initialized",
+                callHierarchy.isCallHierarchySupported(psiManager.findFile(main)));
+    }
+
+    private static CallHierarchyRegistrationOptions callHierarchyOf(String pattern) {
+        var options = new CallHierarchyRegistrationOptions();
+        options.setDocumentSelector(List.of(new DocumentFilter(null, null, Either.forLeft(pattern))));
+        return options;
     }
 
     private static MockWorkspaceService workspace() {
