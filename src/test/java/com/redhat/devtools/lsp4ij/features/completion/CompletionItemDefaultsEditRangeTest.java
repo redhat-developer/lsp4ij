@@ -40,6 +40,11 @@ public class CompletionItemDefaultsEditRangeTest extends LSPCompletionFixtureTes
                   "label": "gap-12",
                   "kind": 21,
                   "sortText": "b"
+                },
+                {
+                  "label": "other",
+                  "kind": 21,
+                  "sortText": "c"
                 }
               ],
               "itemDefaults": {
@@ -73,12 +78,17 @@ public class CompletionItemDefaultsEditRangeTest extends LSPCompletionFixtureTes
                   "label": "col-l-md",
                   "kind": 21,
                   "sortText": "b"
+                },
+                {
+                  "label": "other",
+                  "kind": 21,
+                  "sortText": "c"
                 }
               ],
               "itemDefaults": {
                 "editRange": {
                   "start": { "line": 0, "character": 0 },
-                  "end": { "line": 0, "character": 6 }
+                  "end": { "line": 0, "character": 8 }
                 }
               }
             }""";
@@ -88,14 +98,12 @@ public class CompletionItemDefaultsEditRangeTest extends LSPCompletionFixtureTes
     }
 
     public void testAnItemWithOnlyALabelReplacesTheDefaultEditRangeWithItsLabel() {
-        assertCompletion(TEST_FILE_NAME, "ga", LABEL_ONLY_COMPLETION_JSON, "gap-1", "gap-12");
-        // Without the label fallback, this gives "gap-gap-1px"
+        assertCompletion(TEST_FILE_NAME, "ga<caret>", LABEL_ONLY_COMPLETION_JSON, "gap-1", "gap-12");
         assertApplyCompletionItem(0, "gap-1<caret>");
     }
 
     public void testAnItemWithItsOwnTextEditKeepsItInsteadOfTheDefaultEditRange() {
-        assertCompletion(TEST_FILE_NAME, "cl", OWN_TEXT_EDIT_COMPLETION_JSON, "col-l-sm", "col-l-md");
-        // Without the textEdit guard, this gives the label "gap-px"
+        assertCompletion(TEST_FILE_NAME, "cl<caret>", OWN_TEXT_EDIT_COMPLETION_JSON, "col-l-sm", "col-l-md");
         assertApplyCompletionItem(0, "column-left-small");
     }
 }
