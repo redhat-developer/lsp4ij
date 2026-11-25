@@ -22,7 +22,7 @@ You can use [Rust Analyzer](https://rust-analyzer.github.io/) to benefit from `R
    `"$USER_HOME$/.lsp4ij/lsp/rust-analyzer/rust-analyzer-x86_64-unknown-linux-gnu"` on Linux x64 or
    `"$USER_HOME$/.lsp4ij/lsp/rust-analyzer/rust-analyzer.exe"` on Windows.
 
-   To install rust-analyzer yourself, [download the rust-analyzer language server binary](https://rust-analyzer.github.io/manual.html#rust-analyzer-language-server-binary),
+   To install rust-analyzer yourself, [download the rust-analyzer language server binary](https://rust-analyzer.github.io/book/rust_analyzer_binary.html),
    set the command to it, and empty the `Installer` tab before you click **OK**, so that LSP4IJ doesn't install the
    server.
 

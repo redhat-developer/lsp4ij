@@ -9,7 +9,7 @@ This section provides step-by-step instructions for contributing an LSP language
 The first step is to reference LSP4IJ. LSP4IJ uses `com.redhat.devtools.lsp4ij` as plugin Id.
 
 You
-need [to declare dependency in your plugin.xml](https://plugins.jetbrains.com/docs/intellij/plugin-dependencies.html#3-dependency-declaration-in-pluginxml)
+need [to declare dependency in your plugin.xml](https://plugins.jetbrains.com/docs/intellij/plugin-dependencies.html#dependency-declaration-in-pluginxml)
 like this:
 
 ```xml
@@ -60,6 +60,7 @@ import com.intellij.openapi.project.Project;
 import com.redhat.devtools.lsp4ij.LanguageServerFactory;
 import com.redhat.devtools.lsp4ij.client.LanguageClientImpl;
 import com.redhat.devtools.lsp4ij.server.StreamConnectionProvider;
+import org.eclipse.lsp4j.services.LanguageServer;
 import org.jetbrains.annotations.NotNull;
 
 public class MyLanguageServerFactory implements LanguageServerFactory {
@@ -88,6 +89,7 @@ In this sample `MyCustomServerAPI` interface could look like this:
 import org.eclipse.lsp4j.jsonrpc.services.JsonRequest;
 import org.eclipse.lsp4j.services.LanguageServer;
 
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
 public interface MyCustomServerAPI  extends LanguageServer {
@@ -101,7 +103,7 @@ If you need to provide client specific features (e.g. commands), you can overrid
 return your custom LSP client implementation.
 
 If you need to expose a custom server API, i.e. custom commands supported by your language server, you can override
-the `createLanguageClient` method to return a custom interface extending LSP4J's LanguageServer API.
+the `getServerInterface()` method to return a custom interface extending LSP4J's LanguageServer API.
 
 ### StreamConnectionProvider Implementation
 
@@ -118,14 +120,18 @@ extend [OSProcessStreamConnectionProvider](https://github.com/redhat-developer/l
 
 #### OSProcessStreamConnectionProvider
 
-Even though [OSProcessStreamConnectionProvider](#osprocessstreamconnectionprovider) is experimental, 
-it is recommended to extend it instead of [ProcessStreamConnectionProvider](#processstreamconnectionprovider) because the former internally uses the
+It is recommended to extend [OSProcessStreamConnectionProvider](#osprocessstreamconnectionprovider) instead of
+[ProcessStreamConnectionProvider](#processstreamconnectionprovider) because the former internally uses the
 IntelliJ [OSProcessHandler](https://github.com/JetBrains/intellij-community/blob/master/platform/platform-util-io/src/com/intellij/execution/process/OSProcessHandler.java) class 
 which wraps a process and allows to track the process state via a 
 [ProcessListener](https://github.com/JetBrains/intellij-community/blob/master/platform/util/src/com/intellij/execution/process/ProcessListener.java) listener.
 
-In addition, OSProcessStreamConnectionProvider allows to log errors from the language server in the `Log tab` of the 
+In addition, OSProcessStreamConnectionProvider allows to log errors from the language server in the `Logs` tab of the 
 [LSP console](https://github.com/redhat-developer/lsp4ij/blob/main/docs/UserGuide.md#lsp-console).
+
+An `OSProcessStreamConnectionProvider` starts one process: LSP4IJ creates a new provider with `createConnectionProvider`
+for each start of the language server, and `start()` throws a `CannotStartProcessException` when the provider has
+already been started or stopped.
 
 Since IntelliJ 2025.1, a plugin can set up the environment of a process for its working directory (the
 `commandLineEnvCustomizer` extension point), as the [mise](https://mise.jdx.dev/) plugin does. A command line with a
@@ -143,11 +149,12 @@ the Node.js runtime found in "path/to/nodejs/node.exe":
 package my.language.server;
 
 import com.intellij.execution.configurations.GeneralCommandLine;
+import com.intellij.openapi.project.Project;
 import com.redhat.devtools.lsp4ij.server.OSProcessStreamConnectionProvider;
 
 public class MyLanguageServer extends OSProcessStreamConnectionProvider {
 
-    public MyLanguageServer() {
+    public MyLanguageServer(Project project) {
         GeneralCommandLine commandLine = new GeneralCommandLine("path/to/nodejs/node.exe", "path/to/my/language/server/main.js");
         super.setCommandLine(commandLine);
     }
@@ -162,6 +169,7 @@ the Node.js runtime found in "path/to/nodejs/node.exe":
 ```java
 package my.language.server;
 
+import com.intellij.openapi.project.Project;
 import com.redhat.devtools.lsp4ij.server.ProcessStreamConnectionProvider;
 
 import java.util.Arrays;
@@ -169,7 +177,7 @@ import java.util.List;
 
 public class MyLanguageServer extends ProcessStreamConnectionProvider {
 
-    public MyLanguageServer() {
+    public MyLanguageServer(Project project) {
         List<String> commands = Arrays.asList("path/to/nodejs/node.exe", "path/to/my/language/server/main.js");
         super.setCommands(commands);
     }
@@ -230,7 +238,7 @@ A port of 0 lets LSP4IJ choose a free port, for which the command line is made. 
 only: on `127.0.0.1` and `::1`, on the same port, so that a language server which connects to `localhost` reaches it
 on either, and on the first one alone when the port isn't free on the other, or without IPv6. `startAndConnect`
 connects to the loopback address of the JVM and then to the other one. The output of a language server which LSP4IJ
-starts goes to the `Log tab` of the
+starts goes to the `Logs` tab of the
 [LSP console](https://github.com/redhat-developer/lsp4ij/blob/main/docs/UserGuide.md#lsp-console), since the socket
 carries the protocol: its standard output as information, and its standard error as errors. A language server which ends, or closes the connection, is reported as stopped unexpectedly, as
 a language server process is. Stopping the language server closes the connection, and ends the process only if LSP4IJ
@@ -307,6 +315,19 @@ referencing your `my.language.server.MyLanguageServerFactory`:
 
 ```
 
+`id`, `name` and `factoryClass` are the ones you need. The extension point also takes:
+
+* `icon`: the resource path of the icon of the language server in the LSP console and the Language Servers settings,
+  of 13x13 pixels.
+* `bundle`, `nameKey` and `descriptionKey`: to take the name and the description from a resource bundle, instead of
+  `name` and `description`.
+* `singleton`: `true` for a language server which serves the files of all the open projects, instead of one language
+  server per project. `false` by default.
+* `supportsLightEdit`: `true` for a language server which also serves the files opened in LightEdit mode, without a
+  project. `false` by default.
+* `lastDocumentDisconnectedTimeout`: the time in seconds for which the language server keeps running once its last file
+  is closed, before LSP4IJ stops it. 5 by default.
+
 A that point, once the declaration is done, your server should appear in the `LSP Consoles` view:
 
 ![My LanguageServer in LSP Console](./images/MyLanguageServerInLSPConsole.png)
@@ -369,7 +390,8 @@ custom [DocumentMatcher](https://github.com/redhat-developer/lsp4ij/blob/main/sr
 For instance your language server could be mapped to the `Java` language, and you could implement a DocumentMatcher
 to check if the module containing the file contains certain Java classes in its classpath.
 
-The DocumentMatcher is executed in a non blocking read action.
+The DocumentMatcher is executed in a non blocking read action. A matcher which throws an exception, or whose
+`matchAsync` fails, counts as no match for its mapping, and logs a warning: the other mappings of the file still apply.
 
 A document matcher looks like this:
 
@@ -600,6 +622,7 @@ Here a sample which consumes custom services with [MyCustomApi](#languageserverf
 import org.eclipse.lsp4j.jsonrpc.services.JsonRequest;
 import org.eclipse.lsp4j.services.LanguageServer;
 
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
 public interface MyCustomServerAPI  extends LanguageServer {
@@ -643,7 +666,7 @@ CompletableFuture<@Nullable LanguageServerItem> languageServerFuture =
 CompletableFuture<List<Application>> applications = 
      languageServerFuture
      .thenCompose(languageServerItem -> {
-       if (languageServerItem != null) {
+       if (languageServerItem == null) {
          return CompletableFuture.completedFuture(null);
        }
        return languageServerItem.getInitializedServer(); // here getInitializedServer is used because language server could be stopped and must be restarted
@@ -703,9 +726,9 @@ server until the `Lease` is disposed.
 
 ```java
 Project project = ...
-CompletableFuture<Lease<LanguageServerItem>> serverLease = 
+CompletableFuture<@Nullable Lease<LanguageServerItem>> serverLease = 
         LanguageServerManager.getInstance(project).getLanguageServer("myLanguageServerId")
-        .thenApply(item -> item.keepAlive());
+        .thenApply(item -> item != null ? item.keepAlive() : null);
 ```
 
 As long as the lease has not been disposed this will request lsp4ij not arbitrarily terminate the language
@@ -720,10 +743,14 @@ import com.intellij.openapi.util.Disposer;
 ...
 
 serverLease.thenAccept(lease -> {
+    if (lease == null) {
+        // No language server with this id
+        return;
+    }
     try {
        while (...we need to do suff...) {
-          // Fetch list of 'applications' using some custom protocol on 'MyLanguageServer'
-          List<Application> applications = ((MyLanguageServer)lease.get().getServer()).getApplications();   
+          // Fetch list of 'applications' using some custom protocol on 'MyCustomServerAPI'
+          List<Application> applications = ((MyCustomServerAPI) lease.get().getServer()).getApplications().join();
           ... do something with the result...
        }
     } catch (ServerWasStoppedException e) {   
@@ -856,457 +883,9 @@ By default, LSP4IJ uses the [ProjectWorkspaceFolderStrategy](https://github.com/
 
 ## Workspace Folder Strategy
 
-You can customize workspace folder discovery by using one of the built-in strategies, configuring a strategy with JSON, or implementing your own [WorkspaceFolderStrategy](https://github.com/redhat-developer/lsp4ij/blob/main/src/main/java/com/redhat/devtools/lsp4ij/features/workspaceFolder/WorkspaceFolderStrategy.java).
-
-### Built-in Strategies
-
-LSP4IJ provides several built-in strategies:
-
-#### ProjectWorkspaceFolderStrategy (Default)
-
-Uses the IntelliJ [ProjectWorkspaceFolderStrategy](https://github.com/redhat-developer/lsp4ij/blob/main/src/main/java/com/redhat/devtools/lsp4ij/features/workspaceFolder/ProjectWorkspaceFolderStrategy.java) project base directories as workspace folders. By default, all folders are sent during initialization.
-
-To customize the workspace folder strategy, you need to:
-
-1. Create a class that extends `LSPWorkspaceFolderFeature` and overrides `createStrategy()`:
-
-```java
-package my.language.server;
-
-import com.redhat.devtools.lsp4ij.client.features.LSPWorkspaceFolderFeature;
-import com.redhat.devtools.lsp4ij.features.workspaceFolder.ProjectWorkspaceFolderStrategy;
-import com.redhat.devtools.lsp4ij.features.workspaceFolder.WorkspaceFolderStrategy;
-import org.jetbrains.annotations.NotNull;
-
-public class MyWorkspaceFolderFeature extends LSPWorkspaceFolderFeature {
-    
-    @Override
-    protected @NotNull WorkspaceFolderStrategy createStrategy() {
-        return new ProjectWorkspaceFolderStrategy();
-    }
-}
-```
-
-2. In your `LanguageServerFactory`, create `LSPClientFeatures` and set the workspace folder feature:
-
-```java
-package my.language.server;
-
-import com.intellij.openapi.project.Project;
-import com.redhat.devtools.lsp4ij.LanguageServerFactory;
-import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
-import org.jetbrains.annotations.NotNull;
-
-public class MyLanguageServerFactory implements LanguageServerFactory {
-    
-    @Override
-    public @NotNull LSPClientFeatures createClientFeatures() {
-        LSPClientFeatures clientFeatures = new LSPClientFeatures();
-        clientFeatures.setWorkspaceFolderFeature(new MyWorkspaceFolderFeature());
-        return clientFeatures;
-    }
-}
-```
-
-**Enable lazy loading:**
-
-You can extend the strategy to enable lazy loading, sending workspace folders progressively via `workspace/didChangeWorkspaceFolders` as files are opened:
-
-```java
-package my.language.server;
-
-import com.redhat.devtools.lsp4ij.client.features.LSPWorkspaceFolderFeature;
-import com.redhat.devtools.lsp4ij.features.workspaceFolder.ProjectWorkspaceFolderStrategy;
-import com.redhat.devtools.lsp4ij.features.workspaceFolder.WorkspaceFolderStrategy;
-import org.jetbrains.annotations.NotNull;
-
-public class MyWorkspaceFolderFeature extends LSPWorkspaceFolderFeature {
-    
-    @Override
-    protected @NotNull WorkspaceFolderStrategy createStrategy() {
-        return new ProjectWorkspaceFolderStrategy(true /* Enable lazy loading */);
-    }
-}
-```
-
-This is useful for large projects where you want to avoid sending all workspace folders upfront.
-
-#### SourceRootsWorkspaceFolderStrategy
-
-Uses IntelliJ module [SourceRootsWorkspaceFolderStrategy](https://github.com/redhat-developer/lsp4ij/blob/main/src/main/java/com/redhat/devtools/lsp4ij/features/workspaceFolder/SourceRootsWorkspaceFolderStrategy.java) source roots as workspace folders. By default, all folders are sent during initialization.
-
-Useful when you want to expose only source directories (not the entire project root) to the language server.
-
-```java
-package my.language.server;
-
-import com.redhat.devtools.lsp4ij.client.features.LSPWorkspaceFolderFeature;
-import com.redhat.devtools.lsp4ij.features.workspaceFolder.SourceRootsWorkspaceFolderStrategy;
-import com.redhat.devtools.lsp4ij.features.workspaceFolder.WorkspaceFolderStrategy;
-import org.jetbrains.annotations.NotNull;
-
-public class MyWorkspaceFolderFeature extends LSPWorkspaceFolderFeature {
-    
-    @Override
-    protected @NotNull WorkspaceFolderStrategy createStrategy() {
-        return new SourceRootsWorkspaceFolderStrategy();
-    }
-}
-```
-
-**Enable lazy loading for source roots:**
-
-You can extend the strategy to enable lazy loading, sending workspace folders on-demand as files are opened:
-
-```java
-package my.language.server;
-
-import com.redhat.devtools.lsp4ij.client.features.LSPWorkspaceFolderFeature;
-import com.redhat.devtools.lsp4ij.features.workspaceFolder.SourceRootsWorkspaceFolderStrategy;
-import com.redhat.devtools.lsp4ij.features.workspaceFolder.WorkspaceFolderStrategy;
-import org.jetbrains.annotations.NotNull;
-
-public class MyWorkspaceFolderFeature extends LSPWorkspaceFolderFeature {
-    
-    @Override
-    protected @NotNull WorkspaceFolderStrategy createStrategy() {
-        return new SourceRootsWorkspaceFolderStrategy(true /* Enable lazy loading */);
-    }
-}
-```
-
-#### MarkersWorkspaceFolderStrategy
-
-Use [MarkersWorkspaceFolderStrategy](https://github.com/redhat-developer/lsp4ij/blob/main/src/main/java/com/redhat/devtools/lsp4ij/features/workspaceFolder/MarkersWorkspaceFolderStrategy.java)
-to discover workspace folders dynamically by walking up the directory tree looking for marker files. 
-Folders are discovered lazily as files are opened.
-
-```java
-package my.language.server;
-
-import com.redhat.devtools.lsp4ij.client.features.LSPWorkspaceFolderFeature;
-import com.redhat.devtools.lsp4ij.features.workspaceFolder.MarkersWorkspaceFolderStrategy;
-import com.redhat.devtools.lsp4ij.features.workspaceFolder.WorkspaceFolderStrategy;
-import org.jetbrains.annotations.NotNull;
-
-public class MyWorkspaceFolderFeature extends LSPWorkspaceFolderFeature {
-    
-    @Override
-    protected @NotNull WorkspaceFolderStrategy createStrategy() {
-        return new MarkersWorkspaceFolderStrategy("pyproject.toml", "setup.py");
-    }
-}
-```
-
-This is particularly useful for:
-- **Monorepos** with multiple projects
-- **Python projects** with `pyproject.toml` or `setup.py`
-- **Node.js projects** with multiple `package.json` files
-
-For example, when opening `/monorepo/backend/src/app.py` with markers `["pyproject.toml"]`:
-1. Checks `/monorepo/backend/src/` for `pyproject.toml`
-2. Checks `/monorepo/backend/` for `pyproject.toml` ← **Found!**
-3. Returns `/monorepo/backend/` as workspace folder
-
-#### ConfigurableWorkspaceFolderStrategy
-
-[ConfigurableWorkspaceFolderStrategy](https://github.com/redhat-developer/lsp4ij/blob/main/src/main/java/com/redhat/devtools/lsp4ij/features/workspaceFolder/ConfigurableWorkspaceFolderStrategy.java) is a flexible strategy that can be configured with JSON to support different root types, markers, and lazy loading options:
-
-```java
-package my.language.server;
-
-import com.redhat.devtools.lsp4ij.client.features.LSPWorkspaceFolderFeature;
-import com.redhat.devtools.lsp4ij.features.workspaceFolder.ConfigurableWorkspaceFolderStrategy;
-import com.redhat.devtools.lsp4ij.features.workspaceFolder.WorkspaceFolderStrategy;
-import org.jetbrains.annotations.NotNull;
-
-public class MyWorkspaceFolderFeature extends LSPWorkspaceFolderFeature {
-    
-    @Override
-    protected @NotNull WorkspaceFolderStrategy createStrategy() {
-        // language=json
-        String config = """
-            {
-              "markers": ["pyproject.toml", "setup.py"],
-              "lazy": true
-            }
-            """;
-        ConfigurableWorkspaceFolderStrategy strategy = new ConfigurableWorkspaceFolderStrategy();
-        strategy.configure(config);
-        return strategy;
-    }
-}
-```
-
-### Lazy vs Eager Loading
-
-All workspace folder strategies support two loading modes:
-
-#### Eager Loading (default: `lazy: false`)
-
-All workspace folders are sent **once during initialization**:
-
-```
-Client → Server: initialize(workspaceFolders: ["/project/backend", "/project/frontend"])
-Server → Client: initialized
-```
-
-**Pros:**
-- Server has complete workspace context from the start
-- Simpler implementation
-
-**Cons:**
-- Slower IDE startup for large projects
-- Sends folders that may never be used
-
-#### Lazy Loading (`lazy: true`)
-
-Workspace folders are sent **progressively via notifications** as files are opened.
-
-**Initialization with empty workspace folders:**
-
-```json
-Client → Server: initialize
-{
-  "workspaceFolders": []
-}
-
-Server → Client: initialized
-```
-
-**When a file is opened, the workspace folder is discovered and sent:**
-
-```
-User opens: C:/Users/Foo/lsp4ij-demo/src/Main.java
-
-[Trace] Sending notification 'workspace/didChangeWorkspaceFolders'
-Params: {
-  "event": {
-    "added": [
-      {
-        "uri": "file:///C:/Users/Foo/lsp4ij-demo",
-        "name": "lsp4ij-demo"
-      }
-    ],
-    "removed": []
-  }
-}
-```
-
-**Subsequent files in the same workspace folder don't trigger notifications:**
-
-```
-User opens: C:/Users/Foo/lsp4ij-demo/src/Utils.java
-// No notification sent - workspace folder already known
-```
-
-**Opening a file from a different workspace folder:**
-
-```
-User opens: C:/Users/Foo/lsp4ij-demo/another-project/src/App.java
-
-[Trace] Sending notification 'workspace/didChangeWorkspaceFolders'
-Params: {
-  "event": {
-    "added": [
-      {
-        "uri": "file:///C:/Users/Foo/lsp4ij-demo/another-project",
-        "name": "another-project"
-      }
-    ],
-    "removed": []
-  }
-}
-```
-
-**Pros:**
-- Faster IDE startup (no full project scan)
-- Reduced memory usage (only active workspace folders)
-- Ideal for monorepos
-
-**Cons:**
-- Server must support `workspace/didChangeWorkspaceFolders`
-- More complex notification flow
-
-**When to use lazy loading:**
-- Large monorepos with multiple projects
-- Projects with many modules (only load modules being edited)
-- Marker-based strategies (avoid scanning entire filesystem)
-
-### Configuration Options
-
-The [ConfigurableWorkspaceFolderStrategy](https://github.com/redhat-developer/lsp4ij/blob/main/src/main/java/com/redhat/devtools/lsp4ij/features/workspaceFolder/ConfigurableWorkspaceFolderStrategy.java) supports the following JSON configuration:
-
-#### Root Type
-
-Determines how workspace folders are discovered:
-
-- **`PROJECT_BASE`** (default): Uses IntelliJ project base directories
-- **`SOURCE_ROOTS`**: Uses module source roots
-- **`NONE`**: No workspace folders
-
-```json
-{
-  "rootType": "SOURCE_ROOTS"
-}
-```
-
-#### Server Instances
-
-Spreads the files of a project over several language server instances, see [Several Language Server Instances](#several-language-server-instances):
-
-```json
-{
-  "serverInstances": { "markers": ["pyproject.toml"] }
-}
-```
-
-#### Marker-based Discovery
-
-When `markers` is specified, LSP4IJ walks up the directory tree from each opened file looking for the specified marker files:
-
-```json
-{
-  "markers": ["pyproject.toml", "setup.py", "requirements.txt"]
-}
-```
-
-For example, when opening `/project/src/main/app.py`, LSP4IJ will:
-1. Check if `/project/src/main/` contains a marker file
-2. Check if `/project/src/` contains a marker file
-3. Check if `/project/` contains a marker file
-4. Return the first directory containing any of the marker files
-
-This is useful for monorepos with multiple language server roots.
-
-#### Lazy Loading
-
-Controls when and how workspace folders are sent to the server:
-
-- **`lazy: false`** (default): All workspace folders are sent **during initialization** via the `initialize` request
-- **`lazy: true`**: Workspace folders are discovered and sent **on-demand** as files are opened via `workspace/didChangeWorkspaceFolders` notification
-
-**How lazy loading works:**
-
-When `lazy: true`, the language server receives workspace folders progressively:
-
-1. **Initialization**: Empty or minimal workspace folders list sent in `initialize` request
-2. **File opened**: User opens `/project/backend/src/app.py`
-3. **Discovery**: LSP4IJ discovers the workspace folder (e.g., `/project/backend/`)
-4. **Notification**: Sends `workspace/didChangeWorkspaceFolders` with the new folder added
-5. **Repeat**: Each time a file from a new workspace folder is opened, a notification is sent
-
-**Benefits:**
-- Faster IDE startup (no full project scan)
-- Reduced memory usage (server only loads active workspace folders)
-- Better for large monorepos with many projects
-
-**Example - Lazy loading with markers:**
-```json
-{
-  "markers": ["pyproject.toml"]
-}
-```
-
-**Example - Lazy loading with source roots:**
-```json
-{
-  "rootType": "SOURCE_ROOTS",
-  "lazy": true
-}
-```
-
-### Configuration Examples
-
-**Python project with pyproject.toml:**
-```json
-{
-  "markers": ["pyproject.toml"]
-}
-```
-
-**Multi-module project using source roots:**
-```json
-{
-  "rootType": "SOURCE_ROOTS",
-  "lazy": false
-}
-```
-
-**Monorepo with multiple package.json:**
-```json
-{
-  "markers": ["package.json"]
-}
-```
-
-### Custom Strategy
-
-For complete control, implement your own `WorkspaceFolderStrategy`:
-
-1. Create your custom strategy implementation:
-
-```java
-package my.language.server;
-
-import com.intellij.openapi.project.Project;
-import com.intellij.openapi.vfs.VirtualFile;
-import com.redhat.devtools.lsp4ij.client.features.FileUriSupport;
-import com.redhat.devtools.lsp4ij.features.workspaceFolder.WorkspaceFolderStrategy;
-import org.eclipse.lsp4j.WorkspaceFolder;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
-
-import java.util.ArrayList;
-import java.util.List;
-
-public class MyWorkspaceFolderStrategy implements WorkspaceFolderStrategy {
-    
-    @Override
-    public @NotNull List<WorkspaceFolder> getInitialWorkspaceFolders(
-            @NotNull Project project, 
-            @NotNull FileUriSupport fileUriSupport) {
-        // Return folders to send during initialization
-        List<WorkspaceFolder> folders = new ArrayList<>();
-        // ... custom logic ...
-        return folders;
-    }
-    
-    @Override
-    public @Nullable WorkspaceFolder getWorkspaceFolderForFile(
-            @NotNull VirtualFile file,
-            @NotNull Project project,
-            @NotNull FileUriSupport fileUriSupport) {
-        // Return the workspace folder for a given file
-        // ... custom logic ...
-        return null;
-    }
-    
-    @Override
-    public boolean sendAllFoldersOnInitialization() {
-        // Return true to send all folders at init, false for lazy loading
-        return true;
-    }
-}
-```
-
-2. Create a workspace folder feature that uses your custom strategy:
-
-```java
-package my.language.server;
-
-import com.redhat.devtools.lsp4ij.client.features.LSPWorkspaceFolderFeature;
-import com.redhat.devtools.lsp4ij.features.workspaceFolder.WorkspaceFolderStrategy;
-import org.jetbrains.annotations.NotNull;
-
-public class MyWorkspaceFolderFeature extends LSPWorkspaceFolderFeature {
-    
-    @Override
-    protected @NotNull WorkspaceFolderStrategy createStrategy() {
-        return new MyWorkspaceFolderStrategy();
-    }
-}
-```
+A `WorkspaceFolderStrategy` decides which workspace folders a language server gets. The built-in strategies, lazy
+and eager loading, their configuration options, examples and how to write your own strategy are described in
+[Workspace folder strategies](./WorkspaceFolders.md).
 
 ## Several Language Server Instances
 
@@ -1394,7 +973,7 @@ For user-defined language servers, workspace folder configuration is configured 
 settings of the language server. A template can have it as a `workspaceFolderSettings.json` file, which an export
 writes, and which the New Language Server dialog gives the language server it creates:
 
-![Workspace Folders Configuration](./images/WorkspaceFoldersConfiguration.png)
+![Workspace Folders Configuration](./images/workspace-folders/RootType_PROJECT_BASE.png)
 
 The JSON configuration follows the same format as the programmatic API.
 
@@ -1532,7 +1111,9 @@ import com.intellij.openapi.project.Project;
 import com.redhat.devtools.lsp4ij.LanguageServerFactory;
 import com.redhat.devtools.lsp4ij.client.LanguageClientImpl;
 import com.redhat.devtools.lsp4ij.server.StreamConnectionProvider;
+import com.redhat.devtools.lsp4ij.settings.contributors.LanguageServerSettingsContributor;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 public class MyLanguageServerFactory implements LanguageServerFactory {
 

@@ -562,8 +562,71 @@ and override what you need:
 # Customize the DAP client
 
 * `createInitializeRequestArguments(Map)` returns the arguments of the `initialize` request: the client's id and name,
-  the adapter id (the `type` of the DAP parameters), and the client's capabilities.
+  the adapter id (the `type` of the DAP parameters), and the client's capabilities, such as `supportsANSIStyling`, which
+  tells the DAP server that the debug console shows ANSI styles. Call `super` and change its result: an override which
+  creates the arguments itself must set these capabilities too.
 * `createClient(...)` creates the `DAPClient` of the session. Override it with a subclass of `DAPClient` to handle
   requests or events of your own DAP server, or to send it requests that LSP4IJ does not send.
 
 The DAP features that the client supports, and the capabilities they need, are listed in [DAP support](./DAPSupport.md).
+
+## DAPClient requests
+
+`DAPClient` has public methods for the requests of these features. Each returns a completed future, and sends nothing,
+when the client isn't connected to the DAP server:
+
+* `stepBack(int threadId, SteppingGranularity granularity)` and `reverseContinue(int threadId)`: Step Back and Reverse
+  Continue, for a DAP server with the `supportsStepBack` capability (`isSupportsStepBack()`). When the DAP server
+  refuses, the console says why, and the session stays suspended where it was.
+* `locations(int locationReference)`: asks the DAP server where a location reference which it gave points to, such as
+  the `valueLocationReference` of a variable. The future's value is null when the DAP server answers without a location.
+* `setExpression(String expression, int frameId, String value)`: assigns a value to an expression, for a DAP server with
+  the `supportsSetExpression` capability (`isSupportsSetExpression()`).
+* `terminateThreads(List<Integer> threadIds)`: terminates the threads, when the DAP server has the
+  `supportsTerminateThreadsRequest` capability (`isSupportsTerminateThreadsRequest()`), and sends nothing otherwise. A
+  failure is shown in the console.
+
+## Requests which name a frame or a variable
+
+The id of a stack frame and the `variablesReference` of a value are valid only while the program stays at the stop
+where the DAP server gave them: a DAP server may give them to something else at its next stop. `getExecutionEpoch()`
+returns the current execution epoch, which ends whenever the program resumes or stops, and `DAPStackFrame` has the
+epoch of its stop (`getExecutionEpoch()`).
+
+A request of your subclass which names a frame id or a `variablesReference` must be sent with `sendInExecutionEpoch`,
+not directly with `getDebugProtocolServer()`:
+
+* `sendInExecutionEpoch(DAPStackFrame frame, Supplier<CompletableFuture<T>> request)` sends the request if the frame's
+  epoch is still the current one, and its thread hasn't continued alone (`allThreadsContinued: false`) since. Use it for
+  the references of a frame.
+* `sendInExecutionEpoch(int epoch, Supplier<CompletableFuture<T>> request)` sends the request if the given epoch is
+  still the current one.
+* Both have a variant with a third parameter, `String endedMessage`.
+
+The check and the sending are atomic against a request of the client which resumes the program, so the request is
+written before the program resumes, or not at all. The supplier must only write the request, and the request is
+written on the calling thread: call these methods off the EDT. When the references are out of date, the request isn't
+sent, and the future fails with `endedMessage`, or else with a message which says that the program has run since the
+value was shown.
+
+```java
+CompletableFuture<ScopesResponse> scopes = client.sendInExecutionEpoch(frame, () -> {
+    var args = new ScopesArguments();
+    args.setFrameId(frame.getFrameId());
+    return client.getDebugProtocolServer().scopes(args);
+});
+```
+
+## The context menu of the Threads tab
+
+The `Threads` tab of a debug session shows the context menu of the `DAP.Threads.Popup` action group, which has
+`Terminate Thread`. An action which you add to this group gets the selected threads, and the `DAPClient` of the DAP
+session they belong to, from `ThreadsPanel.SELECTED_THREADS`:
+
+```java
+ThreadsPanel.SelectedThreads selected = e.getData(ThreadsPanel.SELECTED_THREADS);
+if (selected != null) {
+    DAPClient client = selected.client();
+    List<Integer> threadIds = selected.threadIds();
+}
+```

@@ -47,10 +47,14 @@ and use the left toolbar to `Apply` or `Reset` the settings.
 
 You can find more documentation in:
 
- * [the developer guide](./docs/DeveloperGuide.md), providing step-by-step instructions on how to integrate a language server in LSP4J in an external IntelliJ plugin.
- * [the User-defined language server documentation](./docs/UserDefinedLanguageServer.md), explaining how to integrate a language server in LSP4J with few settings. 
+ * [the developer guide](./docs/DeveloperGuide.md), providing step-by-step instructions on how to integrate a language server in LSP4IJ in an external IntelliJ plugin.
+ * [the LSP API](./docs/LSPApi.md), describing how an IntelliJ plugin customizes the LSP features of its language server.
+ * [the workspace folder strategies](./docs/WorkspaceFolders.md), describing how an IntelliJ plugin chooses the workspace folders of its language server.
+ * [the User-defined language server documentation](./docs/UserDefinedLanguageServer.md), explaining how to integrate a language server in LSP4IJ with few settings. 
+ * [the template documentation](./docs/UserDefinedLanguageServerTemplate.md), describing the templates of user-defined language servers and their installers.
  * [the user guide](./docs/UserGuide.md), which explains how to use LSP console and Language Server preferences.
  * [the LSP Support overview](./docs/LSPSupport.md), describing which LSP features are implemented, and how.
+ * [the DAP user guide](./docs/dap/UserGuide.md), [the DAP developer guide](./docs/dap/DeveloperGuide.md) and [the DAP Support overview](./docs/dap/DAPSupport.md), for the Debug Adapter Protocol.
 
 <!-- Plugin description end -->
 
@@ -373,14 +377,15 @@ by opening the `Languages & Frameworks / Language Servers (LSP4IJ)` preferences:
 
 You can select:
  * `None` : in this case the language server error will be ignored.
- * `In notification` (default value) : in this case the language server error appear as a `notification`:
+ * `As notification` (default value) : in this case the language server error appear as a `notification`:
 ![Error in notification](./docs/images/troubleshooting/LanguageServerErrorInNotification.png)
  The error notification shows 3 possible actions:
    * `Disable error reporting` : sets the error reporting to `None`.
    * `Report error in Log` : sets the error reporting to `In log`. 
    * `Open LSP4IJ documentation` : opens this documentation. 
- * `In log` : in this case the language server error will be logged in the standard `IntelliJ log`:
-![Error in log](./docs/images/troubleshooting/LanguageServerErrorInLog.png)
+ * `In log` : in this case the language server error is logged as a warning in `idea.log`, the standard IntelliJ log,
+   as `Error while consuming 'textDocument/hover' with language server 'My Language Server'` followed by the error.
+   No IDE error dialog opens.
 
 You can see this error's details in the [LSP Consoles view](./docs/UserGuide.md#lsp-console) (by setting the `Debug / Trace` combo box in `verbose`):
 

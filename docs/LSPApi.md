@@ -2,12 +2,13 @@
 
 The [LSPClientFeatures](https://github.com/redhat-developer/lsp4ij/blob/main/src/main/java/com/redhat/devtools/lsp4ij/client/features/LSPClientFeatures.java) API allows you to customize the behavior of LSP features, including:
 
+- [LSP callHierarchy feature](#lsp-callhierarchy-feature)
 - [LSP codeAction feature](#lsp-codeAction-feature)
 - [LSP codeLens feature](#lsp-codeLens-feature)
 - [LSP color feature](#lsp-color-feature)
 - [LSP completion feature](#lsp-completion-feature)
 - [LSP inlineCompletion feature](#lsp-inlineCompletion-feature)
-- [LSP diagnostic feature](#lsp-diagnostic-feature) 
+- [LSP configuration feature](#lsp-configuration-feature)
 - [LSP declaration feature](#lsp-declaration-feature)
 - [LSP definition feature](#lsp-definition-feature)
 - [LSP diagnostic feature](#lsp-diagnostic-feature)
@@ -16,6 +17,7 @@ The [LSPClientFeatures](https://github.com/redhat-developer/lsp4ij/blob/main/src
 - [LSP documentSymbol feature](#lsp-documentSymbol-feature)
 - [LSP foldingRange feature](#lsp-foldingRange-feature)
 - [LSP formatting feature](#lsp-formatting-feature)
+- [LSP onTypeFormatting feature](#lsp-ontypeformatting-feature)
 - [LSP selection feature](#lsp-selection-feature)
 - [LSP hover feature](#lsp-hover-feature)
 - [LSP implementation feature](#lsp-implementation-feature)
@@ -28,6 +30,7 @@ The [LSPClientFeatures](https://github.com/redhat-developer/lsp4ij/blob/main/src
 - [LSP semanticTokens feature](#lsp-semanticTokens-feature)
 - [LSP signatureHelp feature](#lsp-signatureHelp-feature)
 - [LSP typeDefinition feature](#lsp-typeDefinition-feature)
+- [LSP typeHierarchy feature](#lsp-typehierarchy-feature)
 - [LSP usage feature](#lsp-usage-feature)
 - [LSP workspace symbol feature](#lsp-workspace-symbol-feature)
 - [LSP workspace folder feature](#lsp-workspace-folder-feature)
@@ -64,7 +67,7 @@ public class MyLanguageServerFactory implements LanguageServerFactory {
 
 | API                                                          | Description                                                                                                                                                                                                                                                                                                                                                                                    | Default Behaviour |
 |--------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------|
-| boolean isEnabled(VirtualFile)                               | Returns `true` if the language server is enabled for the given file and `false` otherwise.                                                                                                                                                                                                                                                                                                     | `true`            |
+| boolean isEnabled(VirtualFile)                               | Returns `true` if the language server is enabled for the given file and `false` otherwise. An override should return `super.isEnabled(file)` for the files it enables, so that a language server with an installer stays disabled until it is installed.                                                                                                                                       | `true`, or, with an installer, `false` until the language server is installed |
 | void initializeParams(InitializeParams)                      | This method is invoked just before [LanguageServer#initialize(InitializeParams)](https://github.com/eclipse-lsp4j/lsp4j/blob/651eb49e1f4cd90439808885ddaad0862b330908/org.eclipse.lsp4j/src/main/java/org/eclipse/lsp4j/services/LanguageServer.java#L50) <br/>to enable customization of the language server's initialization parameters (e.g., {@link InitializeParams#getWorkDoneToken()}). |                   |
 | void handleServerStatusChanged(ServerStatus)                 | Callback invoked when language server status changed.                                                                                                                                                                                                                                                                                                                                          |                   |
 | URI getFileUri(VirtualFile file)                             | Returns the file Uri from the given virtual file and null otherwise (to use default `FileUriSupport.DEFAULT.getFileUri`).                                                                                                                                                                                                                                                                      | `null`            |
@@ -184,12 +187,22 @@ public class MyLSPCodeLensFeature extends LSPCodeLensFeature {
 }
 ```
 
+## LSP CallHierarchy Feature
+
+| API                                                 | Description                                                                                                                                                                                                                        | Default Behaviour             |
+|-----------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------------------|
+| boolean isEnabled(PsiFile file)                     | Returns `true` if the LSP feature is enabled for the given file and `false` otherwise.                                                                                                                                             | `true`                        |
+| boolean isSupported(PsiFile file)                   | Returns `true` if the LSP feature is supported for the given file and `false` otherwise. <br/>This supported state is called after starting the language server, which matches the file and user with the LSP server capabilities. | Check the server capability   |
+| String getText(CallHierarchyItem callHierarchyItem) | Returns the text of the given LSP call hierarchy item in the `Call Hierarchy` view and `null` to ignore the item.                                                                                                                  | `callHierarchyItem.getName()` |
+
 ## LSP CodeAction Feature
 
 | API                                         | Description                                                                                                                                                                                                                        | Default Behaviour           |
 |---------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------------------|
 | boolean isEnabled(PsiFile file)             | Returns `true` if the LSP feature is enabled for the given file and `false` otherwise.                                                                                                                                             | `true`                      |
 | boolean isSupported(PsiFile file)           | Returns `true` if the LSP feature is supported for the given file and `false` otherwise. <br/>This supported state is called after starting the language server, which matches the file and user with the LSP server capabilities. | Check the server capability |
+| boolean isQuickFixesEnabled(PsiFile file)   | Returns `true` if the code actions are shown as quick fixes of the diagnostics and `false` otherwise.                                                                                                                              | `isEnabled(file)`           |
+| boolean isIntentionActionsEnabled(PsiFile file) | Returns `true` if the code actions are shown as intention actions and `false` otherwise.                                                                                                                                           | `isEnabled(file)`           |
 | String getText(CodeAction codeAction)       | Returns the IntelliJ intention action text from the given LSP code action and `null` to ignore the code action.                                                                                                                    | `codeAction.getTitle()`     |
 | String getFamilyName(CodeAction codeAction) | Returns the IntelliJ intention action family name from the given LSP code action.                                                                                                                                                  | Label of `CodeActionKind`   |
 | String getText(Command command)             | Returns the IntelliJ intention action text from the given LSP command and `null` to ignore the command.                                                                                                                            | `command.getTitle()`        |
@@ -203,13 +216,16 @@ public class MyLSPCodeLensFeature extends LSPCodeLensFeature {
 | boolean isSupported(PsiFile file)                                                                               | Returns `true` if the LSP feature is supported for the given file and `false` otherwise. <br/>This supported state is called after starting the language server, which matches the file and user with the LSP server capabilities. | Check the server capability        |
 | CodeVisionEntry createCodeVisionEntry(CodeLens codeLens, String providerId, LSPCodeLensContext codeLensContext) | Creates an IntelliJ `CodeVisionEntry` from the given LSP `CodeLens` and `null` otherwise (to ignore the LSP `CodeLens`).                                                                                                           |                                    |
 | String getText(CodeLens codeLens)                                                                               | Returns the code vision entry text from the LSP `CodeLens` and `null` otherwise (to ignore the LSP `CodeLens`).                                                                                                                    | `codeLens.getCommand().getTitle()` |
+| boolean isClickable(CodeLens codeLens)                                                                          | Returns `true` if the code vision entry of the given LSP `CodeLens` is clickable and `false` otherwise.                                                                                                                            | `true` if the command has an id or the `CodeLens` has `data` |
 
-Here is an example of code that avoids creating an IntelliJ `CodeVisionEntry` when the LSP `CodeLens` command is equal to `Run`:
+Here is an example of code that avoids creating an IntelliJ `CodeVisionEntry` when the title of the LSP `CodeLens` command is `Run`:
 
 ```java
 package my.language.server;
 
 import com.redhat.devtools.lsp4ij.client.features.LSPCodeLensFeature;
+import org.eclipse.lsp4j.CodeLens;
+import org.eclipse.lsp4j.Command;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -217,9 +233,9 @@ public class MyLSPCodeLensFeature extends LSPCodeLensFeature {
 
     @Override
     @Nullable
-    public String getText(CodeLens codeLens) {
+    public String getText(@NotNull CodeLens codeLens) {
         Command command = codeLens.getCommand();
-        if ("Run".equals(command)) {
+        if (command != null && "Run".equals(command.getTitle())) {
             return null;
         }
         return super.getText(codeLens);
@@ -249,6 +265,7 @@ public class MyLSPCodeLensFeature extends LSPCodeLensFeature {
 | boolean isStrikeout(CompletionItem item)                                              | Returns true if the IntelliJ lookup is strike out and false otherwise.                                                                                                                                                             | use `item.getDeprecated()` or `item.getTags().contains(CompletionItemTag.Deprecated)` |
 | String getTailText(CompletionItem item)                                               | Returns the IntelliJ lookup tail text from the given LSP completion item and null otherwise.                                                                                                                                       | `item.getLabelDetails().getDetail()`                                                  |
 | boolean isItemTextBold(CompletionItem item)                                           | Returns the IntelliJ lookup item text bold from the given LSP completion item and null otherwise.                                                                                                                                  | `item.getKind() == CompletionItemKind.Keyword`                                        |
+| boolean shouldResolveOnApply(CompletionItem item, PsiFile file)                       | Returns `true` if the given LSP completion item is resolved with `completionItem/resolve`, when the language server supports it, before it is applied, and `false` otherwise.                                                      | `true`                                                                                |
 | boolean useContextAwareSorting(PsiFile file)                                          | Returns `true` if client-side context-aware completion sorting should be used for the specified file and `false` otherwise.                                                                                                        | `false`                                                                               |
 | boolean useTemplateForInvocationOnlySnippet(PsiFile file)                             | Returns `true` if an editor template should be used for invocation-only snippets and `false` otherwise.                                                                                                                            | `true`                                                                                |
 
@@ -261,23 +278,37 @@ public class MyLSPCodeLensFeature extends LSPCodeLensFeature {
 
 The inline completion feature integrates with IntelliJ's inline completion API to provide AI-assisted code completion suggestions that appear as you type.
 
-## LSP Diagnostic Feature
+## LSP Configuration Feature
 
-| API                                                                                                                   | Description                                                                                                                                                                                                                        | Default Behaviour           |
-|-----------------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------------------|
-| boolean isEnabled(PsiFile file)                                                                                       | Returns `true` if the LSP feature is enabled for the given file and `false` otherwise.                                                                                                                                             | `true`                      |
-| boolean isSupported(PsiFile file)                                                                                     | Returns `true` if the LSP feature is supported for the given file and `false` otherwise. <br/>This supported state is called after starting the language server, which matches the file and user with the LSP server capabilities. | Check the server capability |
-| void createAnnotation(Diagnostic diagnostic, Document document, List<IntentionAction> fixes, AnnotationHolder holder) | Create an IntelliJ annotation in the given holder by using given LSP diagnostic and fixes.                                                                                                                                         |                             |
-| HighlightSeverity getHighlightSeverity(Diagnostic diagnostic)                                                         | Returns the IntelliJ {@link HighlightSeverity} from the given diagnostic and null otherwise.                                                                                                                                       |                             |
-| ProblemHighlightType getProblemHighlightType(Diagnostic diagnostic)                                                   | Returns the IntelliJ {@link ProblemHighlightType} from the given diagnostic and null otherwise.                                                                                                                                    |                             |
-| ProblemHighlightType getProblemHighlightType(List<DiagnosticTag> tags)                                                | Returns the {@link ProblemHighlightType} from the given tags and null otherwise.                                                                                                                                                   |                             |
-| String getMessage(Diagnostic diagnostic)                                                                              | Returns the message of the given diagnostic.                                                                                                                                                                                       |                             |
-| String getTooltip(Diagnostic diagnostic)                                                                              | Returns the annotation tooltip from the given LSP diagnostic.                                                                                                                                                                      |                             |
-| boolean isInspectionApplicableFor(PsiFile file, LocalInspectionTool inspection)                                       | Returns `true` if the local inspection tool is application for the given file and `false` otherwise.                                                                                                                               |                             |
-| boolean isInspectionApplicableFor(Diagnostic diagnostic, LocalInspectionTool inspection)                              | Returns `true` if the local inspection tool is application for the given diagnostic and `false` otherwise.                                                                                                                         |                             |
-| boolean isDiagnosticSupported(PsiFiel file)                                                                           | Returns `true` if the file associated with a language server can support pull diagnostic and `false` otherwise.                                                                                                                    |                             |
-| String getDiagnosticIdentifier()                                                                                      | Returns the diagnostic identifier to use to cache "pull" diagnostics.                                                                                                                                                              |                             |
-| boolean canReportProblem(VirtualFile file)                                                                            | Returns `true` if the given file can report problem in the Project View and false otherwise.                                                                                                                                       | `true`                      |
+`LSPConfigurationFeature` sets what LSP4IJ does when the configuration of the language server, in its `Configuration`
+tab, changes. A change of its `Initialization Options` or `Experimental` restarts the language server in any case.
+
+| API                                                                           | Description                                                                                                                                                                                                                                  | Default Behaviour               |
+|-------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------------------|
+| OnConfigurationChanged getOnConfigurationChanged()                            | Returns what LSP4IJ does when the configuration changes.                                                                                                                                                                                     | `CALL_DID_CHANGE_CONFIGURATION` |
+| void setOnConfigurationChanged(OnConfigurationChanged onConfigurationChanged) | Sets what LSP4IJ does when the configuration changes: `RESTART_LANGUAGE_SERVER` restarts the language server, `CALL_DID_CHANGE_CONFIGURATION` sends it the configuration with `workspace/didChangeConfiguration`, and `IGNORE` does nothing. |                                 |
+
+Here is an example of code that restarts the language server when its configuration changes:
+
+```java
+package my.language.server;
+
+import com.redhat.devtools.lsp4ij.LanguageServerFactory;
+import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
+import com.redhat.devtools.lsp4ij.client.features.LSPConfigurationFeature;
+import org.jetbrains.annotations.NotNull;
+
+public class MyLanguageServerFactory implements LanguageServerFactory {
+
+    @Override
+    public @NotNull LSPClientFeatures createClientFeatures() {
+        LSPClientFeatures clientFeatures = new LSPClientFeatures();
+        clientFeatures.getConfigurationFeature()
+                .setOnConfigurationChanged(LSPConfigurationFeature.OnConfigurationChanged.RESTART_LANGUAGE_SERVER);
+        return clientFeatures;
+    }
+}
+```
 
 ## LSP Declaration Feature
 
@@ -295,14 +326,21 @@ The inline completion feature integrates with IntelliJ's inline completion API t
 
 ## LSP Diagnostic Feature
 
-| API                                                                                                                   | Description                                                                                     | Default Behaviour |
-|-----------------------------------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------|-------------------|
-| boolean isEnabled(PsiFile file)                                                                                       | Returns `true` if the LSP feature is enabled for the given file and `false` otherwise.          | `true`            |
-| void createAnnotation(Diagnostic diagnostic, Document document, List<IntentionAction> fixes, AnnotationHolder holder) | Creates an IntelliJ annotation in the given holder using the provided LSP diagnostic and fixes. |                   |
-| HighlightSeverity getHighlightSeverity(Diagnostic diagnostic)                                                         | Returns the IntelliJ `HighlightSeverity` from the given diagnostic and `null` otherwise.        |                   |
-| String getMessage(Diagnostic diagnostic)                                                                              | Returns the message of the given diagnostic.                                                    |                   |
-| String getToolTip(Diagnostic diagnostic)                                                                              | Returns the annotation tooltip from the given LSP diagnostic.                                   |                   |
-| ProblemHighlightType getProblemHighlightType(List<DiagnosticTag> tags)                                                | Returns the `ProblemHighlightType` from the given tags and `null` otherwise.                    |                   |
+| API                                                                                                                   | Description                                                                                                                                                                                                                        | Default Behaviour           |
+|-----------------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------------------|
+| boolean isEnabled(PsiFile file)                                                                                       | Returns `true` if the LSP feature is enabled for the given file and `false` otherwise.                                                                                                                                             | `true`                      |
+| boolean isSupported(PsiFile file)                                                                                     | Returns `true` if the LSP feature is supported for the given file and `false` otherwise. <br/>This supported state is called after starting the language server, which matches the file and user with the LSP server capabilities. | Check the server capability |
+| void createAnnotation(Diagnostic diagnostic, Document document, List<IntentionAction> fixes, AnnotationHolder holder) | Create an IntelliJ annotation in the given holder by using given LSP diagnostic and fixes.                                                                                                                                         |                             |
+| HighlightSeverity getHighlightSeverity(Diagnostic diagnostic)                                                         | Returns the IntelliJ `HighlightSeverity` from the given diagnostic and `null` otherwise.                                                                                                                                         |                             |
+| ProblemHighlightType getProblemHighlightType(Diagnostic diagnostic)                                                   | Returns the IntelliJ `ProblemHighlightType` from the given diagnostic and `null` otherwise.                                                                                                                                      |                             |
+| ProblemHighlightType getProblemHighlightType(List<DiagnosticTag> tags)                                                | Returns the `ProblemHighlightType` from the given tags and `null` otherwise.                                                                                                                                                     |                             |
+| String getMessage(Diagnostic diagnostic)                                                                              | Returns the message of the given diagnostic.                                                                                                                                                                                       |                             |
+| String getTooltip(Diagnostic diagnostic)                                                                              | Returns the annotation tooltip from the given LSP diagnostic.                                                                                                                                                                      |                             |
+| boolean isInspectionApplicableFor(PsiFile file, LocalInspectionTool inspection)                                       | Returns `true` if the local inspection tool is application for the given file and `false` otherwise.                                                                                                                               |                             |
+| boolean isInspectionApplicableFor(Diagnostic diagnostic, LocalInspectionTool inspection)                              | Returns `true` if the local inspection tool is application for the given diagnostic and `false` otherwise.                                                                                                                         |                             |
+| boolean isDiagnosticSupported(PsiFile file)                                                                           | Returns `true` if the file associated with a language server can support pull diagnostic and `false` otherwise.                                                                                                                    |                             |
+| String getDiagnosticIdentifier()                                                                                      | Returns the diagnostic identifier to use to cache "pull" diagnostics.                                                                                                                                                              |                             |
+| boolean canReportProblem(VirtualFile file)                                                                            | Returns `true` if the given file can report problem in the Project View and false otherwise.                                                                                                                                       | `true`                      |
 
 Here is an example of code that avoids creating an IntelliJ annotation when the LSP diagnostic code is equal to `ignore`:
 
@@ -415,6 +453,17 @@ public class MyLSPDiagnosticFeature extends LSPDiagnosticFeature {
 ```
 
 
+### Observing diagnostic cache updates
+
+Override `LSPDiagnosticFeature.diagnosticsUpdated(VirtualFile, List<Diagnostic>)`
+to maintain a Problems view or another diagnostic consumer. It receives the
+current merged cache after a report is processed, including closed-file updates
+and empty lists that clear diagnostics. Notifications may repeat unchanged data;
+the supplied diagnostics are read-only and must not be mutated. The callback is
+synchronous under the document cache lock: copy any needed presentation data,
+return promptly, and schedule UI work separately. Use client lifecycle callbacks
+to discard retained results when the server stops or is disposed.
+
 ## LSP DocumentHighlight Feature
 
 | API                               | Description                                                                                                                                                                                                                        | Default Behaviour           |
@@ -431,16 +480,18 @@ public class MyLSPDiagnosticFeature extends LSPDiagnosticFeature {
 
 ## LSP DocumentSymbol Feature
 
-| API                                                                                       | Description                                                                                                                                                                                                                        | Default Behaviour           |
-|-------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------------------|
-| boolean isEnabled(PsiFile file)                                                           | Returns `true` if the LSP feature is enabled for the given file and `false` otherwise.                                                                                                                                             | `true`                      |
-| boolean isSupported(PsiFile file)                                                         | Returns `true` if the LSP feature is supported for the given file and `false` otherwise. <br/>This supported state is called after starting the language server, which matches the file and user with the LSP server capabilities. | Check the server capability |
-| StructureViewTreeElement getStructureViewTreeElement(DocumentSymbolData documentSymbol)   |                                                                                                                                                                                                                                    |                             |
-| String getPresentableText(DocumentSymbol documentSymbol, PsiFile psiFile)                 |                                                                                                                                                                                                                                    |                             |
-| Icon getIcon(DocumentSymbol documentSymbol, PsiFile psiFile)                              |                                                                                                                                                                                                                                    |                             |
-| String getPresentableText(DocumentSymbol documentSymbol, PsiFile psiFile, boolean unused) |                                                                                                                                                                                                                                    |                             |
-| void navigate(DocumentSymbol documentSymbol, PsiFile psiFile, boolean requestFocus)       |                                                                                                                                                                                                                                    |                             |                                                                                        | | |
-| boolean canNavigate(DocumentSymbol documentSymbol, PsiFile psiFile)                       |                                                                                                                                                                                                                                    |                             |
+| API                                                                                     | Description                                                                                                                                                                                                                        | Default Behaviour                                                                                            |
+|-----------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------|
+| boolean isEnabled(PsiFile file)                                                         | Returns `true` if the LSP feature is enabled for the given file and `false` otherwise.                                                                                                                                             | `true`                                                                                                       |
+| boolean isSupported(PsiFile file)                                                       | Returns `true` if the LSP feature is supported for the given file and `false` otherwise. <br/>This supported state is called after starting the language server, which matches the file and user with the LSP server capabilities. | Check the server capability                                                                                  |
+| StructureViewTreeElement getStructureViewTreeElement(DocumentSymbolData documentSymbol) | Returns the element of the `Structure` view of the given document symbol and `null` to ignore the document symbol.                                                                                                                 |                                                                                                              |
+| String getPresentableText(DocumentSymbol documentSymbol, PsiFile psiFile)               | Returns the text of the given document symbol.                                                                                                                                                                                     | `documentSymbol.getName()`                                                                                   |
+| Icon getIcon(DocumentSymbol documentSymbol, PsiFile psiFile, boolean unused)            | Returns the icon of the given document symbol.                                                                                                                                                                                     | The icon of `documentSymbol.getKind()`                                                                       |
+| String getLocationString(DocumentSymbol documentSymbol, PsiFile psiFile)                | Returns the location string of the given document symbol, which the `Structure` view shows after its text.                                                                                                                         | `documentSymbol.getDetail()`                                                                                 |
+| int getTextOffset(DocumentSymbol documentSymbol, PsiFile psiFile)                       | Returns the offset of the given document symbol in the file.                                                                                                                                                                       | The start of its selection range, or else of its range                                                       |
+| void navigate(DocumentSymbol documentSymbol, PsiFile psiFile, boolean requestFocus)     | Opens the given document symbol in the editor.                                                                                                                                                                                     | Opens the start of its selection range                                                                       |
+| boolean canNavigate(DocumentSymbol documentSymbol, PsiFile psiFile)                     | Returns `true` if the given document symbol can be opened in the editor and `false` otherwise.                                                                                                                                     | `true` if it has a selection range                                                                           |
+| boolean matchesPsiElement(DocumentSymbolData documentSymbolData, PsiElement psiElement) | Returns `true` if the given document symbol is the given PSI element and `false` otherwise.                                                                                                                                        | `true` if the text range of the PSI element is the selection range of the document symbol, or else its range |
 
 Here is an example of code to customize the document symbol used in `Structure`:
 
@@ -519,13 +570,13 @@ public class MyLSPDocumentSymbolFeature extends LSPDocumentSymbolFeature {
 | boolean isExistingFormatterOverrideable(PsiFile file)               | Returns `true` if existing formatters are overrideable and `false` otherwise.                                                                                                                                                      | `false`                                                               |
 | boolean isOnTypeFormattingEnabled(PsiFile file)                     | Whether or not server-side on-type formatting is enabled if `textDocument/onTypeFormatting` is supported by the server.                                                                                                            | `true`                                                                |
 | boolean isFormatOnCloseBrace(PsiFile file)                          | Whether or not to format the file when close braces are typed.                                                                                                                                                                     | `false`                                                               |
-| boolean getFormatOnCloseBraceCharacters(PsiFile file)               | The specific close brace characters that should trigger on-type formatting in the file.                                                                                                                                            | The language's standard close brace characters.                       |
-| boolean getFormatOnCloseBraceScope(PsiFile file)                    | The scope that should be formatted when a close brace is typed. Allowed values are `CODE_BLOCK` and `FILE`.                                                                                                                        | `CODE_BLOCK`                                                          |
+| String getFormatOnCloseBraceCharacters(PsiFile file)                | The specific close brace characters that should trigger on-type formatting in the file.                                                                                                                                            | The language's standard close brace characters.                       |
+| FormattingScope getFormatOnCloseBraceScope(PsiFile file)            | The scope that should be formatted when a close brace is typed. Allowed values are `CODE_BLOCK` and `FILE`.                                                                                                                        | `CODE_BLOCK`                                                          |
 | boolean isFormatOnStatementTerminator(PsiFile file)                 | Whether or not to format the file when statement terminators are typed.                                                                                                                                                            | `false`                                                               |
-| boolean getFormatOnStatementTerminatorCharacters(PsiFile file)      | The specific statement terminator characters that should trigger on-type formatting in the file.                                                                                                                                   | None.                                                                 |
-| boolean getFormatOnStatementTerminatorScope(PsiFile file)           | The scope that should be formatted when a statement terminator is typed. Allowed values are `STATEMENT`, `CODE_BLOCK` and `FILE`.                                                                                                  | `STATEMENT`                                                           |
+| String getFormatOnStatementTerminatorCharacters(PsiFile file)       | The specific statement terminator characters that should trigger on-type formatting in the file.                                                                                                                                   | None.                                                                 |
+| FormattingScope getFormatOnStatementTerminatorScope(PsiFile file)   | The scope that should be formatted when a statement terminator is typed. Allowed values are `STATEMENT`, `CODE_BLOCK` and `FILE`.                                                                                                  | `STATEMENT`                                                           |
 | boolean isFormatOnCompletionTrigger(PsiFile file)                   | Whether or not to format the file when completion triggers are typed.                                                                                                                                                              | `false`                                                               |
-| boolean getFormatOnCompletionTriggerCharacters(PsiFile file)        | The specific completion trigger characters that should trigger on-type formatting in the file.                                                                                                                                     | The language's standard completion trigger characters.                |
+| String getFormatOnCompletionTriggerCharacters(PsiFile file)         | The specific completion trigger characters that should trigger on-type formatting in the file.                                                                                                                                     | The language's standard completion trigger characters.                |
 
 Here is an example of code that allows executing the LSP formatter even if there is a specific formatter registered by an IntelliJ plugin:
 
@@ -539,13 +590,23 @@ import org.jetbrains.annotations.NotNull;
 public class MyLSPFormattingFeature extends LSPFormattingFeature {
 
     @Override
-    protected boolean isExistingFormatterOverrideable(@NotNull PsiFile file) {
+    public boolean isExistingFormatterOverrideable(@NotNull PsiFile file) {
         // By default, isExistingFormatterOverrideable returns false if it has a custom formatter with psi
         // returns true even if there is a custom formatter
         return true;
     }
 }
 ```
+
+## LSP OnTypeFormatting Feature
+
+Server-side on-type formatting, with [`textDocument/onTypeFormatting`](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_onTypeFormatting), is enabled with `LSPFormattingFeature#isOnTypeFormattingEnabled`, see [LSP Formatting Feature](#lsp-formatting-feature).
+
+| API                                                                        | Description                                                                                                                                                                                                                        | Default Behaviour                                                                                                                                                                                                                              |
+|----------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| boolean isEnabled(PsiFile file)                                            | Returns `true` if the LSP feature is enabled for the given file and `false` otherwise.                                                                                                                                             | `true` when the language server is started, `LSPFormattingFeature#isOnTypeFormattingEnabled(file)` is `true`, and the language of the file has no IntelliJ formatter or `LSPFormattingFeature#isExistingFormatterOverrideable(file)` is `true` |
+| boolean isSupported(PsiFile file)                                          | Returns `true` if the LSP feature is supported for the given file and `false` otherwise. <br/>This supported state is called after starting the language server, which matches the file and user with the LSP server capabilities. | Check the server capability                                                                                                                                                                                                                    |
+| boolean isOnTypeFormattingTriggerCharacter(PsiFile file, String charTyped) | Returns `true` if the typed character triggers on-type formatting in the given file and `false` otherwise.                                                                                                                         | The trigger characters of the server capability                                                                                                                                                                                                |
 
 ## LSP Selection Feature
 
@@ -599,10 +660,13 @@ once linked editing is turned on in `Settings | Editor | General | Smart Keys`. 
 
 ## LSP Progress Feature
 
-| API                                                             | Description                                                     | Default Behaviour |
-|-----------------------------------------------------------------|-----------------------------------------------------------------|-------------------|
-| String getProgressTaskTitle(String title)                       | Returns the progress task title.                                |                   |
-| void updateMessage(String message, ProgressIndicator indicator) | Update the given progress indicator text with the given message |                   |
+| API                                                                                       | Description                                                                         | Default Behaviour                                          |
+|-------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------|------------------------------------------------------------|
+| String getProgressTaskTitle(String title)                                                 | Returns the progress task title.                                                    | The name of the language server, then `: ` and the title   |
+| void onProgressBegin(WorkDoneProgressBegin begin, ProgressIndicator progressIndicator)    | Called when the language server begins a progress, with its `begin` notification.   | Shows its message and percentage in the progress indicator |
+| void onProgressReport(WorkDoneProgressReport report, ProgressIndicator progressIndicator) | Called when the language server reports a progress, with its `report` notification. | Shows its message and percentage in the progress indicator |
+| void onProgressEnd(WorkDoneProgressEnd end)                                               | Called when the language server ends a progress, with its `end` notification.       | Does nothing                                               |
+| void updateMessage(String message, ProgressIndicator indicator)                           | Update the given progress indicator text with the given message                     |                                                            |
 
 ## LSP References Feature
 
@@ -610,6 +674,7 @@ once linked editing is turned on in `Settings | Editor | General | Smart Keys`. 
 |-----------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------------------|
 | boolean isEnabled(PsiFile file)   | Returns `true` if the LSP feature is enabled for the given file and `false` otherwise.                                                                                                                                             | `true`                      |
 | boolean isSupported(PsiFile file) | Returns `true` if the LSP feature is supported for the given file and `false` otherwise. <br/>This supported state is called after starting the language server, which matches the file and user with the LSP server capabilities. | Check the server capability |
+| boolean processExternalReferences(PsiFile file) | Returns `true` if Find Usages and Rename also search the references which plugins add to the symbols of the language server in the given file, and `false` otherwise (see [External References](./LSPSupport.md#external-references)). | `false`                     |
 
 ## LSP Rename Feature
 
@@ -631,9 +696,13 @@ once linked editing is turned on in `Settings | Editor | General | Smart Keys`. 
 ```java
 package my.language.server;
 
+import com.intellij.openapi.editor.colors.TextAttributesKey;
 import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.client.features.LSPSemanticTokensFeature;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+
+import java.util.List;
 
 public class MyLSPSemanticTokensFeature extends LSPSemanticTokensFeature {
 
@@ -683,7 +752,7 @@ If its files are not based on specific language ID, it should be registered usin
 
 ```xml
 <fileType.fileViewProviderFactory
-        fileType="myFileTypeName"
+        filetype="myFileTypeName"
         implementationClass="com.myProduct.semanticTokens.viewProvider.MyCustomSemanticTokensFileViewProviderFactory"/>
 ```
 
@@ -777,6 +846,14 @@ or, if appropriate, the the child/descendant element that represents the declara
 | boolean isEnabled(PsiFile file)   | Returns `true` if the LSP feature is enabled for the given file and `false` otherwise.                                                                                                                                             | `true`                      |
 | boolean isSupported(PsiFile file) | Returns `true` if the LSP feature is supported for the given file and `false` otherwise. <br/>This supported state is called after starting the language server, which matches the file and user with the LSP server capabilities. | Check the server capability |
 
+## LSP TypeHierarchy Feature
+
+| API                                                 | Description                                                                                                                                                                                                                        | Default Behaviour             |
+|-----------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------------------|
+| boolean isEnabled(PsiFile file)                     | Returns `true` if the LSP feature is enabled for the given file and `false` otherwise.                                                                                                                                             | `true`                        |
+| boolean isSupported(PsiFile file)                   | Returns `true` if the LSP feature is supported for the given file and `false` otherwise. <br/>This supported state is called after starting the language server, which matches the file and user with the LSP server capabilities. | Check the server capability   |
+| String getText(TypeHierarchyItem typeHierarchyItem) | Returns the text of the given LSP type hierarchy item in the `Type Hierarchy` view and `null` to ignore the item.                                                                                                                  | `typeHierarchyItem.getName()` |
+
 ## LSP Usage Feature
 
 The LSP Usage Feature determines whether the "Find Usages" functionality is available for a given file or element. This feature aggregates support from multiple LSP capabilities (declaration, type definition, definition, references, and implementation).
@@ -789,6 +866,12 @@ The LSP Usage Feature determines whether the "Find Usages" functionality is avai
 | boolean isUsageSupported(PsiElement element)           | Returns `true` if the given PSI element supports usage searching and `false` otherwise. <br/>For semantic token elements, this delegates to `isUsageSupported(LSPSemanticTokenPsiElement)`. Non-semantic token elements are considered supported by default.                                                                                                                  | `true` for non-semantic token elements; delegates to semantic token check otherwise                                                                                                         |
 | boolean isUsageSupported(LSPSemanticTokenPsiElement element) | Returns `true` if the given semantic token element supports usage searching and `false` otherwise. <br/>Excludes certain semantic token types that do not represent referenceable symbols (comments, keywords, modifiers, operators).                                                                                                                                         | `false` for comments, keywords, modifiers, and operators; `true` for all other semantic token types                                                                                          |
 | ReadWriteAccessDetector.Access getReadWriteAccess(LSPUsagePsiElement reference) | Returns whether a result of `textDocument/references` reads or writes the searched symbol, or `null` when that is not known. <br/>The LSP does not report it, so an integration that can tell - from its own parser, for example - overrides this method. A reference with a known access has the usage type "Value read" or "Value write", shows a read or write access icon, and can be hidden with the read and write access filters of Find Usages and Show Usages. Rider does not group language server usages by usage type, so there the icon and the filters are what changes. Called in a read action, and only for references. | `null`: references have the usage type "References" and no access |
+
+When Find Usages searches an element of a language plugin, it lists the usages of the plugin's own search and those of
+the language server. A reference of the language server is shown once, in the group of the plugin's usage, when the
+plugin has a `PsiReference` of its own at exactly the range of the language server's reference
+(`PsiFile#findReferenceAt` and `PsiReference#getAbsoluteRange()`). With another range, or no reference of the plugin
+there, the language server's reference is listed under "References".
 
 ## LSP Workspace Symbol Feature
 
@@ -874,13 +957,12 @@ Unlike most features above, `LSPBreadcrumbsFeature` does **not** correspond dire
 
 | API                                                             | Description                                                                                                  | Default Behaviour |
 |-----------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------|-------------------|
-| boolean isEnabled(PsiFile file)                                 | Returns `true` if the the document symbols-based breadcrumbs info provider is enabled and `false` otherwise. | `true`            |
+| boolean isEnabled(PsiFile file)                                 | Returns `true` if the the document symbols-based breadcrumbs info provider is enabled and `false` otherwise. | `true` if `isExistingBreadcrumbsProviderOverrideable(file)` is `true` or no other plugin provides breadcrumbs for the languages of the file |
 | boolean isExistingBreadcrumbsProviderOverrideable(PsiFile file) | Returns `true` if existing breadcrumbs provider are overrideable and `false` otherwise.                      | `false`           |
-=======
 
 ## LSP Editor Behavior Feature
 
-Unlike most features above, `LSPEditorFeature` does **not** correspond to an LSP feature. Instead it represents IDE editor behavior features, enhancements, and fixes that, alongside the language server-provided features, help provide an optimal editor experience for LSP4IJ-integrated file types. Note that these features are _disabled by default_ for `LanguageServerDefinition` and _enabled by default_ for `UserDefinedLanguageServerDefinition`. Those implementing custom language server integrations can opt into these features if desired by overriding the respective methods listed below.
+Unlike most features above, `EditorBehaviorFeature`, set with `LSPClientFeatures#setEditorBehaviorFeature`, does **not** correspond to an LSP feature. Instead it represents IDE editor behavior features, enhancements, and fixes that, alongside the language server-provided features, help provide an optimal editor experience for LSP4IJ-integrated file types. Note that these features are _disabled by default_ for `LanguageServerDefinition` and _enabled by default_ for `UserDefinedLanguageServerDefinition`. Those implementing custom language server integrations can opt into these features if desired by overriding the respective methods listed below.
 
 | API                                                            | Description                                                                                                                       | Default Behaviour                                                                                    |
 |----------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------|
@@ -889,7 +971,6 @@ Unlike most features above, `LSPEditorFeature` does **not** correspond to an LSP
 | boolean isEnableEnterBetweenBracesFix(PsiFile file)            | Returns `true` if the fix for [IJPL-159454](https://youtrack.jetbrains.com/issue/IJPL-159454) is enabled and `false` otherwise.   | `true` for user-defined language server definitions; otherwise `false`                               |
 | boolean isEnableTextMateNestedBracesImprovements(PsiFile file) | Returns `true` if editor improvements for nested braces/brackets/parentheses in TextMate files are enabled and `false` otherwise. | `true` for user-defined language server definitions; otherwise `false`                               |
 | boolean isEnableSemanticTokensFileViewProvider(PsiFile file)   | Returns `true` if the semantic tokens-based file view provider is enabled and `false` otherwise.                                  | `true`, but a file view provider must be registered for non-user-defined language server definitions |
-=======
 
 ## JSON-RPC communication feature
 
@@ -949,11 +1030,6 @@ public class DartMessageProducer implements MessageProducer {
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         }
-    }
-
-    @Override
-    public void close() {
-        // no-op
     }
 }
 ```
@@ -1079,6 +1155,7 @@ import com.intellij.openapi.project.Project;
 import com.redhat.devtools.lsp4ij.LanguageServerFactory;
 import com.redhat.devtools.lsp4ij.installation.ServerInstaller;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 public class MyLanguageServerFactory implements LanguageServerFactory {
 
@@ -1104,19 +1181,9 @@ public class MyLanguageServerFactory implements LanguageServerFactory {
 
     @Override
     public @NotNull LSPClientFeatures createClientFeatures() {
-        return new LSPClientFeatures()
-                .setServerInstaller(new MyLanguageServerInstaller()); // customize language server installer         
+        LSPClientFeatures clientFeatures = new LSPClientFeatures();
+        clientFeatures.setServerInstaller(new MyLanguageServerInstaller()); // customize language server installer
+        return clientFeatures;
     }
 }
 ```
-
-### Observing diagnostic cache updates
-
-Override `LSPDiagnosticFeature.diagnosticsUpdated(VirtualFile, List<Diagnostic>)`
-to maintain a Problems view or another diagnostic consumer. It receives the
-current merged cache after a report is processed, including closed-file updates
-and empty lists that clear diagnostics. Notifications may repeat unchanged data;
-the supplied diagnostics are read-only and must not be mutated. The callback is
-synchronous under the document cache lock: copy any needed presentation data,
-return promptly, and schedule UI work separately. Use client lifecycle callbacks
-to discard retained results when the server stops or is disposed.

@@ -156,14 +156,15 @@ public class BundledTemplateCommandsTest {
      * Not the templates whose command is the one of a server on the PATH, as cpp_ls, nor those whose installer puts it
      * in a folder named after its version, as clangd: the check of their installer gives them the command of the file
      * that it finds. The CSS and ESLint language servers start from the npm package that their installers share
-     * (#1960).
+     * (#1960). OmniSharp starts with {@code dotnet}, from {@code OmniSharp.dll}, which its download puts at the same
+     * place on every OS.
      */
     @Test
     void aTemplateStartsItsLanguageServerWhereItsInstallerPutsIt() throws IOException, URISyntaxException {
         var files = bundledFiles();
         List<String> problems = new ArrayList<>();
-        for (String server : List.of("clojure-lsp", "erlang-ls", "harper-ls", "jdtls", "lemminx", "luau-lsp", "perl-lsp",
-                "vscode-css-language-server", "vscode-eslint-language-server")) {
+        for (String server : List.of("clojure-lsp", "erlang-ls", "harper-ls", "jdtls", "lemminx", "luau-lsp",
+                "omnisharp-roslyn", "perl-lsp", "vscode-css-language-server", "vscode-eslint-language-server")) {
             var template = files.get("lsp/" + server + "/template.json");
             var installer = files.get("lsp/" + server + "/installer.json");
             assertNotNull(template, server);
@@ -417,11 +418,12 @@ public class BundledTemplateCommandsTest {
         }
         var run = installer.getAsJsonObject("run");
         var exec = run.getAsJsonObject("exec");
-        if (exec != null) {
+        // An exec of the run before its download checks a tool that the server needs, as the .NET SDK of OmniSharp
+        var download = (exec != null ? exec.getAsJsonObject("onSuccess") : run).getAsJsonObject("download");
+        if (download == null) {
             var command = exec.getAsJsonObject("onSuccess").getAsJsonObject("configureServer").get("command");
             return resolve(byOs(command, os), properties);
         }
-        var download = run.getAsJsonObject("download");
         var output = download.getAsJsonObject("output");
         properties.put("output.dir", resolve(output.get("dir").getAsString(), properties));
         var file = output.getAsJsonObject("file");

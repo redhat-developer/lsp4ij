@@ -10,8 +10,14 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.installation.definition;
 
+import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import com.intellij.notification.Notification;
+import com.intellij.notification.Notifications;
+import com.intellij.openapi.Disposable;
+import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.util.Disposer;
 import com.intellij.openapi.util.SystemInfo;
 import com.intellij.openapi.util.io.FileUtil;
 import com.intellij.testFramework.TestApplicationManager;
@@ -20,6 +26,8 @@ import com.redhat.devtools.lsp4ij.installation.definition.tasks.*;
 import com.redhat.devtools.lsp4ij.launching.templates.LanguageServerTemplate;
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
@@ -30,7 +38,12 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.regex.Pattern;
+import java.util.stream.Stream;
 import java.util.zip.GZIPOutputStream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
@@ -41,6 +54,9 @@ import static org.junit.jupiter.api.Assertions.*;
  * Tests for {@link InstallerTaskRegistry} parsing of the {@code fileExists} task type.
  */
 public class InstallerTaskRegistryFileExistsTest {
+
+    // How long a test waits for the notification of a task, in seconds
+    private static final int NOTIFICATION_TIMEOUT = 30;
 
     // The download task looks up an application service, which an earlier platform test of the same JVM may have
     // started, or not, as when this test runs on its own
@@ -470,6 +486,78 @@ public class InstallerTaskRegistryFileExistsTest {
     }
 
     @Test
+    public void testOmniSharpRoslynInstallerJsonChecksTheDotNetSdkBeforeTheServer() throws IOException {
+        // OmniSharp runs on the .NET SDK 10 or later, which the check and the run look for first
+        var descriptor = assertTemplateInstaller("lsp/omnisharp-roslyn", ExecTask.class, ExecTask.class);
+        assertInstanceOf(FileExistsTask.class, descriptor.getCheck().getOnSuccess(),
+                "The check of OmniSharp should look for OmniSharp once it has found the .NET SDK 10 or later");
+        assertInstanceOf(DownloadTask.class, descriptor.getRun().getOnSuccess(),
+                "The run of OmniSharp should download OmniSharp once it has found the .NET SDK 10 or later");
+        assertInstanceOf(ShowMessageTask.class, descriptor.getRun().getOnFail(),
+                "The run of OmniSharp should say that the .NET SDK 10 or later is missing");
+    }
+
+    @Test
+    public void testOmniSharpRoslynChecksForTheServerWhereItsDownloadPutsIt() throws Exception {
+        Path serverDist = Files.createTempDirectory("lsp4ij-server-dist");
+        Path downloads = Files.createTempDirectory("lsp4ij-release");
+        try {
+            Path archive = writeOmniSharpRelease(downloads);
+            ServerInstallerDescriptor descriptor = loadOmniSharpInstaller(serverDist, archive, null);
+            List<String> commands = new ArrayList<>(List.of(templateCommand("lsp/omnisharp-roslyn")));
+
+            // The download, which the run starts once it has found the .NET SDK 10 or later
+            assertTrue(execute(descriptor, descriptor.getRun().getOnSuccess(), commands),
+                    "The download should install OmniSharp");
+            Path server = serverDist.resolve("OmniSharp.dll");
+            assertTrue(Files.isRegularFile(server), "The download should extract OmniSharp.dll into " + serverDist);
+            assertEquals("dotnet \"" + serverDist.toString().replace('\\', '/') + "/OmniSharp.dll\" --languageserver",
+                    commands.get(commands.size() - 1), "The download should start OmniSharp.dll with dotnet");
+            // The check of the file, once the check has found the .NET SDK 10 or later
+            assertTrue(execute(descriptor, descriptor.getCheck().getOnSuccess(), commands),
+                    "The check should find what the download installed");
+        } finally {
+            FileUtil.delete(serverDist);
+            FileUtil.delete(downloads);
+        }
+    }
+
+    @Test
+    public void testOmniSharpRoslynAsksForTheDotNetSdkInsteadOfDownloadingWithoutDotnet() throws Exception {
+        // A dotnet which isn't on the PATH
+        assertOmniSharpIsNotInstalled(List.of("lsp4ij-missing-dotnet-" + UUID.randomUUID(), "--list-sdks"));
+    }
+
+    @Test
+    public void testOmniSharpRoslynAsksForTheDotNetSdk10InsteadOfDownloadingWithOlderOnes() throws Exception {
+        // OmniSharp 2.0.0 is built for net10.0
+        assertOmniSharpIsNotInstalled(dotnetListSdks("8.0.404 [/usr/share/dotnet/sdk]", "9.0.300 [/usr/share/dotnet/sdk]"));
+    }
+
+    @Test
+    public void testOmniSharpRoslynAsksForTheDotNetSdk10InsteadOfDownloadingWithAPreviewOfIt() throws Exception {
+        // The .NET runtime of a preview, as 10.0.0-rc.2, is older than the 10.0.0 that OmniSharp asks for
+        assertOmniSharpIsNotInstalled(dotnetListSdks("10.0.100-rc.2.25502.107 [/usr/share/dotnet/sdk]"));
+    }
+
+    @Test
+    public void testOmniSharpRoslynAsksForTheDotNetSdkWithADotNetRuntimeOnly() throws Exception {
+        // dotnet --list-sdks lists no SDK
+        assertOmniSharpIsNotInstalled(dotnetListSdks());
+    }
+
+    @Test
+    public void testOmniSharpRoslynInstallsOmniSharpWithTheDotNetSdk10() throws Exception {
+        assertOmniSharpIsInstalled(dotnetListSdks("10.0.100 [C:\\Program Files\\dotnet\\sdk]"));
+    }
+
+    @Test
+    public void testOmniSharpRoslynInstallsOmniSharpWithALaterDotNetSdkNextToAnOlderOne() throws Exception {
+        assertOmniSharpIsInstalled(dotnetListSdks("9.0.300 [/usr/local/share/dotnet/sdk]",
+                "11.0.100 [/usr/local/share/dotnet/sdk]"));
+    }
+
+    @Test
     public void testAllDapTemplatesParseWithoutError() throws IOException {
         assertAllTemplatesInDirectoryParse("dap");
     }
@@ -480,6 +568,143 @@ public class InstallerTaskRegistryFileExistsTest {
     }
 
     // --- Helper methods ---
+
+    /**
+     * Runs the check and the run of the bundled OmniSharp installer with the given command instead of
+     * {@code dotnet --list-sdks}, which finds no .NET SDK 10 or later: the run must say so, in a notification that the
+     * test waits for, download nothing, and leave the command of the server as it is, and the check must fail.
+     */
+    private void assertOmniSharpIsNotInstalled(List<String> dotnetCommand) throws Exception {
+        Path serverDist = Files.createTempDirectory("lsp4ij-server-dist");
+        Path downloads = Files.createTempDirectory("lsp4ij-release");
+        Disposable disposable = Disposer.newDisposable();
+        try {
+            Path archive = writeOmniSharpRelease(downloads);
+            ServerInstallerDescriptor descriptor = loadOmniSharpInstaller(serverDist, archive, dotnetCommand);
+            String templateCommand = templateCommand("lsp/omnisharp-roslyn");
+            List<String> commands = new ArrayList<>(List.of(templateCommand));
+            var notification = new CompletableFuture<Notification>();
+            ApplicationManager.getApplication().getMessageBus().connect(disposable)
+                    .subscribe(Notifications.TOPIC, new Notifications() {
+                        @Override
+                        public void notify(@NotNull Notification given) {
+                            if (".NET SDK 10 or later not found".equals(given.getTitle())) {
+                                notification.complete(given);
+                            }
+                        }
+                    });
+
+            assertFalse(execute(descriptor, descriptor.getCheck(), commands),
+                    "The check should fail without the .NET SDK 10 or later");
+            assertFalse(execute(descriptor, descriptor.getRun(), commands),
+                    "The run should fail without the .NET SDK 10 or later");
+            Notification message;
+            try {
+                message = notification.get(NOTIFICATION_TIMEOUT, TimeUnit.SECONDS);
+            } catch (TimeoutException e) {
+                throw new AssertionError("The run without the .NET SDK 10 or later showed no \".NET SDK 10 or later not "
+                        + "found\" message in " + NOTIFICATION_TIMEOUT + " seconds", e);
+            }
+            assertTrue(message.getContent().contains("https://dotnet.microsoft.com/download")
+                    && message.getContent().contains("10 or later"), message.getContent());
+            try (var installed = Files.list(serverDist)) {
+                assertEquals(List.of(), installed.toList(), "The run should download nothing without the .NET SDK 10 or later");
+            }
+            assertEquals(List.of(templateCommand), commands, "The run should leave the command as it is");
+        } finally {
+            Disposer.dispose(disposable);
+            FileUtil.delete(serverDist);
+            FileUtil.delete(downloads);
+        }
+    }
+
+    /**
+     * Runs the run of the bundled OmniSharp installer, then its check, with the given command instead of
+     * {@code dotnet --list-sdks}, which lists a .NET SDK 10 or later: the run must download OmniSharp, from a local
+     * archive, and give the server its command, and the check must find it.
+     */
+    private void assertOmniSharpIsInstalled(List<String> dotnetCommand) throws Exception {
+        Path serverDist = Files.createTempDirectory("lsp4ij-server-dist");
+        Path downloads = Files.createTempDirectory("lsp4ij-release");
+        try {
+            Path archive = writeOmniSharpRelease(downloads);
+            ServerInstallerDescriptor descriptor = loadOmniSharpInstaller(serverDist, archive, dotnetCommand);
+            List<String> commands = new ArrayList<>(List.of(templateCommand("lsp/omnisharp-roslyn")));
+
+            assertTrue(execute(descriptor, descriptor.getRun(), commands),
+                    "The run should install OmniSharp with " + dotnetCommand);
+            assertTrue(Files.isRegularFile(serverDist.resolve("OmniSharp.dll")),
+                    "The run should extract OmniSharp.dll into " + serverDist);
+            assertEquals("dotnet \"" + serverDist.toString().replace('\\', '/') + "/OmniSharp.dll\" --languageserver",
+                    commands.get(commands.size() - 1), "The run should start OmniSharp.dll with dotnet");
+            assertTrue(execute(descriptor, descriptor.getCheck(), commands),
+                    "The check should find OmniSharp with " + dotnetCommand);
+        } finally {
+            FileUtil.delete(serverDist);
+            FileUtil.delete(downloads);
+        }
+    }
+
+    /**
+     * Returns a command which prints the given lines of .NET SDKs, each on a line, as {@code dotnet --list-sdks} does:
+     * {@link PrintOutput}, which the JVM of the tests runs.
+     */
+    private static List<String> dotnetListSdks(String... sdks) throws Exception {
+        String java = ProcessHandle.current().info().command().orElseThrow();
+        // The directory of the compiled test classes, above the folders of the package of PrintOutput
+        Path classes = Path.of(PrintOutput.class.getResource("PrintOutput.class").toURI());
+        for (int i = PrintOutput.class.getName().split("\\.").length; i > 0; i--) {
+            classes = classes.getParent();
+        }
+        return Stream.concat(Stream.of(java, "-cp", classes.toString(), PrintOutput.class.getName()), Stream.of(sdks))
+                .toList();
+    }
+
+    /**
+     * Writes an archive laid out as the {@code omnisharp-<os>-<arch>.zip} assets of OmniSharp 2.0.0, with OmniSharp at
+     * its root, next to folders, and returns it.
+     */
+    private static Path writeOmniSharpRelease(Path downloads) throws IOException {
+        Path archive = downloads.resolve("omnisharp-osx-arm64.zip");
+        try (var zip = new ZipOutputStream(Files.newOutputStream(archive))) {
+            for (String entry : List.of("OmniSharp", "OmniSharp.exe", "OmniSharp.dll", "OmniSharp.runtimeconfig.json",
+                    "BuildHost-netcore/Microsoft.CodeAnalysis.Workspaces.MSBuild.BuildHost.dll", "cs/OmniSharp.resources.dll")) {
+                zip.putNextEntry(new ZipEntry(entry));
+                zip.write(entry.getBytes(StandardCharsets.UTF_8));
+                zip.closeEntry();
+            }
+        }
+        return archive;
+    }
+
+    /**
+     * Loads the bundled OmniSharp installer, with the given folder as the folder of the server, and the given archive
+     * as its download, and, if it isn't null, the given command instead of {@code dotnet --list-sdks} in its check and
+     * its run, with the {@code outputMatches} of the installer. The exec of such a command ignores its standard error,
+     * where the JVM which runs {@link PrintOutput} can say that it picked up {@code JAVA_TOOL_OPTIONS}.
+     */
+    private ServerInstallerDescriptor loadOmniSharpInstaller(Path serverDist, Path archive,
+                                                             @Nullable List<String> dotnetCommand) throws IOException {
+        JsonObject json = JsonParser.parseString(
+                        Files.readString(Paths.get("src/main/resources/templates/lsp/omnisharp-roslyn/installer.json")))
+                .getAsJsonObject();
+        json.getAsJsonObject("properties").addProperty("serverDist", serverDist.toString().replace('\\', '/'));
+        JsonObject run = json.getAsJsonObject("run").getAsJsonObject("exec");
+        JsonObject download = run.getAsJsonObject("onSuccess").getAsJsonObject("download");
+        download.remove("github");
+        download.addProperty("url", archive.toUri().toString());
+        if (dotnetCommand != null) {
+            for (JsonObject exec : List.of(json.getAsJsonObject("check").getAsJsonObject("exec"), run)) {
+                assertEquals("dotnet --list-sdks", exec.get("command").getAsString());
+                assertTrue(exec.has("outputMatches"), "The .NET SDK check should match the output of " + exec);
+                JsonArray command = new JsonArray();
+                dotnetCommand.forEach(command::add);
+                exec.add("command", command);
+                exec.addProperty("ignoreStderr", true);
+            }
+        }
+        return createRegistry().loadInstaller(json.toString());
+    }
 
     /**
      * Runs the download of the given bundled installer, twice, as a reinstall does, from an archive laid out as the
