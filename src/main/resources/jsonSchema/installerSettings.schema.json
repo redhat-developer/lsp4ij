@@ -86,6 +86,10 @@
               },
               "additionalProperties": false
             },
+            "outputMatches": {
+              "type": "string",
+              "description": "A Java regular expression that the standard output of the command must match somewhere for the task to succeed, as a version. Use (?m) for ^ and $ at each line."
+            },
             "onFail": {
               "anyOf": [
                 { "$ref": "#/definitions/showMessage" },
