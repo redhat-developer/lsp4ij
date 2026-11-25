@@ -207,7 +207,8 @@ When you declare mapping, you can fill the `Language ID` column which is used to
 to identify the document on the server side.
 
 For instance the [vscode-css-languageservice](https://github.com/microsoft/vscode-css-languageservice) (used by the vscode CSS language server) expects the `languageId` to be `css` or `less`.
-To do that, you can declare it with the `languageId` attribute:
+To do that, set `css` in the `Language ID` column of the mapping of the CSS files, and `less` in that of the LESS files,
+as the `CSS Language Server` template does with the `languageId` of its mappings.
 
 ### Configuration tab
 
@@ -442,16 +443,16 @@ and potential configuration.
 ![New Language Server with Default Template](./images/user-defined-ls/NewLanguageServerWithDefaultTemplate.png)
 
 * [Ada Language Server](./user-defined-ls/ada_language_server.md)
-* [Apache Camel Language Server](./user-defined-ls/camel-lsp-server.md)
+* [Camel Language Server](./user-defined-ls/camel-lsp-server.md)
 * [Astro Language Server](./user-defined-ls/astro-ls.md)
 * [Candor Language Server](../src/main/resources/templates/lsp/candor-lsp)
 * [CSS Language Server](./user-defined-ls/vscode-css-language-server.md)
 * [Clangd](./user-defined-ls/clangd.md) 
 * [Clojure LSP](./user-defined-ls/clojure-lsp.md)
 * [Cpp Language Server](./user-defined-ls/cpp_ls.md)
-* [Dart LSP](./user-defined-ls/dart-lsp.md) 
+* [Dart LSP server](./user-defined-ls/dart-lsp.md) 
 * [Docker Language Server](./user-defined-ls/docker-language-server.md)
-* [EO LSP Server](./user-defined-ls/eo-lsp-server.md) 
+* [LSP Server for EOLANG](./user-defined-ls/eo-lsp-server.md) 
 * [Erlang Language Platform (ELP)](./user-defined-ls/erlang-elp.md)
 * [Erlang Language Server (erlang_ls, discontinued October 2024)](./user-defined-ls/erlang-ls.md)
 * [ESLint Language Server](./user-defined-ls/vscode-eslint-language-server.md) 
@@ -466,12 +467,12 @@ and potential configuration.
 * [Scala Language Server (Metals)](./user-defined-ls/metals.md)
 * [Smart Data Lake Language Server](../src/main/resources/templates/lsp/sdl-lsp)
 * [SourceKit-LSP](./user-defined-ls/sourcekit-lsp.md)
-* [Stylelint-LSP](./user-defined-ls/stylelint-lsp.md)
+* [Stylelint Language Server](./user-defined-ls/stylelint-lsp.md)
 * [Svelte Language Server](./user-defined-ls/svelte-language-server.md) 
 * [SysML v2 Language Server](./user-defined-ls/sysml-lsp.md)
 * [Terraform Language Server](./user-defined-ls/terraform-ls.md)
 * [TypeScript Language Server](./user-defined-ls/typescript-language-server.md)
-* [Vue Language Server](./user-defined-ls/vue-js-language-server.md)
+* [Vue.js Language Server](./user-defined-ls/vue-js-language-server.md)
 * [WGSL Analyzer](./user-defined-ls/wgsl-analyzer.md)
 
 If the template directory contains a `README.md` file, you can open the instructions by pressing the help icon: the

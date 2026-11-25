@@ -358,7 +358,8 @@ server's [stopped](https://microsoft.github.io/debug-adapter-protocol//specifica
 session's resumes and steps say. When the DAP server stops a thread without `allThreadsStopped`, the other threads
 stay as they were, running until it says otherwise, as in VS Code. When a thread other than the one where the session
 is suspended continues alone (`allThreadsContinued: false`), the session stays suspended, and the `Frames` view shows
-`Frames not available: the thread is running` for that thread instead of the frames of its stop. When that thread was
+`Frames not available: the thread is running` for that thread instead of the frames of its stop, or
+`Frames not available: the thread has exited` once it has exited. When that thread was
 selected, the selection moves to the top frame of the thread where the session is suspended, which the `Variables`
 view, the execution point, `Step` and `Resume` then follow.
 
@@ -442,6 +443,8 @@ A variable which the DAP server marks as lazy
 ([presentationHint.lazy](https://microsoft.github.io/debug-adapter-protocol//specification.html#Types_VariablePresentationHint)),
 such as a property computed by a getter, is shown with a `Show value` link instead of its value, since getting the value
 may run code. Clicking the link asks the DAP server for the value, which then replaces the link and can be expanded.
+`Jump to Source` then opens the [declaration](#jump-to-value-source) of the value, or, when the DAP server gives the
+value none, the declaration of the lazy variable.
 
 ## Jump to value source
 
@@ -509,6 +512,25 @@ gives, and the variable inside it, which gives the value, can be set.
   or no longer supports setting it.
 
 The Watches view doesn't offer `Set Value...`: there, editing a watch changes its expression.
+
+## Console output
+
+The `Console` tab shows the output that the DAP server sends with the
+[output](https://microsoft.github.io/debug-adapter-protocol//specification.html#Events_Output) event, such as the
+program's standard output and error:
+
+* **Colours**: LSP4IJ tells the DAP server that it shows ANSI styles (`supportsANSIStyling`), so the console shows the
+  colours and bold of the output, as a run console does, instead of their escape sequences. Text without a style keeps
+  the colour of its category, such as red for the standard error.
+* **Groups**: the output of a group, as `console.group()` gives in JavaScript, is indented by 2 spaces per level below
+  the header of the group. A group can't be folded yet, so a group which starts collapsed (`startCollapsed`) is shown
+  expanded.
+* **Telemetry**: the output of the category `telemetry`, which DAP sends to telemetry instead of the client, isn't
+  shown.
+* **Source links**: when the DAP server gives the source of an output, a link after it, such as `app.js:12`, opens the
+  source at that line. When the DAP server gives only a location reference (`locationReference`), the link is
+  `Jump to Value Source`, which asks the DAP server where the source is when it is clicked, as long as the program
+  hasn't stopped or resumed since the output.
 
 ## Debugged process
 
@@ -636,7 +658,8 @@ You can `create/remove/update` DAP servers with the `Build, Execution, Deploymen
 
 LSP4IJ provides DAP templates that allow to initialize a given DAP server very quickly:
 
-- [CodeLLDB](./user-defined-dap/codelldb.md) which allows you to debug `Rust`,`Swift`, etc. files.
+- [CodeLLDB](./user-defined-dap/codelldb.md) which allows you to debug `Rust` files. Add mappings for the other
+  languages that LLDB debugs.
 - [Docker: Dockerfile Build Debugging](./user-defined-dap/buildx-dockerfile.md) which allows you to debug the build of a
   `Dockerfile`.
 - [Erlang edb DAP server](./user-defined-dap/erlang-edb.md) which allows you to debug `Erlang` files.

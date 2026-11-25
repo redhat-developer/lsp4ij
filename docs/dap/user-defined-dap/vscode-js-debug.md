@@ -62,7 +62,7 @@ node "/home/path/to/dap/js-debug/src/dapDebugServer.js" ${port} 127.0.0.1
 
 The `${port}` argument will be replaced with a free port when the run configuration starts.
 
- * the `Connect to the server by waiting` option is set to `Log pattern before processing` with:
+ * the `Connect to the server by waiting` option is set to `Log pattern before proceeding` with:
 
  ```
  Debug server listening at

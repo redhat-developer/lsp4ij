@@ -71,7 +71,7 @@ As you have selected `Ruby Debug` server, it will automatically populate the fil
 
 As you have selected `Ruby Debug` server, it will automatically populate the `Attach` configuration like this:
 
-1. `Attach` as `Debug mode` should be selected.
+1. Select `Attach` as `Debug mode`: the template also has a launch configuration, so the dialog opens on `Launch`.
 2. The DAP parameters of the launch should look like this:
 
 ```json

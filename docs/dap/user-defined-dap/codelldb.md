@@ -151,7 +151,10 @@ If you need language support for Rust (completion, validation, etc.), you can [c
 
 # C++ Application
 
-TODO
+The `CodeLLDB` template maps only Rust files. To debug a C or C++ program built with debug information, such as with
+`clang++ -g`, add its files in the [Mappings tab](#configure-file-mappings), for instance with the file name patterns
+`*.c`, `*.cpp` and `*.h`, so that you can set breakpoints in them. Then select the executable in the `File` field, as
+for a [Rust application](#configure-the-executable-to-rundebug).
 
 ## Language Support
 
