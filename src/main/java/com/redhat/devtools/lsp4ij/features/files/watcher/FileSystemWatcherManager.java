@@ -214,15 +214,37 @@ public class FileSystemWatcherManager implements Disposable {
      * @param watchers the file system watcher list.
      */
     public void registerFileSystemWatchers(String id, List<FileSystemWatcher> watchers) {
+        addFileSystemWatchers(id, watchers);
+    }
+
+    /**
+     * Register the file system watcher list with the given id, in place of the list registered with it before.
+     *
+     * @param id       the id.
+     * @param watchers the file system watcher list.
+     * @return what unregisters the list, unless a later registration of the id has replaced it, and null if none was
+     * registered.
+     */
+    public @Nullable Runnable addFileSystemWatchers(String id, List<FileSystemWatcher> watchers) {
         if (watchers == null) {
-            return;
+            return null;
         }
         synchronized (registry) {
             if (disposed) {
-                return;
+                return null;
             }
-            registry.put(id, List.copyOf(watchers));
+            List<FileSystemWatcher> registered = List.copyOf(watchers);
+            registry.put(id, registered);
             reset();
+            return () -> {
+                synchronized (registry) {
+                    // By identity: a later registration of the id can have registered equal watchers, which stay
+                    if (registry.get(id) == registered) {
+                        registry.remove(id);
+                        reset();
+                    }
+                }
+            };
         }
     }
 

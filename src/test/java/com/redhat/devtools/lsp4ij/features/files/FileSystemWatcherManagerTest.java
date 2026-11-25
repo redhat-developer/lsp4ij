@@ -272,6 +272,30 @@ public class FileSystemWatcherManagerTest {
     }
 
     @Test
+    public void unregister_replaced_watchers() {
+        String watchers = // language=json
+                """
+                        {"watchers": [
+                                  {
+                                    "globPattern": "**/*.java"
+                                  }
+                                ]
+                              }
+                        """;
+        Runnable first = addWatchers(watchers);
+        // Equal watchers with the same id, as when the language server registers the id again while LSP4IJ installs a
+        // registration of it which the server withdrew
+        Runnable second = addWatchers(watchers);
+
+        // The unregistration of the replaced watchers leaves those that replaced them
+        first.run();
+        assertMatchFile(getBaseUri() + "foo.java"); // file:///C:/foo.java// Match "**/*.java"
+
+        second.run();
+        assertNoMatchFile(getBaseUri() + "foo.java"); // file:///C:/foo.java
+    }
+
+    @Test
     public void watcherKind() {
         // Register Java watcher
         registerWatchers("watcher-kind", // language=json
@@ -865,6 +889,11 @@ public class FileSystemWatcherManagerTest {
     private void registerWatchers(String id, String watchers) {
         var options = JSONUtils.getLsp4jGson().fromJson(watchers, DidChangeWatchedFilesRegistrationOptions.class);
         manager.registerFileSystemWatchers(id, options.getWatchers());
+    }
+
+    private Runnable addWatchers(String watchers) {
+        var options = JSONUtils.getLsp4jGson().fromJson(watchers, DidChangeWatchedFilesRegistrationOptions.class);
+        return manager.addFileSystemWatchers(DEFAULT_WATCHER, options.getWatchers());
     }
 
     private static String getBaseUri() {
