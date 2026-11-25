@@ -507,7 +507,7 @@ public class DAPDebugProcess extends XDebugProcess implements Disposable {
             if (threadId != null) {
                 DAPClient client = dapContext.getClient();
                 var granularity = getSteppingGranularity(client);
-                client.next(threadId, granularity);
+                client.next(threadId, granularity, dapContext);
             }
         }
     }
@@ -519,7 +519,7 @@ public class DAPDebugProcess extends XDebugProcess implements Disposable {
             if (threadId != null) {
                 DAPClient client = dapContext.getClient();
                 var granularity = getSteppingGranularity(client);
-                client.stepOut(threadId, granularity);
+                client.stepOut(threadId, granularity, dapContext);
             }
         }
     }
@@ -531,7 +531,7 @@ public class DAPDebugProcess extends XDebugProcess implements Disposable {
             if (threadId != null) {
                 DAPClient client = dapContext.getClient();
                 var granularity = getSteppingGranularity(client);
-                client.stepIn(threadId, granularity);
+                client.stepIn(threadId, null, granularity, dapContext);
             }
         }
     }
@@ -621,9 +621,10 @@ public class DAPDebugProcess extends XDebugProcess implements Disposable {
         if (context instanceof DAPSuspendContext dapContext) {
             Integer threadId = dapContext.getThreadId();
             if (threadId != null) {
-                // Continue... the temporary breakpoint of "Run to Cursor" stays until the program next stops
+                // Continue... the temporary breakpoint of "Run to Cursor" stays until the program next stops, or the DAP
+                // server refuses to continue
                 DAPClient client = dapContext.getClient();
-                client.continue_(threadId);
+                client.continue_(threadId, dapContext);
             }
         }
     }

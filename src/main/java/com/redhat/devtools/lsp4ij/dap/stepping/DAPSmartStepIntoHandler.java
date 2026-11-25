@@ -190,7 +190,7 @@ public class DAPSmartStepIntoHandler extends XSmartStepIntoHandler<DAPStepIntoVa
 
         // Execute stepIn with targetId
         Integer targetId = variant.getTargetId();
-        client.stepIn(threadId, targetId, granularity);
+        client.stepIn(threadId, targetId, granularity, dapContext);
     }
 
     @Override

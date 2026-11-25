@@ -308,7 +308,9 @@ session's toolbar have `Step Only the Current Thread`, as the Java debugger's `R
 option. When it is selected, `Step Over`, `Step Into`, `Smart Step Into` and `Step Out` send
 [singleThread](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_Next), so the DAP server
 resumes only the thread that steps while the other threads stay stopped, as the `Threads` tab shows. `Resume Program`
-still resumes every thread. The choice holds for the debug session.
+still resumes every thread. The choice holds for the debug session. When the DAP server refuses a step or
+`Resume Program`, as one which can't resume a thread alone may, the console shows why, and the program stays stopped
+where it was.
 
 ### Step back and reverse continue
 
