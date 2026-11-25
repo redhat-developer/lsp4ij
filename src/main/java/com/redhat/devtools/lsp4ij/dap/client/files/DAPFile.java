@@ -17,10 +17,15 @@ import com.intellij.openapi.vfs.VirtualFileManager;
 import com.intellij.openapi.vfs.VirtualFileSystem;
 import com.intellij.testFramework.LightVirtualFile;
 import com.intellij.util.LocalTimeCounter;
+import com.redhat.devtools.lsp4ij.dap.client.DAPClient;
 import com.redhat.devtools.lsp4ij.dap.disassembly.DisassemblyFileType;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
+import java.lang.ref.Reference;
+import java.lang.ref.WeakReference;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * Represents a virtual, writable file in IntelliJ for content coming from a DAP client.
@@ -30,13 +35,15 @@ import java.util.Objects;
  * <p>
  * The {@link #path} field has the form:
  * <pre>
- *   $projectLocationHash/$configName/$sourceName
+ *   $projectLocationHash/$configName/$sourceReference/$sourceName
+ *   $projectLocationHash/$configName/disassembly
  * </pre>
  * where:
  * <ul>
  *   <li>$projectLocationHash = a hash or identifier for the project location</li>
  *   <li>$configName = the run/debug configuration name</li>
- *   <li>$sourceName = the name of the file or source reference</li>
+ *   <li>$sourceReference = the source reference of a source which the debug adapter gives the text of</li>
+ *   <li>$sourceName = the name of the source, which is the name of the file</li>
  * </ul>
  * The {@link #getUrl()} method returns:
  * <pre>
@@ -46,7 +53,10 @@ import java.util.Objects;
  */
 public abstract class DAPFile extends LightVirtualFile {
 
-    /** Virtual file path in the form $projectLocationHash/$configName/$sourceName */
+    /**
+     * Virtual file path in the form $projectLocationHash/$configName/$sourceReference/$sourceName, or
+     * $projectLocationHash/$configName/disassembly
+     */
     private final @NotNull String path;
 
     /** URL used by IntelliJ VirtualFileSystem, automatically generated from path */
@@ -57,6 +67,14 @@ public abstract class DAPFile extends LightVirtualFile {
      */
     private final @NotNull Project project;
     private long sessionId;
+    // The source reference whose text the document has, as the last load of a source reference left it, or null if it
+    // has none: before the first load, and after one which got no text. A source reference is valid only in its
+    // session, and the file outlives it: a later session, or another session of the tree ('startDebugging'), may give
+    // another text for the same source reference. The client is weakly referenced, so that the file doesn't keep it.
+    private volatile @Nullable LoadedSource loadedSource;
+    // The number of texts which loads of source references wrote to the document, each replacing the one it had: the
+    // document keeps the text which a load left in it as long as the number stays the same
+    private final AtomicLong writtenTexts = new AtomicLong();
 
     public DAPFile(@NlsSafe String name,
                    @NotNull String path,
@@ -74,6 +92,59 @@ public abstract class DAPFile extends LightVirtualFile {
         }
         this.sessionId = sessionId;
         return true;
+    }
+
+    /**
+     * Says that the document of this file has the text which the debug adapter of the given client gave for the given
+     * source reference.
+     *
+     * @param client          the client of the debug adapter which gave the text.
+     * @param sourceReference the source reference whose text the document has.
+     */
+    public void setLoadedSource(@NotNull DAPClient client, int sourceReference) {
+        loadedSource = new LoadedSource(new WeakReference<>(client), sourceReference);
+    }
+
+    /**
+     * Says that the document of this file has the text of no source reference, as when the debug adapter gave none: a
+     * stack frame of the source asks for it again.
+     */
+    void clearLoadedSource() {
+        loadedSource = null;
+    }
+
+    /**
+     * Returns whether the document of this file has the text which the debug adapter of the given client gave for the
+     * given source reference. The file outlives the session of the source reference: the document may have the text
+     * which another client gave for it.
+     *
+     * @param client          the client of the debug adapter which gives the text.
+     * @param sourceReference the source reference.
+     * @return true if the document has the text of the source reference, and false otherwise.
+     */
+    public boolean isLoadedSource(@NotNull DAPClient client, int sourceReference) {
+        var loaded = loadedSource;
+        return loaded != null && loaded.client().get() == client && loaded.sourceReference() == sourceReference;
+    }
+
+    private record LoadedSource(@NotNull Reference<DAPClient> client, int sourceReference) {
+    }
+
+    /**
+     * Says that a load of a source reference wrote a text to the document of this file, which replaced the one it had.
+     */
+    void textWritten() {
+        writtenTexts.incrementAndGet();
+    }
+
+    /**
+     * Returns the number of texts which loads of source references wrote to the document of this file: as long as it
+     * stays the same, the document keeps its text.
+     *
+     * @return the number of texts which loads wrote to the document.
+     */
+    long getWrittenTexts() {
+        return writtenTexts.get();
     }
 
     @Override

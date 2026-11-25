@@ -131,8 +131,11 @@ public class DAPStackFrame extends XStackFrame {
         if (sourceReference > 0) {
             // If the value > 0 the contents of the source must be retrieved through
             // the SourceRequest (even if a path is specified).
-            var file = DAPFileRegistry.getInstance().getOrCreateDAPFile(client.getConfigName(), getValidSourceName(source), client.getProject());
-            if (file.shouldReload(getClient().getSessionId())) {
+            // Each source reference has its own file, also when sources share a name. The file outlives the session,
+            // and a later one may give another text for the same source reference: the text is loaded once per client
+            var file = DAPFileRegistry.getInstance().getOrCreateDAPFile(client.getConfigName(), sourceReference,
+                    getValidSourceName(source), client.getProject());
+            if (!file.isLoadedSource(client, sourceReference)) {
                 return new DAPSourceReferencePosition(file, sourceReference, line, client);
             }
             return XDebuggerUtil.getInstance().createPosition(file, line);

@@ -1121,7 +1121,7 @@ public class DAPDebugProcess extends XDebugProcess implements Disposable {
     private void openLoadedSource(@NotNull DAPClient client, @NotNull Source source) {
         int sourceReference = source.getSourceReference() != null ? source.getSourceReference() : 0;
         if (sourceReference > 0) {
-            var file = DAPFileRegistry.getInstance().getOrCreateDAPFile(getConfigName(), LoadedSourcesPanel.name(source), getProject());
+            var file = DAPFileRegistry.getInstance().getOrCreateDAPFile(getConfigName(), sourceReference, LoadedSourcesPanel.name(source), getProject());
             new DAPSourceReferencePosition(file, sourceReference, 0, client).createNavigatable(getProject()).navigate(true);
             return;
         }

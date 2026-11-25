@@ -16,6 +16,7 @@ import com.intellij.openapi.util.text.StringUtil;
 import com.redhat.devtools.lsp4ij.dap.client.DAPClient;
 import org.eclipse.lsp4j.debug.SourceArguments;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.concurrent.CompletableFuture;
 
@@ -36,8 +37,11 @@ public class DAPSourceReferencePosition extends DeferredSourcePosition<DAPSource
      */
     public record SourceParams(@NotNull int sourceReference, int line) {}
 
-    // Whether the last load got the text of the source from the debug adapter
-    private volatile boolean textLoaded;
+    // The number of texts written to the document of the file when the last load left the text which the debug adapter
+    // gave for the source in it, or null if it left none. No initializer: the constructor of DeferredSourcePosition
+    // starts the load, and when the debug adapter's answer is already there once the load waits for it, the load ends
+    // in that constructor, before the initializers of this class run, which would reset what it set.
+    private volatile @Nullable Long loadedText;
 
     /**
      * Creates a deferred source position based on a DAP sourceReference.
@@ -73,14 +77,16 @@ public class DAPSourceReferencePosition extends DeferredSourcePosition<DAPSource
 
     /**
      * Returns whether the document of the file has the text which the debug adapter gave for the source when the
-     * position was last resolved: the load wrote it, or an earlier load of the same source did. Without it, as when the
-     * debug adapter gave no text, or when another source of the same name gave the document its text, the position is
-     * resolved all the same, at the requested line, in a document whose text isn't that of the source.
+     * position was last resolved: the load wrote it, or an earlier load of the same source did, and no other load,
+     * which got another text, or none, for the same source reference, in this session or another, replaced it since.
+     * Without it, as when the debug adapter gave no text, the position is resolved all the same, at the requested line,
+     * in a document whose text isn't that of the source.
      *
      * @return true if the document of the file has the text of the source, and false otherwise.
      */
     public boolean isTextLoaded() {
-        return textLoaded;
+        Long text = loadedText;
+        return text != null && ((DAPFile) getFile()).getWrittenTexts() == text;
     }
 
     /**
@@ -89,6 +95,9 @@ public class DAPSourceReferencePosition extends DeferredSourcePosition<DAPSource
      * If the server returns content, the editor document is updated in a write command action:
      * <ul>
      *     <li>Line endings are normalized to LF.</li>
+     *     <li>The text replaces the one of the document if it differs: the file of a source reference outlives its
+     *     session, and its document may have the text which an earlier session gave for the same source
+     *     reference.</li>
      *     <li>The document is set to read-only.</li>
      *     <li>The requested line number is returned.</li>
      * </ul>
@@ -110,7 +119,7 @@ public class DAPSourceReferencePosition extends DeferredSourcePosition<DAPSource
         return client.getDebugProtocolServer()
                 .source(args)
                 .thenCompose(sourceResponse -> {
-                    textLoaded = false;
+                    loadedText = null;
                     if (sourceResponse != null) {
                         String content = sourceResponse.getContent() != null ? sourceResponse.getContent() : "";
 
@@ -122,15 +131,31 @@ public class DAPSourceReferencePosition extends DeferredSourcePosition<DAPSource
                             var doc = FileDocumentManager.getInstance().getDocument(getFile());
                             // Normalize line endings to LF
                             String normalized = content.replace("\r\n", "\n");
-                            if (doc != null && doc.isWritable()) {
-                                doc.setText(normalized);
-                                doc.setReadOnly(true); // Make the document read-only
+                            if (doc != null) {
+                                try {
+                                    // The text which another session gave for the same source reference, or none yet,
+                                    // is replaced: the read-only document is made writable for the write
+                                    if (!StringUtil.equals(doc.getImmutableCharSequence(), normalized)) {
+                                        doc.setReadOnly(false);
+                                        doc.setText(normalized);
+                                        file.textWritten();
+                                    }
+                                } finally {
+                                    doc.setReadOnly(true); // Make the document read-only
+                                }
                             }
                             // The document has the text of this answer: it was just written, or an earlier load of the
-                            // same source wrote it. A source of the same name with another text, whose file is the
-                            // same, finds the read-only text of the earlier one
-                            textLoaded = doc != null && !normalized.isEmpty()
+                            // same source wrote it. An empty text is none: the next stack frame of the source asks the
+                            // debug adapter for it again, also when the empty text replaced the one of the source.
+                            boolean hasText = doc != null && !normalized.isEmpty()
                                     && StringUtil.equals(doc.getImmutableCharSequence(), normalized);
+                            if (hasText) {
+                                file.setLoadedSource(client, params.sourceReference());
+                            } else if (doc != null) {
+                                file.clearLoadedSource();
+                            }
+                            // The document keeps the text as long as no other load writes another one
+                            loadedText = hasText ? Long.valueOf(file.getWrittenTexts()) : null;
                             // Complete the future with the requested line number
                             updatedDoc.complete(params.line());
                         });
