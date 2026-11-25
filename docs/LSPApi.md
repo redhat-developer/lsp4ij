@@ -852,6 +852,12 @@ The LSP Usage Feature determines whether the "Find Usages" functionality is avai
 | boolean isUsageSupported(LSPSemanticTokenPsiElement element) | Returns `true` if the given semantic token element supports usage searching and `false` otherwise. <br/>Excludes certain semantic token types that do not represent referenceable symbols (comments, keywords, modifiers, operators).                                                                                                                                         | `false` for comments, keywords, modifiers, and operators; `true` for all other semantic token types                                                                                          |
 | ReadWriteAccessDetector.Access getReadWriteAccess(LSPUsagePsiElement reference) | Returns whether a result of `textDocument/references` reads or writes the searched symbol, or `null` when that is not known. <br/>The LSP does not report it, so an integration that can tell - from its own parser, for example - overrides this method. A reference with a known access has the usage type "Value read" or "Value write", shows a read or write access icon, and can be hidden with the read and write access filters of Find Usages and Show Usages. Rider does not group language server usages by usage type, so there the icon and the filters are what changes. Called in a read action, and only for references. | `null`: references have the usage type "References" and no access |
 
+When Find Usages searches an element of a language plugin, it lists the usages of the plugin's own search and those of
+the language server. A reference of the language server is shown once, in the group of the plugin's usage, when the
+plugin has a `PsiReference` of its own at exactly the range of the language server's reference
+(`PsiFile#findReferenceAt` and `PsiReference#getAbsoluteRange()`). With another range, or no reference of the plugin
+there, the language server's reference is listed under "References".
+
 ## LSP Workspace Symbol Feature
 
 | API                         | Description                                                                                                                                                                              | Default Behaviour                      |

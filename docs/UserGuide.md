@@ -1,5 +1,21 @@
 # User guide
 
+## Getting started
+
+LSP4IJ gives the editors of your files the features of a language server, such as completion, diagnostics and hover.
+A language server comes from a plugin which [integrates it](./DeveloperGuide.md), or from a definition that you add:
+
+1. Open the [New Language Server dialog](./UserDefinedLanguageServer.md#new-language-server-dialog), with the `+` of
+   `Settings | Languages & Frameworks | Language Servers (LSP4IJ)` or the menu of the [LSP console](#lsp-console).
+2. Click `Choose template...` to start from one of the [templates](./UserDefinedLanguageServer.md#default-template),
+   most of which install their language server, or set the command of the language server in the
+   [Server tab](./UserDefinedLanguageServer.md#server-tab) and the files that it serves in the
+   [Mappings tab](./UserDefinedLanguageServer.md#mappings-tab).
+3. Click `OK`, and open a file that the language server serves: LSP4IJ starts it.
+
+When no language server is configured, the LSP console says `No language servers`, with a `Getting Started` link to
+this page, and `Add a language server`, which opens the `Language Servers (LSP4IJ)` settings.
+
 ## LSP console
 
 Although not directly useful to users in most cases, the Language Server console view is extremely valuable 
@@ -14,6 +30,10 @@ In verbose mode, the messages can be expanded for more details:
 
 ![LSP console Traces](./images/LSPConsole.png)
 
+A message of the language server that LSP4J can't parse, such as a notification whose params don't have the type that
+LSP gives them, is shown in the traces too, with the error, such as
+`Message could not be parsed. java.lang.NumberFormatException: Expected an int but was 4294967295 ...`.
+
 If the language server logs messages via [window/logMessage](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#window_logMessage), you can see them in the `Logs` tab:
 
 ![LSP console Logs](./images/LSPConsole_Logs.png) 
@@ -22,9 +42,17 @@ When a language server is started, several actions are available, like stopping 
 
 ![LSP console actions](./images/LSPConsoleActions.png)
 
-When a language server is running, hovering over it shows the name and version that the server reports in its response to [initialize](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#initialize), when it reports them:
+Each language server of the tree shows its state after its name, in grey, such as `[started]`, `[1/2 started]`,
+`[starting]`, `[crashed]`, `[stopped]` or `[disabled]`. Hovering over it shows its name and id, the name and version
+that the server reports in its response to [initialize](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#initialize)
+when it reports them, whether it is enabled, the number of its instances, and the error of an instance which failed:
 
 ![LSP console server name and version](./images/LSPConsoleServerInfo.png)
+
+Below it, each instance of the language server shows its state, and how LSP4IJ talks to it, in grey: `[stdio]`, or its
+socket, such as `[accept on port 5008]`. Hovering over an instance shows its root, when the language server has
+[several instances](./UserDefinedLanguageServer.md#several-language-server-instances), its state, the connection, the
+PID and the command of its process, and its error.
 
 ### Language Server Installation
 
@@ -51,6 +79,16 @@ The `Mappings` tab shows the file associations with the language server:
 The `Debug` tab allows to configure language servers debugging and tracing:
 
 ![Language Server preferences - Debug](./images/LanguageServerPreferencesDebug.png)
+
+### Files served twice
+
+IntelliJ IDEA 2026.3 has a language server client of its own, configured in
+`Settings | Languages & Frameworks | Language Servers`. When a language server of that page and a language server of
+LSP4IJ are both enabled for a file, both serve it, and you see each diagnostic, completion item and hover twice. The
+editor of the file then warns: "This file is served twice: by 'X' of LSP4IJ, and by 'Y' of IntelliJ's Language
+Servers settings. Disable one of them to avoid duplicate results." Its links open the `Language Servers (LSP4IJ)` and
+the `Language Servers` settings, and `Don't show again` turns the warning off. The language servers that other plugins
+add to IntelliJ's page aren't checked.
 
 ### LSP CodeLens
 
@@ -108,6 +146,11 @@ The following LSP features are integrated with the standard `Find Usages` menu (
 ![Find Usages menu](./images/find-usages/FindUsagesMenu.png)
 
 ![Find Usages result](./images/find-usages/FindUsagesResult.png)
+
+A declaration or a definition is listed once: a reference or a type definition at the same place isn't listed again.
+When Find Usages searches an element of a language plugin, such as a Scala class with the Metals language server, a
+reference that both the plugin and the language server find is listed once, in the group of the plugin's usage, such as
+`Method call`.
 
 ### Refactoring
 

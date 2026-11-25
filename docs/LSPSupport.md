@@ -80,8 +80,8 @@ Current state of [Language Features]( https://microsoft.github.io/language-serve
 Current state of [Workspace Features]( https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspaceFeatures) support:
 
  * ✅ [workspace/didChangeWatchedFiles](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_didChangeWatchedFiles) (see [implementation details](#did-change-watched-files)).
- * ✅ [workspace/executeCommand](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_executeCommand).
- * ✅ [workspace/applyEdit](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_applyEdit).
+ * ✅ [workspace/executeCommand](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_executeCommand): the traces of the LSP console name the command of the request and of its response, as `Sending request 'workspace/executeCommand [gopls.reset_go_mod_diagnostics] - (62)'`.
+ * ✅ [workspace/applyEdit](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_applyEdit). The snippet edits of a workspace edit (`SnippetTextEdit`, LSP 3.18), as a code action can give, are applied with the text of their snippet, with the default value of each placeholder. The first snippet edit in the document of the selected editor then starts as a live template, so that you go through its placeholders.
  * ✅ [workspace/symbol](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_symbol) (see [implementation details](#workspace-symbol))
  * ✅ [workspace/symbolResolve](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_symbolResolve) (see [implementation details](#workspace-symbol)).
  * ✅ [workspace/configuration](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_configuration) (see [implementation details](./DeveloperGuide.md#workspace-configuration))
@@ -252,6 +252,11 @@ Here is an example with the [Qute language server](https://github.com/redhat-dev
 [textDocument/hover](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_hover) is implemented with the `platform.backend.documentation.targetProvider` 
 extension point, to support any language, making `textDocument/hover` work out-of-the-box for all languages.
 
+In a file whose language has documentation of its own, Quick Documentation waits 500 ms at most for the reply of the
+language server, and shows a later reply the next time at the same place. In a plain text or TextMate file, a file of a
+custom file type, and a file whose languages register no documentation provider, the popup opens at once and shows the
+reply when it comes.
+
 Here is an example with the [Qute language server](https://github.com/redhat-developer/quarkus-ls/tree/master/qute.ls) showing documentation while hovering over an `include` section:
 
 ![textDocument/hover](./images/lsp-support/textDocument_hover.png)
@@ -370,6 +375,9 @@ the `ColorChooserService`:
 declared with the
 `completion.contributor` extension point. As this extension point supports `any` language, it works out-of-the-box.
 When a language server returns an incomplete list (`isIncomplete: true`), or no items for a trigger character, typing further asks the language servers again instead of filtering the items they gave.
+When the token at the caret spans whitespace, such as a comment that a language plugin keeps as one token, a completion
+item without a `textEdit` is matched against, and replaces, the word before the caret instead of the whole token: after
+`foo.ba`, the item `foo.bar` replaces `foo.ba`, and the item `bar` replaces `ba`.
 
 Here is an example with the [Qute language server](https://github.com/redhat-developer/quarkus-ls/tree/master/qute.ls) showing method completion:
 
