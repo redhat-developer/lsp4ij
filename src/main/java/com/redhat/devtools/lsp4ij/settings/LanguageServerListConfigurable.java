@@ -22,6 +22,7 @@ import com.intellij.openapi.options.SearchableConfigurable;
 import com.intellij.openapi.project.DumbAwareAction;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.MasterDetailsComponent;
+import com.intellij.openapi.util.Disposer;
 import com.intellij.openapi.util.NlsContexts;
 import com.intellij.ui.TreeUIHelper;
 import com.intellij.ui.speedSearch.SpeedSearchSupply;
@@ -242,6 +243,7 @@ public class LanguageServerListConfigurable extends MasterDetailsComponent imple
                     .setFileOperationsTimeout((int) fileOperationsTimeoutSpinner.getValue());
         }
         if (gitHubTokenField != null) {
+            // Asynchronous: a token which the Password Safe doesn't store stays modified, and the field says why
             gitHubTokenField.apply();
         }
         super.apply();
@@ -263,6 +265,9 @@ public class LanguageServerListConfigurable extends MasterDetailsComponent imple
     @Override
     public void disposeUIResources() {
         super.disposeUIResources();
+        if (gitHubTokenField != null) {
+            Disposer.dispose(gitHubTokenField);
+        }
         LanguageServersRegistry.getInstance().removeLanguageServerDefinitionListener(listener);
     }
 
