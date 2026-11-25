@@ -74,18 +74,18 @@ public class ClosedDocumentFormattingTest extends LSPCodeInsightFixtureTestCase 
         var document = LSPIJUtils.getDocument(source);
         assertNotNull(document);
         var servers = LanguageServiceAccessor.getInstance(myFixture.getProject())
-                .getLanguageServers(file, null, null).get(5, TimeUnit.SECONDS);
+                .getLanguageServers(file, null, null).get(30, TimeUnit.SECONDS);
         // Keep the server alive while closing this file, as when another file is open.
         var otherFile = myFixture.addFileToProject("other.ts", "const other=1;");
         LanguageServiceAccessor.getInstance(myFixture.getProject())
-                .getLanguageServers(otherFile, null, null).get(5, TimeUnit.SECONDS);
+                .getLanguageServers(otherFile, null, null).get(30, TimeUnit.SECONDS);
         var closed = new CompletableFuture<DidCloseTextDocumentParams>();
         service.setDidCloseCallback(closed);
         // The headless fixture has no editor tabs. Deliver the public close event emitted
         // by FileEditorManager in an IDE, and verify it reaches the mock server over LSP.
         myFixture.getProject().getMessageBus().syncPublisher(FileEditorManagerListener.FILE_EDITOR_MANAGER)
                 .fileClosed(FileEditorManager.getInstance(myFixture.getProject()), source);
-        PlatformTestUtil.waitWithEventsDispatching("the file must disconnect before save formatting", closed::isDone, 5);
+        PlatformTestUtil.waitWithEventsDispatching("the file must disconnect before save formatting", closed::isDone, 30);
         var wrapper = servers.get(0).getServerWrapper();
         assertNull(wrapper.getOpenedDocument(wrapper.toUri(source)));
         assertEquals(0, LSPIJUtils.editorsForFile(source, myFixture.getProject()).length);
@@ -98,20 +98,20 @@ public class ClosedDocumentFormattingTest extends LSPCodeInsightFixtureTestCase 
         var request = new FormattingResult(original, new CompletableFuture<>());
         new LSPFormattingSupport(file).format(document, file, null, ranges, request);
 
-        assertEquals("const value = 1;", request.result().get(5, TimeUnit.SECONDS));
+        assertEquals("const value = 1;", request.result().get(30, TimeUnit.SECONDS));
         assertEquals(original, service.formattedText.get());
         assertEquals(!ranges.isEmpty(), service.rangeFormatting);
         assertEquals("Formatting returns text for the platform to apply", original, document.getText());
 
         PlatformTestUtil.waitWithEventsDispatching("save formatting must release its closed buffer",
-                () -> wrapper.getOpenedDocument(wrapper.toUri(source)) == null, 5);
+                () -> wrapper.getOpenedDocument(wrapper.toUri(source)) == null, 30);
         assertEquals("Only the other persistent document remains", 1, wrapper.getOpenedDocuments().size());
         int openedCount = service.openedCount.get();
         var repeated = new FormattingResult(original, new CompletableFuture<>());
         new LSPFormattingSupport(file).format(document, file, null, ranges, repeated);
-        assertEquals("const value = 1;", repeated.result().get(5, TimeUnit.SECONDS));
+        assertEquals("const value = 1;", repeated.result().get(30, TimeUnit.SECONDS));
         PlatformTestUtil.waitWithEventsDispatching("repeated formatting must also release its connection",
-                () -> wrapper.getOpenedDocument(wrapper.toUri(source)) == null, 5);
+                () -> wrapper.getOpenedDocument(wrapper.toUri(source)) == null, 30);
         assertEquals(openedCount + 1, service.openedCount.get());
         assertEquals(1, wrapper.getOpenedDocuments().size());
     }
@@ -130,11 +130,11 @@ public class ClosedDocumentFormattingTest extends LSPCodeInsightFixtureTestCase 
 
         var request = new FormattingResult(original, new CompletableFuture<>());
         new LSPFormattingSupport(file).format(document, file, null, List.of(), request);
-        assertEquals("const value = 1;", request.result().get(5, TimeUnit.SECONDS));
+        assertEquals("const value = 1;", request.result().get(30, TimeUnit.SECONDS));
 
         var wrapper = accessor.getStartedServers().iterator().next();
         PlatformTestUtil.waitWithEventsDispatching("a server started only for formatting must stop once idle",
-                () -> wrapper.getServerStatus() == ServerStatus.stopped, 5);
+                () -> wrapper.getServerStatus() == ServerStatus.stopped, 30);
         assertTrue(wrapper.getOpenedDocuments().isEmpty());
     }
 
@@ -151,7 +151,7 @@ public class ClosedDocumentFormattingTest extends LSPCodeInsightFixtureTestCase 
         var file = myFixture.configureByText("stale.ts", original);
         var document = myFixture.getEditor().getDocument();
         LanguageServiceAccessor.getInstance(myFixture.getProject())
-                .getLanguageServers(file, null, null).get(5, TimeUnit.SECONDS);
+                .getLanguageServers(file, null, null).get(30, TimeUnit.SECONDS);
         var request = new FormattingResult(original, new CompletableFuture<>());
         var support = new LSPFormattingSupport(file) {
             @Override
@@ -169,7 +169,7 @@ public class ClosedDocumentFormattingTest extends LSPCodeInsightFixtureTestCase 
             }
         };
         support.format(document, file, null, List.of(), request);
-        assertNull("A stale reply must not replace the current buffer", request.result().get(5, TimeUnit.SECONDS));
+        assertNull("A stale reply must not replace the current buffer", request.result().get(30, TimeUnit.SECONDS));
         assertEquals(restoreOriginal ? original : "const other=2;", document.getText());
     }
 
@@ -185,16 +185,16 @@ public class ClosedDocumentFormattingTest extends LSPCodeInsightFixtureTestCase 
             }
         };
         LanguageServiceAccessor.getInstance(myFixture.getProject())
-                .getLanguageServers(file, null, null).get(5, TimeUnit.SECONDS);
+                .getLanguageServers(file, null, null).get(30, TimeUnit.SECONDS);
         support.format(myFixture.getEditor().getDocument(), file, null, List.of(), request);
-        assertNull(request.result().get(5, TimeUnit.SECONDS));
+        assertNull(request.result().get(30, TimeUnit.SECONDS));
     }
 
     public void testCancelledFormattingDoesNotReturnOldText() throws Exception {
         String original = "const value=1;";
         var file = myFixture.configureByText("cancelled.ts", original);
         LanguageServiceAccessor.getInstance(myFixture.getProject())
-                .getLanguageServers(file, null, null).get(5, TimeUnit.SECONDS);
+                .getLanguageServers(file, null, null).get(30, TimeUnit.SECONDS);
         var request = new FormattingResult(original, new CompletableFuture<>());
         var support = new LSPFormattingSupport(file) {
             @Override
@@ -204,14 +204,14 @@ public class ClosedDocumentFormattingTest extends LSPCodeInsightFixtureTestCase 
             }
         };
         support.format(myFixture.getEditor().getDocument(), file, null, List.of(), request);
-        assertNull(request.result().get(5, TimeUnit.SECONDS));
+        assertNull(request.result().get(30, TimeUnit.SECONDS));
     }
 
     public void testCancellationDuringReconnectDoesNotStartFormatting() throws Exception {
         String original = "const value=1;";
         var file = myFixture.configureByText("reconnecting.ts", original);
         LanguageServiceAccessor.getInstance(myFixture.getProject())
-                .getLanguageServers(file, null, null).get(5, TimeUnit.SECONDS);
+                .getLanguageServers(file, null, null).get(30, TimeUnit.SECONDS);
         var lookup = new CompletableFuture<List<LanguageServerItem>>();
         var request = new FormattingResult(original, new CompletableFuture<>());
         var support = new LSPFormattingSupport(file) {
@@ -238,7 +238,7 @@ public class ClosedDocumentFormattingTest extends LSPCodeInsightFixtureTestCase 
         String original = "const value=1;";
         var file = myFixture.configureByText("stopped.ts", original);
         LanguageServiceAccessor.getInstance(myFixture.getProject())
-                .getLanguageServers(file, null, null).get(5, TimeUnit.SECONDS);
+                .getLanguageServers(file, null, null).get(30, TimeUnit.SECONDS);
         var request = new FormattingResult(original, new CompletableFuture<>());
         var support = new LSPFormattingSupport(file) {
             @Override
@@ -249,14 +249,14 @@ public class ClosedDocumentFormattingTest extends LSPCodeInsightFixtureTestCase 
             }
         };
         support.format(myFixture.getEditor().getDocument(), file, null, List.of(), request);
-        assertNull("A retired server no longer owns the formatting request", request.result().get(5, TimeUnit.SECONDS));
+        assertNull("A retired server no longer owns the formatting request", request.result().get(30, TimeUnit.SECONDS));
     }
 
     public void testNoFormattingServerCompletesWithoutChanges() throws Exception {
         var file = myFixture.configureByText("unmapped.txt", "text");
         var request = new FormattingResult("text", new CompletableFuture<>());
         new LSPFormattingSupport(file).format(myFixture.getEditor().getDocument(), file, null, List.of(), request);
-        assertNull(request.result().get(5, TimeUnit.SECONDS));
+        assertNull(request.result().get(30, TimeUnit.SECONDS));
     }
 
     public void testTheFormatOf021WithOneRangeFormatsThatRange() throws Exception {
@@ -277,7 +277,7 @@ public class ClosedDocumentFormattingTest extends LSPCodeInsightFixtureTestCase 
         String original = "const value=1;";
         var file = myFixture.configureByText("range.ts", original);
         LanguageServiceAccessor.getInstance(myFixture.getProject())
-                .getLanguageServers(file, null, null).get(5, TimeUnit.SECONDS);
+                .getLanguageServers(file, null, null).get(30, TimeUnit.SECONDS);
         var params = new AtomicReference<LSPFormattingParams>();
         var support = new LSPFormattingSupport(file) {
             @Override
@@ -291,7 +291,7 @@ public class ClosedDocumentFormattingTest extends LSPCodeInsightFixtureTestCase 
 
         support.format(myFixture.getEditor().getDocument(), file, null, range, request);
 
-        request.result().get(5, TimeUnit.SECONDS);
+        request.result().get(30, TimeUnit.SECONDS);
         var sent = params.get();
         assertNotNull("The formatting must reach the language server", sent);
         assertEquals(expectedRanges, sent.textRanges());

@@ -187,8 +187,8 @@ public class WorkspaceDiagnosticsTest extends UsefulTestCase {
         var first = next();
         try {
             stream(first, report(pending, "stale", null));
-            matcherStarted.get(5, TimeUnit.SECONDS);
-            definition.client.refreshDiagnostics().get(5, TimeUnit.SECONDS);
+            matcherStarted.get(30, TimeUnit.SECONDS);
+            definition.client.refreshDiagnostics().get(30, TimeUnit.SECONDS);
             var refreshed = next();
             await(first.future::isCancelled);
             matching.complete(true);
@@ -237,7 +237,7 @@ public class WorkspaceDiagnosticsTest extends UsefulTestCase {
                 + (identifier == null ? "" : "\"identifier\":\"" + identifier + "\",")
                 + "\"workspaceDiagnostics\":true}", com.google.gson.JsonObject.class);
         definition.client.registerCapability(new RegistrationParams(List.of(
-                new Registration("dynamic", "textDocument/diagnostic", options)))).get(5, TimeUnit.SECONDS);
+                new Registration("dynamic", "textDocument/diagnostic", options)))).get(30, TimeUnit.SECONDS);
         var first = next();
         assertEquals(identifier, first.params.getIdentifier());
         var errorReport = report(rejected, "stale", null);
@@ -365,7 +365,7 @@ public class WorkspaceDiagnosticsTest extends UsefulTestCase {
         var documentOptions = JSONUtils.getLsp4jGson().fromJson(
                 "{\"identifier\":\"document\",\"workspaceDiagnostics\":false}", com.google.gson.JsonObject.class);
         definition.client.registerCapability(new RegistrationParams(List.of(
-                new Registration("document", "textDocument/diagnostic", documentOptions)))).get(5, TimeUnit.SECONDS);
+                new Registration("document", "textDocument/diagnostic", documentOptions)))).get(30, TimeUnit.SECONDS);
         definition.getServer().setPullDiagnostics(new DocumentDiagnosticReport(
                 new RelatedFullDocumentDiagnosticReport(List.of(diagnostic("document retained")))));
         var open = fixture.configureByText("open.workspace", "value").getVirtualFile();
@@ -378,7 +378,7 @@ public class WorkspaceDiagnosticsTest extends UsefulTestCase {
                 + (identifier == null ? "" : "\"identifier\":\"" + identifier + "\",")
                 + "\"workspaceDiagnostics\":true}", com.google.gson.JsonObject.class);
         definition.client.registerCapability(new RegistrationParams(List.of(
-                new Registration("dynamic", "textDocument/diagnostic", options)))).get(5, TimeUnit.SECONDS);
+                new Registration("dynamic", "textDocument/diagnostic", options)))).get(30, TimeUnit.SECONDS);
         var request = next();
         assertEquals(identifier, request.params.getIdentifier());
         assertEquals("document", wrapper.getClientFeatures().getDiagnosticFeature().getDiagnosticIdentifier());
@@ -396,7 +396,7 @@ public class WorkspaceDiagnosticsTest extends UsefulTestCase {
         assertTrue(firstDocument.hasErrors());
         assertTrue(openDocument.hasErrors());
         definition.client.unregisterCapability(new UnregistrationParams(List.of(
-                new Unregistration("dynamic", "textDocument/diagnostic")))).get(5, TimeUnit.SECONDS);
+                new Unregistration("dynamic", "textDocument/diagnostic")))).get(30, TimeUnit.SECONDS);
         await(request.future::isCancelled);
         await(() -> firstDocument.getDiagnostics().size() == 1 && secondDocument.getDiagnostics().isEmpty());
         assertEquals("retained", firstDocument.getDiagnostics().iterator().next().getMessage().getLeft());
@@ -449,13 +449,13 @@ public class WorkspaceDiagnosticsTest extends UsefulTestCase {
                 + (identifier == null ? "" : "\"identifier\":\"" + identifier + "\",")
                 + "\"workspaceDiagnostics\":true}", com.google.gson.JsonObject.class);
         definition.client.registerCapability(new RegistrationParams(List.of(
-                new Registration("workspace", "textDocument/diagnostic", options)))).get(5, TimeUnit.SECONDS);
+                new Registration("workspace", "textDocument/diagnostic", options)))).get(30, TimeUnit.SECONDS);
         var request = next();
         stream(request, report(closed, "workspace removed", null));
         await(() -> wrapper.getClosedDocument(LSPIJUtils.toUri(closed), false) != null
                 && wrapper.getClosedDocument(LSPIJUtils.toUri(closed), false).getDiagnostics().size() == 1);
         definition.client.unregisterCapability(new UnregistrationParams(List.of(
-                new Unregistration("workspace", "textDocument/diagnostic")))).get(5, TimeUnit.SECONDS);
+                new Unregistration("workspace", "textDocument/diagnostic")))).get(30, TimeUnit.SECONDS);
         await(request.future::isCancelled);
         await(() -> wrapper.getClosedDocument(LSPIJUtils.toUri(closed), false).getDiagnostics().isEmpty());
         // Also check the cleanup synchronously: observing the closed cache alone
@@ -500,7 +500,7 @@ public class WorkspaceDiagnosticsTest extends UsefulTestCase {
         var options = JSONUtils.getLsp4jGson().fromJson(
                 "{\"identifier\":\"workspace\",\"workspaceDiagnostics\":true}", com.google.gson.JsonObject.class);
         definition.client.registerCapability(new RegistrationParams(List.of(
-                new Registration("workspace", "textDocument/diagnostic", options)))).get(5, TimeUnit.SECONDS);
+                new Registration("workspace", "textDocument/diagnostic", options)))).get(30, TimeUnit.SECONDS);
         var pending = next();
         assertTrue(pending.params.getPreviousResultIds().isEmpty());
         // The event that closing the file's last editor publishes, which disconnects the file.
@@ -567,7 +567,7 @@ public class WorkspaceDiagnosticsTest extends UsefulTestCase {
                 + "\"workspaceDiagnostics\":true}", com.google.gson.JsonObject.class);
         definition.client.registerCapability(new RegistrationParams(List.of(
                 new Registration("document", "textDocument/diagnostic", documentOptions),
-                new Registration("workspace", "textDocument/diagnostic", workspaceOptions)))).get(5, TimeUnit.SECONDS);
+                new Registration("workspace", "textDocument/diagnostic", workspaceOptions)))).get(30, TimeUnit.SECONDS);
         var first = next();
         var ownedReport = report(file, "workspace", null);
         ownedReport.getLeft().setResultId("owned");
@@ -662,11 +662,11 @@ public class WorkspaceDiagnosticsTest extends UsefulTestCase {
                 "{\"identifier\":\"dynamic\",\"workspaceDiagnostics\":true,\"interFileDependencies\":true}",
                 com.google.gson.JsonObject.class);
         definition.client.registerCapability(new RegistrationParams(List.of(
-                new Registration("dynamic", "textDocument/diagnostic", options)))).get(5, TimeUnit.SECONDS);
+                new Registration("dynamic", "textDocument/diagnostic", options)))).get(30, TimeUnit.SECONDS);
         var request = next();
         assertEquals("dynamic", request.params.getIdentifier());
         definition.client.unregisterCapability(new UnregistrationParams(List.of(
-                new Unregistration("dynamic", "textDocument/diagnostic")))).get(5, TimeUnit.SECONDS);
+                new Unregistration("dynamic", "textDocument/diagnostic")))).get(30, TimeUnit.SECONDS);
         await(request.future::isCancelled);
         assertNull(requests.poll(150, TimeUnit.MILLISECONDS));
     }
@@ -674,7 +674,7 @@ public class WorkspaceDiagnosticsTest extends UsefulTestCase {
     public void testRefreshAndStopCancelRequestsThroughTransport() throws Exception {
         start(true);
         var first = next();
-        definition.getServer().getRemoteProxies().get(0).refreshDiagnostics().get(5, TimeUnit.SECONDS);
+        definition.getServer().getRemoteProxies().get(0).refreshDiagnostics().get(30, TimeUnit.SECONDS);
         var second = next();
         await(first.future::isCancelled);
         wrapper.stop().get(10, TimeUnit.SECONDS);

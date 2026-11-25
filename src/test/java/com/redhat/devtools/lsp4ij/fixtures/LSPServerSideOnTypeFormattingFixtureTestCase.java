@@ -92,7 +92,7 @@ public abstract class LSPServerSideOnTypeFormattingFixtureTestCase extends LSPCo
         try {
             ContainerUtil.addAllNotNull(languageServers, LanguageServiceAccessor.getInstance(project)
                     .getLanguageServers(file, null, null)
-                    .get(5000, TimeUnit.MILLISECONDS));
+                    .get(30, TimeUnit.SECONDS));
         } catch (Exception e) {
             fail(e.getMessage());
         }

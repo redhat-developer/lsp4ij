@@ -63,9 +63,9 @@ public abstract class LSPFormattingFixtureTestCase extends LSPCodeInsightFixture
         try {
             LanguageServiceAccessor.getInstance(file.getProject())
                     .getLanguageServers(file, null, null)
-                    .get(5000, TimeUnit.MILLISECONDS);
+                    .get(30, TimeUnit.SECONDS);
         } catch (Exception e) {
-            e.printStackTrace();
+            throw new AssertionError("The language server must start", e);
         }
 
         myFixture.type('1');

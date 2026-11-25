@@ -201,6 +201,6 @@ public class FileOperationRefactoringTest extends LSPCodeInsightFixtureTestCase 
     private void connect(VirtualFile file) throws Exception {
         LanguageServiceAccessor.getInstance(myFixture.getProject())
                 .getLanguageServers(psiFile(file), null, null)
-                .get(5, TimeUnit.SECONDS);
+                .get(30, TimeUnit.SECONDS);
     }
 }

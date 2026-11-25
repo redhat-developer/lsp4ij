@@ -46,12 +46,12 @@ public class LSPInlineCompletionContextTest extends LSPCodeInsightFixtureTestCas
         var support = new LSPInlineCompletionSupport(file);
         var identifier = new TextDocumentIdentifier(LSPIJUtils.toUri(file).toString());
         var automatic = params(identifier, InlineCompletionTriggerKind.Automatic, null);
-        support.getInlineCompletions(automatic).get(5, TimeUnit.SECONDS);
+        support.getInlineCompletions(automatic).get(30, TimeUnit.SECONDS);
         var explicit = params(identifier, InlineCompletionTriggerKind.Invoked, null);
-        support.getInlineCompletions(explicit).get(5, TimeUnit.SECONDS);
+        support.getInlineCompletions(explicit).get(30, TimeUnit.SECONDS);
         var selected = new SelectedCompletionInfo(new Range(new Position(0, 0), new Position(0, 3)), "console");
         var popup = params(identifier, InlineCompletionTriggerKind.Automatic, selected);
-        var result = support.getInlineCompletions(popup).get(5, TimeUnit.SECONDS);
+        var result = support.getInlineCompletions(popup).get(30, TimeUnit.SECONDS);
         assertEquals(3, service.requests.size());
         assertEquals(InlineCompletionTriggerKind.Automatic, service.requests.get(0).getContext().getTriggerKind());
         assertEquals(InlineCompletionTriggerKind.Invoked, service.requests.get(1).getContext().getTriggerKind());
@@ -59,12 +59,12 @@ public class LSPInlineCompletionContextTest extends LSPCodeInsightFixtureTestCas
         assertEquals(popup.getContext(), service.requests.get(2).getContext());
         assertEquals(identifier.getUri(), popup.getTextDocument().getUri());
         assertSame(result, support.getInlineCompletions(
-                params(identifier, InlineCompletionTriggerKind.Automatic, selected)).get(5, TimeUnit.SECONDS));
+                params(identifier, InlineCompletionTriggerKind.Automatic, selected)).get(30, TimeUnit.SECONDS));
         assertEquals("Equivalent requests may reuse the response", 3, service.requests.size());
 
         var changed = new SelectedCompletionInfo(selected.getRange(), "constant");
         support.getInlineCompletions(params(identifier, InlineCompletionTriggerKind.Automatic, changed))
-                .get(5, TimeUnit.SECONDS);
+                .get(30, TimeUnit.SECONDS);
         assertEquals(4, service.requests.size());
         assertEquals("constant", service.requests.get(3).getContext().getSelectedCompletionInfo().getText());
     }

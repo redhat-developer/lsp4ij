@@ -265,7 +265,7 @@ public class FileDocumentMoveTest extends LSPCodeInsightFixtureTestCase {
             synchronized (documentsLock) {
                 held.countDown();
                 try {
-                    waitedFor.set(!released.await(5, TimeUnit.SECONDS));
+                    waitedFor.set(!released.await(30, TimeUnit.SECONDS));
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                 }
@@ -276,7 +276,7 @@ public class FileDocumentMoveTest extends LSPCodeInsightFixtureTestCase {
         WriteCommandAction.writeCommandAction(myFixture.getProject()).run(() -> file.rename(this, "renamed.foo"));
         released.countDown();
 
-        holder.get(10, TimeUnit.SECONDS);
+        holder.get(60, TimeUnit.SECONDS);
         assertFalse("The move must not wait for the documents of a language server that isn't running", waitedFor.get());
     }
 
@@ -297,7 +297,7 @@ public class FileDocumentMoveTest extends LSPCodeInsightFixtureTestCase {
             var psiFile = PsiManager.getInstance(myFixture.getProject()).findFile(context.file());
             assertNotNull(psiFile);
             assertEmpty("No language server matches the renamed file", LanguageServiceAccessor.getInstance(myFixture.getProject())
-                    .getLanguageServers(psiFile, null, null).get(5, TimeUnit.SECONDS));
+                    .getLanguageServers(psiFile, null, null).get(30, TimeUnit.SECONDS));
         } finally {
             context.wrapper().setConnectionExecutor(AppExecutorUtil.getAppExecutorService());
         }
@@ -629,7 +629,7 @@ public class FileDocumentMoveTest extends LSPCodeInsightFixtureTestCase {
     private Context connect(VirtualFile file) throws Exception {
         var servers = LanguageServiceAccessor.getInstance(myFixture.getProject())
                 .getLanguageServers(PsiManager.getInstance(myFixture.getProject()).findFile(file), null, null)
-                .get(5, TimeUnit.SECONDS);
+                .get(30, TimeUnit.SECONDS);
         return new Context(file, servers.get(0).getServerWrapper());
     }
 

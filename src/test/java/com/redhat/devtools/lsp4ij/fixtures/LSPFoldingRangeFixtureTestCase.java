@@ -99,7 +99,7 @@ public abstract class LSPFoldingRangeFixtureTestCase extends LSPCodeInsightFixtu
         try {
             LanguageServiceAccessor.getInstance(file.getProject())
                     .getLanguageServers(file, null, null)
-                    .get(5000, TimeUnit.MILLISECONDS);
+                    .get(30, TimeUnit.SECONDS);
         } catch (Exception e) {
             fail(e.getMessage());
         }

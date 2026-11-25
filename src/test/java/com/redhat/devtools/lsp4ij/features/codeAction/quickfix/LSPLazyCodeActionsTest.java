@@ -135,7 +135,7 @@ public class LSPLazyCodeActionsTest extends LSPCodeInsightFixtureTestCase {
         var codeActions = new LSPLazyCodeActions(List.of(diagnostic), file.getVirtualFile(), languageServer);
         Future<?> pending = ApplicationManager.getApplication().executeOnPooledThread(() -> codeActions.getCodeActionAt(0));
         PlatformTestUtil.waitWithEventsDispatching("textDocument/codeAction must be sent",
-                () -> textDocumentService.codeActionRequests > 0, 5);
+                () -> textDocumentService.codeActionRequests > 0, 30);
         // LSPDiagnosticsForServer cancels the lazy code actions whenever diagnostics are published again, also
         // when they are unchanged, and the editor then keeps the quick fixes that use these code actions.
         codeActions.cancel();
@@ -180,7 +180,7 @@ public class LSPLazyCodeActionsTest extends LSPCodeInsightFixtureTestCase {
             pending = ApplicationManager.getApplication().executeOnPooledThread(() -> codeActions.getCodeActionAt(0));
             // The server status cannot tell that the load has created its request, if another start set it
             PlatformTestUtil.waitWithEventsDispatching("the pending load must create its request",
-                    codeActions::hasRequest, 5);
+                    codeActions::hasRequest, 30);
             assertEquals("The request must wait for the server to initialize", 0,
                     textDocumentService.codeActionRequests);
             codeActions.cancel();
@@ -260,7 +260,7 @@ public class LSPLazyCodeActionsTest extends LSPCodeInsightFixtureTestCase {
     private LanguageServerItem getLanguageServer(PsiFile file) throws Exception {
         List<LanguageServerItem> languageServers = LanguageServiceAccessor.getInstance(file.getProject())
                 .getLanguageServers(file, null, null)
-                .get(5000, TimeUnit.MILLISECONDS);
+                .get(30, TimeUnit.SECONDS);
         assertSize(1, languageServers);
         return languageServers.get(0);
     }

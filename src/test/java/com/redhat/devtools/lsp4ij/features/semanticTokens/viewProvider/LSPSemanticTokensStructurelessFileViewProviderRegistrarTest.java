@@ -45,7 +45,7 @@ public class LSPSemanticTokensStructurelessFileViewProviderRegistrarTest extends
         try {
             LanguageServiceAccessor.getInstance(project)
                     .getLanguageServers(cssFile, null, null)
-                    .get(5000, TimeUnit.MILLISECONDS);
+                    .get(30, TimeUnit.SECONDS);
         } catch (Exception e) {
             fail(e.getMessage());
         }

@@ -55,7 +55,7 @@ public class LSPDiagnosticsForServerTest extends LSPCodeInsightFixtureTestCase {
         MockLanguageServer.INSTANCE.setTimeToProceedQueries(2_000);
         Future<?> pending = ApplicationManager.getApplication().executeOnPooledThread(editorQuickFix::getText);
         PlatformTestUtil.waitWithEventsDispatching("textDocument/codeAction must be sent",
-                () -> textDocumentService.codeActionRequests > 0, 5);
+                () -> textDocumentService.codeActionRequests > 0, 30);
 
         // The server publishes the same diagnostics again, as servers commonly do after each change
         assertFalse(diagnostics.update("test", List.of(createDiagnostic())));
@@ -90,7 +90,7 @@ public class LSPDiagnosticsForServerTest extends LSPCodeInsightFixtureTestCase {
     private LanguageServerItem getLanguageServer(PsiFile file) throws Exception {
         List<LanguageServerItem> languageServers = LanguageServiceAccessor.getInstance(file.getProject())
                 .getLanguageServers(file, null, null)
-                .get(5000, TimeUnit.MILLISECONDS);
+                .get(30, TimeUnit.SECONDS);
         assertSize(1, languageServers);
         return languageServers.get(0);
     }

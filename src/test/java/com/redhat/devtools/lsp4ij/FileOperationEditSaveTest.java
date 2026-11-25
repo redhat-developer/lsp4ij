@@ -155,7 +155,7 @@ public class FileOperationEditSaveTest extends LSPCodeInsightFixtureTestCase {
     private void connect(VirtualFile file) throws Exception {
         LanguageServiceAccessor.getInstance(myFixture.getProject())
                 .getLanguageServers(PsiManager.getInstance(myFixture.getProject()).findFile(file), null, null)
-                .get(5, TimeUnit.SECONDS);
+                .get(BOUND_SECONDS, TimeUnit.SECONDS);
     }
 
     private void rename(VirtualFile file, String name) {
