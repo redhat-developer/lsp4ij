@@ -62,6 +62,9 @@ import org.eclipse.lsp4j.debug.VariablesResponse;
 import org.eclipse.lsp4j.debug.launch.DSPLauncher;
 import org.eclipse.lsp4j.debug.services.IDebugProtocolClient;
 import org.eclipse.lsp4j.debug.services.IDebugProtocolServer;
+import org.eclipse.lsp4j.jsonrpc.ResponseErrorException;
+import org.eclipse.lsp4j.jsonrpc.messages.ResponseError;
+import org.eclipse.lsp4j.jsonrpc.messages.ResponseErrorCode;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -73,6 +76,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -83,7 +87,8 @@ import java.util.stream.IntStream;
  * session against a DAP server in the test's process which the session attaches to: the program stops in a frame of
  * each, as two scripts evaluated with {@code eval} are both named {@code <anonymous>}. Each source has its own file,
  * and editor tab, named after the source, with its own text (#2196). A load of a source has its text only while the
- * document keeps it, and a stack frame asks again for the text of a source which the debug adapter gave none for.
+ * document keeps it, and a stack frame asks again for the text of a source which the debug adapter gave none for. Loads
+ * of a source which run at once ask the debug adapter once for its text.
  */
 public class DAPSameNameSourceReferencesSessionTest extends HeavyPlatformTestCase {
 
@@ -273,6 +278,54 @@ public class DAPSameNameSourceReferencesSessionTest extends HeavyPlatformTestCas
         assertEquals("", document(file).getText());
         server.texts.put(FIRST_REFERENCE, FIRST);
         waitForTextOfLaterFrame(frame);
+    }
+
+    public void testFramesWhichAskForTheTextOfTheirSourceAtOnceAskTheDebugAdapterOnce() throws Exception {
+        // The debug adapter has no text for the first source yet
+        var evalServer = new EvalServer();
+        evalServer.texts.put(FIRST_REFERENCE, "");
+        debug(evalServer);
+        firstPosition();
+        var frame = currentFrame();
+        int asked = sourcesOf(FIRST_REFERENCE);
+
+        // It has the text now, and answers once the test lets it. Two later frames of the source ask for it before it
+        // answers, as the frames of a recursion do, or the session and the Frames view asking for a frame's position.
+        server.texts.put(FIRST_REFERENCE, FIRST);
+        var answers = server.holdSourceAnswers();
+        var positions = IntStream.range(0, 2)
+                .mapToObj(i -> new DAPStackFrame(frame.getClient(), frame.getStackFrame()).getSourcePosition())
+                .toList();
+        answers.complete(null);
+        positions.forEach(position -> {
+            assertNotNull(position);
+            PlatformTestUtil.waitWithEventsDispatching(() -> "a frame didn't get the text of its source at line "
+                    + (FIRST_LINE - 1) + ", its position is at line " + position.getLine() + " and the file has:\n"
+                    + document(position.getFile()).getText(),
+                    () -> FIRST.equals(document(position.getFile()).getText()) && position.getLine() == FIRST_LINE - 1,
+                    BOUND_SECONDS);
+        });
+        assertEquals("The frames asked the debug adapter once for the text of their source", asked + 1,
+                sourcesOf(FIRST_REFERENCE));
+    }
+
+    public void testALoadOfASourceAsksAgainOnceTheRequestForItsTextFailed() throws Exception {
+        debug();
+        var file = (DAPFile) firstPosition().getFile();
+        var client = currentFrame().getClient();
+
+        // The debug adapter answers the request for the text of the first source with an error
+        server.failing.add(FIRST_REFERENCE);
+        var failed = new DAPSourceReferencePosition(file, FIRST_REFERENCE, FIRST_LINE - 1, client).whenResolved();
+        PlatformTestUtil.waitWithEventsDispatching("the failed load of the first source didn't end", failed::isDone,
+                BOUND_SECONDS);
+        assertFalse("The position of a source whose text the debug adapter failed to give is resolved", failed.join());
+
+        // The failed load doesn't keep the next one from asking for the text
+        server.failing.remove(FIRST_REFERENCE);
+        int asked = sourcesOf(FIRST_REFERENCE);
+        assertTrue("The load after the failed one got the text", loadFirst(file, client).isTextLoaded());
+        assertEquals("The load after the failed one asked the debug adapter", asked + 1, sourcesOf(FIRST_REFERENCE));
     }
 
     /**
@@ -525,6 +578,10 @@ public class DAPSameNameSourceReferencesSessionTest extends HeavyPlatformTestCas
         // The text which the debug adapter gives for each source reference, which a test may change
         private final Map<Integer, String> texts = new ConcurrentHashMap<>(Map.of(FIRST_REFERENCE, FIRST,
                 SECOND_REFERENCE, SECOND));
+        // The source references whose 'source' requests the debug adapter answers with an error
+        private final Set<Integer> failing = ConcurrentHashMap.newKeySet();
+        // The answers to the 'source' requests wait for it: a test holds them with holdSourceAnswers()
+        private volatile CompletableFuture<Void> sourceAnswers = CompletableFuture.completedFuture(null);
         private volatile IDebugProtocolClient client;
 
         EvalServer() throws IOException {
@@ -631,12 +688,26 @@ public class DAPSameNameSourceReferencesSessionTest extends HeavyPlatformTestCas
             return CompletableFuture.completedFuture(location);
         }
 
+        /**
+         * Holds the answers to the 'source' requests, the ones asked before as the ones asked later, until the test
+         * completes the returned future.
+         */
+        @NotNull CompletableFuture<Void> holdSourceAnswers() {
+            var answers = new CompletableFuture<Void>();
+            sourceAnswers = answers;
+            return answers;
+        }
+
         @Override
         public CompletableFuture<SourceResponse> source(SourceArguments args) {
             sources.add(args.getSourceReference());
+            if (failing.contains(args.getSourceReference())) {
+                return CompletableFuture.failedFuture(new ResponseErrorException(new ResponseError(
+                        ResponseErrorCode.InvalidParams, "the source reference has no text", null)));
+            }
             var response = new SourceResponse();
             response.setContent(texts.get(args.getSourceReference()));
-            return CompletableFuture.completedFuture(response);
+            return sourceAnswers.thenApply(unused -> response);
         }
 
         @Override
