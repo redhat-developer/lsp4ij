@@ -786,7 +786,8 @@ When the download occurs, LSP4IJ requests the 100 newest releases of the reposit
 https://api.github.com/repos/clojure-lsp/clojure-lsp/releases?per_page=100. It takes the newest of them whose
 `prerelease` is the `prerelease` of the task, and in it the first asset whose name matches `asset`, and downloads its
 `browser_download_url`. When that release has no such asset, LSP4IJ doesn't look at older releases, and falls back to
-`url`. It requests the releases of a repository once per IDE session.
+`url`. It requests the releases of a repository once per IDE session. The rate limit of the GitHub API can stop it: a
+[GitHub token](#github-token) raises it.
 
  * `owner` (required) the github owner.
  * `repository` (required) the github repository. 
@@ -826,40 +827,78 @@ Samples:
 * [clojure-lsp installer](../src/main/resources/templates/lsp/clojure-lsp/installer.json)
 * [rust-analyzer installer](../src/main/resources/templates/lsp/rust-analyzer/installer.json)
 
-##### GitHub API rate limit
+##### GitHub token
 
-Without a token, the GitHub API allows 60 requests an hour per IP address, which all the IDEs and tools behind one
-address share, as on a corporate network, a VPN or CI runners. When they are used up, LSP4IJ falls back to `url`, and a
-download without `url` fails until the limit resets. With a GitHub token in the environment variable `GITHUB_TOKEN`, or
-else `GH_TOKEN`, the variable that the `gh` CLI reads, LSP4IJ sends it to the GitHub API, `api.github.com`, and the
-limit is 5,000 requests an hour. Any token works, as a fine-grained personal access token or the one that
-`gh auth token` prints: public repositories need no scope or permission. LSP4IJ doesn't send it with the download of
-the asset, nor to another host, and the console doesn't show it. The variable must be in the environment of the IDE,
-as for the commands of `exec` tasks: set in the shell that starts the IDE, or, for an IDE started from the Dock on
-macOS, in the profile of the login shell, as `~/.zprofile` or `~/.zshrc`. After setting it, restart the IDE.
+A `github` download asks the GitHub API, `api.github.com`, for the releases of the repository. Without a token, the
+GitHub API allows 60 requests an hour per IP address, which all the IDEs and tools behind one address share, as on a
+corporate network, a VPN or CI runners. When they are used up, LSP4IJ falls back to `url`, and a download without `url`
+fails until the limit resets. With a GitHub token, the limit is 5,000 requests an hour.
 
-The 5,000 requests an hour are per GitHub user: all the tokens of a user share them. In GitHub Actions, the
-`GITHUB_TOKEN` of a workflow allows 1,000 requests an hour per repository.
+Any token works, as a fine-grained personal access token, the one that `gh auth token` prints, or the one of the IDE's
+GitHub account: public repositories need no scope or permission. The 5,000 requests an hour are per GitHub user: all the
+tokens of a user share them. In GitHub Actions, the `GITHUB_TOKEN` of a workflow allows 1,000 requests an hour per
+repository.
 
-A `github` download supports public repositories only: since the token goes with the request to the GitHub API only,
-the assets of a private repository don't download.
+A token doesn't make private repositories work: a `github` download supports public repositories only. With a token
+that can read a private repository, the GitHub API lists its releases, but the token goes with the request to the GitHub
+API only, so the assets of a private repository don't download.
+
+###### Where LSP4IJ finds the token
+
+LSP4IJ takes the first of these that has a token, at each request to the GitHub API:
+
+1. **The environment variable `GITHUB_TOKEN`, or else `GH_TOKEN`**, the variable that the `gh` CLI reads. As with the
+   `gh` CLI, the environment comes before the stored settings. The variable must be in the environment of the IDE, as
+   for the commands of `exec` tasks: set in the shell that starts the IDE, or, for an IDE started from the Dock on macOS,
+   in the profile of the login shell, as `~/.zprofile` or `~/.zshrc`, which the IDE reads when it starts. After setting
+   it, restart the IDE.
+2. **The GitHub token of the LSP4IJ settings**, in *Settings | Languages & Frameworks | Language Servers (LSP4IJ)*. It
+   is kept in the IDE's Password Safe, for all the projects, never in a settings file, and the field doesn't show it.
+   Emptying the field removes it.
+3. **The token of the IDE's GitHub account**, in *Settings | Version Control | GitHub*, when the IDE has its GitHub
+   plugin, as IntelliJ IDEA and most JetBrains IDEs do. LSP4IJ takes the first account on `github.com` there. The token
+   of an account goes to its own server only: since a `github` download asks `api.github.com`, a GitHub Enterprise
+   account isn't used.
+
+Without any of them, the request has no token, as before.
+
+![The GitHub token of the LSP4IJ settings](./images/user-defined-ls/GitHubTokenSetting.png)
+
+On Windows and Linux, an IDE started from the Start menu or a desktop launcher doesn't see a token that a shell profile,
+as `~/.bashrc`, exports. The setting and the GitHub account need no environment variable: they are the way to give a
+token to such an IDE.
+
+LSP4IJ doesn't send the token with the download of the asset, nor to another host, even on a redirect. The console, the
+notifications and the log never show it: they name where it comes from, as `the token of the environment variable
+GITHUB_TOKEN`, `the token of the LSP4IJ settings` or `the token of the IDE's GitHub account octocat`.
+
+###### GitHub API rate limit
 
 When a request to the GitHub API fails, the console says why:
 
 | The console says                                     | Because                                                                                                                                                                                                      |
 |------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `GitHub API rate limit reached`                      | the 60 requests an hour, or those of the token, are used up; the console says when the limit resets                                                                                                          |
-| `GitHub API refused the token ... (HTTP 401)`        | the token is invalid or has expired                                                                                                                                                                          |
+| `GitHub API rate limit reached`                      | the 60 requests an hour, or those of the token, are used up; the console says when the limit resets, and, without a token, where to set one                                                                  |
+| `GitHub API refused the token ... (HTTP 401)`        | the token is invalid or has expired; the console says where it comes from, and how to replace it                                                                                                             |
 | `... enforces SAML single sign-on`                   | the owner of the repository is an organization which enforces SAML single sign-on, and the token isn't authorized for it; the console shows the link which authorizes it, for an hour, when GitHub gives one |
 | `the token lacks the permission ...`                 | the token, as a fine-grained one, hasn't the permissions that GitHub names                                                                                                                                   |
 | `the repository ... was not found, or it is private` | the `owner` or the `repository` of the download is wrong, or the repository is private                                                                                                                       |
 
 When GitHub refuses the token, as for these messages, or the rate limit of the token is reached, LSP4IJ tries the
 request once again without the token, since the releases of a public repository don't need one, and the console says
-so.
+so. This is the same for a token of the environment, of the settings or of the GitHub account.
 
 When a download without `url` fails for one of these reasons, the notification of the failed installation says why
-too.
+too, as the console does. At the rate limit, for example:
+
+> Installation of `clojure-lsp` failed.
+>
+> GitHub API rate limit reached: 60 requests an hour (HTTP 403). It resets at 15:35:07 (local time). A GitHub token in
+> Settings | Languages & Frameworks | Language Servers (LSP4IJ), or in the environment variable GITHUB_TOKEN of the
+> IDE, raises the limit to 5,000 requests an hour.
+
+<!-- TODO: a screenshot of this notification, taken from a running IDE, as
+     docs/images/user-defined-ls/GitHubRateLimitNotification.png -->
 
 The IDE's log, `idea.log` (*Help | Show Log in Finder*, *Explorer* or *Files*), has a line for each download, with its
 URL, where the URL comes from and how long it took, and a warning for a rate limit, a refused token or a failed
