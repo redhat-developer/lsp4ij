@@ -21,6 +21,7 @@ import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
 import com.redhat.devtools.lsp4ij.templates.ServerMappingSettings;
 import com.redhat.devtools.lsp4ij.mock.MockLanguageServer;
 import com.redhat.devtools.lsp4ij.mock.MockLanguageServerDefinition;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
 
@@ -72,9 +73,20 @@ public abstract class LSPCodeInsightFixtureTestCase extends UsefulTestCase {
     }
 
     private void registerServer() {
-        serverDefinition = new MockLanguageServerDefinition(clientConfigurable, true);
+        serverDefinition = createServerDefinition(clientConfigurable);
         List<ServerMappingSettings> mappings = List.of(ServerMappingSettings.createFileNamePatternsMappingSettings(List.of(fileNamePatterns), languageId));
         LanguageServersRegistry.getInstance().addServerDefinition(myFixture.getProject(), serverDefinition, mappings);
+    }
+
+    /**
+     * Creates the definition of the mock language server that the files of the test map to, which a test overrides to
+     * change what the client features of the language server do.
+     *
+     * @param clientConfigurable whether the client of the language server can be configured.
+     * @return the definition.
+     */
+    protected @NotNull MockLanguageServerDefinition createServerDefinition(boolean clientConfigurable) {
+        return new MockLanguageServerDefinition(clientConfigurable, true);
     }
 
     private void unregisterServer() {

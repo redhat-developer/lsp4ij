@@ -16,6 +16,7 @@ import com.intellij.openapi.fileEditor.FileEditorManagerListener;
 import com.intellij.testFramework.IndexingTestUtil;
 import com.intellij.testFramework.PlatformTestUtil;
 import com.intellij.util.containers.ContainerUtil;
+import com.redhat.devtools.lsp4ij.client.indexing.ProjectIndexingManager;
 import com.redhat.devtools.lsp4ij.fixtures.LSPCodeInsightFixtureTestCase;
 import com.redhat.devtools.lsp4ij.mock.MockLanguageServer;
 import org.eclipse.lsp4j.DidOpenTextDocumentParams;
@@ -84,6 +85,7 @@ public class SelectedEditorConnectionTest extends LSPCodeInsightFixtureTestCase 
     public void testASelectionWhoseConnectionRunsAfterItsTabClosedLeavesTheFileDisconnected() throws Exception {
         var running = myFixture.addFileToProject("running.ts", "const running=1;");
         var closed = myFixture.addFileToProject("closed.ts", "const closed=1;");
+        var later = myFixture.addFileToProject("later.ts", "const later=1;");
         var editors = FileEditorManager.getInstance(myFixture.getProject());
         // the server runs, so a connection of the closed file would reach it at once
         var runningOpened = expectDidOpen("running.ts");
@@ -105,15 +107,27 @@ public class SelectedEditorConnectionTest extends LSPCodeInsightFixtureTestCase 
         NonBlockingReadActionImpl.waitForAsyncTaskCompletion();
 
         // The selection of the closed tab, as a connection that runs after the close sees it, on a slow machine.
-        // Its read action waits for indexing, which must not outlast the time checked below.
+        // Its connection waits for indexing to end, and then checks the file in a read action. The test holds that
+        // wait, so that the read action is submitted as the test ends it, and is waited for.
         IndexingTestUtil.waitUntilIndexesAreReady(myFixture.getProject());
         var reopened = expectDidOpen("closed.ts");
-        projectEditorListeners().selectionChanged(
-                new FileEditorManagerEvent(editors, null, null, null, closed.getVirtualFile(), null, null));
+        var indexed = holdTheWaitsForIndexing();
+        try {
+            projectEditorListeners().selectionChanged(
+                    new FileEditorManagerEvent(editors, null, null, null, closed.getVirtualFile(), null, null));
+        } finally {
+            indexed.complete(null);
+        }
         NonBlockingReadActionImpl.waitForAsyncTaskCompletion();
 
-        // a connection would send the didOpen within the time the others take
-        dispatchEventsFor(2);
+        // A connection of the closed file, which the read action would have started, would send its didOpen before a
+        // connection of another file that starts after the read action, as the selection's does
+        var connection = new DocumentConnectionScope();
+        LanguageServiceAccessor.getInstance(myFixture.getProject())
+                .getLanguageServersForScope(later, null, null, connection)
+                .whenComplete((servers, error) -> connection.close());
+        PlatformTestUtil.waitWithEventsDispatching("a later connection must send its didOpen",
+                () -> MockLanguageServer.INSTANCE.getNotifications().contains("didOpen:later.ts"), 30);
         assertFalse("the closed file must stay disconnected", reopened.isDone());
     }
 
@@ -228,12 +242,17 @@ public class SelectedEditorConnectionTest extends LSPCodeInsightFixtureTestCase 
         return myFixture.getProject().getMessageBus().syncPublisher(FileEditorManagerListener.FILE_EDITOR_MANAGER);
     }
 
-    private static void dispatchEventsFor(int seconds) throws InterruptedException {
-        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(seconds);
-        while (System.nanoTime() < deadline) {
-            PlatformTestUtil.dispatchAllInvocationEventsInIdeEventQueue();
-            Thread.sleep(20);
-        }
+    /**
+     * Holds what waits for indexing to end, as the connection of a selected tab does, until the returned future is
+     * completed, which then runs it. The caller must complete the future, also when the test fails.
+     */
+    private static CompletableFuture<Void> holdTheWaitsForIndexing() throws ReflectiveOperationException {
+        // ProjectIndexingManager.waitForIndexingAll() gives the future of the current wait until it is done
+        var current = ProjectIndexingManager.class.getDeclaredField("waitForIndexingAllFuture");
+        current.setAccessible(true);
+        var held = new CompletableFuture<Void>();
+        current.set(null, held);
+        return held;
     }
 
     /**
