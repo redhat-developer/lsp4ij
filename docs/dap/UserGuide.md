@@ -356,7 +356,8 @@ server's [stopped](https://microsoft.github.io/debug-adapter-protocol//specifica
 session's resumes and steps say. When the DAP server stops a thread without `allThreadsStopped`, the other threads
 stay as they were, running until it says otherwise, as in VS Code. When a thread other than the one where the session
 is suspended continues alone (`allThreadsContinued: false`), the session stays suspended, and the `Frames` view shows
-`Frames not available: the thread is running` for that thread instead of the frames of its stop. When that thread was
+`Frames not available: the thread is running` for that thread instead of the frames of its stop, or
+`Frames not available: the thread has exited` once it has exited. When that thread was
 selected, the selection moves to the top frame of the thread where the session is suspended, which the `Variables`
 view, the execution point, `Step` and `Resume` then follow.
 
@@ -634,7 +635,8 @@ You can `create/remove/update` DAP servers with the `Build, Execution, Deploymen
 
 LSP4IJ provides DAP templates that allow to initialize a given DAP server very quickly:
 
-- [CodeLLDB](./user-defined-dap/codelldb.md) which allows you to debug `Rust`,`Swift`, etc. files.
+- [CodeLLDB](./user-defined-dap/codelldb.md) which allows you to debug `Rust` files. Add mappings for the other
+  languages that LLDB debugs.
 - [Docker: Dockerfile Build Debugging](./user-defined-dap/buildx-dockerfile.md) which allows you to debug the build of a
   `Dockerfile`.
 - [Erlang edb DAP server](./user-defined-dap/erlang-edb.md) which allows you to debug `Erlang` files.

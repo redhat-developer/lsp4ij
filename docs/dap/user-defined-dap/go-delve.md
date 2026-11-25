@@ -64,7 +64,7 @@ This will automatically populate:
 dlv dap
 ```
 
- * the `Connect to the server by waiting` option is set to `Log pattern before processing` with:
+ * the `Connect to the server by waiting` option is set to `Log pattern before proceeding` with:
 
 ```
 DAP server listening at: ${address}:${port}

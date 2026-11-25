@@ -31,7 +31,7 @@ Current state of [Requests](https://microsoft.github.io/debug-adapter-protocol//
 
 * ✅ [Attach](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_Attach).
 * ❌ [BreakpointLocations](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_BreakpointLocations).
-* ❌ [Cancel](https://microsoft.github.io/debug-adapter-protocol//specification.html#Base_Protocol_Cancel).
+* ✅ [Cancel](https://microsoft.github.io/debug-adapter-protocol//specification.html#Base_Protocol_Cancel): a request which LSP4IJ cancels is cancelled with the `cancel` request when the debug adapter supports it (`supportsCancelRequest`), and is otherwise only dropped on the client.
 * ✅ [Completions](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_Completions) (see [user guide](./UserGuide.md#completion)).
 * ✅ [ConfigurationDone](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_ConfigurationDone).
 * ✅ [Continue](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_Continue).
@@ -68,7 +68,7 @@ Current state of [Requests](https://microsoft.github.io/debug-adapter-protocol//
 * ✅ [StepInTargets](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_StepInTargets).
 * ✅ [StepOut](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_StepOut).
 * ✅ [Terminate](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_Terminate).
-* ✅ [TerminateThreads](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_TerminateThreads), with the `supportsTerminateThreadsRequest` capability: `Terminate Thread` in the context menu of the `Threads` tab terminates the selected threads, in the DAP session they belong to (see [user guide](./UserGuide.md#terminate-a-thread)).
+* ✅ [TerminateThreads](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_TerminateThreads), with the `supportsTerminateThreadsRequest` capability: `Terminate Thread` in the context menu of the `Threads` tab terminates the selected threads, or the thread of the selected frame in the `Frames` view, in the DAP session they belong to (see [user guide](./UserGuide.md#terminate-a-thread)).
 * ✅ [Threads](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_Threads).
 * ✅ [Variables](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_Variables).
 * ❌ [WriteMemory](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_WriteMemory).
