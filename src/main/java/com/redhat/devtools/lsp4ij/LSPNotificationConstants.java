@@ -20,6 +20,12 @@ public class LSPNotificationConstants {
 
     public static final String WORKSPACE_DID_CHANGE_WATCHED_FILES = "workspace/didChangeWatchedFiles";
 
+    public static final String WORKSPACE_DID_CREATE_FILES = "workspace/didCreateFiles";
+
+    public static final String WORKSPACE_DID_RENAME_FILES = "workspace/didRenameFiles";
+
+    public static final String WORKSPACE_DID_DELETE_FILES = "workspace/didDeleteFiles";
+
     public static final String LSP4IJ_GENERAL_NOTIFICATIONS_ID = "LSP4IJ general notifications";
 
     private LSPNotificationConstants() {
