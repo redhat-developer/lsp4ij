@@ -10,6 +10,7 @@ package com.redhat.devtools.lsp4ij;
 import com.intellij.openapi.application.impl.LaterInvocator;
 import com.intellij.openapi.command.WriteCommandAction;
 import com.intellij.openapi.fileEditor.FileDocumentManager;
+import com.intellij.openapi.util.Disposer;
 import com.intellij.openapi.vfs.VfsUtilCore;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiManager;
@@ -18,6 +19,7 @@ import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
 import com.redhat.devtools.lsp4ij.fixtures.LSPCodeInsightFixtureTestCase;
 import com.redhat.devtools.lsp4ij.mock.MockLanguageServer;
 import com.redhat.devtools.lsp4ij.mock.MockLanguageServerDefinition;
+import com.redhat.devtools.lsp4ij.settings.GlobalLanguageServerSettings;
 import org.eclipse.lsp4j.FileOperationFilter;
 import org.eclipse.lsp4j.FileOperationOptions;
 import org.eclipse.lsp4j.FileOperationPattern;
@@ -92,6 +94,13 @@ public class FileOperationEditSaveTest extends LSPCodeInsightFixtureTestCase {
             capabilities.setWorkspace(workspace);
             return capabilities;
         });
+        // The 5 s of the file operations setting are for a user waiting for a rename: once they are up, the rename is
+        // made without the edit. The rename waits for it as long as a slow CI runner takes, and the test's end restores
+        // the setting.
+        var settings = GlobalLanguageServerSettings.getInstance();
+        int fileOperationsTimeout = settings.getFileOperationsTimeout();
+        Disposer.register(getTestRootDisposable(), () -> settings.setFileOperationsTimeout(fileOperationsTimeout));
+        settings.setFileOperationsTimeout((int) TimeUnit.SECONDS.toMillis(30));
     }
 
     public void testWillRenameEditToAFileWithoutAnEditorIsSaved() throws Exception {
