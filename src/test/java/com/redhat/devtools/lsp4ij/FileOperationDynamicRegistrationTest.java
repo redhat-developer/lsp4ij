@@ -61,7 +61,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  * them. A registration which the server withdraws while it initializes, before LSP4IJ installs it, is never installed,
  * and one which it withdraws while LSP4IJ installs it is removed once installed, without removing a registration of the
  * same id that the server made since: neither its file system watchers, nor its commands, nor the workspace folders it
- * turned on.
+ * turned on. A registration of watchers withdrawn before it adds them doesn't replace those of such a registration.
  */
 public class FileOperationDynamicRegistrationTest extends LSPCodeInsightFixtureTestCase {
 
@@ -332,15 +332,35 @@ public class FileOperationDynamicRegistrationTest extends LSPCodeInsightFixtureT
         } finally {
             callHierarchy.release.complete(null);
         }
+        assertTheRegistrationAgainWatches(wrapper);
+    }
 
-        myFixture.getTempDirFixture().createFile("created.txt", "");
-        PlatformTestUtil.waitWithEventsDispatching("the watchers of a registration again of a withdrawn id must stay "
-                + "registered once the first installation ends, and report a change", () -> watched("/created.txt"), 10);
-
-        unregister(new Unregistration("watchers", "workspace/didChangeWatchedFiles"));
-        myFixture.getTempDirFixture().createFile("after.txt", "");
-        awaitTheNotificationsSentSoFar(wrapper);
-        assertFalse("the unregistration of the registration again must remove its watchers", watched("/after.txt"));
+    public void testARegistrationWithdrawnBeforeItAddsItsWatchersLeavesThoseOfARegistrationAgainOfItsIdInPlace()
+            throws Exception {
+        var main = myFixture.getTempDirFixture().createFile("main.foo", "");
+        var wrapper = connect(main);
+        var directory = main.getParent().toNioPath();
+        var held = new HeldRegistration("watchers", "workspace/didChangeWatchedFiles",
+                JSONUtils.getLsp4jGson().toJsonTree(textFilesIn(directory)));
+        var client = MockLanguageServer.INSTANCE.getRemoteProxies().get(0);
+        try {
+            // Given to the wrapper as its client gives it, on another thread, since the installation waits for the test
+            var registered = CompletableFuture.runAsync(() ->
+                    wrapper.registerCapability(new RegistrationParams(List.of(held))));
+            // Once LSP4IJ has found the registration pending, before it adds its watchers
+            get(held.reading, "LSP4IJ must install the registration up to reading its watchers");
+            get(client.unregisterCapability(new UnregistrationParams(List.of(new Unregistration("watchers",
+                    "workspace/didChangeWatchedFiles")))), "the client must answer the unregistration");
+            // Installed before the first registration adds its own watchers, of the same id
+            get(client.registerCapability(new RegistrationParams(List.of(new Registration("watchers",
+                            "workspace/didChangeWatchedFiles", textFilesIn(directory))))),
+                    "the client must answer the registration again");
+            held.release.complete(null);
+            get(registered, "LSP4IJ must end the installation of the first registration");
+        } finally {
+            held.release.complete(null);
+        }
+        assertTheRegistrationAgainWatches(wrapper);
     }
 
     public void testAWithdrawnInstallationLeavesTheWorkspaceFoldersOfARegistrationAgainOn() throws Exception {
@@ -474,6 +494,46 @@ public class FileOperationDynamicRegistrationTest extends LSPCodeInsightFixtureT
             }
             return super.registerCapability(registerOptions);
         }
+    }
+
+    /**
+     * A registration whose options LSP4IJ reads once it has found the registration pending, and before it installs it:
+     * the reading waits until the test releases it.
+     */
+    private static final class HeldRegistration extends Registration {
+
+        private final CompletableFuture<Void> reading = new CompletableFuture<>();
+        private final CompletableFuture<Void> release = new CompletableFuture<>();
+
+        private HeldRegistration(String id, String method, Object registerOptions) {
+            super(id, method, registerOptions);
+        }
+
+        @Override
+        public Object getRegisterOptions() {
+            reading.complete(null);
+            try {
+                release.get(30, TimeUnit.SECONDS);
+            } catch (Exception e) {
+                throw new IllegalStateException("the test must release the reading of the options of '" + getId() + "'", e);
+            }
+            return super.getRegisterOptions();
+        }
+    }
+
+    /**
+     * Asserts that the watchers of the registration again of the id "watchers" are registered, as the server is told
+     * of a change to a file they match, and that its unregistration removes them.
+     */
+    private void assertTheRegistrationAgainWatches(LanguageServerWrapper wrapper) throws Exception {
+        myFixture.getTempDirFixture().createFile("created.txt", "");
+        PlatformTestUtil.waitWithEventsDispatching("the watchers of a registration again of a withdrawn id must stay "
+                + "registered once the first installation ends, and report a change", () -> watched("/created.txt"), 10);
+
+        unregister(new Unregistration("watchers", "workspace/didChangeWatchedFiles"));
+        myFixture.getTempDirFixture().createFile("after.txt", "");
+        awaitTheNotificationsSentSoFar(wrapper);
+        assertFalse("the unregistration of the registration again must remove its watchers", watched("/after.txt"));
     }
 
     /**
