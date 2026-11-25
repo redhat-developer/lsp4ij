@@ -73,10 +73,10 @@ The debug adapter's process gets that environment when it starts, and LSP4IJ loo
 
 ### Installer tab
 
-The `Installer` tab holds the JSON of the [installer](../UserDefinedLanguageServerTemplate.md#installer-descriptor) of
+The `Installer` tab holds the JSON of the [installer](../Installer.md) of
 the DAP server, as its [template](#templates) gives it. Before the first debug session of the DAP server in each IDE
 session, LSP4IJ runs the `check` of the installer, and its `run` if the check fails, in a console, and then starts the
-debug session (see [When the installer runs](../UserDefinedLanguageServerTemplate.md#when-the-installer-runs)). The
+debug session (see [When the installer runs](../Installer.md#when-the-installer-runs)). The
 `Installer` tab of the debug session has the links `Check Installation`, `Run Installation` and
 `Check / Run Installation`, which run the installer again.
 
@@ -681,7 +681,7 @@ A DAP template is a folder in
 files, of which only `template.json` is required:
 
 - `template.json`: the DAP server, its command and its file mappings.
-- `installer.json`: the [installer](../UserDefinedLanguageServerTemplate.md#installer-descriptor) of the DAP server.
+- `installer.json`: the [installer](../Installer.md) of the DAP server.
 - each file whose name starts with `launch.` or `attach.`, such as `launch.json` or `attach.tcp.json`: a launch or an
   attach configuration, the `DAP parameters (JSON)` of the `Configuration` tab, named by its `name`. The tab offers
   them in `Use the configuration:`, and fills the first launch and the first attach configuration. A template with

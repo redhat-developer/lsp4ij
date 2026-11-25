@@ -125,7 +125,7 @@ to `"$USER_HOME$/.lsp4ij/dap/codelldb/extension/adapter/codelldb"` (`codelldb.ex
 ![Debugging / Installing](../images/codelldb/server_installing.png)
 
 If you encounter an error during installation, go to the `Installer` tab, update the 
-[Installer Descriptor](https://github.com/redhat-developer/lsp4ij/blob/main/docs/UserDefinedLanguageServerTemplate.md#installer-descriptor)
+[Installer Descriptor](https://github.com/redhat-developer/lsp4ij/blob/main/docs/Installer.md)
 , and run `Run Installation` again:
 
 ![Installer](../images/codelldb/installer_tab.png)

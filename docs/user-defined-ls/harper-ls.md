@@ -42,6 +42,6 @@ then click on the **Run Installation** hyperlink to reinstall the server:
 
 ![Installer tab](../images/user-defined-ls/harper-ls/installer_tab.png)
 
-See [Installer descriptor](../UserDefinedLanguageServerTemplate.md#installer-descriptor) for more information.
+See [Installer descriptor](../Installer.md) for more information.
 
 ---

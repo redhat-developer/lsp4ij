@@ -30,10 +30,10 @@ Once you clicked on either of them, the dialog will appear:
 
 When you click the `OK` button, the language server will be created.
 
-If the language server definition [declares an installer](UserDefinedLanguageServerTemplate.md#installer-descriptor)
+If the language server definition [declares an installer](./Installer.md)
 in the [Installer tab](#installer-tab), the installer runs at the first start of the language server: it checks the
 installation, installs the language server if the check fails, and then starts it. See
-[When the installer runs](./UserDefinedLanguageServerTemplate.md#when-the-installer-runs).
+[When the installer runs](./Installer.md#when-the-installer-runs).
 
 You can check the installation again with the `Install if Needed` action, or reinstall the server at any time (e.g. to
 fetch the latest version) using the `Reinstall` action, in the context menu of the language server in the LSP console:
@@ -247,10 +247,10 @@ with task to execute like:
 ![Installer tab](images/user-defined-ls/InstallUserDefinedLanguageServer.png)
 
 A language server created with this JSON runs it at its first start, see
-[When the installer runs](UserDefinedLanguageServerTemplate.md#when-the-installer-runs). In the LSP console, the tab
+[When the installer runs](./Installer.md#when-the-installer-runs). In the LSP console, the tab
 also has the links `Check Installation`, `Run Installation` and `Check / Run Installation`, which run the JSON of the
 tab and show its output next to it; a link whose task the JSON doesn't have says that there is nothing to check or to
-install. See [here](UserDefinedLanguageServerTemplate.md#installer-descriptor)
+install. See [here](./Installer.md)
 to understand how to write this JSON installer descriptor.
 
 ### Workspace Folders tab
