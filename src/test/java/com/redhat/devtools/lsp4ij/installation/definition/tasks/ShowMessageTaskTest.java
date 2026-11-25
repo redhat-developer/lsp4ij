@@ -22,12 +22,14 @@ import com.redhat.devtools.lsp4ij.installation.definition.InstallerTaskRegistry;
 import com.redhat.devtools.lsp4ij.installation.definition.ServerInstallerDescriptor;
 import org.jetbrains.annotations.NotNull;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
@@ -118,7 +120,9 @@ public class ShowMessageTaskTest extends BasePlatformTestCase {
 
     public void testAnInterruptedTaskEnds() throws Exception {
         var ended = new CompletableFuture<Throwable>();
+        var taskThread = new CompletableFuture<Thread>();
         Future<?> running = executor.submit(() -> {
+            taskThread.complete(Thread.currentThread());
             try {
                 createTask().run(new InstallerContext(null, InstallerContext.InstallerAction.RUN));
                 ended.complete(null);
@@ -127,12 +131,34 @@ public class ShowMessageTaskTest extends BasePlatformTestCase {
             }
         });
         waitForTheNotification();
+        // The test's listener gets the notification while Notifications.Bus.notify() still delivers it to the others,
+        // where an interrupt would end a service that a listener of the platform still creates, and not the task
+        // (#2259)
+        Thread thread = taskThread.get(TIMEOUT, TimeUnit.SECONDS);
+        PlatformTestUtil.waitWithEventsDispatching("The task must wait for the user's choice",
+                () -> waitsForTheChoice(thread), TIMEOUT);
 
         running.cancel(true);
 
         PlatformTestUtil.waitWithEventsDispatching("The task must end once its thread is interrupted", ended::isDone, TIMEOUT);
         assertInstanceOf(ended.get(), ProcessCanceledException.class);
         assertFalse(actionRan.get());
+    }
+
+    /**
+     * Returns true if the given thread waits in {@link ShowMessageTask#run} for the user's choice: in
+     * {@code Object.wait}, as the stack of that thread shows, since its state alone doesn't say what it waits for.
+     */
+    private static boolean waitsForTheChoice(@NotNull Thread thread) {
+        if (thread.getState() != Thread.State.TIMED_WAITING) {
+            return false;
+        }
+        StackTraceElement[] stack = thread.getStackTrace();
+        return stack.length > 0
+                && stack[0].getClassName().equals(Object.class.getName())
+                && stack[0].getMethodName().startsWith("wait")
+                && Arrays.stream(stack).anyMatch(frame -> frame.getClassName().equals(ShowMessageTask.class.getName())
+                && frame.getMethodName().equals("run"));
     }
 
     private @NotNull ShowMessageTask createTask() {
