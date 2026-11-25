@@ -49,6 +49,7 @@ You can find more documentation in:
 
  * [the developer guide](./docs/DeveloperGuide.md), providing step-by-step instructions on how to integrate a language server in LSP4IJ in an external IntelliJ plugin.
  * [the LSP API](./docs/LSPApi.md), describing how an IntelliJ plugin customizes the LSP features of its language server.
+ * [the workspace folder strategies](./docs/WorkspaceFolders.md), describing how an IntelliJ plugin chooses the workspace folders of its language server.
  * [the User-defined language server documentation](./docs/UserDefinedLanguageServer.md), explaining how to integrate a language server in LSP4IJ with few settings. 
  * [the template documentation](./docs/UserDefinedLanguageServerTemplate.md), describing the templates of user-defined language servers and their installers.
  * [the user guide](./docs/UserGuide.md), which explains how to use LSP console and Language Server preferences.

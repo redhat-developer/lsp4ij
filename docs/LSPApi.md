@@ -453,6 +453,17 @@ public class MyLSPDiagnosticFeature extends LSPDiagnosticFeature {
 ```
 
 
+### Observing diagnostic cache updates
+
+Override `LSPDiagnosticFeature.diagnosticsUpdated(VirtualFile, List<Diagnostic>)`
+to maintain a Problems view or another diagnostic consumer. It receives the
+current merged cache after a report is processed, including closed-file updates
+and empty lists that clear diagnostics. Notifications may repeat unchanged data;
+the supplied diagnostics are read-only and must not be mutated. The callback is
+synchronous under the document cache lock: copy any needed presentation data,
+return promptly, and schedule UI work separately. Use client lifecycle callbacks
+to discard retained results when the server stops or is disposed.
+
 ## LSP DocumentHighlight Feature
 
 | API                               | Description                                                                                                                                                                                                                        | Default Behaviour           |
@@ -1176,14 +1187,3 @@ public class MyLanguageServerFactory implements LanguageServerFactory {
     }
 }
 ```
-
-### Observing diagnostic cache updates
-
-Override `LSPDiagnosticFeature.diagnosticsUpdated(VirtualFile, List<Diagnostic>)`
-to maintain a Problems view or another diagnostic consumer. It receives the
-current merged cache after a report is processed, including closed-file updates
-and empty lists that clear diagnostics. Notifications may repeat unchanged data;
-the supplied diagnostics are read-only and must not be mutated. The callback is
-synchronous under the document cache lock: copy any needed presentation data,
-return promptly, and schedule UI work separately. Use client lifecycle callbacks
-to discard retained results when the server stops or is disposed.
