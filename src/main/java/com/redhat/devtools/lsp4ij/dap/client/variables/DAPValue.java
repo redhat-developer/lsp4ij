@@ -25,10 +25,12 @@ import org.eclipse.lsp4j.debug.VariablePresentationHintAttributes;
 import org.jetbrains.annotations.Nls;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.jetbrains.annotations.TestOnly;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.swing.*;
+import java.time.Duration;
 import java.util.Arrays;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
@@ -48,6 +50,9 @@ public class DAPValue extends XNamedValue {
      * never answers must not leave the user without one.
      */
     static final int DECLARATION_TIMEOUT_SECONDS = 3;
+
+    // How long the "Jump to Source" of this value waits for the DAP server, which only a test changes
+    private volatile @NotNull Duration declarationTimeout = Duration.ofSeconds(DECLARATION_TIMEOUT_SECONDS);
 
     @NotNull
     private final DAPStackFrame stackFrame;
@@ -291,20 +296,32 @@ public class DAPValue extends XNamedValue {
             return getSourcePositionOfName();
         }
         DAPClient client = getClient();
+        Duration timeout = declarationTimeout;
         return DAPLocations.locate(this, reference, DAPBundle.message("dap.variables.declaration.stale"))
                 .thenComposeAsync(location -> DAPLocations.getSourcePosition(client, location),
                         AppExecutorUtil.getAppExecutorService())
-                .orTimeout(DECLARATION_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+                .orTimeout(timeout.toMillis(), TimeUnit.MILLISECONDS)
                 .exceptionally(error -> {
                     Throwable cause = error instanceof CompletionException && error.getCause() != null ?
                             error.getCause() : error;
                     LOGGER.warn("Cannot locate the declaration of '{}', its name is searched instead: {}", getName(),
                             cause instanceof TimeoutException ?
-                                    "no answer within " + DECLARATION_TIMEOUT_SECONDS + " seconds" : cause.getMessage());
+                                    "no answer within " + timeout.toMillis() + " ms" : cause.getMessage());
                     return null;
                 })
                 .thenCompose(position -> position != null ?
                         CompletableFuture.completedFuture(position) : getSourcePositionOfName());
+    }
+
+    /**
+     * Sets how long the "Jump to Source" of this value waits for the DAP server to locate the declaration, before it
+     * searches the name instead, {@link #DECLARATION_TIMEOUT_SECONDS} seconds by default.
+     *
+     * @param declarationTimeout how long "Jump to Source" waits for the DAP server.
+     */
+    @TestOnly
+    void setDeclarationTimeout(@NotNull Duration declarationTimeout) {
+        this.declarationTimeout = declarationTimeout;
     }
 
     /**
