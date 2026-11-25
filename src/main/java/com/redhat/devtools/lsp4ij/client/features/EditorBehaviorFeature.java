@@ -27,6 +27,7 @@ import org.jetbrains.annotations.Nullable;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Stream;
 
 /**
  * Client-side editor behavior feature. This does not correspond to an actual LSP feature.
@@ -235,10 +236,11 @@ public class EditorBehaviorFeature {
 
         LanguageServiceAccessor languageServiceAccessor = LanguageServiceAccessor.getInstance(project);
         // Evict if any language server definition config that could affect the file changes. The counts are read
-        // before the language servers are, see FlagValue
-        List<TrackerCount> trackerCounts = languageServiceAccessor.getModificationTrackers(file)
-                .stream()
-                .map(TrackerCount::of)
+        // before the language servers are, see FlagValue. The count of the project's language servers is read first,
+        // before the language servers of the file are looked for
+        TrackerCount languageServersCount = TrackerCount.of(languageServiceAccessor::getModificationCount);
+        List<TrackerCount> trackerCounts = Stream.concat(Stream.of(languageServersCount),
+                        languageServiceAccessor.getModificationTrackers(file).stream().map(TrackerCount::of))
                 .toList();
         boolean value = languageServiceAccessor.hasAny(
                 file,
@@ -257,6 +259,11 @@ public class EditorBehaviorFeature {
      * a change that the flag missed, and keep the flag until the next change: a file opened as its language server
      * started then kept the flags of a file that no started language server serves, such as a semantic tokens-based
      * file view provider that stays disabled.
+     * <p>
+     * The count of the project's language servers, which changes as one starts, is read before the language servers
+     * of the file are looked for. A language server created after that lookup isn't among them, so its own count isn't
+     * kept, but the flag can still be computed from it once it has started. Read after the lookup, that count could
+     * already include the start, and the flag would miss the later changes of that language server.
      *
      * @param value         the flag.
      * @param trackerCounts the modification counts read before the flag was computed.
