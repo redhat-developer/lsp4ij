@@ -24,7 +24,7 @@ When a language server is started, several actions are available, like stopping 
 
 When a language server is running, hovering over it shows the name and version that the server reports in its response to [initialize](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#initialize), when it reports them:
 
-![LSP console server name and version](./images/LSPConsoleServerInfo.png)
+![LSP console tooltips of a language server, with its name and version, and of its process](./images/LSPConsoleServerInfo.png)
 
 ### Language Server Installation
 
