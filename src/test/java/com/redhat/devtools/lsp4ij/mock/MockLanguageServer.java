@@ -52,7 +52,8 @@ public final class MockLanguageServer implements LanguageServer {
 	private volatile InitializeParams initializeParams;
 	private volatile boolean started;
 
-	private final List<LanguageClient> remoteProxies = new ArrayList<>();
+	// Each start of the language server connects its client here, and several can start at the same time
+	private final List<LanguageClient> remoteProxies = new CopyOnWriteArrayList<>();
 
 	private final List<CompletableFuture<?>> inFlight = new CopyOnWriteArrayList<>();
 

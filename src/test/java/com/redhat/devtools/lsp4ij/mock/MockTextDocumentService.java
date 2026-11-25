@@ -81,7 +81,8 @@ public class MockTextDocumentService implements TextDocumentService {
     private ConcurrentLinkedQueue<DidChangeTextDocumentParams> didChangeEvents = new ConcurrentLinkedQueue<>();
 
     private Function<?, ? extends CompletableFuture<?>> _futureFactory;
-    private List<LanguageClient> remoteProxies;
+    // Each start of the language server connects its client here, and several can start at the same time
+    private final List<LanguageClient> remoteProxies = new CopyOnWriteArrayList<>();
     private Location[] mockReferences = new Location[0];
     private final List<ReferenceParams> referenceRequests = new CopyOnWriteArrayList<>();
     private List<Diagnostic> publishDiagnostics;
@@ -111,7 +112,6 @@ public class MockTextDocumentService implements TextDocumentService {
         mockCompletionList = new CompletionList(false, Collections.singletonList(item));
         mockCompletionItem = null;
         mockHover = new Hover(Collections.singletonList(Either.forLeft("Mock hover")), null);
-        this.remoteProxies = new ArrayList<>();
         this.documentSymbols = Collections.emptyList();
         this.codeActionRequests = 0;
     }
@@ -525,7 +525,9 @@ public class MockTextDocumentService implements TextDocumentService {
         this.mockCodeLenses = null;
         this.mockReferences = null;
         this.referenceRequests.clear();
-        this.remoteProxies = new ArrayList<>();
+        synchronized (this.remoteProxies) {
+            this.remoteProxies.clear();
+        }
         this.mockCodeActions = new ArrayList<>();
         this.mockResolvedCodeAction = new CodeAction();
         this.diagnosticRequests.clear();
