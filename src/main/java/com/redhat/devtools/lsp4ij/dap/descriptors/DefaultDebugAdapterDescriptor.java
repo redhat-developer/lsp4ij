@@ -86,7 +86,9 @@ public class DefaultDebugAdapterDescriptor extends DebugAdapterDescriptor {
     protected GeneralCommandLine createStartServerCommandLine(
             @NotNull RunConfigurationOptions options) throws ExecutionException {
         if (options instanceof DAPRunConfigurationOptions dapOptions) {
-            String workingDirectory = dapOptions.getWorkingDirectory();
+            // Without a working directory, the directory of the file, whose environment the Debug Adapter then gets
+            String workingDirectory = LaunchUtils.getWorkingDirectory(dapOptions.getWorkingDirectory(),
+                    dapOptions.getFile(), environment.getProject());
             String command = dapOptions.getCommand();
 
             if (StringUtils.isBlank(command)) {
