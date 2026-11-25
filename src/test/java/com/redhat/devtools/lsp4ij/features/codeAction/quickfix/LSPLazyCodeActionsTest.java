@@ -117,7 +117,7 @@ public class LSPLazyCodeActionsTest extends LSPCodeInsightFixtureTestCase {
             assertNotNull(codeAction);
             assertTrue(codeAction.isLeft());
         }
-        assertEquals(1, textDocumentService.codeActionRequests);
+        assertEquals(1, textDocumentService.codeActionRequests.get());
     }
 
     public void testCodeActionsLoadAgainAfterAPendingRequestWasCancelled() throws Exception {
@@ -136,7 +136,7 @@ public class LSPLazyCodeActionsTest extends LSPCodeInsightFixtureTestCase {
         try {
             Future<?> pending = ApplicationManager.getApplication().executeOnPooledThread(() -> codeActions.getCodeActionAt(0));
             PlatformTestUtil.waitWithEventsDispatching("textDocument/codeAction must be sent",
-                    () -> textDocumentService.codeActionRequests > 0, 30);
+                    () -> textDocumentService.codeActionRequests.get() > 0, 30);
             assertFalse("The first load must still wait for the held reply when its request is cancelled",
                     pending.isDone());
             // LSPDiagnosticsForServer cancels the lazy code actions whenever diagnostics are published again, also
@@ -188,7 +188,7 @@ public class LSPLazyCodeActionsTest extends LSPCodeInsightFixtureTestCase {
             PlatformTestUtil.waitWithEventsDispatching("the pending load must create its request",
                     codeActions::hasRequest, 30);
             assertEquals("The request must wait for the server to initialize", 0,
-                    textDocumentService.codeActionRequests);
+                    textDocumentService.codeActionRequests.get());
             codeActions.cancel();
         } finally {
             initialize.complete(null);
@@ -205,7 +205,7 @@ public class LSPLazyCodeActionsTest extends LSPCodeInsightFixtureTestCase {
         assertNotNull(codeAction);
         assertTrue(codeAction.isLeft());
         // The request cancelled while the server initialized must not be sent; only the new load's request is.
-        assertEquals(1, textDocumentService.codeActionRequests);
+        assertEquals(1, textDocumentService.codeActionRequests.get());
     }
 
     public void testAQuickFixLoadsNoCodeActionWhileIndexing() throws Exception {
@@ -226,11 +226,11 @@ public class LSPLazyCodeActionsTest extends LSPCodeInsightFixtureTestCase {
             assertEquals(LanguageServerBundle.message("lsp.intention.code.action.kind.empty"),
                     onPooledThread(quickFix::getFamilyName));
             assertFalse(onPooledThread(() -> quickFix.isAvailable(myFixture.getProject(), myFixture.getEditor(), file)));
-            assertEquals(0, textDocumentService.codeActionRequests);
+            assertEquals(0, textDocumentService.codeActionRequests.get());
         });
 
         assertEquals("Remove unused declaration for: 'foo'", onPooledThread(quickFix::getText));
-        assertEquals(1, textDocumentService.codeActionRequests);
+        assertEquals(1, textDocumentService.codeActionRequests.get());
     }
 
     public void testCodeActionsOfADisposedLanguageServerAreNone() throws Exception {

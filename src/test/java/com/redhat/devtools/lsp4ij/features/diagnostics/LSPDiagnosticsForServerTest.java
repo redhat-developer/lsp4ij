@@ -59,7 +59,7 @@ public class LSPDiagnosticsForServerTest extends LSPCodeInsightFixtureTestCase {
         try {
             pending = ApplicationManager.getApplication().executeOnPooledThread(editorQuickFix::getText);
             PlatformTestUtil.waitWithEventsDispatching("textDocument/codeAction must be sent",
-                    () -> textDocumentService.codeActionRequests > 0, 30);
+                    () -> textDocumentService.codeActionRequests.get() > 0, 30);
             assertFalse("The request must still wait for the held reply when the diagnostics are published again",
                     pending.isDone());
 
@@ -77,7 +77,7 @@ public class LSPDiagnosticsForServerTest extends LSPCodeInsightFixtureTestCase {
 
         assertEquals(QUICK_FIX_TITLE, editorQuickFix.getText());
         assertEquals("The pending request must not be cancelled and sent again", 1,
-                textDocumentService.codeActionRequests);
+                textDocumentService.codeActionRequests.get());
         assertSame("The editor keeps its quick fix, so the update must keep it current",
                 editorQuickFix, diagnostics.getQuickFixesFor(createDiagnostic(), file).get(0));
     }

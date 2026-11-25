@@ -29,6 +29,7 @@ import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import java.util.function.Predicate;
@@ -98,7 +99,8 @@ public class MockTextDocumentService implements TextDocumentService {
     private List<FoldingRange> foldingRanges;
     private List<InlineValue> mockInlineValues;
     private final List<InlineValueParams> inlineValueRequests = new CopyOnWriteArrayList<>();
-    public int codeActionRequests = 0;
+    // Counted by the threads which read the messages, and read by the tests while they wait for a request
+    public final AtomicInteger codeActionRequests = new AtomicInteger();
     public volatile CodeActionParams lastCodeActionParams;
     // Completes when the replies to textDocument/codeAction may be sent
     private volatile CompletableFuture<Void> codeActionGate = CompletableFuture.completedFuture(null);
@@ -113,7 +115,6 @@ public class MockTextDocumentService implements TextDocumentService {
         mockCompletionItem = null;
         mockHover = new Hover(Collections.singletonList(Either.forLeft("Mock hover")), null);
         this.documentSymbols = Collections.emptyList();
-        this.codeActionRequests = 0;
     }
 
     private <U> CompletableFuture<U> futureFactory(U value) {
@@ -222,7 +223,7 @@ public class MockTextDocumentService implements TextDocumentService {
 
     @Override
     public CompletableFuture<List<Either<Command, CodeAction>>> codeAction(CodeActionParams params) {
-        codeActionRequests++;
+        codeActionRequests.incrementAndGet();
         lastCodeActionParams = params;
         // Filter code actions by using params.getContext().getOnly()
         var only = (params.getContext() != null && params.getContext().getOnly() != null && !params.getContext().getOnly().isEmpty()) ?
@@ -539,7 +540,7 @@ public class MockTextDocumentService implements TextDocumentService {
         this.prepareRenameProcessor = null;
         this.documentSymbols = Collections.emptyList();
         this.foldingRanges = new ArrayList<>();
-        this.codeActionRequests = 0;
+        this.codeActionRequests.set(0);
         this.lastCodeActionParams = null;
         this.codeActionGate = CompletableFuture.completedFuture(null);
         this.resolveCompletionItemProcessor = null;
