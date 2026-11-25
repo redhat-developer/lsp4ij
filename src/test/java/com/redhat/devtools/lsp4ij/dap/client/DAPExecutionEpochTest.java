@@ -12,6 +12,8 @@ package com.redhat.devtools.lsp4ij.dap.client;
 
 import org.junit.jupiter.api.Test;
 
+import java.lang.management.ManagementFactory;
+import java.lang.management.ThreadInfo;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -175,7 +177,8 @@ public class DAPExecutionEpochTest {
         }, "Step Over");
         step.start();
 
-        assertEquals(Thread.State.BLOCKED, waitUntilBlockedOrEnded(step), "the resume waits for the request");
+        assertEquals(Thread.State.BLOCKED, waitUntilBlockedByOrEnded(step, setValue),
+                "the resume waits for the request");
         assertEquals(stop, epoch.get(), "the epoch doesn't end while its request is written");
         mayWrite.countDown();
         setValue.join(BOUND_MILLIS);
@@ -203,7 +206,8 @@ public class DAPExecutionEpochTest {
         var reader = new Thread(() -> epoch.resumeRefused(ended), "DAP messages");
         reader.start();
         try {
-            assertEquals(Thread.State.TERMINATED, waitUntilBlockedOrEnded(reader), "the refusal waits for the request");
+            assertEquals(Thread.State.TERMINATED, waitUntilBlockedByOrEnded(reader, setValue),
+                    "the refusal waits for the request");
         } finally {
             mayWrite.countDown();
             setValue.join(BOUND_MILLIS);
@@ -228,14 +232,26 @@ public class DAPExecutionEpochTest {
     }
 
     /**
-     * Waits until the given thread is blocked on a lock or has ended, and returns its state then.
+     * Waits until the given thread is blocked on a lock which the given owner holds, or has ended, and returns its
+     * state then.
+     * <p>
+     * A thread is also blocked for a moment on other locks of the JVM, such as a lock of the coverage agent or of a
+     * class which another thread of the test's application loads: only a lock which the owner holds, which is the lock
+     * of the epoch while the owner writes its request, counts.
      */
-    private static Thread.State waitUntilBlockedOrEnded(Thread thread) throws InterruptedException {
+    private static Thread.State waitUntilBlockedByOrEnded(Thread thread, Thread owner) throws InterruptedException {
+        var threads = ManagementFactory.getThreadMXBean();
         long end = System.currentTimeMillis() + BOUND_MILLIS;
         while (System.currentTimeMillis() < end) {
             var state = thread.getState();
-            if (state == Thread.State.BLOCKED || state == Thread.State.TERMINATED) {
+            if (state == Thread.State.TERMINATED) {
                 return state;
+            }
+            if (state == Thread.State.BLOCKED) {
+                ThreadInfo info = threads.getThreadInfo(thread.getId());
+                if (info != null && info.getLockOwnerId() == owner.getId()) {
+                    return state;
+                }
             }
             Thread.sleep(1);
         }
