@@ -106,7 +106,7 @@ public class DirectoryDocumentMoveTest extends LSPCodeInsightFixtureTestCase {
         var accessor = LanguageServiceAccessor.getInstance(project);
         var other = myFixture.getTempDirFixture().createFile("source/other.foo", "other");
         var wrapper = accessor.getLanguageServers(PsiManager.getInstance(project).findFile(other), null, null)
-                .get(5, TimeUnit.SECONDS).get(0).getServerWrapper();
+                .get(30, TimeUnit.SECONDS).get(0).getServerWrapper();
         var file = myFixture.getTempDirFixture().createFile("source/nested/test.foo", "disk");
         var target = myFixture.getTempDirFixture().findOrCreateDir("destination");
         var earlierUri = wrapper.toUri(file);
@@ -137,7 +137,7 @@ public class DirectoryDocumentMoveTest extends LSPCodeInsightFixtureTestCase {
         myFixture.configureFromExistingVirtualFile(virtualFile);
         var file = myFixture.getFile();
         var servers = LanguageServiceAccessor.getInstance(myFixture.getProject())
-                .getLanguageServers(file, null, null).get(5, TimeUnit.SECONDS);
+                .getLanguageServers(file, null, null).get(30, TimeUnit.SECONDS);
         var wrapper = servers.get(0).getServerWrapper();
         WriteCommandAction.writeCommandAction(myFixture.getProject()).run(() -> myFixture.getEditor().getDocument().setText("unsaved"));
         return new Context(virtualFile, wrapper);

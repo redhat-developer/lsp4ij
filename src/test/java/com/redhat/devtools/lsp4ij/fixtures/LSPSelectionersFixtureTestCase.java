@@ -19,14 +19,12 @@ import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.editor.SelectionModel;
 import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.JSONUtils;
-import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
 import com.redhat.devtools.lsp4ij.mock.MockLanguageServer;
 import org.eclipse.lsp4j.FoldingRange;
 import org.eclipse.lsp4j.SelectionRange;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
-import java.util.concurrent.TimeUnit;
 
 /**
  * Base class for language-specific testing of selectioner behavior.
@@ -70,13 +68,7 @@ public abstract class LSPSelectionersFixtureTestCase extends LSPCodeInsightFixtu
         Document document = editor.getDocument();
 
         // Initialize the language server
-        try {
-            LanguageServiceAccessor.getInstance(file.getProject())
-                    .getLanguageServers(file, null, null)
-                    .get(5000, TimeUnit.MILLISECONDS);
-        } catch (Exception e) {
-            fail(e.getMessage());
-        }
+        awaitLanguageServers(file);
 
         // Move the caret to the beginning of the start line
         int lineStartOffset = document.getLineStartOffset(startLineNumber);

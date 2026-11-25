@@ -155,7 +155,7 @@ public class CodeActionsOnTheEdtTest extends LSPCodeInsightFixtureTestCase {
             assertFalse(intention.isAvailable(myFixture.getProject(), myFixture.getEditor(), file));
             assertFalse(quickFix.isAvailable(myFixture.getProject(), myFixture.getEditor(), file));
             PlatformTestUtil.waitWithEventsDispatching("both textDocument/codeAction requests must be sent",
-                    () -> textDocumentService.codeActionRequests == 2, 5);
+                    () -> textDocumentService.codeActionRequests.get() == 2, 30);
         } finally {
             release.complete(null);
         }
@@ -203,7 +203,7 @@ public class CodeActionsOnTheEdtTest extends LSPCodeInsightFixtureTestCase {
         assertEquals("", intention.getText());
         assertFalse("The EDT waited for the language server's answer", release.isDone());
         PlatformTestUtil.waitWithEventsDispatching("textDocument/codeAction must be sent",
-                () -> textDocumentService.codeActionRequests > 0, 5);
+                () -> textDocumentService.codeActionRequests.get() > 0, 30);
         assertFalse("The answer is still held", intention.isAvailable(myFixture.getProject(), myFixture.getEditor(), file));
     }
 
@@ -271,7 +271,7 @@ public class CodeActionsOnTheEdtTest extends LSPCodeInsightFixtureTestCase {
                         intention.isAvailable(myFixture.getProject(), myFixture.getEditor(), file)))
                 .get(HANG_SECONDS, TimeUnit.SECONDS);
         assertTrue(available);
-        assertEquals(requests, MockLanguageServer.INSTANCE.getTextDocumentService().codeActionRequests);
+        assertEquals(requests, MockLanguageServer.INSTANCE.getTextDocumentService().codeActionRequests.get());
     }
 
     /**
@@ -318,7 +318,7 @@ public class CodeActionsOnTheEdtTest extends LSPCodeInsightFixtureTestCase {
     private LanguageServerItem getLanguageServer(PsiFile file) throws Exception {
         List<LanguageServerItem> languageServers = LanguageServiceAccessor.getInstance(file.getProject())
                 .getLanguageServers(file, null, null)
-                .get(5000, TimeUnit.MILLISECONDS);
+                .get(30, TimeUnit.SECONDS);
         assertSize(1, languageServers);
         return languageServers.get(0);
     }

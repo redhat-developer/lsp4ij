@@ -10,13 +10,24 @@ package com.redhat.devtools.lsp4ij.installation.definition.tasks;
 import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.concurrent.TimeUnit;
 
 /**
- * A program which holds the file given as its argument for two seconds, and fails if another program holds it already,
- * as two {@code npm install} in one directory break each other's install: of two exec tasks that run it at the same
- * time with the same file, one fails.
+ * A program which holds the file given as its first argument until the file given as its second argument exists, which
+ * the test creates once the installation which runs it is to end, and fails if another program holds it already, as
+ * two {@code npm install} in one directory break each other's install: of two exec tasks that run it at the same time
+ * with the same file, one fails.
+ * <p>
+ * Since it holds the file until the test releases it, and not for a while, the test decides when the installation
+ * which runs it ends, however slow the machine is. It ends with the exit code 2 if the test doesn't release it within
+ * a minute, so that it doesn't outlive a test which failed.
  */
 public final class HoldFile {
+
+    // How long the program holds a file at most, if the test doesn't release it
+    private static final long MAX_HOLD_NANOS = TimeUnit.SECONDS.toNanos(60);
+    // How often the program looks for the file which releases it
+    private static final long POLL_MILLIS = 10;
 
     private HoldFile() {
     }
@@ -28,10 +39,28 @@ public final class HoldFile {
         } catch (FileAlreadyExistsException e) {
             System.exit(1);
         }
+        boolean released;
         try {
-            Thread.sleep(2000);
+            released = awaitRelease(Path.of(args[1]));
         } finally {
             Files.delete(file);
         }
+        if (!released) {
+            System.exit(2);
+        }
+    }
+
+    /**
+     * Waits until the given file, which the test creates to release the program, exists, and returns true then, or
+     * false if it doesn't exist within a minute.
+     */
+    static boolean awaitRelease(Path release) throws InterruptedException {
+        for (long end = System.nanoTime() + MAX_HOLD_NANOS; !Files.exists(release); ) {
+            if (System.nanoTime() - end >= 0) {
+                return false;
+            }
+            Thread.sleep(POLL_MILLIS);
+        }
+        return true;
     }
 }

@@ -219,7 +219,7 @@ public class DocumentContentProviderTest extends BasePlatformTestCase {
         server.reply(1, "too late");
         assertNull(pending.join());
         assertNull(provider.findFile(URI_TEXT));
-        PlatformTestUtil.waitWithEventsDispatching("retired file becomes invalid", () -> !file.isValid(), 5);
+        PlatformTestUtil.waitWithEventsDispatching("retired file becomes invalid", () -> !file.isValid(), 10);
         assertNull(provider.resolve(URI_TEXT).join());
         assertEquals(2, server.pending.size());
     }
@@ -229,12 +229,12 @@ public class DocumentContentProviderTest extends BasePlatformTestCase {
         var manager = FileEditorManager.getInstance(getProject());
         manager.openFile(file, true);
         assertTrue(manager.isFileOpen(file));
-        CompletableFuture.runAsync(provider::dispose).get(5, TimeUnit.SECONDS);
+        CompletableFuture.runAsync(provider::dispose).get(10, TimeUnit.SECONDS);
         assertNull("Connection lookup retires without waiting for the EDT", provider.findFile(URI_TEXT));
         // This test is on the EDT, so queued close/invalidation has not run yet.
         assertTrue("Visible PSI must stay valid until its editor can close on the EDT", file.isValid());
         PlatformTestUtil.waitWithEventsDispatching("closed view is invalidated",
-                () -> !file.isValid() && !manager.isFileOpen(file), 5);
+                () -> !file.isValid() && !manager.isFileOpen(file), 10);
     }
 
     public void testDisposalCompletesPendingRefreshEvenWhenServerIgnoresCancellation() {
@@ -257,7 +257,7 @@ public class DocumentContentProviderTest extends BasePlatformTestCase {
         features.removeDocumentContentProvider(provider);
         var next = replacement.resolve(URI_TEXT);
         replacementServer.reply(0, "replacement");
-        PlatformTestUtil.waitWithEventsDispatching("old file becomes invalid", () -> !oldFile.isValid(), 5);
+        PlatformTestUtil.waitWithEventsDispatching("old file becomes invalid", () -> !oldFile.isValid(), 10);
         assertSame(next.join(), features.findFileByUri(URI_TEXT));
         var oldResult = new Location("lsp-source:///retired.txt", range());
         assertSame(oldResult, features.prepareDocumentContent(oldResult, server).join());
@@ -300,7 +300,7 @@ public class DocumentContentProviderTest extends BasePlatformTestCase {
         await(shown);
         assertTrue(shown.join().isSuccess());
         PlatformTestUtil.waitWithEventsDispatching("virtual content editor should open",
-                () -> FileEditorManager.getInstance(getProject()).isFileOpen(file), 5);
+                () -> FileEditorManager.getInstance(getProject()).isFileOpen(file), 10);
     }
 
     public void testCapabilitiesAdvertiseDocumentContentWithDynamicRegistration() {
@@ -327,7 +327,7 @@ public class DocumentContentProviderTest extends BasePlatformTestCase {
 
         assertNull(dynamic.findFile(URI_TEXT));
         assertSame(kept, dynamic.findFile("other:///kept.txt"));
-        PlatformTestUtil.waitWithEventsDispatching("the retired document becomes invalid", () -> !retired.isValid(), 5);
+        PlatformTestUtil.waitWithEventsDispatching("the retired document becomes invalid", () -> !retired.isValid(), 10);
         assertTrue(kept.isValid());
         assertNull("a scheme no longer provided is not fetched", dynamic.resolve(URI_TEXT).join());
         assertEquals(2, owner.pending.size());
@@ -344,7 +344,7 @@ public class DocumentContentProviderTest extends BasePlatformTestCase {
     }
 
     private static void await(CompletableFuture<?> future) {
-        PlatformTestUtil.waitWithEventsDispatching("document content operation must complete", future::isDone, 5);
+        PlatformTestUtil.waitWithEventsDispatching("document content operation must complete", future::isDone, 10);
         future.join();
     }
 

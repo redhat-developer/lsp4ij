@@ -94,7 +94,7 @@ public class FileRenameUriTest extends LSPCodeInsightFixtureTestCase {
     private LanguageServerWrapper connect(VirtualFile file) throws Exception {
         var servers = LanguageServiceAccessor.getInstance(myFixture.getProject())
                 .getLanguageServers(PsiManager.getInstance(myFixture.getProject()).findFile(file), null, null)
-                .get(5, TimeUnit.SECONDS);
+                .get(30, TimeUnit.SECONDS);
         return servers.get(0).getServerWrapper();
     }
 

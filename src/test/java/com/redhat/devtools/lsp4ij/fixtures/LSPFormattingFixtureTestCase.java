@@ -13,13 +13,11 @@ package com.redhat.devtools.lsp4ij.fixtures;
 import com.intellij.openapi.actionSystem.IdeActions;
 import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.JSONUtils;
-import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
 import com.redhat.devtools.lsp4ij.mock.MockLanguageServer;
 import org.eclipse.lsp4j.TextEdit;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
-import java.util.concurrent.TimeUnit;
 
 /**
  * Base class test case to test LSP 'textDocument/formatting', 'textDocument/rangeFormatting' features.
@@ -60,13 +58,7 @@ public abstract class LSPFormattingFixtureTestCase extends LSPCodeInsightFixture
         PsiFile file = myFixture.configureByText(fileName, text);
         // As LSPFormattingService is done in async mode, force the connection of the language server
         // to avoid having some block when ReadAction#compute is required (ex: call of LSP4IJUtils#getDocument).
-        try {
-            LanguageServiceAccessor.getInstance(file.getProject())
-                    .getLanguageServers(file, null, null)
-                    .get(5000, TimeUnit.MILLISECONDS);
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+        awaitLanguageServers(file);
 
         myFixture.type('1');
         myFixture.performEditorAction(IdeActions.ACTION_EDITOR_REFORMAT);

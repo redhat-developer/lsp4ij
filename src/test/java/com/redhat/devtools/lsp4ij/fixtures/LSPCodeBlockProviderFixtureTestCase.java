@@ -19,14 +19,12 @@ import com.intellij.openapi.util.Trinity;
 import com.intellij.psi.PsiFile;
 import com.intellij.testFramework.EditorTestUtil;
 import com.redhat.devtools.lsp4ij.JSONUtils;
-import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
 import com.redhat.devtools.lsp4ij.mock.MockLanguageServer;
 import org.eclipse.lsp4j.FoldingRange;
 import org.eclipse.lsp4j.SelectionRange;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
-import java.util.concurrent.TimeUnit;
 
 /**
  * Base class test case to test the 'codeBlockProvider' based on LSP 'textDocument/codeBlock' feature.
@@ -60,13 +58,7 @@ public abstract class LSPCodeBlockProviderFixtureTestCase extends LSPCodeInsight
         Editor editor = myFixture.getEditor();
 
         // Initialize the language server
-        try {
-            LanguageServiceAccessor.getInstance(project)
-                    .getLanguageServers(file, null, null)
-                    .get(5000, TimeUnit.MILLISECONDS);
-        } catch (Exception e) {
-            fail(e.getMessage());
-        }
+        awaitLanguageServers(file);
 
         EditorTestUtil.buildInitialFoldingsInBackground(editor);
 

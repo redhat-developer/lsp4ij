@@ -108,7 +108,7 @@ public class RangesFormattingTest extends LSPCodeInsightFixtureTestCase {
     private String reformat() throws Exception {
         var file = myFixture.configureByText("test.ts", TEXT);
         LanguageServiceAccessor.getInstance(myFixture.getProject())
-                .getLanguageServers(file, null, null).get(5, TimeUnit.SECONDS);
+                .getLanguageServers(file, null, null).get(30, TimeUnit.SECONDS);
         WriteCommandAction.runWriteCommandAction(myFixture.getProject(),
                 () -> CodeStyleManager.getInstance(myFixture.getProject()).reformatText(file, RANGES));
         return myFixture.getEditor().getDocument().getText();

@@ -13,16 +13,26 @@ import com.intellij.openapi.application.impl.NonBlockingReadActionImpl;
 import com.intellij.openapi.fileEditor.FileEditorManager;
 import com.intellij.openapi.fileEditor.FileEditorManagerEvent;
 import com.intellij.openapi.fileEditor.FileEditorManagerListener;
+import com.intellij.openapi.project.Project;
 import com.intellij.testFramework.IndexingTestUtil;
 import com.intellij.testFramework.PlatformTestUtil;
 import com.intellij.util.containers.ContainerUtil;
+import com.redhat.devtools.lsp4ij.client.indexing.ProjectIndexingManager;
 import com.redhat.devtools.lsp4ij.fixtures.LSPCodeInsightFixtureTestCase;
+import com.redhat.devtools.lsp4ij.mock.MockConnectionProvider;
 import com.redhat.devtools.lsp4ij.mock.MockLanguageServer;
+import com.redhat.devtools.lsp4ij.mock.MockLanguageServerDefinition;
+import com.redhat.devtools.lsp4ij.server.StreamConnectionProvider;
 import org.eclipse.lsp4j.DidOpenTextDocumentParams;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 /**
  * Selecting the editor tab of a file connects the file to its language servers, which then receive its didOpen.
@@ -31,10 +41,36 @@ import java.util.concurrent.TimeUnit;
  */
 public class SelectedEditorConnectionTest extends LSPCodeInsightFixtureTestCase {
 
+    // Where the stop of a language server waits for the notifications that its dispatcher holds, before the shutdown
+    private static final String WAIT_FOR_THE_NOTIFICATIONS = "LanguageServerWrapper.waitForTheNotifications";
+
     private boolean codeVisionEnabled;
+
+    // Completed, with its thread, as the stop of the language server checks its connection, which it does right before
+    // it waits for the notifications that its dispatcher holds; null for nothing
+    private volatile @Nullable CompletableFuture<Thread> stopChecksTheConnection;
 
     public SelectedEditorConnectionTest() {
         super("*.ts");
+    }
+
+    @Override
+    protected @NotNull MockLanguageServerDefinition createServerDefinition(boolean clientConfigurable) {
+        return new MockLanguageServerDefinition(clientConfigurable, true) {
+            @Override
+            public @NotNull StreamConnectionProvider createConnectionProvider(@NotNull Project project) {
+                return new MockConnectionProvider(getServer()) {
+                    @Override
+                    public boolean isAlive() {
+                        var checked = stopChecksTheConnection;
+                        if (checked != null) {
+                            checked.complete(Thread.currentThread());
+                        }
+                        return super.isAlive();
+                    }
+                };
+            }
+        };
     }
 
     @Override
@@ -47,6 +83,7 @@ public class SelectedEditorConnectionTest extends LSPCodeInsightFixtureTestCase 
     @Override
     protected void tearDown() throws Exception {
         try {
+            stopChecksTheConnection = null;
             CodeVisionSettings.getInstance().setCodeVisionEnabled(codeVisionEnabled);
         } finally {
             super.tearDown();
@@ -82,6 +119,7 @@ public class SelectedEditorConnectionTest extends LSPCodeInsightFixtureTestCase 
     public void testASelectionWhoseConnectionRunsAfterItsTabClosedLeavesTheFileDisconnected() throws Exception {
         var running = myFixture.addFileToProject("running.ts", "const running=1;");
         var closed = myFixture.addFileToProject("closed.ts", "const closed=1;");
+        var later = myFixture.addFileToProject("later.ts", "const later=1;");
         var editors = FileEditorManager.getInstance(myFixture.getProject());
         // the server runs, so a connection of the closed file would reach it at once
         var runningOpened = expectDidOpen("running.ts");
@@ -103,15 +141,27 @@ public class SelectedEditorConnectionTest extends LSPCodeInsightFixtureTestCase 
         NonBlockingReadActionImpl.waitForAsyncTaskCompletion();
 
         // The selection of the closed tab, as a connection that runs after the close sees it, on a slow machine.
-        // Its read action waits for indexing, which must not outlast the time checked below.
+        // Its connection waits for indexing to end, and then checks the file in a read action. The test holds that
+        // wait, so that the read action is submitted as the test ends it, and is waited for.
         IndexingTestUtil.waitUntilIndexesAreReady(myFixture.getProject());
         var reopened = expectDidOpen("closed.ts");
-        projectEditorListeners().selectionChanged(
-                new FileEditorManagerEvent(editors, null, null, null, closed.getVirtualFile(), null, null));
+        var indexed = holdTheWaitsForIndexing();
+        try {
+            projectEditorListeners().selectionChanged(
+                    new FileEditorManagerEvent(editors, null, null, null, closed.getVirtualFile(), null, null));
+        } finally {
+            indexed.complete(null);
+        }
         NonBlockingReadActionImpl.waitForAsyncTaskCompletion();
 
-        // a connection would send the didOpen within the time the others take
-        dispatchEventsFor(2);
+        // A connection of the closed file, which the read action would have started, would send its didOpen before a
+        // connection of another file that starts after the read action, as the selection's does
+        var connection = new DocumentConnectionScope();
+        LanguageServiceAccessor.getInstance(myFixture.getProject())
+                .getLanguageServersForScope(later, null, null, connection)
+                .whenComplete((servers, error) -> connection.close());
+        PlatformTestUtil.waitWithEventsDispatching("a later connection must send its didOpen",
+                () -> MockLanguageServer.INSTANCE.getNotifications().contains("didOpen:later.ts"), 30);
         assertFalse("the closed file must stay disconnected", reopened.isDone());
     }
 
@@ -150,25 +200,35 @@ public class SelectedEditorConnectionTest extends LSPCodeInsightFixtureTestCase 
         var wrapper = ContainerUtil.getOnlyItem(LanguageServiceAccessor.getInstance(myFixture.getProject()).getStartedServers());
 
         // The dispatcher is still busy, as on a slow machine, when the close of the last file queues its didClose and
-        // stops the server at once, as in tests. It is freed 200 ms later: well within the second that the stop waits
-        // for it before the shutdown, and long after a stop that does not wait has closed the connection.
-        var busy = new CompletableFuture<Void>();
+        // stops the server at once, as in tests. The stop checks the connection of the server, and then waits for the
+        // notifications that the dispatcher holds, a second at most, before the shutdown. The dispatcher is freed by
+        // the stop itself, once its thread waits there, whenever the test thread runs: the stop gets the didClose
+        // then. A stop that does not wait there never frees it, and sends the shutdown first, after which no didClose
+        // is sent.
+        var stopChecked = new CompletableFuture<Thread>();
+        stopChecksTheConnection = stopChecked;
+        var stopWaited = new CompletableFuture<Void>();
+        var released = new CompletableFuture<Void>();
         wrapper.sendNotification(server -> {
-            busy.join();
+            holdTheDispatcherUntilTheStopWaits(stopChecked, stopWaited, released);
             return server;
         });
         try {
             editors.closeFile(last);
             projectEditorListeners().fileClosed(editors, last);
-            busy.completeAsync(() -> null, CompletableFuture.delayedExecutor(200, TimeUnit.MILLISECONDS));
             PlatformTestUtil.waitWithEventsDispatching("the server must stop",
                     () -> wrapper.getServerStatus() == ServerStatus.stopped, 10);
         } finally {
-            busy.complete(null);
+            released.complete(null);
         }
 
-        assertFalse("the server must read the didClose of its last file before it stops; it read, of last.ts, "
-                + openCloseNotificationsOf("last.ts"), isConnected("last.ts"));
+        assertTrue("the stop must check the connection of the server before it waits for the notifications",
+                stopChecked.isDone());
+        assertTrue("the stop must wait in " + WAIT_FOR_THE_NOTIFICATIONS + " for the notifications that the "
+                + "dispatcher holds, within 10 s; the server read, of last.ts, " + openCloseNotificationsOf("last.ts"),
+                stopWaited.isDone());
+        assertEquals("the server must read the didOpen of its last file, and then its didClose, before it stops",
+                List.of("didOpen", "didClose"), openCloseNotificationsOf("last.ts"));
     }
 
     public void testAFeatureThatAsksWhileItsEditorIsOpenDoesNotConnectTheFileAfterTheEditorCloses() throws Exception {
@@ -224,12 +284,72 @@ public class SelectedEditorConnectionTest extends LSPCodeInsightFixtureTestCase 
         return myFixture.getProject().getMessageBus().syncPublisher(FileEditorManagerListener.FILE_EDITOR_MANAGER);
     }
 
-    private static void dispatchEventsFor(int seconds) throws InterruptedException {
-        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(seconds);
-        while (System.nanoTime() < deadline) {
-            PlatformTestUtil.dispatchAllInvocationEventsInIdeEventQueue();
-            Thread.sleep(20);
+    /**
+     * Holds what waits for indexing to end, as the connection of a selected tab does, until the returned future is
+     * completed, which then runs it. The caller must complete the future, also when the test fails.
+     */
+    private static CompletableFuture<Void> holdTheWaitsForIndexing() throws ReflectiveOperationException {
+        // ProjectIndexingManager.waitForIndexingAll() gives the future of the current wait until it is done
+        var current = ProjectIndexingManager.class.getDeclaredField("waitForIndexingAllFuture");
+        current.setAccessible(true);
+        var held = new CompletableFuture<Void>();
+        current.set(null, held);
+        return held;
+    }
+
+    /**
+     * Holds the calling thread, the dispatcher of the language server, until the thread which stops the language server
+     * has checked its connection and then waits in {@link #WAIT_FOR_THE_NOTIFICATIONS}, for the notifications that the
+     * dispatcher holds, before the shutdown. The hold ends without that once the given release is done, once the
+     * thread of the stop has ended, or after 10 s.
+     *
+     * @param stopChecksTheConnection completed with the thread of the stop as it checks the connection.
+     * @param stopWaited              completed as the hold sees the thread of the stop wait for the notifications.
+     * @param release                 completed by the test as it ends.
+     */
+    private static void holdTheDispatcherUntilTheStopWaits(CompletableFuture<Thread> stopChecksTheConnection,
+                                                           CompletableFuture<Void> stopWaited,
+                                                           CompletableFuture<Void> release) {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+        try {
+            CompletableFuture.anyOf(stopChecksTheConnection, release).get(10, TimeUnit.SECONDS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return;
+        } catch (ExecutionException | TimeoutException e) {
+            // no stop checked the connection in time, which the test reports
+            return;
         }
+        var stop = stopChecksTheConnection.getNow(null);
+        // A thread tells no other that it starts to wait, so the thread of the stop is looked at, for the moment between
+        // the check and the wait that follows it. Its state says that it waits, but not for what: it could wait for a
+        // lock, a class or a log on the way, and a didClose sent then could come before the shutdown of a stop that
+        // doesn't wait for it. So the wait is recognized by the stack of that thread, which shows at once that it parks,
+        // at its top, and that it parks in the wait for the notifications, below.
+        while (stop != null && !release.isDone() && System.nanoTime() - deadline < 0) {
+            var state = stop.getState();
+            if (state == Thread.State.TERMINATED) {
+                return;
+            }
+            if ((state == Thread.State.WAITING || state == Thread.State.TIMED_WAITING)
+                    && parksInTheWaitForTheNotifications(stop.getStackTrace())) {
+                stopWaited.complete(null);
+                return;
+            }
+            Thread.onSpinWait();
+        }
+    }
+
+    /**
+     * True if the given stack of a thread parks it, at its top, in {@link #WAIT_FOR_THE_NOTIFICATIONS}, below.
+     */
+    private static boolean parksInTheWaitForTheNotifications(StackTraceElement[] stack) {
+        return stack.length > 0
+                && stack[0].getClassName().equals("jdk.internal.misc.Unsafe")
+                && stack[0].getMethodName().equals("park")
+                && Arrays.stream(stack).anyMatch(frame ->
+                        frame.getClassName().equals(LanguageServerWrapper.class.getName())
+                                && frame.getMethodName().equals("waitForTheNotifications"));
     }
 
     /** True if the last didOpen or didClose of the file that the server read is a didOpen. */

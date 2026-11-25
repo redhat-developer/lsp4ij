@@ -117,7 +117,7 @@ public class LSPLazyCodeActionsTest extends LSPCodeInsightFixtureTestCase {
             assertNotNull(codeAction);
             assertTrue(codeAction.isLeft());
         }
-        assertEquals(1, textDocumentService.codeActionRequests);
+        assertEquals(1, textDocumentService.codeActionRequests.get());
     }
 
     public void testCodeActionsLoadAgainAfterAPendingRequestWasCancelled() throws Exception {
@@ -129,22 +129,28 @@ public class LSPLazyCodeActionsTest extends LSPCodeInsightFixtureTestCase {
         quickFix.setDiagnostics(List.of(diagnostic));
         MockLanguageServer.INSTANCE.setCodeActions(List.of(Either.forRight(quickFix)));
         var textDocumentService = MockLanguageServer.INSTANCE.getTextDocumentService();
-        // Keep the first textDocument/codeAction request pending until it is cancelled.
-        MockLanguageServer.INSTANCE.setTimeToProceedQueries(10_000);
-
         var codeActions = new LSPLazyCodeActions(List.of(diagnostic), file.getVirtualFile(), languageServer);
-        Future<?> pending = ApplicationManager.getApplication().executeOnPooledThread(() -> codeActions.getCodeActionAt(0));
-        PlatformTestUtil.waitWithEventsDispatching("textDocument/codeAction must be sent",
-                () -> textDocumentService.codeActionRequests > 0, 5);
-        // LSPDiagnosticsForServer cancels the lazy code actions whenever diagnostics are published again, also
-        // when they are unchanged, and the editor then keeps the quick fixes that use these code actions.
-        codeActions.cancel();
+        // Keep the first textDocument/codeAction request pending until it is cancelled: the server holds its reply
+        // until the test releases it, and a delay could end before the test cancels the request.
+        CompletableFuture<Void> codeActionReplies = MockLanguageServer.INSTANCE.holdCodeActions();
         try {
-            pending.get(5, TimeUnit.SECONDS);
-        } catch (ExecutionException e) {
-            // The cancelled request may fail the pending load; only the next load matters here.
+            Future<?> pending = ApplicationManager.getApplication().executeOnPooledThread(() -> codeActions.getCodeActionAt(0));
+            PlatformTestUtil.waitWithEventsDispatching("textDocument/codeAction must be sent",
+                    () -> textDocumentService.codeActionRequests.get() > 0, 30);
+            assertFalse("The first load must still wait for the held reply when its request is cancelled",
+                    pending.isDone());
+            // LSPDiagnosticsForServer cancels the lazy code actions whenever diagnostics are published again, also
+            // when they are unchanged, and the editor then keeps the quick fixes that use these code actions.
+            codeActions.cancel();
+            try {
+                pending.get(5, TimeUnit.SECONDS);
+            } catch (ExecutionException e) {
+                // The cancelled request may fail the pending load; only the next load matters here.
+            }
+        } finally {
+            // Also when the test fails: the mock language server is shared by the next tests
+            codeActionReplies.complete(null);
         }
-        MockLanguageServer.INSTANCE.setTimeToProceedQueries(0);
 
         var codeAction = load(codeActions);
 
@@ -180,9 +186,9 @@ public class LSPLazyCodeActionsTest extends LSPCodeInsightFixtureTestCase {
             pending = ApplicationManager.getApplication().executeOnPooledThread(() -> codeActions.getCodeActionAt(0));
             // The server status cannot tell that the load has created its request, if another start set it
             PlatformTestUtil.waitWithEventsDispatching("the pending load must create its request",
-                    codeActions::hasRequest, 5);
+                    codeActions::hasRequest, 30);
             assertEquals("The request must wait for the server to initialize", 0,
-                    textDocumentService.codeActionRequests);
+                    textDocumentService.codeActionRequests.get());
             codeActions.cancel();
         } finally {
             initialize.complete(null);
@@ -199,7 +205,7 @@ public class LSPLazyCodeActionsTest extends LSPCodeInsightFixtureTestCase {
         assertNotNull(codeAction);
         assertTrue(codeAction.isLeft());
         // The request cancelled while the server initialized must not be sent; only the new load's request is.
-        assertEquals(1, textDocumentService.codeActionRequests);
+        assertEquals(1, textDocumentService.codeActionRequests.get());
     }
 
     public void testAQuickFixLoadsNoCodeActionWhileIndexing() throws Exception {
@@ -220,11 +226,11 @@ public class LSPLazyCodeActionsTest extends LSPCodeInsightFixtureTestCase {
             assertEquals(LanguageServerBundle.message("lsp.intention.code.action.kind.empty"),
                     onPooledThread(quickFix::getFamilyName));
             assertFalse(onPooledThread(() -> quickFix.isAvailable(myFixture.getProject(), myFixture.getEditor(), file)));
-            assertEquals(0, textDocumentService.codeActionRequests);
+            assertEquals(0, textDocumentService.codeActionRequests.get());
         });
 
         assertEquals("Remove unused declaration for: 'foo'", onPooledThread(quickFix::getText));
-        assertEquals(1, textDocumentService.codeActionRequests);
+        assertEquals(1, textDocumentService.codeActionRequests.get());
     }
 
     public void testCodeActionsOfADisposedLanguageServerAreNone() throws Exception {
@@ -260,7 +266,7 @@ public class LSPLazyCodeActionsTest extends LSPCodeInsightFixtureTestCase {
     private LanguageServerItem getLanguageServer(PsiFile file) throws Exception {
         List<LanguageServerItem> languageServers = LanguageServiceAccessor.getInstance(file.getProject())
                 .getLanguageServers(file, null, null)
-                .get(5000, TimeUnit.MILLISECONDS);
+                .get(30, TimeUnit.SECONDS);
         assertSize(1, languageServers);
         return languageServers.get(0);
     }

@@ -7,14 +7,17 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij;
 
+import com.intellij.openapi.application.impl.LaterInvocator;
 import com.intellij.openapi.command.WriteCommandAction;
 import com.intellij.openapi.fileEditor.FileDocumentManager;
 import com.intellij.openapi.vfs.VfsUtilCore;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiManager;
 import com.intellij.testFramework.PlatformTestUtil;
+import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
 import com.redhat.devtools.lsp4ij.fixtures.LSPCodeInsightFixtureTestCase;
 import com.redhat.devtools.lsp4ij.mock.MockLanguageServer;
+import com.redhat.devtools.lsp4ij.mock.MockLanguageServerDefinition;
 import org.eclipse.lsp4j.FileOperationFilter;
 import org.eclipse.lsp4j.FileOperationOptions;
 import org.eclipse.lsp4j.FileOperationPattern;
@@ -25,6 +28,8 @@ import org.eclipse.lsp4j.RenameFilesParams;
 import org.eclipse.lsp4j.TextEdit;
 import org.eclipse.lsp4j.WorkspaceEdit;
 import org.eclipse.lsp4j.WorkspaceServerCapabilities;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -46,8 +51,31 @@ public class FileOperationEditSaveTest extends LSPCodeInsightFixtureTestCase {
     // a few seconds
     private static final int BOUND_SECONDS = 60;
 
+    // Completed once the language server asks whether it is kept alive, as it does before it stops for having no
+    // document left; null for nothing
+    private volatile @Nullable CompletableFuture<Void> keepAliveAsked;
+
     public FileOperationEditSaveTest() {
         super("*.foo");
+    }
+
+    @Override
+    protected @NotNull MockLanguageServerDefinition createServerDefinition(boolean clientConfigurable) {
+        return new MockLanguageServerDefinition(clientConfigurable, true) {
+            @Override
+            public @NotNull LSPClientFeatures createClientFeatures() {
+                return new LSPClientFeatures() {
+                    @Override
+                    public boolean keepServerAlive() {
+                        var asked = keepAliveAsked;
+                        if (asked != null) {
+                            asked.complete(null);
+                        }
+                        return super.keepServerAlive();
+                    }
+                };
+            }
+        };
     }
 
     @Override
@@ -127,11 +155,23 @@ public class FileOperationEditSaveTest extends LSPCodeInsightFixtureTestCase {
         CompletableFuture<Integer> connectionsAtDidRename =
                 didRename.thenApply(params -> MockLanguageServer.INSTANCE.getRemoteProxies().size());
         MockLanguageServer.INSTANCE.getWorkspaceService().setDidRenameCallback(didRename);
+        var idleCheck = new CompletableFuture<Void>();
+        keepAliveAsked = idleCheck;
 
         rename(renamed, "moved.foo");
-        // A busy UI thread: the moved document, which has no editor, isn't connected again at its new place, and its
-        // language server, which has no document left, would stop before the save and the notification
-        Thread.sleep(500);
+        // The save and the notification wait for the UI thread, as on a slow machine, while the moved document, which
+        // has no editor, isn't connected again at its new place, and its language server, which has no document left,
+        // is asked whether it is kept alive, as it is before it stops. A dialog holds them, as they don't run while one
+        // is shown, and lets that check run, which a blocked UI thread would hold too.
+        var dialog = new Object();
+        LaterInvocator.enterModal(dialog);
+        try {
+            PlatformTestUtil.waitWithEventsDispatching(
+                    "the language server must be asked whether it is kept alive once the moved document isn't connected again",
+                    idleCheck::isDone, BOUND_SECONDS);
+        } finally {
+            LaterInvocator.leaveModal(dialog);
+        }
 
         PlatformTestUtil.waitWithEventsDispatching("the server must be told of the rename", connectionsAtDidRename::isDone, BOUND_SECONDS);
         assertEquals("the server must be told of the rename before it stops, not as it starts again",
@@ -155,7 +195,7 @@ public class FileOperationEditSaveTest extends LSPCodeInsightFixtureTestCase {
     private void connect(VirtualFile file) throws Exception {
         LanguageServiceAccessor.getInstance(myFixture.getProject())
                 .getLanguageServers(PsiManager.getInstance(myFixture.getProject()).findFile(file), null, null)
-                .get(5, TimeUnit.SECONDS);
+                .get(BOUND_SECONDS, TimeUnit.SECONDS);
     }
 
     private void rename(VirtualFile file, String name) {

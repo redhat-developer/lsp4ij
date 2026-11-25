@@ -21,7 +21,6 @@ import com.intellij.testFramework.EditorTestUtil;
 import com.intellij.util.ArrayUtil;
 import com.intellij.util.text.TextRangeUtil;
 import com.redhat.devtools.lsp4ij.JSONUtils;
-import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
 import com.redhat.devtools.lsp4ij.mock.MockLanguageServer;
 import org.eclipse.lsp4j.FoldingRange;
 import org.jetbrains.annotations.NotNull;
@@ -30,7 +29,6 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -96,13 +94,7 @@ public abstract class LSPFoldingRangeFixtureTestCase extends LSPCodeInsightFixtu
         editor.getCaretModel().moveToOffset(file.getTextLength());
 
         // Initialize the language server
-        try {
-            LanguageServiceAccessor.getInstance(file.getProject())
-                    .getLanguageServers(file, null, null)
-                    .get(5000, TimeUnit.MILLISECONDS);
-        } catch (Exception e) {
-            fail(e.getMessage());
-        }
+        awaitLanguageServers(file);
 
         EditorTestUtil.buildInitialFoldingsInBackground(editor);
         FoldingModel foldingModel = editor.getFoldingModel();

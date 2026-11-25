@@ -22,6 +22,7 @@ import com.intellij.psi.PsiFile;
 import com.intellij.testFramework.ExtensionTestUtil;
 import com.intellij.util.concurrency.AppExecutorUtil;
 import com.intellij.util.containers.ContainerUtil;
+import com.redhat.devtools.lsp4ij.LSPFileSupport;
 import com.redhat.devtools.lsp4ij.LSPIJEditorUtils;
 import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
 import com.redhat.devtools.lsp4ij.fixtures.LSPCodeInsightFixtureTestCase;
@@ -35,8 +36,10 @@ import org.eclipse.lsp4j.MarkupKind;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static com.intellij.platform.backend.documentation.impl.ImplKt.computeDocumentationBlocking;
@@ -50,6 +53,8 @@ public class HoverWithoutWaitingTest extends LSPCodeInsightFixtureTestCase {
     private static final String DOCUMENTATION = "The documentation of the word";
     // How long the server holds its reply when the targets wait for it, which the test would then wait for
     private static final long HELD_REPLY_SECONDS = 20;
+    // How long the test waits for the targets, all in all, as for a reply to reach LSP4IJ and for the targets of it
+    private static final long TARGETS_SECONDS = 30;
 
     private final AtomicInteger hoverRequests = new AtomicInteger();
     private final CountDownLatch hoverRequested = new CountDownLatch(1);
@@ -130,8 +135,8 @@ public class HoverWithoutWaitingTest extends LSPCodeInsightFixtureTestCase {
 
         assertEmpty("no target, so that IntelliJ shows the file's own documentation", targets);
         reply.complete(hover());
-        // The request went on: the next time at the same offset, its reply is used
-        List<? extends DocumentationTarget> next = targets(file);
+        // The request went on: the next time at the same offset, its reply is used, once it reached LSP4IJ
+        List<? extends DocumentationTarget> next = awaitTargets(file);
         assertSize(1, next);
         var target = assertInstanceOf(next.get(0), LSPDocumentationTarget.class);
         assertTrue(target.getHtml(), target.getHtml().contains(DOCUMENTATION));
@@ -185,10 +190,42 @@ public class HoverWithoutWaitingTest extends LSPCodeInsightFixtureTestCase {
      * does.
      */
     private List<? extends DocumentationTarget> targets(PsiFile file) throws Exception {
+        return targets(file, System.nanoTime() + TimeUnit.SECONDS.toNanos(TARGETS_SECONDS));
+    }
+
+    /**
+     * Returns the documentation targets of the last word, asked for on a pooled thread in a read action, as IntelliJ
+     * does, by the given deadline; a request that isn't done then is cancelled.
+     *
+     * @param deadline the {@link System#nanoTime()} by which the targets are there.
+     */
+    private List<? extends DocumentationTarget> targets(PsiFile file, long deadline) throws Exception {
         int offset = file.getTextLength() - 1;
-        return ApplicationManager.getApplication().executeOnPooledThread(() -> ReadAction.compute(
-                        () -> new LSPDocumentationTargetProvider().documentationTargets(file, offset)))
-                .get(30, TimeUnit.SECONDS);
+        Future<List<? extends DocumentationTarget>> request = ApplicationManager.getApplication().executeOnPooledThread(
+                () -> ReadAction.compute(() -> new LSPDocumentationTargetProvider().documentationTargets(file, offset)));
+        try {
+            return request.get(deadline - System.nanoTime(), TimeUnit.NANOSECONDS);
+        } catch (TimeoutException e) {
+            request.cancel(true);
+            throw new AssertionError("no documentation targets within " + TARGETS_SECONDS + " s", e);
+        }
+    }
+
+    /**
+     * Returns the documentation targets of the last word once the reply of the server reached LSP4IJ, within
+     * {@link #TARGETS_SECONDS} in all: the reply reaches LSP4IJ after the server sends it, and the targets use it once
+     * the hover request which the hover support of the file keeps for the next time at the same offset is answered.
+     */
+    private List<? extends DocumentationTarget> awaitTargets(PsiFile file) throws Exception {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(TARGETS_SECONDS);
+        var kept = ReadAction.compute(() -> LSPFileSupport.getSupport(file).getHoverSupport().getValidLSPFuture());
+        assertNotNull("the hover request is kept for the next time at the same offset", kept);
+        try {
+            kept.get(deadline - System.nanoTime(), TimeUnit.NANOSECONDS);
+        } catch (TimeoutException e) {
+            throw new AssertionError("the reply of the server didn't reach LSP4IJ within " + TARGETS_SECONDS + " s", e);
+        }
+        return targets(file, deadline);
     }
 
     private static Hover hover() {

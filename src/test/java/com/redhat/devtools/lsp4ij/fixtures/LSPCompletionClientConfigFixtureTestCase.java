@@ -20,7 +20,6 @@ import com.intellij.util.ArrayUtil;
 import com.intellij.util.containers.ContainerUtil;
 import com.redhat.devtools.lsp4ij.JSONUtils;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
-import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
 import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
 import com.redhat.devtools.lsp4ij.mock.MockLanguageServer;
 import com.redhat.devtools.lsp4ij.server.definition.ClientConfigurableLanguageServerDefinition;
@@ -33,9 +32,7 @@ import org.eclipse.lsp4j.CompletionOptions;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.LinkedList;
 import java.util.List;
-import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
 /**
@@ -86,14 +83,7 @@ public abstract class LSPCompletionClientConfigFixtureTestCase extends LSPCodeIn
         CaretModel caretModel = editor.getCaretModel();
 
         // Initialize the language server
-        List<LanguageServerItem> languageServers = new LinkedList<>();
-        try {
-            ContainerUtil.addAllNotNull(languageServers, LanguageServiceAccessor.getInstance(project)
-                    .getLanguageServers(file, null, null)
-                    .get(5000, TimeUnit.MILLISECONDS));
-        } catch (Exception e) {
-            fail(e.getMessage());
-        }
+        List<LanguageServerItem> languageServers = awaitLanguageServers(file);
 
         // Configure the language server's completion client configuration
         LanguageServerItem languageServer = ContainerUtil.getFirstItem(languageServers);

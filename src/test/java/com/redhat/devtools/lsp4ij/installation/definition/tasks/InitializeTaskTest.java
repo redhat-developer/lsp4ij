@@ -25,6 +25,8 @@ import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
@@ -32,11 +34,13 @@ import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * Tests that the {@code initialize} task of an installer counts a language server or a debug adapter as installed only
@@ -47,7 +51,9 @@ public class InitializeTaskTest {
 
     // Long enough for a JVM to start on a slow machine, for the servers which answer
     private static final int ANSWER_TIMEOUT = 30_000;
-    private static final int NO_ANSWER_TIMEOUT = 1_500;
+    // For the servers which don't answer, whose tests wait for all of it: long enough for the JVM of the server to start
+    // and to get initialize on a slow machine, which the tests assert
+    private static final int NO_ANSWER_TIMEOUT = 5_000;
     private static final String TRACE = "Test debug adapter listening at: ${address}:${port}";
 
     private Path record;
@@ -146,9 +152,14 @@ public class InitializeTaskTest {
         var context = context(languageServer(command("lsp", "silent")));
         var indicator = new EmptyProgressIndicator();
         context.setProgressIndicator(indicator);
-        var canceller = Executors.newSingleThreadScheduledExecutor();
+        var canceller = Executors.newSingleThreadExecutor();
         try {
-            canceller.schedule(indicator::cancel, 1, TimeUnit.SECONDS);
+            // Once the server got initialize, while the task waits for its answer
+            canceller.execute(() -> {
+                if (awaitReceived("initialize")) {
+                    indicator.cancel();
+                }
+            });
             long start = System.nanoTime();
             assertThrows(ProcessCanceledException.class, () -> check(ANSWER_TIMEOUT, context));
             assertTrue(TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start) < ANSWER_TIMEOUT, "the cancellation ends the wait");
@@ -319,6 +330,28 @@ public class InitializeTaskTest {
     }
 
     /**
+     * Waits until the test server got the given method or command, and returns true then, or false if it doesn't get it
+     * within 30 seconds, or if the wait is interrupted.
+     */
+    private boolean awaitReceived(@NotNull String name) {
+        try {
+            for (long end = System.nanoTime() + TimeUnit.SECONDS.toNanos(30); ; Thread.sleep(10)) {
+                if (Files.exists(record) && Files.readAllLines(record).contains(name)) {
+                    return true;
+                }
+                if (System.nanoTime() - end >= 0) {
+                    return false;
+                }
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return false;
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    /**
      * Asserts that the process of the test server is gone.
      */
     private void assertGone() throws Exception {
@@ -327,12 +360,16 @@ public class InitializeTaskTest {
                 .map(line -> Long.parseLong(line.substring("pid ".length())))
                 .findFirst()
                 .orElseThrow();
-        // The task waits for the process to end: give the system a moment to reap it
-        long end = System.nanoTime() + TimeUnit.SECONDS.toNanos(2);
-        while (ProcessHandle.of(pid).map(ProcessHandle::isAlive).orElse(false) && System.nanoTime() < end) {
-            Thread.sleep(20);
+        // The task waits for the process to end, which the system then reaps
+        var process = ProcessHandle.of(pid);
+        if (process.isEmpty()) {
+            return;
         }
-        assertFalse(ProcessHandle.of(pid).map(ProcessHandle::isAlive).orElse(false), "the process " + pid + " must be gone");
+        try {
+            process.get().onExit().get(30, TimeUnit.SECONDS);
+        } catch (TimeoutException e) {
+            fail("the process " + pid + " must be gone");
+        }
     }
 
     /**
