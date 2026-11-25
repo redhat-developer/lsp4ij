@@ -741,7 +741,7 @@ If its files are not based on specific language ID, it should be registered usin
 
 ```xml
 <fileType.fileViewProviderFactory
-        fileType="myFileTypeName"
+        filetype="myFileTypeName"
         implementationClass="com.myProduct.semanticTokens.viewProvider.MyCustomSemanticTokensFileViewProviderFactory"/>
 ```
 
