@@ -129,13 +129,16 @@ public class LSPLazyCodeActionsTest extends LSPCodeInsightFixtureTestCase {
         quickFix.setDiagnostics(List.of(diagnostic));
         MockLanguageServer.INSTANCE.setCodeActions(List.of(Either.forRight(quickFix)));
         var textDocumentService = MockLanguageServer.INSTANCE.getTextDocumentService();
-        // Keep the first textDocument/codeAction request pending until it is cancelled.
-        MockLanguageServer.INSTANCE.setTimeToProceedQueries(10_000);
         var codeActions = new LSPLazyCodeActions(List.of(diagnostic), file.getVirtualFile(), languageServer);
+        // Keep the first textDocument/codeAction request pending until it is cancelled: the server holds its reply
+        // until the test releases it, and a delay could end before the test cancels the request.
+        CompletableFuture<Void> codeActionReplies = MockLanguageServer.INSTANCE.holdCodeActions();
         try {
             Future<?> pending = ApplicationManager.getApplication().executeOnPooledThread(() -> codeActions.getCodeActionAt(0));
             PlatformTestUtil.waitWithEventsDispatching("textDocument/codeAction must be sent",
                     () -> textDocumentService.codeActionRequests > 0, 30);
+            assertFalse("The first load must still wait for the held reply when its request is cancelled",
+                    pending.isDone());
             // LSPDiagnosticsForServer cancels the lazy code actions whenever diagnostics are published again, also
             // when they are unchanged, and the editor then keeps the quick fixes that use these code actions.
             codeActions.cancel();
@@ -146,7 +149,7 @@ public class LSPLazyCodeActionsTest extends LSPCodeInsightFixtureTestCase {
             }
         } finally {
             // Also when the test fails: the mock language server is shared by the next tests
-            MockLanguageServer.INSTANCE.setTimeToProceedQueries(0);
+            codeActionReplies.complete(null);
         }
 
         var codeAction = load(codeActions);

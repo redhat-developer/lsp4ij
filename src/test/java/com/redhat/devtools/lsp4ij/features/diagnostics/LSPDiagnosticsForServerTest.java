@@ -24,6 +24,7 @@ import org.eclipse.lsp4j.Range;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
 
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
@@ -51,20 +52,28 @@ public class LSPDiagnosticsForServerTest extends LSPCodeInsightFixtureTestCase {
         assertTrue(diagnostics.update("test", List.of(createDiagnostic())));
         IntentionAction editorQuickFix = diagnostics.getQuickFixesFor(createDiagnostic(), file).get(0);
 
-        // Keep the textDocument/codeAction request of the editor's quick fix pending
-        MockLanguageServer.INSTANCE.setTimeToProceedQueries(2_000);
-        Future<?> pending = ApplicationManager.getApplication().executeOnPooledThread(editorQuickFix::getText);
-        PlatformTestUtil.waitWithEventsDispatching("textDocument/codeAction must be sent",
-                () -> textDocumentService.codeActionRequests > 0, 30);
+        // Keep the textDocument/codeAction request of the editor's quick fix pending: the server holds its reply until
+        // the test releases it, and a delay could end before the diagnostics are published again.
+        CompletableFuture<Void> codeActionReplies = MockLanguageServer.INSTANCE.holdCodeActions();
+        Future<?> pending;
+        try {
+            pending = ApplicationManager.getApplication().executeOnPooledThread(editorQuickFix::getText);
+            PlatformTestUtil.waitWithEventsDispatching("textDocument/codeAction must be sent",
+                    () -> textDocumentService.codeActionRequests > 0, 30);
+            assertFalse("The request must still wait for the held reply when the diagnostics are published again",
+                    pending.isDone());
 
-        // The server publishes the same diagnostics again, as servers commonly do after each change
-        assertFalse(diagnostics.update("test", List.of(createDiagnostic())));
+            // The server publishes the same diagnostics again, as servers commonly do after each change
+            assertFalse(diagnostics.update("test", List.of(createDiagnostic())));
+        } finally {
+            // Also when the test fails: the mock language server is shared by the next tests
+            codeActionReplies.complete(null);
+        }
         try {
             pending.get(10, TimeUnit.SECONDS);
         } catch (ExecutionException e) {
             // A cancelled request may fail the pending load; the assertions below tell
         }
-        MockLanguageServer.INSTANCE.setTimeToProceedQueries(0);
 
         assertEquals(QUICK_FIX_TITLE, editorQuickFix.getText());
         assertEquals("The pending request must not be cancelled and sent again", 1,
