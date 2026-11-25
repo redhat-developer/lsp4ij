@@ -534,8 +534,7 @@ as the bundled template does:
           "command": {
             "windows": "\"${workingDir}/.bin/typescript-language-server.cmd\" --stdio",
             "default": "\"${workingDir}/.bin/typescript-language-server\" --stdio"
-          },
-          "update": true
+          }
         }
       }
     }
@@ -696,8 +695,7 @@ Example: downloading a JAR and configuring the start command
       "onSuccess": {
         "configureServer": {
           "name": "Configure Camel Language Server command",
-          "command": "java -jar \"${output.dir}/${output.file.name}\"",
-          "update": true
+          "command": "java -jar \"${output.dir}/${output.file.name}\""
         }
       }
     }
@@ -781,7 +779,7 @@ you can use the `github` JSON object to download the proper asset:
         },
         "mac": {
           "aarch64": "clojure-lsp-native-macos-aarch64.zip",
-          "amd64": "clojure-lsp-native-macos-amd64.zip"
+          "x86_64": "clojure-lsp-native-macos-amd64.zip"
         }
       }
     }
@@ -822,7 +820,7 @@ If there is an asset per OS and with architecture, you can write:
     },
     "mac": {
       "aarch64": "clojure-lsp-native-macos-aarch64.zip",
-      "amd64": "clojure-lsp-native-macos-amd64.zip"
+      "x86_64": "clojure-lsp-native-macos-amd64.zip"
     }
   }
 }
@@ -971,8 +969,7 @@ Used to set the server launch command:
 {
   "configureServer": {
     "name": "Configure Camel Language Server command",
-    "command": "java -jar \"${output.dir}/${output.file.name}\"",
-    "update": true
+    "command": "java -jar \"${output.dir}/${output.file.name}\""
   }
 }
 ```

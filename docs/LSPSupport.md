@@ -674,7 +674,7 @@ configuration with the following settings:
 * `format.onTypeFormatting.clientSide.formatOnCloseBraceCharacters` - Specifies the exact characters that should treated as a close brace character for purposes of client-side on-type formatting. Defaults to the close brace characters for the language, typically `}`, `]`, and `)`.
 * `format.onTypeFormatting.clientSide.formatOnCloseBraceScope` - Specifies the scope that should be formatted when a close brace is typed. Valid values are `CODE_BLOCK` and `FILE`. Defaults to `CODE_BLOCK`.
 * `format.onTypeFormatting.clientSide.formatOnStatementTerminator` - When set to `true`, formatting is automatically applied when a statement terminator character is typed. Defaults to `false`.
-* `format.onTypeFormatting.clientSide.formatOnStatementTerminatorCharacters` - Specifies the exact characters that should treated as a statement terminator character for purposes of client-side on-type formatting. Defaults to empty and must be specified if `formatOnStatementTerminator` is enabled.
+* `format.onTypeFormatting.clientSide.formatOnStatementTerminatorCharacters` - Specifies the exact characters that should treated as a statement terminator character for purposes of client-side on-type formatting. Defaults to the statement terminator characters of the language, `statementTerminatorCharacters` in the client configuration, which are empty by default: one of them must be set if `formatOnStatementTerminator` is enabled.
 * `format.onTypeFormatting.clientSide.formatOnStatementTerminatorScope` - Specifies the scope that should be formatted when a statement terminator is typed. Valid values are `STATEMENT`, `CODE_BLOCK` and `FILE`. Defaults to `STATEMENT`. The other values are most useful for language servers that do not support range formatting or yield incorrect results for range formatting.
 * `format.onTypeFormatting.clientSide.formatOnCompletionTrigger` - When set to `true`, formatting is automatically applied when a completion trigger character is typed. Defaults to `false`.
 * `format.onTypeFormatting.clientSide.formatOnCompletionTriggerCharacters` - Specifies the exact characters that should treated as a completion trigger character for purposes of client-side on-type formatting. Defaults to the completion trigger characters specified by the language server.
@@ -691,12 +691,12 @@ formatting configuration:
 
 ```json
 {
+  "statementTerminatorCharacters": ";",
   "format": {
     "onTypeFormatting": {
       "clientSide": {
         "formatOnCloseBrace": true,
         "formatOnStatementTerminator": true,
-        "formatOnStatementTerminatorCharacters": ";",
         "formatOnCompletionTrigger": true
       }
     }
