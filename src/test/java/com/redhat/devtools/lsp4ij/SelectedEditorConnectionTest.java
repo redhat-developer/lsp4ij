@@ -20,6 +20,8 @@ import com.redhat.devtools.lsp4ij.fixtures.LSPCodeInsightFixtureTestCase;
 import com.redhat.devtools.lsp4ij.mock.MockLanguageServer;
 import org.eclipse.lsp4j.DidOpenTextDocumentParams;
 
+import java.lang.management.ManagementFactory;
+import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
@@ -150,8 +152,8 @@ public class SelectedEditorConnectionTest extends LSPCodeInsightFixtureTestCase 
         var wrapper = ContainerUtil.getOnlyItem(LanguageServiceAccessor.getInstance(myFixture.getProject()).getStartedServers());
 
         // The dispatcher is still busy, as on a slow machine, when the close of the last file queues its didClose and
-        // stops the server at once, as in tests. It is freed 200 ms later: well within the second that the stop waits
-        // for it before the shutdown, and long after a stop that does not wait has closed the connection.
+        // stops the server at once, as in tests. It is freed once the stop waits for it, within the second that the
+        // stop waits before the shutdown; a stop that does not wait closes the connection without waiting there.
         var busy = new CompletableFuture<Void>();
         wrapper.sendNotification(server -> {
             busy.join();
@@ -160,7 +162,9 @@ public class SelectedEditorConnectionTest extends LSPCodeInsightFixtureTestCase 
         try {
             editors.closeFile(last);
             projectEditorListeners().fileClosed(editors, last);
-            busy.completeAsync(() -> null, CompletableFuture.delayedExecutor(200, TimeUnit.MILLISECONDS));
+            PlatformTestUtil.waitWithEventsDispatching("the stop must wait for the didClose which the dispatcher holds",
+                    SelectedEditorConnectionTest::aStopWaitsForTheNotifications, 10);
+            busy.complete(null);
             PlatformTestUtil.waitWithEventsDispatching("the server must stop",
                     () -> wrapper.getServerStatus() == ServerStatus.stopped, 10);
         } finally {
@@ -230,6 +234,17 @@ public class SelectedEditorConnectionTest extends LSPCodeInsightFixtureTestCase 
             PlatformTestUtil.dispatchAllInvocationEventsInIdeEventQueue();
             Thread.sleep(20);
         }
+    }
+
+    /**
+     * True if a thread stops a language server and waits for the notifications that its dispatcher holds, before the
+     * shutdown.
+     */
+    private static boolean aStopWaitsForTheNotifications() {
+        return Arrays.stream(ManagementFactory.getThreadMXBean().dumpAllThreads(false, false))
+                .anyMatch(thread -> Arrays.stream(thread.getStackTrace()).anyMatch(frame ->
+                        frame.getClassName().equals(LanguageServerWrapper.class.getName())
+                                && frame.getMethodName().equals("waitForTheNotifications")));
     }
 
     /** True if the last didOpen or didClose of the file that the server read is a didOpen. */

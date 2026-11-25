@@ -34,6 +34,11 @@ public class HangingTestWatchdogTest {
     private static final Duration LIMIT = Duration.ofMillis(100);
     // Several times the limit, for a watchdog which wrongly ends the tests to do so
     private static final long QUIET_MILLIS = 1000;
+    // For a test which ends in time: far longer than a pause of this thread, as for a garbage collection, between its
+    // start and its end, which a shorter limit would count as a hang
+    private static final Duration LIMIT_OF_A_TEST_WHICH_ENDS = Duration.ofSeconds(1);
+    // Several times that limit, for a watchdog which wrongly ends the tests to do so
+    private static final long QUIET_AFTER_A_TEST_WHICH_ENDS_MILLIS = 3000;
 
     private final CompletableFuture<String> report = new CompletableFuture<>();
     private final CountDownLatch ended = new CountDownLatch(1);
@@ -105,13 +110,13 @@ public class HangingTestWatchdogTest {
 
     @Test
     void aTestWhichEndsInTimeLeavesTheTestsRunning() throws Exception {
-        watchdog = new HangingTestWatchdog(LIMIT, report::complete, ended::countDown, false);
+        watchdog = new HangingTestWatchdog(LIMIT_OF_A_TEST_WHICH_ENDS, report::complete, ended::countDown, false);
         var test = identify("passes", TestDescriptor.Type.TEST);
 
         watchdog.executionStarted(test);
         watchdog.executionFinished(test, TestExecutionResult.successful());
 
-        assertFalse(ended.await(QUIET_MILLIS, TimeUnit.MILLISECONDS));
+        assertFalse(ended.await(QUIET_AFTER_A_TEST_WHICH_ENDS_MILLIS, TimeUnit.MILLISECONDS));
     }
 
     @Test

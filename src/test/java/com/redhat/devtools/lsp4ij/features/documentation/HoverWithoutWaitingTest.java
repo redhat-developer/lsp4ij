@@ -130,8 +130,8 @@ public class HoverWithoutWaitingTest extends LSPCodeInsightFixtureTestCase {
 
         assertEmpty("no target, so that IntelliJ shows the file's own documentation", targets);
         reply.complete(hover());
-        // The request went on: the next time at the same offset, its reply is used
-        List<? extends DocumentationTarget> next = targets(file);
+        // The request went on: the next time at the same offset, its reply is used, once it reached LSP4IJ
+        List<? extends DocumentationTarget> next = awaitTargets(file);
         assertSize(1, next);
         var target = assertInstanceOf(next.get(0), LSPDocumentationTarget.class);
         assertTrue(target.getHtml(), target.getHtml().contains(DOCUMENTATION));
@@ -189,6 +189,19 @@ public class HoverWithoutWaitingTest extends LSPCodeInsightFixtureTestCase {
         return ApplicationManager.getApplication().executeOnPooledThread(() -> ReadAction.compute(
                         () -> new LSPDocumentationTargetProvider().documentationTargets(file, offset)))
                 .get(30, TimeUnit.SECONDS);
+    }
+
+    /**
+     * Returns the documentation targets of the last word once there are some, or none after 30 seconds: the reply of
+     * the server reaches LSP4IJ after the server sends it, and each time, the targets wait briefly for it.
+     */
+    private List<? extends DocumentationTarget> awaitTargets(PsiFile file) throws Exception {
+        for (long end = System.nanoTime() + TimeUnit.SECONDS.toNanos(30); ; ) {
+            List<? extends DocumentationTarget> targets = targets(file);
+            if (!targets.isEmpty() || System.nanoTime() - end >= 0) {
+                return targets;
+            }
+        }
     }
 
     private static Hover hover() {

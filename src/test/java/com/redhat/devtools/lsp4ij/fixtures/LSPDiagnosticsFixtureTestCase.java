@@ -10,12 +10,15 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.fixtures;
 
+import com.intellij.openapi.application.impl.NonBlockingReadActionImpl;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.impl.DocumentImpl;
 import com.intellij.testFramework.ExpectedHighlightingData;
+import com.intellij.testFramework.PlatformTestUtil;
 import com.intellij.testFramework.fixtures.impl.CodeInsightTestFixtureImpl;
 import com.redhat.devtools.lsp4ij.JSONUtils;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
+import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
 import com.redhat.devtools.lsp4ij.mock.MockLanguageServer;
 import org.eclipse.lsp4j.Diagnostic;
 import org.eclipse.lsp4j.DocumentDiagnosticReport;
@@ -24,12 +27,20 @@ import org.eclipse.lsp4j.RelatedFullDocumentDiagnosticReport;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.net.URI;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * Base class test case to test LSP 'textDocument/publishDiagnostic' feature.
  */
 public abstract class LSPDiagnosticsFixtureTestCase extends LSPCodeInsightFixtureTestCase {
+
+    // The diagnostics which the language server gives when it is pulled
+    private @NotNull List<Diagnostic> pulledDiagnostics = List.of();
 
     public LSPDiagnosticsFixtureTestCase(String... fileNamePatterns) {
         super(fileNamePatterns);
@@ -67,16 +78,12 @@ public abstract class LSPDiagnosticsFixtureTestCase extends LSPCodeInsightFixtur
         MockLanguageServer.INSTANCE.setTimeToProceedQueries(200);
         MockLanguageServer.INSTANCE.setPublishDiagnostics(publishDiagnostics);
         MockLanguageServer.INSTANCE.setPullDiagnostics(pullDiagnostics);
+        pulledDiagnostics = pullDiagnostics != null && pullDiagnostics.isLeft() ? pullDiagnostics.getLeft().getItems() : List.of();
         // Open editor for a given file name and content (which declares <caret> to know where the completion is triggered).
         myFixture.configureByText(fileName, editorContentText);
 
-        // Wait for pull diagnostics...
-        try {
-            Thread.sleep(1000);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-        }
-        assertDiagnostics(expectedEditorContentText);
+        // The language server publishes its diagnostics once it gets the didOpen of the file, which the pull follows
+        assertDiagnostics(publishDiagnostics, expectedEditorContentText);
     }
 
     protected void publishAndAssertDiagnostics(@NotNull String publishJsonDiagnostics,
@@ -89,16 +96,12 @@ public abstract class LSPDiagnosticsFixtureTestCase extends LSPCodeInsightFixtur
     protected void publishAndAssertDiagnostics(@NotNull PublishDiagnosticsParams publishDiagnostics,
                                                @NotNull String expectedEditorContentText) {
         MockLanguageServer.INSTANCE.getTextDocumentService().publishDiagnostics(publishDiagnostics);
-        assertDiagnostics(expectedEditorContentText);
+        assertDiagnostics(publishDiagnostics.getDiagnostics(), expectedEditorContentText);
     }
 
-    private void assertDiagnostics(@NotNull String expectedEditorContentText) {
-        // Wait for publish diagnostics during 3000ms (since Alarm to restart Daemon is configured with 2000ms)
-        try {
-            Thread.sleep(3000);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-        }
+    private void assertDiagnostics(@NotNull List<Diagnostic> publishedDiagnostics,
+                                   @NotNull String expectedEditorContentText) {
+        awaitDiagnostics(publishedDiagnostics);
         // DaemonCodeAnalyzer.restart(file) can be called asynchronously by LSP4IJ to refresh IJ annotations from the LSP diagnostics.
         // To avoid having error like
 
@@ -119,6 +122,31 @@ public abstract class LSPDiagnosticsFixtureTestCase extends LSPCodeInsightFixtur
         ExpectedHighlightingData data = new ExpectedHighlightingData(expectedDocument, true, true, true);
         data.init();
         ((CodeInsightTestFixtureImpl) myFixture).collectAndCheckHighlighting(data);
+    }
+
+    /**
+     * Waits until the diagnostics of the file, which reach LSP4IJ asynchronously, are the given published ones and the
+     * pulled ones, and until no refresh of them is under way.
+     */
+    private void awaitDiagnostics(@NotNull List<Diagnostic> publishedDiagnostics) {
+        Set<Diagnostic> expected = new HashSet<>(publishedDiagnostics);
+        expected.addAll(pulledDiagnostics);
+        URI uri = LSPIJUtils.toUri(myFixture.getFile().getVirtualFile());
+        PlatformTestUtil.waitWithEventsDispatching(
+                () -> "the file must get the " + expected.size() + " diagnostics of the language server, but it has " + diagnosticsOf(uri),
+                () -> expected.equals(diagnosticsOf(uri)), 30);
+        NonBlockingReadActionImpl.waitForAsyncTaskCompletion();
+    }
+
+    /**
+     * Returns the diagnostics of the language servers for the file with the given URI.
+     */
+    private @NotNull Set<Diagnostic> diagnosticsOf(@NotNull URI uri) {
+        return LanguageServiceAccessor.getInstance(myFixture.getProject()).getStartedServers().stream()
+                .map(server -> server.getOpenedDocument(uri))
+                .filter(Objects::nonNull)
+                .flatMap(document -> document.getDiagnostics().stream())
+                .collect(Collectors.toSet());
     }
 
     @NotNull

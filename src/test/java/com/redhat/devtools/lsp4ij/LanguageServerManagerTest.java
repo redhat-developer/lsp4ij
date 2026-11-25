@@ -10,6 +10,7 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij;
 
+import com.intellij.testFramework.PlatformTestUtil;
 import com.intellij.testFramework.UsefulTestCase;
 import com.intellij.testFramework.fixtures.IdeaProjectTestFixture;
 import com.intellij.testFramework.fixtures.IdeaTestFixtureFactory;
@@ -72,15 +73,15 @@ public class LanguageServerManagerTest extends UsefulTestCase {
         assertTrue(serverDefinition.isEnabled(myFixture.getProject()));
     }
 
-    private static void asserServerStatus(ServerStatus actual, LanguageServerManager manager, MockLanguageServerDefinition serverDefinition) {
-        try {
-            Thread.sleep(1000);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-        }
-
-        var expected = manager.getServerStatus(serverDefinition.getId());
-        assertEquals("Check of server status", expected, actual);
+    /**
+     * Waits until the server has the given status, as a start and a stop change it asynchronously. A start without
+     * forcing, while no file of the server is open, neither creates nor starts the server, at once: its status is none
+     * right after it, and stays so.
+     */
+    private static void asserServerStatus(ServerStatus expected, LanguageServerManager manager, MockLanguageServerDefinition serverDefinition) {
+        PlatformTestUtil.waitWithEventsDispatching(
+                () -> "the server must be " + expected + ", but it is " + manager.getServerStatus(serverDefinition.getId()),
+                () -> manager.getServerStatus(serverDefinition.getId()) == expected, 10);
     }
 
     @Override
