@@ -105,6 +105,9 @@ public class LanguageServerWrapper implements Disposable {
 
     private static final int MAX_NUMBER_OF_RESTART_ATTEMPTS = 20; // TODO move this max value in settings
 
+    // How long a stop waits for the notifications that the dispatcher holds, and then for the message writer, each
+    private static final Duration STOP_WAIT_TIMEOUT = Duration.ofSeconds(1);
+
     /**
      * The most LSP traces that wait for the LSP console to show them.
      */
@@ -165,6 +168,8 @@ public class LanguageServerWrapper implements Disposable {
     private @NotNull CompletableFuture<LanguageServer> lastNotification = CompletableFuture.completedFuture(null);
     private final ExecutorService listener;
     private final ExecutorService messageWriter;
+    // The waits of a stop for the dispatcher and the message writer, which only a test changes
+    private volatile @NotNull Duration stopWaitTimeout = STOP_WAIT_TIMEOUT;
     private final SimpleModificationTracker modificationTracker = new SimpleModificationTracker();
     /**
      * Map containing unregistration handlers for dynamic capability registrations.
@@ -939,6 +944,18 @@ public class LanguageServerWrapper implements Disposable {
         // No more doublings than it takes to reach any pause in practice, so that it never overflows
         Duration pause = first.multipliedBy(1L << Math.min(restarts - 1, 20));
         return pause.compareTo(max) > 0 ? max : pause;
+    }
+
+    /**
+     * Sets how long a stop of this language server waits for the notifications that its dispatcher holds, and then for
+     * its message writer, each, instead of a second, so that a test sees the messages that the stop waits for however
+     * slowly the dispatcher and the writer run.
+     *
+     * @param stopWaitTimeout how long a stop waits for the dispatcher, and then for the message writer.
+     */
+    @TestOnly
+    public void setStopWaitTimeout(@NotNull Duration stopWaitTimeout) {
+        this.stopWaitTimeout = stopWaitTimeout;
     }
 
     @TestOnly
@@ -3133,9 +3150,9 @@ public class LanguageServerWrapper implements Disposable {
     }
 
     /**
-     * Waits until the dispatcher has handed the given notifications to the message writer, for a second at most, so
-     * that a request sent after this is written after them. A disposed language server sends no messages, and isn't
-     * waited for.
+     * Waits until the dispatcher has handed the given notifications to the message writer, for a second at most
+     * ({@link #STOP_WAIT_TIMEOUT}), so that a request sent after this is written after them. A disposed language
+     * server sends no messages, and isn't waited for.
      *
      * @param notifications the last of the notifications to wait for, as {@link #getLastNotification()} gave it, or
      *                      null for none.
@@ -3145,7 +3162,7 @@ public class LanguageServerWrapper implements Disposable {
             return;
         }
         try {
-            notifications.get(1, TimeUnit.SECONDS);
+            notifications.get(stopWaitTimeout.toMillis(), TimeUnit.MILLISECONDS);
         } catch (InterruptedException ex) {
             Thread.currentThread().interrupt();
         } catch (ExecutionException | CancellationException | TimeoutException ex) {
@@ -3164,8 +3181,8 @@ public class LanguageServerWrapper implements Disposable {
     }
 
     /**
-     * Waits until the message writer has sent the messages queued so far, for a second at most. A disposed language
-     * server sends no messages, and isn't waited for.
+     * Waits until the message writer has sent the messages queued so far, for a second at most
+     * ({@link #STOP_WAIT_TIMEOUT}). A disposed language server sends no messages, and isn't waited for.
      */
     private void waitForTheMessageWriter() {
         if (isDisposed()) {
@@ -3174,7 +3191,7 @@ public class LanguageServerWrapper implements Disposable {
         try {
             // The writer has one thread, so it runs this once the messages before it are sent
             CompletableFuture.runAsync(() -> {
-            }, messageWriter).get(1, TimeUnit.SECONDS);
+            }, messageWriter).get(stopWaitTimeout.toMillis(), TimeUnit.MILLISECONDS);
         } catch (InterruptedException ex) {
             Thread.currentThread().interrupt();
         } catch (ExecutionException | TimeoutException | RejectedExecutionException ex) {

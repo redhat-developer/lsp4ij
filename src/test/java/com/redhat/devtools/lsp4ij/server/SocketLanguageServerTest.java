@@ -40,11 +40,16 @@ import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
+import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * A language server which LSP4IJ reaches over a socket, here one that runs already, in the test's process: it
@@ -158,15 +163,18 @@ public class SocketLanguageServerTest extends LSPCodeInsightFixtureTestCase {
 
     /**
      * A stop lets the message writer send the exit notification before it closes the connection, also when the write
-     * takes a moment, so the language server gets it.
+     * is still going on as the stop waits for the writer, so the language server gets it.
      */
     public void testAStopSendsTheExitNotificationBeforeItClosesTheConnection() throws Exception {
         var project = myFixture.getProject();
         try (var listening = new ServerSocket(0, 1, InetAddress.getLoopbackAddress())) {
+            var provider = new AtomicReference<HeldExitProvider>();
             var definition = new MockLanguageServerDefinition("socket-server", false) {
                 @Override
                 public @NotNull StreamConnectionProvider createConnectionProvider(@NotNull Project project) {
-                    return new SlowExitProvider(listening.getLocalPort());
+                    var created = new HeldExitProvider(listening.getLocalPort());
+                    provider.set(created);
+                    return created;
                 }
             };
             var server = definition.getServer();
@@ -233,13 +241,32 @@ public class SocketLanguageServerTest extends LSPCodeInsightFixtureTestCase {
                 // Nothing listens anymore, so that a start again fails at once instead of waiting on a connection
                 // which nothing serves
                 listening.close();
+                var held = provider.get();
+                // Once the write goes on, the writer has as long as a slow runner takes to end it, instead of what is
+                // left of the second for a user
+                wrapper.setStopWaitTimeout(Duration.ofSeconds(IN_MEMORY_TIMEOUT_SECONDS));
 
-                wrapper.stop().get(BOUND_SECONDS, TimeUnit.SECONDS);
+                held.stopping();
+                CompletableFuture<Void> stopped = wrapper.stop();
+                try {
+                    // A stop that doesn't wait for the writer closes the connection, and then ends the hold
+                    stopped.whenComplete((result, error) -> held.release.complete(null));
+                    stopped.get(BOUND_SECONDS, TimeUnit.SECONDS);
+                } finally {
+                    held.release.complete(null);
+                }
 
+                assertTrue("the stop must wait in " + HeldExitProvider.WAIT_FOR_THE_MESSAGE_WRITER + " while the writer "
+                        + "writes the exit notification, whose write "
+                        + (held.exitWriteStarted.isDone() ? "started" : "didn't start"), held.stopWaited.isDone());
                 // the language server reads the notification on its own thread
                 exitReceived.get(BOUND_SECONDS, TimeUnit.SECONDS);
                 assertEquals("errors of the stop", List.of(), errors);
             } finally {
+                var held = provider.get();
+                if (held != null) {
+                    held.release.complete(null);
+                }
                 lifecycle.removeLanguageServerLifecycleListener(listener);
                 server.waitBeforeTearDown();
                 LanguageServersRegistry.getInstance().removeServerDefinition(project, definition);
@@ -248,13 +275,42 @@ public class SocketLanguageServerTest extends LSPCodeInsightFixtureTestCase {
     }
 
     /**
-     * Connects to a language server which runs already, and takes a moment to write the exit notification, as a writer
-     * which has other messages to send first does.
+     * Connects to a language server which runs already, and holds the write of the exit notification until the stop
+     * which sent it waits for the message writer, as a writer which has other messages to send first does. So the stop
+     * waits for a write which goes on, whenever the test thread runs.
      */
-    private static final class SlowExitProvider extends SocketStreamConnectionProvider {
+    private static final class HeldExitProvider extends SocketStreamConnectionProvider {
 
-        SlowExitProvider(int port) {
+        // Where the stop of a language server waits for its message writer, before it closes the connection
+        static final String WAIT_FOR_THE_MESSAGE_WRITER = "LanguageServerWrapper.waitForTheMessageWriter";
+
+        // Completed, with its thread, as the stop checks the connection, which it does before the shutdown
+        private final CompletableFuture<Thread> stopChecksTheConnection = new CompletableFuture<>();
+        // Completed as the writer starts to write the exit notification
+        final CompletableFuture<Void> exitWriteStarted = new CompletableFuture<>();
+        // Completed as the writer, which holds the exit notification, sees the stop wait for it
+        final CompletableFuture<Void> stopWaited = new CompletableFuture<>();
+        // Ends the hold of the exit notification, as the test ends
+        final CompletableFuture<Void> release = new CompletableFuture<>();
+        private volatile boolean stopping;
+
+        HeldExitProvider(int port) {
             super(Direction.CONNECT, InetAddress.getLoopbackAddress().getHostAddress(), port, null);
+        }
+
+        /**
+         * Tells the provider that the test stops the language server: the next check of the connection is the stop's.
+         */
+        void stopping() {
+            stopping = true;
+        }
+
+        @Override
+        public boolean isAlive() {
+            if (stopping) {
+                stopChecksTheConnection.complete(Thread.currentThread());
+            }
+            return super.isAlive();
         }
 
         @Override
@@ -264,15 +320,54 @@ public class SocketLanguageServerTest extends LSPCodeInsightFixtureTestCase {
                 @Override
                 public void write(byte @NotNull [] bytes, int offset, int length) throws IOException {
                     if (new String(bytes, offset, length, StandardCharsets.UTF_8).contains("\"method\":\"exit\"")) {
-                        try {
-                            Thread.sleep(100);
-                        } catch (InterruptedException e) {
-                            Thread.currentThread().interrupt();
-                        }
+                        exitWriteStarted.complete(null);
+                        holdUntilTheStopWaitsForTheWriter();
                     }
                     out.write(bytes, offset, length);
                 }
             };
+        }
+
+        /**
+         * Holds the writer, as it writes the exit notification, until the thread of the stop waits in
+         * {@link #WAIT_FOR_THE_MESSAGE_WRITER}, for the writer, as SelectedEditorConnectionTest holds the dispatcher. A
+         * thread tells no other that it starts to wait, so the thread of the stop is looked at, and its wait is
+         * recognized by its stack, which shows that it parks, at its top, in that wait, below. The hold ends without
+         * that once released, or after {@link #BOUND_SECONDS}.
+         */
+        private void holdUntilTheStopWaitsForTheWriter() {
+            long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(BOUND_SECONDS);
+            try {
+                CompletableFuture.anyOf(stopChecksTheConnection, release).get(BOUND_SECONDS, TimeUnit.SECONDS);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return;
+            } catch (ExecutionException | TimeoutException e) {
+                // no stop checked the connection in time, which the test reports
+                return;
+            }
+            var stop = stopChecksTheConnection.getNow(null);
+            while (stop != null && !release.isDone() && System.nanoTime() - deadline < 0) {
+                var state = stop.getState();
+                if ((state == Thread.State.WAITING || state == Thread.State.TIMED_WAITING)
+                        && parksInTheWaitForTheWriter(stop.getStackTrace())) {
+                    stopWaited.complete(null);
+                    return;
+                }
+                Thread.onSpinWait();
+            }
+        }
+
+        /**
+         * True if the given stack of a thread parks it, at its top, in {@link #WAIT_FOR_THE_MESSAGE_WRITER}, below.
+         */
+        private static boolean parksInTheWaitForTheWriter(StackTraceElement[] stack) {
+            return stack.length > 0
+                    && stack[0].getClassName().equals("jdk.internal.misc.Unsafe")
+                    && stack[0].getMethodName().equals("park")
+                    && Arrays.stream(stack).anyMatch(frame ->
+                    frame.getClassName().equals(LanguageServerWrapper.class.getName())
+                            && frame.getMethodName().equals("waitForTheMessageWriter"));
         }
     }
 }
