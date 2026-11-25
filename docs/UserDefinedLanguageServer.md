@@ -438,6 +438,7 @@ and potential configuration.
 * [Ada Language Server](./user-defined-ls/ada_language_server.md)
 * [Apache Camel Language Server](./user-defined-ls/camel-lsp-server.md)
 * [Astro Language Server](./user-defined-ls/astro-ls.md)
+* [C# Language Server (OmniSharp)](./user-defined-ls/omnisharp-roslyn.md)
 * [Candor Language Server](../src/main/resources/templates/lsp/candor-lsp)
 * [CSS Language Server](./user-defined-ls/vscode-css-language-server.md)
 * [Clangd](./user-defined-ls/clangd.md) 

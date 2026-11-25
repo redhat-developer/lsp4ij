@@ -1,20 +1,24 @@
 {
   "id": "omnisharp-roslyn",
-  "name": "Omnisharp Roslyn",
+  "name": "C# Language Server (OmniSharp)",
   "programArgs": {
-    "windows": "\"OmniSharp --languageserver\"",
-    "default": "\"OmniSharp --languageserver\""
+    "default": "dotnet \"$USER_HOME$/.lsp4ij/lsp/omnisharp-roslyn/OmniSharp.dll\" --languageserver"
   },
+  "transports": [
+    {
+      "mode": "stdio"
+    }
+  ],
   "expandConfiguration": true,
   "fileTypeMappings": [
     {
       "fileType": {
-        "name": "CSharp",
         "patterns": [
-          "*.cs"
+          "*.cs",
+          "*.csx"
         ]
       },
-      "languageId": "clojure"
+      "languageId": "csharp"
     }
   ]
 }

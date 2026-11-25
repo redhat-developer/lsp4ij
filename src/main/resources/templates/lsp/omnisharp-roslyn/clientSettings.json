@@ -1,6 +1,9 @@
 {
   "caseSensitive": true,
-  "lineCommentPrefix": ";",
+  "lineCommentPrefix": "//",
+  "blockCommentPrefix": "/*",
+  "blockCommentSuffix": "*/",
+  "statementTerminatorCharacters": ";",
   "completion": {
     "useContextAwareSorting": true,
     "useTemplateForInvocationOnlySnippet": false
