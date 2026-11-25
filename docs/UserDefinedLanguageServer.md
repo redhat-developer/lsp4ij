@@ -233,7 +233,8 @@ the LSP console show the error.
 ### Debug tab
 
 The `Debug tab` is available when you have created the language server definition. It allows to customize the 
-level Trace used in LSP console.
+level Trace used in LSP console. It has no debug port: to debug the language server, add its debug options to its
+command in the `Server` tab.
 
 ### Installer tab
 
