@@ -134,6 +134,27 @@ public class LanguageServerViewDebugTest extends BasePlatformTestCase {
         assertDoesntContain(new JavaProcessCommandBuilder(getProject(), definition.getId()).setJar("server.jar").create(), JDWP);
     }
 
+    public void testResetClearsTheDebugPortOfALanguageServerOfAnExtensionWithoutSavedSettings() {
+        var definition = addDefinition(extensionServer());
+        var view = createView(definition, false);
+        assertNull("the language server has no saved settings",
+                ProjectLanguageServerSettings.getInstance(getProject()).getLanguageServerSettings(definition.getId()));
+
+        view.setDebugPort("1044");
+        view.setDebugSuspend(true);
+        view.setServerTrace(ServerTrace.verbose);
+        view.setReportErrorKind(ErrorReportingKind.in_log);
+        assertTrue(view.isModified());
+        view.reset();
+
+        // Every field of the Debug tab is back to its default value
+        assertEquals("", view.getDebugPort());
+        assertFalse(view.isDebugSuspend());
+        assertEquals(ServerTrace.getDefaultValue(), view.getServerTrace());
+        assertEquals(ErrorReportingKind.getDefaultValue(), view.getReportErrorKind());
+        assertFalse(view.isModified());
+    }
+
     public void testADebugPortStoredForAUserDefinedLanguageServerDoesNotModifyItsPage() throws ConfigurationException {
         var definition = addDefinition(userDefinedServer());
         // As the Debug tab used to save it, when it showed the debug port and Suspend of a user-defined language server

@@ -327,6 +327,10 @@ public class LanguageServerView implements Disposable {
             if (projectSettings != null) {
                 this.setDebugPort(projectSettings.getDebugPort());
                 this.setDebugSuspend(projectSettings.isDebugSuspend());
+            } else {
+                // No saved settings: no debug port and no Suspend, as for Trace and Error reporting above
+                this.setDebugPort("");
+                this.setDebugSuspend(false);
             }
             List<LanguageServerFileAssociation> mappings = LanguageServersRegistry.getInstance().findLanguageServerDefinitionFor(languageServerId);
             List<ServerMappingSettings> languageMappings = mappings
