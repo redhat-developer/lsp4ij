@@ -57,14 +57,21 @@ The `Configuration` tab to specify the working directory and the file you want t
 
   ![DAP Configuration Type/Configuration](./images/DAP_config_type_configuration.png)
 
-The working directory is the one of the debug adapter's process. Since IntelliJ 2025.1, a plugin can set up the environment
-of a process for its working directory (the `commandLineEnvCustomizer` extension point), as the
-[mise](https://mise.jdx.dev/) plugin does from a `mise.toml`, or a [direnv](https://direnv.net/) plugin from an `.envrc`.
-The debug adapter's process gets that environment when it starts, and LSP4IJ looks up the debug adapter's command in its
-`PATH`, so that the tools which the directory selects, such as its version of `node`, are the ones that run.
+The working directory is the one of the debug adapter's process. Without one, the debug adapter runs in the directory of
+the `File`, or in the `File` itself when it is a folder, such as a Go package, and without a file in the project's
+directory. The empty `Working directory` field shows this as `File's directory` or `Project directory`. A configuration
+created from a file has no working directory, so its debug adapter runs in the directory of that file. For a file whose
+directory isn't on disk, as in an archive, it runs in the project's directory, and in a project whose directory isn't on
+disk, in the IDE's working directory.
+
+Since IntelliJ 2025.1, a plugin can set up the environment of a process for its working directory (the
+`commandLineEnvCustomizer` extension point), as the [mise](https://mise.jdx.dev/) plugin does from a `mise.toml`, or a
+[direnv](https://direnv.net/) plugin from an `.envrc`. The debug adapter's process gets that environment when it starts,
+and LSP4IJ looks up the debug adapter's command in its `PATH`, so that the tools which the directory selects, such as its
+version of `node`, are the ones that run.
 
 > [!NOTE]
-> - **The working directory selects the environment**: a configuration created from a file keeps the project's directory. For a file in a directory that selects other tools, such as a subdirectory with its own `mise.toml`, set the working directory to that directory. It is also the `${workspaceFolder}` of the launch configuration.
+> - **The working directory selects the environment**: without a working directory, that is the environment of the file's directory, so a subdirectory with its own `mise.toml` or `.envrc` applies to the files in it. Set a working directory for the environment of another directory. A configuration created from a file by an earlier version of LSP4IJ stored the project's directory as its working directory, and keeps it: clear the field to run in the file's directory.
 > - **The debug adapter runs with them too**: its own command, such as `node`, is the directory's. A project pinned to a version that the debug adapter doesn't support can keep it from starting.
 > - **Precedence**: the directory's environment is applied when the process starts, after the environment variables of the run configuration, so it wins over a variable that both set.
 > - **Windows**: with a working directory, a debug adapter's command without its extension, such as `node` or `npx`, is looked up with the extensions in `PATHEXT`, as Windows does, so that the directory's `node.exe` or `npx.cmd` starts.
@@ -121,9 +128,9 @@ Next to the IntelliJ macros, LSP4IJ replaces placeholders of its own:
   writes in their place (see the [Go Delve example](./user-defined-dap/go-delve.md)).
 - `${file}`, in the `DAP parameters (JSON)` of the `Configuration` tab: the `File` of that tab, the one to run or
   debug.
-- `${workspaceFolder}`, in the `DAP parameters (JSON)`: the `Working directory` of the `Configuration` tab. For a
-  configuration created from a file, that is the project's directory (see the note above), not the folder of the
-  file.
+- `${workspaceFolder}`, in the `DAP parameters (JSON)`: the `Working directory` of the `Configuration` tab, and
+  without one the project's directory. For a configuration created from a file, that is the project's directory, not
+  the folder of the file, in which its debug adapter runs.
 
 For example:
 
