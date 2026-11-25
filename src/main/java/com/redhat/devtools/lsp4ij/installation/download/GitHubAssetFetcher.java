@@ -14,8 +14,10 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.util.EnvironmentUtil;
 import com.redhat.devtools.lsp4ij.JSONUtils;
+import com.redhat.devtools.lsp4ij.installation.download.GitHubAccountTokenProvider.AccountToken;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
@@ -33,8 +35,10 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
+import java.util.function.Supplier;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
@@ -155,9 +159,15 @@ public class GitHubAssetFetcher implements AssetFetcher {
     /**
      * The environment variables which can hold a GitHub token, in order of precedence: {@code GITHUB_TOKEN}, and
      * {@code GH_TOKEN}, which the gh CLI reads. With a token, the GitHub API allows 5,000 requests an hour, instead of
-     * 60 an hour by IP address (#2142).
+     * 60 an hour by IP address (#2142). They come before the token of the LSP4IJ settings and the one of the IDE's
+     * GitHub account, as the environment comes before the stored configuration of the gh CLI (#2188).
      */
     private static final List<String> TOKEN_VARIABLES = List.of("GITHUB_TOKEN", "GH_TOKEN");
+
+    /**
+     * Where to set a GitHub token in the IDE, which the message of the rate limit names.
+     */
+    static final String TOKEN_SETTING = "Settings | Languages & Frameworks | Language Servers (LSP4IJ)";
 
     private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ofPattern("HH:mm:ss");
 
@@ -171,6 +181,8 @@ public class GitHubAssetFetcher implements AssetFetcher {
     private final @NotNull String repository;
     private final @NotNull String apiUrl;
     private final @NotNull Function<String, String> environment;
+    private final @NotNull Supplier<String> settingsToken;
+    private final @NotNull GitHubAccountTokenProvider accountTokens;
     private @Nullable JsonArray releases;
     // Where the releases come from, for the log: never the token
     private volatile @NotNull String source = "the GitHub API";
@@ -183,13 +195,17 @@ public class GitHubAssetFetcher implements AssetFetcher {
      */
     public GitHubAssetFetcher(@NotNull String owner, @NotNull String repository) {
         // The environment of the IDE, as the commands of the exec tasks get it: on macOS, with the variables of the
-        // login shell when the IDE was started from the Dock
-        this(owner, repository, GITHUB_API_URL, EnvironmentUtil::getValue);
+        // login shell when the IDE was started from the Dock. The GitHub plugin is looked up at each request, since it
+        // can be disabled
+        this(owner, repository, GITHUB_API_URL, EnvironmentUtil::getValue, GitHubTokenSettings::getToken, apiUrl -> {
+            GitHubAccountTokenProvider provider = GitHubAccountTokenProvider.getInstance();
+            return provider != null ? provider.findToken(apiUrl) : null;
+        });
     }
 
     /**
      * Constructs a GitHubAssetFetcher for a given repository owner and name, which requests the given GitHub API, and
-     * finds a GitHub token in the given environment.
+     * finds a GitHub token in the given environment only.
      *
      * @param owner       the GitHub repository owner
      * @param repository  the GitHub repository name
@@ -200,10 +216,32 @@ public class GitHubAssetFetcher implements AssetFetcher {
                        @NotNull String repository,
                        @NotNull String apiUrl,
                        @NotNull Function<String, String> environment) {
+        this(owner, repository, apiUrl, environment, () -> null, url -> null);
+    }
+
+    /**
+     * Constructs a GitHubAssetFetcher for a given repository owner and name, which requests the given GitHub API, and
+     * finds a GitHub token in the given environment, else in the LSP4IJ settings, else in a GitHub account of the IDE.
+     *
+     * @param owner         the GitHub repository owner
+     * @param repository    the GitHub repository name
+     * @param apiUrl        the URL of the GitHub API, without a trailing slash
+     * @param environment   the value of an environment variable, by name, or null if it isn't set
+     * @param settingsToken the GitHub token of the LSP4IJ settings, or null if there is none
+     * @param accountTokens the token of a GitHub account of the IDE for a GitHub API
+     */
+    GitHubAssetFetcher(@NotNull String owner,
+                       @NotNull String repository,
+                       @NotNull String apiUrl,
+                       @NotNull Function<String, String> environment,
+                       @NotNull Supplier<String> settingsToken,
+                       @NotNull GitHubAccountTokenProvider accountTokens) {
         this.owner = owner;
         this.repository = repository;
         this.apiUrl = apiUrl;
         this.environment = environment;
+        this.settingsToken = settingsToken;
+        this.accountTokens = accountTokens;
     }
 
     /**
@@ -264,7 +302,8 @@ public class GitHubAssetFetcher implements AssetFetcher {
 
     /**
      * Returns where the releases of the last download URL come from: the GitHub API, with the token of an environment
-     * variable, by its name, or anonymously. Never the token.
+     * variable, by its name, of the LSP4IJ settings or of the IDE's GitHub account, by its login, or anonymously. Never
+     * the token.
      *
      * @return where the releases of the last download URL come from.
      */
@@ -312,44 +351,104 @@ public class GitHubAssetFetcher implements AssetFetcher {
     }
 
     /**
-     * A GitHub token, and the environment variable which holds it. Its string doesn't show the token.
+     * Where a GitHub token comes from, as the console and the log name it: an environment variable, the LSP4IJ
+     * settings, or a GitHub account of the IDE.
      *
-     * @param variable the environment variable which holds the token.
-     * @param value    the token.
+     * @param name    the name which follows "the token of", as "the environment variable GITHUB_TOKEN".
+     * @param subject the name at the start of a sentence, as "The environment variable GITHUB_TOKEN".
+     * @param renewal what to do when GitHub refuses the token, as "Set GITHUB_TOKEN to a valid token, or unset it."
      */
-    private record Token(@NotNull String variable, @NotNull String value) {
+    private record TokenSource(@NotNull String name, @NotNull String subject, @NotNull String renewal) {
 
-        @Override
-        public @NotNull String toString() {
-            return "Token[" + variable + "]";
+        static final TokenSource SETTINGS = new TokenSource("the LSP4IJ settings", "The token of the LSP4IJ settings",
+                "Set a valid token in " + TOKEN_SETTING + ", or remove it.");
+
+        static @NotNull TokenSource variable(@NotNull String variable) {
+            return new TokenSource("the environment variable " + variable, "The environment variable " + variable,
+                    "Set " + variable + " to a valid token, or unset it.");
+        }
+
+        static @NotNull TokenSource account(@NotNull String login) {
+            return new TokenSource("the IDE's GitHub account " + login, "The token of the IDE's GitHub account " + login,
+                    "Log in to the account again in Settings | Version Control | GitHub, or remove it there.");
         }
     }
 
     /**
-     * Returns the GitHub token of the first environment variable of {@link #TOKEN_VARIABLES} which is set and isn't
-     * blank, without the spaces around it, or null if there is none. A value with a space or a control character
-     * inside, which a token doesn't have, is skipped and reported, without the value: a line break in a header would
-     * make {@link HttpURLConnection} throw an exception whose message shows it.
+     * A GitHub token, and where it comes from. Its string doesn't show the token.
+     *
+     * @param source where the token comes from.
+     * @param value  the token.
+     */
+    private record Token(@NotNull TokenSource source, @NotNull String value) {
+
+        @Override
+        public @NotNull String toString() {
+            return "Token[" + source.name() + "]";
+        }
+    }
+
+    /**
+     * Returns the GitHub token of the first of these which has one: the environment variables of
+     * {@link #TOKEN_VARIABLES}, the LSP4IJ settings, and a GitHub account of the IDE on the server of the GitHub API.
+     * The token is without the spaces around it, and a blank one counts as none. Returns null if there is none.
      *
      * @param reporter an object to report progress or status messages
      * @return the GitHub token, or null if there is none.
      */
     private @Nullable Token findToken(@NotNull Reporter reporter) {
         for (String variable : TOKEN_VARIABLES) {
-            String value = environment.apply(variable);
-            if (value == null || value.isBlank()) {
-                continue;
+            Token token = toToken(environment.apply(variable), TokenSource.variable(variable), reporter);
+            if (token != null) {
+                return token;
             }
-            value = value.strip();
-            if (value.chars().allMatch(c -> c > ' ' && c < 0x7F)) {
-                return new Token(variable, value);
-            }
-            reporter.setText("The environment variable " + variable
-                    + " has characters which a GitHub token doesn't have: LSP4IJ doesn't send it to GitHub");
-            LOGGER.warn("The environment variable {} has characters which a GitHub token doesn't have: LSP4IJ "
-                    + "doesn't send it to GitHub", variable);
         }
+        Token settings = toToken(read(settingsToken, TokenSource.SETTINGS.name()), TokenSource.SETTINGS, reporter);
+        if (settings != null) {
+            return settings;
+        }
+        // The token of an account goes to the server of the account only, as github.com for api.github.com
+        AccountToken account = read(() -> accountTokens.findToken(apiUrl), "the IDE's GitHub account");
+        return account != null ? toToken(account.token(), TokenSource.account(account.login()), reporter) : null;
+    }
+
+    /**
+     * Returns the given value as a GitHub token from the given source, without the spaces around it, or null if it's
+     * null or blank. A value with a space or a control character inside, which a token doesn't have, is reported,
+     * without the value, and null is returned: a line break in a header would make {@link HttpURLConnection} throw an
+     * exception whose message shows it.
+     */
+    private static @Nullable Token toToken(@Nullable String value,
+                                           @NotNull TokenSource source,
+                                           @NotNull Reporter reporter) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        String token = value.strip();
+        if (token.chars().allMatch(c -> c > ' ' && c < 0x7F)) {
+            return new Token(source, token);
+        }
+        reporter.setText(source.subject()
+                + " has characters which a GitHub token doesn't have: LSP4IJ doesn't send it to GitHub");
+        LOGGER.warn("{} has characters which a GitHub token doesn't have: LSP4IJ doesn't send it to GitHub",
+                source.subject());
         return null;
+    }
+
+    /**
+     * Returns what the given source of a GitHub token gives, or null if it fails, as the Password Safe can: the
+     * request is then sent without its token, as without one.
+     */
+    private static <T> @Nullable T read(@NotNull Supplier<T> source, @NotNull String name) {
+        try {
+            return source.get();
+        } catch (RuntimeException e) {
+            if (e instanceof ProcessCanceledException || e instanceof CancellationException) {
+                throw e;
+            }
+            LOGGER.warn("Cannot read the GitHub token of {}", name, e);
+            return null;
+        }
     }
 
     /**
@@ -363,7 +462,7 @@ public class GitHubAssetFetcher implements AssetFetcher {
         // Read at each request, after the IDE has loaded the environment of the login shell
         Token token = findToken(reporter);
         reporter.setText("> Loading GitHub releases: " + urlStr
-                + (token != null ? " (with the token of the environment variable " + token.variable() + ")" : ""));
+                + (token != null ? " (with the token of " + token.source().name() + ")" : ""));
         // The messages which explain why the releases can't be loaded, reported only if they can't (#2188)
         List<String> failureReasons = new ArrayList<>();
 
@@ -381,15 +480,15 @@ public class GitHubAssetFetcher implements AssetFetcher {
                 // once, and only when it had a token
                 String refused = getErrorMessage(conn, responseCode, token);
                 if (refused == null) {
-                    refused = "GitHub API refused the token of the environment variable " + token.variable()
+                    refused = "GitHub API refused the token of " + token.source().name()
                             + " (HTTP " + responseCode + ").";
                 }
                 reporter.setText("Error while loading GitHub releases: ",
                         new GitHubApiError(refused + " Trying again without the token."));
                 failureReasons.add(refused);
                 LOGGER.warn("GitHub releases of {}/{}: {}", owner, repository, refused);
-                LOGGER.info("GitHub releases of {}/{}: trying again anonymously, since GitHub refused the token of "
-                        + "the environment variable {}", owner, repository, token.variable());
+                LOGGER.info("GitHub releases of {}/{}: trying again anonymously, since GitHub refused the token of {}",
+                        owner, repository, token.source().name());
                 conn.disconnect();
                 refusedToken = token;
                 refusedCode = responseCode;
@@ -419,9 +518,9 @@ public class GitHubAssetFetcher implements AssetFetcher {
                 }
                 logRequest(url, token, conn, responseCode, start);
                 source = "the GitHub API, " + (token != null
-                        ? "with the token of the environment variable " + token.variable()
+                        ? "with the token of " + token.source().name()
                         : "anonymously" + (refusedToken != null
-                        ? ", since GitHub refused the token of the environment variable " + refusedToken.variable()
+                        ? ", since GitHub refused the token of " + refusedToken.source().name()
                         : ""));
                 return sb.toString();
             }
@@ -439,8 +538,8 @@ public class GitHubAssetFetcher implements AssetFetcher {
     }
 
     /**
-     * Logs, for Debug Log Settings, the given request to the GitHub API: its URL, whether it had a token, by the name
-     * of its variable, its HTTP status, its rate limit and how long it took. Never the token.
+     * Logs, for Debug Log Settings, the given request to the GitHub API: its URL, whether it had a token, by where it
+     * comes from, its HTTP status, its rate limit and how long it took. Never the token.
      */
     private static void logRequest(@NotNull URL url,
                                    @Nullable Token token,
@@ -454,7 +553,7 @@ public class GitHubAssetFetcher implements AssetFetcher {
         String limit = conn.getHeaderField("X-RateLimit-Limit");
         LOGGER.debug("GitHub API request {} {}: HTTP {} in {} ms{}",
                 url,
-                token != null ? "with the token of the environment variable " + token.variable() : "anonymously",
+                token != null ? "with the token of " + token.source().name() : "anonymously",
                 responseCode,
                 TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start),
                 remaining != null && limit != null
@@ -513,9 +612,8 @@ public class GitHubAssetFetcher implements AssetFetcher {
                                              int responseCode,
                                              @Nullable Token token) {
         if (responseCode == HttpURLConnection.HTTP_UNAUTHORIZED && token != null) {
-            return "GitHub API refused the token of the environment variable " + token.variable()
-                    + " (HTTP 401): the token is invalid or has expired. Set " + token.variable()
-                    + " to a valid token, or unset it.";
+            return "GitHub API refused the token of " + token.source().name()
+                    + " (HTTP 401): the token is invalid or has expired. " + token.source().renewal();
         }
         if (responseCode == HttpURLConnection.HTTP_FORBIDDEN || responseCode == 429) {
             String rateLimit = getRateLimitMessage(conn, responseCode, token);
@@ -531,7 +629,7 @@ public class GitHubAssetFetcher implements AssetFetcher {
         String singleSignOn = conn.getHeaderField("X-GitHub-SSO");
         if (token != null && singleSignOn != null) {
             String url = getSingleSignOnUrl(singleSignOn, token);
-            return "GitHub API refused the token of the environment variable " + token.variable() + " (HTTP "
+            return "GitHub API refused the token of " + token.source().name() + " (HTTP "
                     + responseCode + "): the organization " + owner + " enforces SAML single sign-on, and the token "
                     + "isn't authorized for it. "
                     + (url != null ? "Authorize it at " + url + ", a link which expires after an hour."
@@ -544,7 +642,7 @@ public class GitHubAssetFetcher implements AssetFetcher {
             if (token == null || permissions.isEmpty()) {
                 return null;
             }
-            return "GitHub API refused the token of the environment variable " + token.variable()
+            return "GitHub API refused the token of " + token.source().name()
                     + " (HTTP 403): the token lacks the " + formatPermissions(permissions) + ".";
         }
         // GitHub answers 404 for a private repository which the request can't read, so as not to show that it exists
@@ -553,7 +651,7 @@ public class GitHubAssetFetcher implements AssetFetcher {
         if (token == null) {
             return notFound + ".";
         }
-        return notFound + " and the token of the environment variable " + token.variable() + " can't read it."
+        return notFound + " and the token of " + token.source().name() + " can't read it."
                 + (permissions.isEmpty() ? "" : " Reading it needs the " + formatPermissions(permissions) + ".");
     }
 
@@ -578,7 +676,7 @@ public class GitHubAssetFetcher implements AssetFetcher {
         }
         StringBuilder message = new StringBuilder("GitHub API rate limit reached");
         if (token != null) {
-            message.append(" for the token of the environment variable ").append(token.variable());
+            message.append(" for the token of ").append(token.source().name());
         }
         String limit = conn.getHeaderField("X-RateLimit-Limit");
         if (exhausted && limit != null) {
@@ -594,7 +692,8 @@ public class GitHubAssetFetcher implements AssetFetcher {
                     .append(formatLocalTime(Instant.now().plusSeconds(seconds))).append('.');
         }
         if (token == null) {
-            message.append(" Setting the environment variable GITHUB_TOKEN of the IDE to a GitHub token raises the")
+            message.append(" A GitHub token in ").append(TOKEN_SETTING)
+                    .append(", or in the environment variable GITHUB_TOKEN of the IDE, raises the")
                     .append(exhausted ? " limit to 5,000 requests an hour." : " limit.");
         }
         return message.toString();

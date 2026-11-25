@@ -65,8 +65,11 @@ public class GitHubDownloadTaskTest {
 
     // What the notification says of the rate limit of the GitHub API without a token
     private static final String RATE_LIMIT = "GitHub API rate limit reached: 60 requests an hour (HTTP 403). It resets "
-            + "at " + localTime(RESET) + " (local time). Setting the environment variable GITHUB_TOKEN of the IDE to a "
-            + "GitHub token raises the limit to 5,000 requests an hour.";
+            + "at " + localTime(RESET) + " (local time)." + GitHubAssetFetcherTest.RAISE_LIMIT
+            + " limit to 5,000 requests an hour.";
+
+    // The same, in the HTML of the notification
+    private static final String HTML_RATE_LIMIT = html(RATE_LIMIT);
 
     private LocalHttpServer server;
     private Path outputDir;
@@ -148,8 +151,8 @@ public class GitHubDownloadTaskTest {
         assertEquals("server", Files.readString(outputDir.resolve("server.jar")));
         assertTrue(context.errors().stream().anyMatch(error -> error.startsWith(
                         "Error while loading GitHub releases: GitHub API rate limit reached: 60 requests an hour "
-                                + "(HTTP 403). It resets at " + localTime(RESET) + " (local time). Setting the "
-                                + "environment variable GITHUB_TOKEN")),
+                                + "(HTTP 403). It resets at " + localTime(RESET) + " (local time)."
+                                + GitHubAssetFetcherTest.RAISE_LIMIT)),
                 "the console must show the rate limit as an error: " + context.output());
         assertTrue(context.output().contains("fallback to the 'url' JSON property"), context.output());
     }
@@ -163,7 +166,7 @@ public class GitHubDownloadTaskTest {
 
         assertEquals(NotificationType.ERROR, notification.getType());
         assertEquals("Installation of <code>test</code> failed.", notification.getTitle());
-        assertEquals("<p>" + RATE_LIMIT + "</p>", notification.getContent());
+        assertEquals("<p>" + HTML_RATE_LIMIT + "</p>", notification.getContent());
         assertTrue(context.errors().stream().anyMatch(error -> error.contains(RATE_LIMIT)),
                 "the console must show the rate limit as before: " + context.output());
     }
@@ -193,7 +196,7 @@ public class GitHubDownloadTaskTest {
 
         assertEquals("<p>GitHub API refused the token of the environment variable GITHUB_TOKEN (HTTP 401): the token "
                         + "is invalid or has expired. Set GITHUB_TOKEN to a valid token, or unset it.</p>"
-                        + "<p>" + RATE_LIMIT + "</p>",
+                        + "<p>" + HTML_RATE_LIMIT + "</p>",
                 notification.getContent());
         assertNoToken(context);
     }
@@ -406,6 +409,13 @@ public class GitHubDownloadTaskTest {
         } finally {
             Disposer.dispose(disposable);
         }
+    }
+
+    /**
+     * Returns the given text as the HTML of the notification has it.
+     */
+    private static @NotNull String html(@NotNull String text) {
+        return text.replace("&", "&amp;").replace("'", "&#39;");
     }
 
     private static void assertNoToken(@NotNull RecordingContext context) {

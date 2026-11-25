@@ -53,6 +53,10 @@ public class GitHubAssetFetcherTest {
     // What the console adds to the message of a token which GitHub refuses
     static final String RETRY = " Trying again without the token.";
 
+    // What the message of the rate limit without a token says of a token, before what it raises the limit to
+    static final String RAISE_LIMIT = " A GitHub token in Settings | Languages & Frameworks | Language Servers "
+            + "(LSP4IJ), or in the environment variable GITHUB_TOKEN of the IDE, raises the";
+
     // As in GitHub's documentation: the authorization request has the id of the token, not the token
     static final String SSO_URL = "https://github.com/orgs/owner/sso?authorization_request="
             + "AZSCKtL4U8yX1H3sCQIVnVgmjmon5fWxks5YrqhJgah0b2tlbl9pZM4EuMz4";
@@ -238,9 +242,8 @@ public class GitHubAssetFetcherTest {
             assertNull(fetch(Map.of(), reporter));
 
             assertEquals("Error while loading GitHub releases: GitHub API rate limit reached: 60 requests an hour "
-                            + "(HTTP " + code + "). It resets at " + localTime(RESET) + " (local time). Setting the "
-                            + "environment variable GITHUB_TOKEN of the IDE to a GitHub token raises the limit to "
-                            + "5,000 requests an hour.",
+                            + "(HTTP " + code + "). It resets at " + localTime(RESET) + " (local time)." + RAISE_LIMIT
+                            + " limit to 5,000 requests an hour.",
                     reporter.lines().get(1).strip(), "the message must explain the error, without a stack trace");
         }
     }
@@ -286,8 +289,7 @@ public class GitHubAssetFetcherTest {
         String message = reporter.lines().get(1).strip();
         assertTrue(message.startsWith("Error while loading GitHub releases: GitHub API rate limit reached (HTTP 403). "
                 + "Try again in 60 seconds, at "), message);
-        assertTrue(message.endsWith(" (local time). Setting the environment variable GITHUB_TOKEN of the IDE to a "
-                + "GitHub token raises the limit."), message);
+        assertTrue(message.endsWith(" (local time)." + RAISE_LIMIT + " limit."), message);
     }
 
     @Test
@@ -593,9 +595,8 @@ public class GitHubAssetFetcherTest {
             fetch(Map.of(), new RecordingReporter());
 
             assertEquals("WARNING Cannot load the GitHub releases of owner/repo: GitHub API rate limit reached: 60 "
-                            + "requests an hour (HTTP 403). It resets at " + localTime(RESET) + " (local time). "
-                            + "Setting the environment variable GITHUB_TOKEN of the IDE to a GitHub token raises the "
-                            + "limit to 5,000 requests an hour.",
+                            + "requests an hour (HTTP 403). It resets at " + localTime(RESET) + " (local time)."
+                            + RAISE_LIMIT + " limit to 5,000 requests an hour.",
                     log.lines().get(1), log.output());
         }
     }
