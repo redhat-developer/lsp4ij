@@ -1,0 +1,240 @@
+/*******************************************************************************
+ * Copyright (c) 2026 Red Hat, Inc.
+ * Distributed under license by Red Hat, Inc. All rights reserved.
+ * This program is made available under the terms of the
+ * Eclipse Public License v2.0 which accompanies this distribution,
+ * and is available at https://www.eclipse.org/legal/epl-v20.html
+ *
+ * Contributors:
+ * Red Hat, Inc. - initial API and implementation
+ ******************************************************************************/
+package com.redhat.devtools.lsp4ij;
+
+import com.google.gson.JsonObject;
+import com.intellij.openapi.application.ApplicationListener;
+import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.command.WriteCommandAction;
+import com.intellij.openapi.vfs.VirtualFile;
+import com.intellij.psi.PsiManager;
+import com.intellij.refactoring.rename.RenameProcessor;
+import com.intellij.testFramework.PlatformTestUtil;
+import com.redhat.devtools.lsp4ij.fixtures.LSPCodeInsightFixtureTestCase;
+import com.redhat.devtools.lsp4ij.mock.MockLanguageServer;
+import com.redhat.devtools.lsp4ij.mock.MockWorkspaceService;
+import org.eclipse.lsp4j.DidChangeConfigurationParams;
+import org.eclipse.lsp4j.FileOperationFilter;
+import org.eclipse.lsp4j.FileOperationOptions;
+import org.eclipse.lsp4j.FileOperationPattern;
+import org.eclipse.lsp4j.FileRename;
+import org.eclipse.lsp4j.Registration;
+import org.eclipse.lsp4j.RegistrationParams;
+import org.eclipse.lsp4j.RenameFilesParams;
+import org.eclipse.lsp4j.Unregistration;
+import org.eclipse.lsp4j.UnregistrationParams;
+import org.jetbrains.annotations.NotNull;
+
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+
+/**
+ * A language server which announces no file operations in its capabilities, and registers them dynamically, is told of
+ * the creations, renames and deletions of the files that the filters of its registrations match, until it unregisters
+ * them.
+ */
+public class FileOperationDynamicRegistrationTest extends LSPCodeInsightFixtureTestCase {
+
+    private static final FileOperationOptions FOO_FILES =
+            new FileOperationOptions(List.of(new FileOperationFilter(new FileOperationPattern("**/*.foo"))));
+
+    // The write actions running now
+    private final AtomicInteger writeActions = new AtomicInteger();
+    // Tells apart the notifications that the test sends to know that the notifications before them have arrived
+    private final AtomicInteger markers = new AtomicInteger();
+
+    public FileOperationDynamicRegistrationTest() {
+        super("*.foo");
+    }
+
+    @Override
+    protected void setUp() throws Exception {
+        super.setUp();
+        // The default capabilities of the mock language server have no file operations
+        MockLanguageServer.reset();
+        ApplicationManager.getApplication().addApplicationListener(new ApplicationListener() {
+            @Override
+            public void writeActionStarted(@NotNull Object action) {
+                writeActions.incrementAndGet();
+            }
+
+            @Override
+            public void writeActionFinished(@NotNull Object action) {
+                writeActions.decrementAndGet();
+            }
+        }, getTestRootDisposable());
+    }
+
+    public void testRenamesThatADynamicRegistrationMatchesAreSentUntilItIsUnregistered() throws Exception {
+        var wrapper = connect(myFixture.getTempDirFixture().createFile("main.foo", ""));
+        var renamed = myFixture.getTempDirFixture().createFile("renamed.foo", "");
+        var notes = myFixture.getTempDirFixture().createFile("notes.txt", "");
+        var workspace = workspace();
+
+        register(new Registration("will-rename", "workspace/willRenameFiles", FOO_FILES),
+                new Registration("did-rename", "workspace/didRenameFiles", FOO_FILES));
+
+        rename(renamed, "moved.foo");
+        PlatformTestUtil.waitWithEventsDispatching("a rename that the filters match must send workspace/willRenameFiles",
+                () -> !workspace.getWillRenameRequests().isEmpty(), 10);
+        assertRename(workspace.getWillRenameRequests().get(0), "/renamed.foo", "/moved.foo");
+        PlatformTestUtil.waitWithEventsDispatching("a rename that the filters match must send workspace/didRenameFiles",
+                () -> !workspace.getDidRenameNotifications().isEmpty(), 10);
+        assertRename(workspace.getDidRenameNotifications().get(0), "/renamed.foo", "/moved.foo");
+
+        rename(notes, "todo.txt");
+        awaitTheNotificationsSentSoFar(wrapper);
+        assertEquals("a rename that the filters don't match must not send workspace/willRenameFiles",
+                1, workspace.getWillRenameRequests().size());
+        assertEquals("a rename that the filters don't match must not send workspace/didRenameFiles",
+                1, workspace.getDidRenameNotifications().size());
+
+        unregister(new Unregistration("will-rename", "workspace/willRenameFiles"),
+                new Unregistration("did-rename", "workspace/didRenameFiles"));
+
+        rename(renamed, "final.foo");
+        awaitTheNotificationsSentSoFar(wrapper);
+        assertEquals("after the unregistration a rename must not send workspace/willRenameFiles",
+                1, workspace.getWillRenameRequests().size());
+        assertEquals("after the unregistration a rename must not send workspace/didRenameFiles",
+                1, workspace.getDidRenameNotifications().size());
+    }
+
+    public void testCreationsAndDeletionsThatADynamicRegistrationMatchesAreSentUntilItIsUnregistered() throws Exception {
+        var wrapper = connect(myFixture.getTempDirFixture().createFile("main.foo", ""));
+        var workspace = workspace();
+
+        // LSP4IJ doesn't announce workspace/willCreateFiles, and ignores its registration
+        register(new Registration("will-create", "workspace/willCreateFiles", FOO_FILES),
+                new Registration("did-create", "workspace/didCreateFiles", FOO_FILES),
+                new Registration("did-delete", "workspace/didDeleteFiles", FOO_FILES));
+
+        var created = myFixture.getTempDirFixture().createFile("created.foo", "");
+        PlatformTestUtil.waitWithEventsDispatching("a creation that the filters match must send workspace/didCreateFiles",
+                () -> !workspace.getDidCreateNotifications().isEmpty(), 10);
+        assertTrue(workspace.getDidCreateNotifications().get(0).getFiles().get(0).getUri().endsWith("/created.foo"));
+        delete(created);
+        PlatformTestUtil.waitWithEventsDispatching("a deletion that the filters match must send workspace/didDeleteFiles",
+                () -> !workspace.getDidDeleteNotifications().isEmpty(), 10);
+        assertTrue(workspace.getDidDeleteNotifications().get(0).getFiles().get(0).getUri().endsWith("/created.foo"));
+
+        delete(myFixture.getTempDirFixture().createFile("created.txt", ""));
+        awaitTheNotificationsSentSoFar(wrapper);
+        assertEquals("a creation that the filters don't match must not send workspace/didCreateFiles",
+                1, workspace.getDidCreateNotifications().size());
+        assertEquals("a deletion that the filters don't match must not send workspace/didDeleteFiles",
+                1, workspace.getDidDeleteNotifications().size());
+        assertEquals("a registration of workspace/willCreateFiles must be ignored", 0, workspace.getWillCreateRequests().size());
+
+        unregister(new Unregistration("did-create", "workspace/didCreateFiles"),
+                new Unregistration("did-delete", "workspace/didDeleteFiles"));
+
+        delete(myFixture.getTempDirFixture().createFile("again.foo", ""));
+        awaitTheNotificationsSentSoFar(wrapper);
+        assertEquals("after the unregistration a creation must not send workspace/didCreateFiles",
+                1, workspace.getDidCreateNotifications().size());
+        assertEquals("after the unregistration a deletion must not send workspace/didDeleteFiles",
+                1, workspace.getDidDeleteNotifications().size());
+    }
+
+    public void testARenameRefactoringAsksADynamicRegistrationBeforeItsWriteAction() throws Exception {
+        var renamed = myFixture.getTempDirFixture().createFile("renamed.foo", "");
+        connect(renamed);
+        register(new Registration("will-rename", "workspace/willRenameFiles", FOO_FILES));
+        var willRename = new CompletableFuture<RenameFilesParams>();
+        // Runs when the server receives the request
+        var askedInWriteAction = willRename.thenApply(params -> writeActions.get() > 0);
+        workspace().setWillRenameCallback(willRename);
+
+        new RenameProcessor(myFixture.getProject(), PsiManager.getInstance(myFixture.getProject()).findFile(renamed),
+                "moved.foo", false, false).run();
+
+        PlatformTestUtil.waitWithEventsDispatching("the rename refactoring must send workspace/willRenameFiles",
+                askedInWriteAction::isDone, 10);
+        assertFalse("workspace/willRenameFiles must be sent before the write action of the refactoring",
+                askedInWriteAction.join());
+        assertEquals("the rename must send workspace/willRenameFiles once", 1, workspace().getWillRenameRequests().size());
+        assertEquals("moved.foo", renamed.getName());
+    }
+
+    private static MockWorkspaceService workspace() {
+        return MockLanguageServer.INSTANCE.getWorkspaceService();
+    }
+
+    private static void assertRename(RenameFilesParams params, String oldName, String newName) {
+        FileRename rename = params.getFiles().get(0);
+        assertTrue(rename.getOldUri(), rename.getOldUri().endsWith(oldName));
+        assertTrue(rename.getNewUri(), rename.getNewUri().endsWith(newName));
+    }
+
+    private LanguageServerWrapper connect(VirtualFile file) throws Exception {
+        return LanguageServiceAccessor.getInstance(myFixture.getProject())
+                .getLanguageServers(PsiManager.getInstance(myFixture.getProject()).findFile(file), null, null)
+                .get(30, TimeUnit.SECONDS)
+                .get(0)
+                .getServerWrapper();
+    }
+
+    private static void register(Registration... registrations) throws Exception {
+        await(MockLanguageServer.INSTANCE.getRemoteProxies().get(0)
+                .registerCapability(new RegistrationParams(List.of(registrations))));
+    }
+
+    private static void unregister(Unregistration... unregistrations) throws Exception {
+        await(MockLanguageServer.INSTANCE.getRemoteProxies().get(0)
+                .unregisterCapability(new UnregistrationParams(List.of(unregistrations))));
+    }
+
+    private static void await(CompletableFuture<?> future) throws Exception {
+        PlatformTestUtil.waitWithEventsDispatching("the client must answer", future::isDone, 10);
+        future.get();
+    }
+
+    /**
+     * Sends a notification and waits for the server to receive it: the requests and notifications sent before it have
+     * then arrived, since they keep their order.
+     */
+    private void awaitTheNotificationsSentSoFar(LanguageServerWrapper wrapper) {
+        var marker = new JsonObject();
+        marker.addProperty("marker", "marker-" + markers.incrementAndGet());
+        wrapper.sendNotification(ls -> {
+            ls.getWorkspaceService().didChangeConfiguration(new DidChangeConfigurationParams(marker));
+            return ls;
+        });
+        PlatformTestUtil.waitWithEventsDispatching("the server must receive the later notification",
+                () -> workspace().getConfigurationChanges().stream()
+                        .anyMatch(change -> marker.equals(change.getSettings())), 10);
+    }
+
+    private void rename(VirtualFile file, String name) {
+        WriteCommandAction.runWriteCommandAction(myFixture.getProject(), () -> {
+            try {
+                file.rename(this, name);
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+        });
+    }
+
+    private void delete(VirtualFile file) {
+        WriteCommandAction.runWriteCommandAction(myFixture.getProject(), () -> {
+            try {
+                file.delete(this);
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+        });
+    }
+}

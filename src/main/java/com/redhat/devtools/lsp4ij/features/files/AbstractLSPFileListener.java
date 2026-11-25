@@ -386,8 +386,7 @@ public abstract class AbstractLSPFileListener implements FileEditorManagerListen
      */
     void sendWillRenameFiles(@NotNull List<FileRenamePlan> renames) {
         var ls = languageServerWrapper.getLanguageServer();
-        if (ls == null || !languageServerWrapper.isActive() ||
-                !LanguageServerItem.isWillRenameFilesSupported(languageServerWrapper.getServerCapabilitiesSync())) {
+        if (ls == null || !languageServerWrapper.isActive() || !languageServerWrapper.canWillRenameFiles()) {
             return;
         }
         var fileRenames = new ArrayList<FileRename>();

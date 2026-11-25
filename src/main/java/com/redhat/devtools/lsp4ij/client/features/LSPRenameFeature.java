@@ -11,7 +11,6 @@
 package com.redhat.devtools.lsp4ij.client.features;
 
 import com.intellij.psi.PsiFile;
-import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import com.redhat.devtools.lsp4ij.server.capabilities.RenameCapabilityRegistry;
 import org.eclipse.lsp4j.ServerCapabilities;
 import org.jetbrains.annotations.ApiStatus;
@@ -76,7 +75,7 @@ public class LSPRenameFeature extends AbstractLSPDocumentFeature {
 
     public boolean isWillRenameFilesSupported(@NotNull PsiFile file) {
         // TODO implement documentSelector to use language of the given file
-        return LanguageServerItem.isWillRenameFilesSupported(getClientFeatures().getServerWrapper().getServerCapabilitiesSync());
+        return getClientFeatures().getServerWrapper().canWillRenameFiles();
     }
 
     /**

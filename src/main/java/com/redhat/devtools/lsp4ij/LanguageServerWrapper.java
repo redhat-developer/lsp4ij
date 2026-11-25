@@ -2084,6 +2084,32 @@ public class LanguageServerWrapper implements Disposable {
                     } catch (Exception e) {
                         LOGGER.error("Error while getting 'workspace/executeCommand' capability", e);
                     }
+                } else if (FileOperationsManager.isFileOperation(reg.getMethod())) {
+                    // register 'workspace/didCreateFiles', 'workspace/didDeleteFiles', 'workspace/willRenameFiles'
+                    // or 'workspace/didRenameFiles' capability
+                    String method = reg.getMethod();
+                    try {
+                        JsonObject registerOptions = (JsonObject) reg.getRegisterOptions();
+                        FileOperationOptions options = registerOptions != null
+                                ? JSONUtils.getLsp4jGson().fromJson(registerOptions, FileOperationOptions.class)
+                                : new FileOperationOptions(List.of());
+                        synchronized (LanguageServerWrapper.this) {
+                            // The callback can run once its server has stopped, whose filters must not reach the file
+                            // operations of the next connection
+                            if (isDisposed() || registrationContext != currentInitializingContext
+                                    || fileOperationsManager == null) {
+                                return;
+                            }
+                            Runnable unregistration = fileOperationsManager.registerFileOperation(method, options);
+                            if (unregistration == null) {
+                                LOGGER.debug("Dynamic registration of '{}' ignored: LSP4IJ doesn't announce it", method); //$NON-NLS-1$
+                                return;
+                            }
+                            addRegistration(reg, unregistration);
+                        }
+                    } catch (Exception e) {
+                        LOGGER.error("Error while getting '{}' capability", method, e);
+                    }
                 } else {
                     String method = reg.getMethod();
                     try {
@@ -2526,6 +2552,17 @@ public class LanguageServerWrapper implements Disposable {
 
     public boolean canRenameFilesSupported() {
         return fileOperationsManager != null && (fileOperationsManager.canWillRenameFiles() || fileOperationsManager.canDidRenameFiles());
+    }
+
+    /**
+     * Returns true if the language server may ask for 'workspace/willRenameFiles', in its server capabilities or with a
+     * dynamic registration, and false otherwise. Each renamed file is then checked against the filters.
+     *
+     * @return true if the language server may ask for 'workspace/willRenameFiles' and false otherwise.
+     */
+    public boolean canWillRenameFiles() {
+        var manager = fileOperationsManager;
+        return manager != null && manager.canWillRenameFiles();
     }
 
     /**

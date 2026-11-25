@@ -43,6 +43,10 @@ public class MockWorkspaceService implements WorkspaceService {
     private volatile CompletableFuture<RenameFilesParams> didRenameCallback;
     private volatile CompletableFuture<RenameFilesParams> willRenameCallback;
     private final List<RenameFilesParams> willRenameRequests = new CopyOnWriteArrayList<>();
+    private final List<CreateFilesParams> willCreateRequests = new CopyOnWriteArrayList<>();
+    private final List<CreateFilesParams> didCreateNotifications = new CopyOnWriteArrayList<>();
+    private final List<RenameFilesParams> didRenameNotifications = new CopyOnWriteArrayList<>();
+    private final List<DeleteFilesParams> didDeleteNotifications = new CopyOnWriteArrayList<>();
     private final Map<String, String> documentContents = new ConcurrentHashMap<>();
     private Function<WorkspaceDiagnosticParams, CompletableFuture<WorkspaceDiagnosticReport>> diagnosticHandler;
     private Function<WorkspaceSymbol, CompletableFuture<WorkspaceSymbol>> workspaceSymbolResolveProcessor;
@@ -95,8 +99,47 @@ public class MockWorkspaceService implements WorkspaceService {
         return willRenameRequests;
     }
 
+    /**
+     * @return the workspace/willCreateFiles requests this server received, in order
+     */
+    public List<CreateFilesParams> getWillCreateRequests() {
+        return willCreateRequests;
+    }
+
+    /**
+     * @return the workspace/didCreateFiles notifications this server received, in order
+     */
+    public List<CreateFilesParams> getDidCreateNotifications() {
+        return didCreateNotifications;
+    }
+
+    /**
+     * @return the workspace/didRenameFiles notifications this server received, in order
+     */
+    public List<RenameFilesParams> getDidRenameNotifications() {
+        return didRenameNotifications;
+    }
+
+    /**
+     * @return the workspace/didDeleteFiles notifications this server received, in order
+     */
+    public List<DeleteFilesParams> getDidDeleteNotifications() {
+        return didDeleteNotifications;
+    }
+
+    @Override
+    public void didCreateFiles(CreateFilesParams params) {
+        didCreateNotifications.add(params);
+    }
+
+    @Override
+    public void didDeleteFiles(DeleteFilesParams params) {
+        didDeleteNotifications.add(params);
+    }
+
     @Override
     public void didRenameFiles(RenameFilesParams params) {
+        didRenameNotifications.add(params);
         var callback = didRenameCallback;
         if (callback != null) {
             didRenameCallback = null;
@@ -130,6 +173,7 @@ public class MockWorkspaceService implements WorkspaceService {
 
     @Override
     public CompletableFuture<WorkspaceEdit> willCreateFiles(CreateFilesParams params) {
+        willCreateRequests.add(params);
         return delayedResult(willCreate, willCreateDelayMs);
     }
 
