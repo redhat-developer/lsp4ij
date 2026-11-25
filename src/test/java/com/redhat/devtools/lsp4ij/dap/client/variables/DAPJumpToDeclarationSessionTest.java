@@ -324,6 +324,10 @@ public class DAPJumpToDeclarationSessionTest extends HeavyPlatformTestCase {
         var position = jumpToSource(total);
         long millis = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start);
 
+        // The 'locations' request goes out asynchronously, and the search of the name doesn't wait until it has reached
+        // the DAP server: on a slow runner, the jump can end first
+        PlatformTestUtil.waitWithEventsDispatching("the DAP server got no 'locations' request",
+                () -> !server.locations.isEmpty(), BOUND_SECONDS);
         assertEquals(List.of(TOTAL_DECLARATION), List.copyOf(server.locations));
         // where the name is last found up to the line of the frame, once the wait for the DAP server ends
         assertEquals(sumFile, position.getFile());
