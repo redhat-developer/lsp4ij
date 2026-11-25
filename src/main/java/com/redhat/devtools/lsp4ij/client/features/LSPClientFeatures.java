@@ -1836,8 +1836,10 @@ public class LSPClientFeatures implements Disposable, FileUriSupport {
             // register 'textDocument/linkedEditingRange' capability
             case LSPRequestConstants.TEXT_DOCUMENT_LINKED_EDITING_RANGE ->
                     getLinkedEditingRangeFeature().getLinkedEditingRangeCapabilityRegistry();
-            // register 'textDocument/callHierarchy' capability
-            case LSPRequestConstants.TEXT_DOCUMENT_CALL_HIERARCHY ->
+            // register 'textDocument/prepareCallHierarchy' capability, the method a server registers call hierarchy
+            // with, and 'textDocument/callHierarchy', which LSP4IJ looked up before
+            case LSPRequestConstants.TEXT_DOCUMENT_PREPARE_CALL_HIERARCHY,
+                 LSPRequestConstants.TEXT_DOCUMENT_CALL_HIERARCHY ->
                     getCallHierarchyFeature().getCallHierarchyCapabilityRegistry();
             // register 'textDocument/references' capability
             case LSPRequestConstants.TEXT_DOCUMENT_REFERENCES ->
@@ -1853,8 +1855,10 @@ public class LSPClientFeatures implements Disposable, FileUriSupport {
             // register 'textDocument/typeDefinition' capability
             case LSPRequestConstants.TEXT_DOCUMENT_TYPE_DEFINITION ->
                     getTypeDefinitionFeature().getTypeDefinitionCapabilityRegistry();
-            // register 'textDocument/typeHierarchy' capability
-            case LSPRequestConstants.TEXT_DOCUMENT_TYPE_HIERARCHY ->
+            // register 'textDocument/prepareTypeHierarchy' capability, the method a server registers type hierarchy
+            // with, and 'textDocument/typeHierarchy', which LSP4IJ looked up before
+            case LSPRequestConstants.TEXT_DOCUMENT_PREPARE_TYPE_HIERARCHY,
+                 LSPRequestConstants.TEXT_DOCUMENT_TYPE_HIERARCHY ->
                     getTypeHierarchyFeature().getTypeHierarchyCapabilityRegistry();
             default -> null;
         };

@@ -696,6 +696,11 @@ public class MockTextDocumentService implements TextDocumentService {
     private static final Range DUMMY_RANGE = new Range(new Position(0, 0), new Position(0, 0));
 
     @Override
+    public CompletableFuture<List<CallHierarchyItem>> prepareCallHierarchy(CallHierarchyPrepareParams params) {
+        return CompletableFuture.completedFuture(List.of(new CallHierarchyItem("a", SymbolKind.Function, params.getTextDocument().getUri(), DUMMY_RANGE, DUMMY_RANGE)));
+    }
+
+    @Override
     public CompletableFuture<List<TypeHierarchyItem>> prepareTypeHierarchy(TypeHierarchyPrepareParams params) {
         return CompletableFuture.completedFuture(List.of(new TypeHierarchyItem("a", SymbolKind.Class, params.getTextDocument().getUri(), DUMMY_RANGE, DUMMY_RANGE, null)));
     }
