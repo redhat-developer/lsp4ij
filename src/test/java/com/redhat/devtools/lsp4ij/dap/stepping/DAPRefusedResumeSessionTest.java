@@ -98,6 +98,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
@@ -160,7 +161,7 @@ public class DAPRefusedResumeSessionTest extends HeavyPlatformTestCase {
         debug(false, "next");
         var context = (DAPSuspendContext) session.getSuspendContext();
         var frame = (DAPStackFrame) session.getCurrentStackFrame();
-        var paused = countPauses();
+        var paused = recordPauses();
 
         session.stepOver(false);
         assertInstanceOf(request(), NextArguments.class);
@@ -189,7 +190,7 @@ public class DAPRefusedResumeSessionTest extends HeavyPlatformTestCase {
         debug(false, "continue");
         var context = (DAPSuspendContext) session.getSuspendContext();
         var frame = (DAPStackFrame) session.getCurrentStackFrame();
-        var paused = countPauses();
+        var paused = recordPauses();
 
         session.resume();
         assertInstanceOf(request(), ContinueArguments.class);
@@ -213,7 +214,7 @@ public class DAPRefusedResumeSessionTest extends HeavyPlatformTestCase {
         waitForConsoleLine("Cannot resume the program: " + REFUSAL);
         waitUntilStoppedAt(2, "at the breakpoint, once the DAP server refused to resume the program from there");
         assertStopRestored((DAPSuspendContext) session.getSuspendContext());
-        assertEquals("The times the session paused since it ran to the breakpoint", 1, paused.get());
+        assertPausedAt(paused, "since it ran to the breakpoint", 2);
     }
 
     public void testARefusedReverseContinueAtABreakpointWhichDoesNotSuspendSuspendsTheSessionThere() throws Exception {
@@ -224,7 +225,7 @@ public class DAPRefusedResumeSessionTest extends HeavyPlatformTestCase {
         waitForConsoleLine("Cannot reverse continue: " + REFUSAL);
         waitUntilStoppedAt(2, "at the breakpoint, once the DAP server refused to run the program backwards from there");
         assertStopRestored((DAPSuspendContext) session.getSuspendContext());
-        assertEquals("The times the session paused since it ran to the breakpoint", 1, paused.get());
+        assertPausedAt(paused, "since it ran to the breakpoint", 2);
     }
 
     public void testAStopBeforeARefusedResumeAtABreakpointWhichDoesNotSuspendIsWhereTheSessionIsSuspended() throws Exception {
@@ -250,7 +251,7 @@ public class DAPRefusedResumeSessionTest extends HeavyPlatformTestCase {
         server.answer(true);
         waitForConsoleLine("Cannot reverse continue: " + REFUSAL);
         assertStopRestored(context);
-        assertEquals("The times the session paused since Resume Program", 1, paused.get());
+        assertPausedAt(paused, "since Resume Program", 1);
     }
 
     public void testAResumeRefusedWhileReverseContinueIsPendingLetsTheSessionRunOnceTheDAPServerAcceptsReverseContinue() throws Exception {
@@ -266,7 +267,7 @@ public class DAPRefusedResumeSessionTest extends HeavyPlatformTestCase {
         assertEquals(DAPThreadRunState.RUNNING, client.getThreadRunStates().getState(MAIN));
         server.stop(StoppedEventArgumentsReason.ENTRY);
         waitUntilStoppedAt(2, "where the program stopped running backwards");
-        assertEquals("The times the session paused since Resume Program", 2, paused.get());
+        assertPausedAt(paused, "since Resume Program", 1, 2);
     }
 
     public void testAReverseContinueRefusedWhileAResumeIsPendingKeepsTheStopEndedUntilTheDAPServerRefusesTheResumeToo() throws Exception {
@@ -277,7 +278,7 @@ public class DAPRefusedResumeSessionTest extends HeavyPlatformTestCase {
         server.held.addAll(Set.of("reverseContinue", "continue"));
         ((DAPDebugProcess) session.getDebugProcess()).startReverseContinue(context);
         assertInstanceOf(request(), ReverseContinueArguments.class);
-        var paused = countPauses();
+        var paused = recordPauses();
         // The session stays suspended until the DAP server answers Reverse Continue: Resume Program can be performed
         session.resume();
         assertInstanceOf(request(), ContinueArguments.class);
@@ -306,7 +307,7 @@ public class DAPRefusedResumeSessionTest extends HeavyPlatformTestCase {
 
     public void testAResumeRefusedAtABreakpointWhichDoesNotSuspendWhileANewerOneIsAcceptedLeavesBothThreadsRunning() throws Exception {
         resumeAtTheBreakpointInEachThreadAlone();
-        var paused = countPauses();
+        var paused = recordPauses();
 
         server.answer(true);
         waitForConsoleLine("Cannot resume the program: " + REFUSAL);
@@ -316,7 +317,7 @@ public class DAPRefusedResumeSessionTest extends HeavyPlatformTestCase {
         assertFalse("The session isn't suspended: the DAP server accepted the newer resume", session.isSuspended());
         PlatformTestUtil.waitWithEventsDispatching(() -> "the Threads tab shows both threads running: " + getRows(),
                 () -> getRows().equals(List.of("main [running]", "worker [running]")), BOUND_SECONDS);
-        assertEquals("The times the session paused since the threads stopped at the breakpoint", 0, paused.get());
+        assertPausedAt(paused, "since the threads stopped at the breakpoint");
     }
 
     /**
@@ -326,7 +327,7 @@ public class DAPRefusedResumeSessionTest extends HeavyPlatformTestCase {
      */
     private void assertBothThreadsStoppedOnceBothResumesAreRefused(boolean newestFirst) throws Exception {
         resumeAtTheBreakpointInEachThreadAlone();
-        var paused = countPauses();
+        var paused = recordPauses();
 
         var refusal = "Cannot resume the program: " + REFUSAL;
         if (newestFirst) {
@@ -351,7 +352,7 @@ public class DAPRefusedResumeSessionTest extends HeavyPlatformTestCase {
         var states = client.getThreadRunStates();
         assertEquals(DAPThreadRunState.STOPPED, states.getState(MAIN));
         assertEquals(DAPThreadRunState.STOPPED, states.getState(WORKER));
-        assertEquals("The times the session paused since the threads stopped at the breakpoint", 1, paused.get());
+        assertPausedAt(paused, "since the threads stopped at the breakpoint", 3);
     }
 
     /**
@@ -387,8 +388,9 @@ public class DAPRefusedResumeSessionTest extends HeavyPlatformTestCase {
         waitForConsoleLine((reverse ? "Cannot reverse continue: " : "Cannot resume the program: ") + REFUSAL);
         waitUntilStoppedAt(3, "at the stop which the DAP server sent before it refused");
         assertStopRestored((DAPSuspendContext) session.getSuspendContext());
-        assertEquals("The times the session paused since it ran to the breakpoint: only at the newer stop", 1,
-                paused.get());
+        // A pause at the breakpoint would come from the refusal, which the client handles before the answers which
+        // it needs to suspend the session at the newer stop: it would be among the frames, before the newer stop
+        assertPausedAt(paused, "since it ran to the breakpoint: only at the newer stop", 3);
     }
 
     /**
@@ -402,7 +404,7 @@ public class DAPRefusedResumeSessionTest extends HeavyPlatformTestCase {
         waitForConsoleLine((reverse ? "Cannot reverse continue: " : "Cannot resume the program: ") + REFUSAL);
         waitForAnswersSoFar();
         assertFalse("The session isn't suspended at the breakpoint: the program continued", session.isSuspended());
-        assertEquals("The times the session paused since it ran to the breakpoint", 0, paused.get());
+        assertPausedAt(paused, "since it ran to the breakpoint");
         PlatformTestUtil.waitWithEventsDispatching(() -> "the Threads tab shows the thread running: " + getRows(),
                 () -> getRows().equals(List.of("main [running]")), BOUND_SECONDS);
 
@@ -410,7 +412,7 @@ public class DAPRefusedResumeSessionTest extends HeavyPlatformTestCase {
         server.stop(StoppedEventArgumentsReason.PAUSE);
         waitUntilStoppedAt(3, "where the program stopped after it continued");
         assertStopRestored((DAPSuspendContext) session.getSuspendContext());
-        assertEquals("The times the session paused since it ran to the breakpoint", 1, paused.get());
+        assertPausedAt(paused, "since it ran to the breakpoint", 3);
     }
 
     /**
@@ -419,12 +421,12 @@ public class DAPRefusedResumeSessionTest extends HeavyPlatformTestCase {
      * stops at that breakpoint. The client then resumes it from there in the same direction, which the DAP server
      * refuses, once it ran the given newer event, if any.
      *
-     * @return the number of times the session paused since the program first stopped.
+     * @return the frames where the session paused since the program first stopped.
      */
-    private @NotNull AtomicInteger runToBreakpointWhichDoesNotSuspend(boolean reverse,
+    private @NotNull List<Integer> runToBreakpointWhichDoesNotSuspend(boolean reverse,
                                                                       @Nullable Runnable newerEvent) throws Exception {
         debug(true);
-        var paused = countPauses();
+        var paused = recordPauses();
         if (reverse) {
             ((DAPDebugProcess) session.getDebugProcess()).startReverseContinue(session.getSuspendContext());
             assertInstanceOf(request(), ReverseContinueArguments.class);
@@ -450,16 +452,16 @@ public class DAPRefusedResumeSessionTest extends HeavyPlatformTestCase {
      * then Resume Program, which the DAP server refuses: the session is suspended again at the stop where it was, while
      * the execution epoch of the stop stays ended, since Reverse Continue may still run the program.
      *
-     * @return the number of times the session paused since Resume Program.
+     * @return the frames where the session paused since Resume Program.
      */
-    private @NotNull AtomicInteger refuseResumeWhileReverseContinueIsPending() throws Exception {
+    private @NotNull List<Integer> refuseResumeWhileReverseContinueIsPending() throws Exception {
         debug(false, "continue");
         var context = (DAPSuspendContext) session.getSuspendContext();
         var frame = (DAPStackFrame) session.getCurrentStackFrame();
         server.held.add("reverseContinue");
         ((DAPDebugProcess) session.getDebugProcess()).startReverseContinue(context);
         assertInstanceOf(request(), ReverseContinueArguments.class);
-        var paused = countPauses();
+        var paused = recordPauses();
 
         // The session stays suspended until the DAP server answers Reverse Continue: Resume Program can be performed
         assertTrue("The session stays suspended while Reverse Continue is pending", session.isSuspended());
@@ -535,31 +537,52 @@ public class DAPRefusedResumeSessionTest extends HeavyPlatformTestCase {
     }
 
     /**
-     * Returns the number of times the session pauses from now on.
+     * Returns the frames where the session pauses from now on, in order: the frame where it is suspended when IntelliJ
+     * tells its listeners that it paused.
      */
-    private @NotNull AtomicInteger countPauses() {
-        var paused = new AtomicInteger();
+    private @NotNull List<Integer> recordPauses() {
+        var paused = new CopyOnWriteArrayList<Integer>();
         session.addSessionListener(new XDebugSessionListener() {
             @Override
             public void sessionPaused() {
-                paused.incrementAndGet();
+                paused.add(currentFrameId());
             }
         }, getTestRootDisposable());
         return paused;
     }
 
     /**
+     * Waits until IntelliJ has told the listeners of the session of as many pauses as the given frames, and asserts
+     * that the session paused at these frames, in that order, since the given moment. IntelliJ tells them only after
+     * the session shows the stop, on the thread which suspended the session, so that a stop which shows may not be
+     * counted yet. A pause elsewhere which comes before the expected ones, such as at the breakpoint before a newer
+     * stop, is among the frames.
+     *
+     * @param paused the frames where the session paused, as {@link #recordPauses()} records them.
+     * @param since  since when the session paused.
+     * @param frames the frames where the session paused, none if it didn't pause.
+     */
+    private static void assertPausedAt(@NotNull List<Integer> paused, @NotNull String since, Integer... frames) {
+        var expected = List.of(frames);
+        PlatformTestUtil.waitWithEventsDispatching(() -> "IntelliJ tells the listeners of the session that it paused "
+                        + since + " at the frames " + expected + ", not only at " + paused,
+                () -> paused.size() >= expected.size(), BOUND_SECONDS);
+        assertEquals("The frames where the session paused " + since, expected, List.copyOf(paused));
+    }
+
+    /**
      * Waits until the session, which IntelliJ resumed for a request, is suspended again at the given suspend context
-     * of the stop where it was, in the given frame of that stop.
+     * of the stop where it was, in the given frame of that stop, and IntelliJ has told the listeners of the session
+     * that it paused there.
      */
     private void waitUntilSuspendedAgainAt(@NotNull DAPSuspendContext context,
                                            @NotNull XStackFrame frame,
-                                           @NotNull AtomicInteger paused,
+                                           @NotNull List<Integer> paused,
                                            @NotNull String after) {
         PlatformTestUtil.waitWithEventsDispatching(() -> "the session is suspended again " + after
-                        + ", at the stop where it was and in the same frame: paused " + paused.get() + " times, at "
+                        + ", at the stop where it was and in the same frame: paused at the frames " + paused + ", at "
                         + session.getSuspendContext() + " in " + session.getCurrentStackFrame(),
-                () -> paused.get() == 1 && session.isSuspended() && session.getSuspendContext() == context
+                () -> paused.size() == 1 && session.isSuspended() && session.getSuspendContext() == context
                         && session.getCurrentStackFrame() == frame, BOUND_SECONDS);
     }
 
