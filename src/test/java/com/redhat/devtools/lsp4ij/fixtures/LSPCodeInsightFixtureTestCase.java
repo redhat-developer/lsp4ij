@@ -12,6 +12,7 @@ package com.redhat.devtools.lsp4ij.fixtures;
 
 import com.intellij.codeInsight.daemon.DaemonCodeAnalyzer;
 import com.intellij.codeInsight.daemon.impl.DaemonCodeAnalyzerImpl;
+import com.intellij.testFramework.PlatformTestUtil;
 import com.intellij.testFramework.UsefulTestCase;
 import com.intellij.testFramework.fixtures.IdeaProjectTestFixture;
 import com.intellij.testFramework.fixtures.IdeaTestFixtureFactory;
@@ -81,14 +82,11 @@ public abstract class LSPCodeInsightFixtureTestCase extends UsefulTestCase {
     }
 
     /**
-     * Wait for DaemonCodeAnalyzer restart has finished.
+     * Wait for DaemonCodeAnalyzer restart has finished, while the UI thread dispatches its events, which the daemon
+     * may need to end.
      */
     protected void waitForDaemonCodeAnalyzerFinished() {
-        long start = System.currentTimeMillis();
-        while(((DaemonCodeAnalyzerImpl) DaemonCodeAnalyzer.getInstance(myFixture.getProject())).isRunning()) {
-            if (System.currentTimeMillis() - start > 5000) {
-                throw new RuntimeException("Stop to wait for DaemonCodeAnalyzer.retart()");
-            }
-        }
+        var daemon = (DaemonCodeAnalyzerImpl) DaemonCodeAnalyzer.getInstance(myFixture.getProject());
+        PlatformTestUtil.waitWithEventsDispatching("the daemon must finish its restart", () -> !daemon.isRunning(), 30);
     }
 }

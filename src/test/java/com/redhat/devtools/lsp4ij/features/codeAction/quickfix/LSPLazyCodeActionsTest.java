@@ -131,20 +131,23 @@ public class LSPLazyCodeActionsTest extends LSPCodeInsightFixtureTestCase {
         var textDocumentService = MockLanguageServer.INSTANCE.getTextDocumentService();
         // Keep the first textDocument/codeAction request pending until it is cancelled.
         MockLanguageServer.INSTANCE.setTimeToProceedQueries(10_000);
-
         var codeActions = new LSPLazyCodeActions(List.of(diagnostic), file.getVirtualFile(), languageServer);
-        Future<?> pending = ApplicationManager.getApplication().executeOnPooledThread(() -> codeActions.getCodeActionAt(0));
-        PlatformTestUtil.waitWithEventsDispatching("textDocument/codeAction must be sent",
-                () -> textDocumentService.codeActionRequests > 0, 30);
-        // LSPDiagnosticsForServer cancels the lazy code actions whenever diagnostics are published again, also
-        // when they are unchanged, and the editor then keeps the quick fixes that use these code actions.
-        codeActions.cancel();
         try {
-            pending.get(5, TimeUnit.SECONDS);
-        } catch (ExecutionException e) {
-            // The cancelled request may fail the pending load; only the next load matters here.
+            Future<?> pending = ApplicationManager.getApplication().executeOnPooledThread(() -> codeActions.getCodeActionAt(0));
+            PlatformTestUtil.waitWithEventsDispatching("textDocument/codeAction must be sent",
+                    () -> textDocumentService.codeActionRequests > 0, 30);
+            // LSPDiagnosticsForServer cancels the lazy code actions whenever diagnostics are published again, also
+            // when they are unchanged, and the editor then keeps the quick fixes that use these code actions.
+            codeActions.cancel();
+            try {
+                pending.get(5, TimeUnit.SECONDS);
+            } catch (ExecutionException e) {
+                // The cancelled request may fail the pending load; only the next load matters here.
+            }
+        } finally {
+            // Also when the test fails: the mock language server is shared by the next tests
+            MockLanguageServer.INSTANCE.setTimeToProceedQueries(0);
         }
-        MockLanguageServer.INSTANCE.setTimeToProceedQueries(0);
 
         var codeAction = load(codeActions);
 
