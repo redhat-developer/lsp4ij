@@ -101,7 +101,7 @@ If you need to provide client specific features (e.g. commands), you can overrid
 return your custom LSP client implementation.
 
 If you need to expose a custom server API, i.e. custom commands supported by your language server, you can override
-the `createLanguageClient` method to return a custom interface extending LSP4J's LanguageServer API.
+the `getServerInterface()` method to return a custom interface extending LSP4J's LanguageServer API.
 
 ### StreamConnectionProvider Implementation
 
@@ -118,14 +118,18 @@ extend [OSProcessStreamConnectionProvider](https://github.com/redhat-developer/l
 
 #### OSProcessStreamConnectionProvider
 
-Even though [OSProcessStreamConnectionProvider](#osprocessstreamconnectionprovider) is experimental, 
-it is recommended to extend it instead of [ProcessStreamConnectionProvider](#processstreamconnectionprovider) because the former internally uses the
+It is recommended to extend [OSProcessStreamConnectionProvider](#osprocessstreamconnectionprovider) instead of
+[ProcessStreamConnectionProvider](#processstreamconnectionprovider) because the former internally uses the
 IntelliJ [OSProcessHandler](https://github.com/JetBrains/intellij-community/blob/master/platform/platform-util-io/src/com/intellij/execution/process/OSProcessHandler.java) class 
 which wraps a process and allows to track the process state via a 
 [ProcessListener](https://github.com/JetBrains/intellij-community/blob/master/platform/util/src/com/intellij/execution/process/ProcessListener.java) listener.
 
-In addition, OSProcessStreamConnectionProvider allows to log errors from the language server in the `Log tab` of the 
+In addition, OSProcessStreamConnectionProvider allows to log errors from the language server in the `Logs` tab of the 
 [LSP console](https://github.com/redhat-developer/lsp4ij/blob/main/docs/UserGuide.md#lsp-console).
+
+An `OSProcessStreamConnectionProvider` starts one process: LSP4IJ creates a new provider with `createConnectionProvider`
+for each start of the language server, and `start()` throws a `CannotStartProcessException` when the provider has
+already been started or stopped.
 
 Since IntelliJ 2025.1, a plugin can set up the environment of a process for its working directory (the
 `commandLineEnvCustomizer` extension point), as the [mise](https://mise.jdx.dev/) plugin does. A command line with a
@@ -230,7 +234,7 @@ A port of 0 lets LSP4IJ choose a free port, for which the command line is made. 
 only: on `127.0.0.1` and `::1`, on the same port, so that a language server which connects to `localhost` reaches it
 on either, and on the first one alone when the port isn't free on the other, or without IPv6. `startAndConnect`
 connects to the loopback address of the JVM and then to the other one. The output of a language server which LSP4IJ
-starts goes to the `Log tab` of the
+starts goes to the `Logs` tab of the
 [LSP console](https://github.com/redhat-developer/lsp4ij/blob/main/docs/UserGuide.md#lsp-console), since the socket
 carries the protocol: its standard output as information, and its standard error as errors. A language server which ends, or closes the connection, is reported as stopped unexpectedly, as
 a language server process is. Stopping the language server closes the connection, and ends the process only if LSP4IJ
@@ -307,6 +311,19 @@ referencing your `my.language.server.MyLanguageServerFactory`:
 
 ```
 
+`id`, `name` and `factoryClass` are the ones you need. The extension point also takes:
+
+* `icon`: the resource path of the icon of the language server in the LSP console and the Language Servers settings,
+  of 13x13 pixels.
+* `bundle`, `nameKey` and `descriptionKey`: to take the name and the description from a resource bundle, instead of
+  `name` and `description`.
+* `singleton`: `true` for a language server which serves the files of all the open projects, instead of one language
+  server per project. `false` by default.
+* `supportsLightEdit`: `true` for a language server which also serves the files opened in LightEdit mode, without a
+  project. `false` by default.
+* `lastDocumentDisconnectedTimeout`: the time in seconds for which the language server keeps running once its last file
+  is closed, before LSP4IJ stops it. 5 by default.
+
 A that point, once the declaration is done, your server should appear in the `LSP Consoles` view:
 
 ![My LanguageServer in LSP Console](./images/MyLanguageServerInLSPConsole.png)
@@ -369,7 +386,8 @@ custom [DocumentMatcher](https://github.com/redhat-developer/lsp4ij/blob/main/sr
 For instance your language server could be mapped to the `Java` language, and you could implement a DocumentMatcher
 to check if the module containing the file contains certain Java classes in its classpath.
 
-The DocumentMatcher is executed in a non blocking read action.
+The DocumentMatcher is executed in a non blocking read action. A matcher which throws an exception, or whose
+`matchAsync` fails, counts as no match for its mapping, and logs a warning: the other mappings of the file still apply.
 
 A document matcher looks like this:
 
@@ -643,7 +661,7 @@ CompletableFuture<@Nullable LanguageServerItem> languageServerFuture =
 CompletableFuture<List<Application>> applications = 
      languageServerFuture
      .thenCompose(languageServerItem -> {
-       if (languageServerItem != null) {
+       if (languageServerItem == null) {
          return CompletableFuture.completedFuture(null);
        }
        return languageServerItem.getInitializedServer(); // here getInitializedServer is used because language server could be stopped and must be restarted
@@ -703,9 +721,9 @@ server until the `Lease` is disposed.
 
 ```java
 Project project = ...
-CompletableFuture<Lease<LanguageServerItem>> serverLease = 
+CompletableFuture<@Nullable Lease<LanguageServerItem>> serverLease = 
         LanguageServerManager.getInstance(project).getLanguageServer("myLanguageServerId")
-        .thenApply(item -> item.keepAlive());
+        .thenApply(item -> item != null ? item.keepAlive() : null);
 ```
 
 As long as the lease has not been disposed this will request lsp4ij not arbitrarily terminate the language
@@ -720,10 +738,14 @@ import com.intellij.openapi.util.Disposer;
 ...
 
 serverLease.thenAccept(lease -> {
+    if (lease == null) {
+        // No language server with this id
+        return;
+    }
     try {
        while (...we need to do suff...) {
-          // Fetch list of 'applications' using some custom protocol on 'MyLanguageServer'
-          List<Application> applications = ((MyLanguageServer)lease.get().getServer()).getApplications();   
+          // Fetch list of 'applications' using some custom protocol on 'MyCustomServerAPI'
+          List<Application> applications = ((MyCustomServerAPI) lease.get().getServer()).getApplications().join();
           ... do something with the result...
        }
     } catch (ServerWasStoppedException e) {   
@@ -1263,10 +1285,11 @@ import java.util.List;
 public class MyWorkspaceFolderStrategy implements WorkspaceFolderStrategy {
     
     @Override
-    public @NotNull List<WorkspaceFolder> getInitialWorkspaceFolders(
+    public @NotNull List<WorkspaceFolder> getWorkspaceFolders(
             @NotNull Project project, 
             @NotNull FileUriSupport fileUriSupport) {
-        // Return folders to send during initialization
+        // Return all the workspace folders of the project, which getInitialWorkspaceFolders sends during
+        // initialization when sendAllFoldersOnInitialization() returns true
         List<WorkspaceFolder> folders = new ArrayList<>();
         // ... custom logic ...
         return folders;

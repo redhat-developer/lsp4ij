@@ -30,7 +30,7 @@ import org.jetbrains.annotations.Nullable;
  * <pre>{@code
  * public class MyLSPFormattingFeature extends LSPFormattingFeature {
  *     @Override
- *     protected boolean isExistingFormatterOverrideable(@NotNull PsiFile file) {
+ *     public boolean isExistingFormatterOverrideable(@NotNull PsiFile file) {
  *         // returns true even if there is a custom formatter
  *         return true;
  *     }
