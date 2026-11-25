@@ -27,20 +27,21 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.Callable;
-import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.stream.IntStream;
+import java.util.function.BooleanSupplier;
 import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * Tests that the installers of two language servers which install into the same directory, as the CSS and ESLint
@@ -51,6 +52,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 public class ExecTaskTest {
 
+    // Bounds each wait of the tests for an installation, or its command, to reach a state
+    private static final long WAIT_NANOS = TimeUnit.SECONDS.toNanos(30);
+    // How often the tests look at that state, while they wait for the installation to end
+    private static final long POLL_MILLIS = 10;
+
     @BeforeClass
     public static void initPlatform() {
         TestApplicationManager.getInstance();
@@ -60,21 +66,17 @@ public class ExecTaskTest {
     public void testTwoInstallersWhichRunACommandInTheSameDirectoryRunThereOneAtATime() throws Exception {
         try (var workingDir = new WorkingDir()) {
             // Each command holds the same file until the test releases it, and fails if the other one holds it
-            var start = new CountDownLatch(1);
-            List<Installation> installations = IntStream.range(0, 2)
-                    .mapToObj(i -> workingDir.startInstallation(() -> {
-                        start.await();
-                        return workingDir.holdFileTask().run(new InstallerContext(null, InstallerContext.InstallerAction.RUN));
-                    }))
-                    .toList();
-            start.countDown();
-            // While the command of one of them holds the file, the other one waits
-            awaitOneWaits(installations);
+            var first = workingDir.startInstallation(() -> workingDir.holdFileTask()
+                    .run(new InstallerContext(null, InstallerContext.InstallerAction.RUN)));
+            awaitHolds(first, workingDir.held);
+            // Only then the second one starts: it must wait for the directory while the command of the first one holds
+            // the file, else its command would run then, and fail
+            var second = workingDir.startInstallation(() -> workingDir.holdFileTask()
+                    .run(new InstallerContext(null, InstallerContext.InstallerAction.RUN)));
+            awaitWaits(second, "the command of the first installation",
+                    () -> !first.result().isDone() && Files.exists(workingDir.held));
             workingDir.release();
-            List<Boolean> results = new ArrayList<>();
-            for (var installation : installations) {
-                results.add(installation.result().get(60, TimeUnit.SECONDS));
-            }
+            List<Boolean> results = List.of(first.result().get(60, TimeUnit.SECONDS), second.result().get(60, TimeUnit.SECONDS));
             assertEquals(List.of(true, true), results, "the two commands must not run in the directory at the same time");
         }
     }
@@ -99,7 +101,7 @@ public class ExecTaskTest {
             // The command fails if it runs while the other IDE holds the file
             var context = new InstallerContext(null, InstallerContext.InstallerAction.RUN);
             var installation = workingDir.startInstallation(() -> workingDir.holdFileTask().run(context));
-            awaitOneWaits(List.of(installation));
+            awaitWaits(installation, "the other IDE", () -> otherIDE.isAlive() && Files.exists(workingDir.held));
             // The other IDE leaves the directory
             workingDir.release();
             assertEquals(0, otherIDE.onExit().get(60, TimeUnit.SECONDS).exitValue(), "the other IDE must leave the directory");
@@ -138,10 +140,7 @@ public class ExecTaskTest {
             // The command of the other installation holds the file until the test releases it
             var other = workingDir.startInstallation(() -> workingDir.holdFileTask()
                     .run(new InstallerContext(null, InstallerContext.InstallerAction.RUN)));
-            for (long end = System.nanoTime() + TimeUnit.SECONDS.toNanos(30); !Files.exists(workingDir.held); ) {
-                assertTrue(System.nanoTime() < end, "the other installation must start");
-                Thread.sleep(10);
-            }
+            awaitHolds(other, workingDir.held);
             // The other installation installs the server, which the check of the installer finds
             Path installed = Files.createFile(workingDir.directory.resolve("installed"));
             var descriptor = descriptor();
@@ -150,7 +149,8 @@ public class ExecTaskTest {
             context.setCheckAgainAfterWaiting(checkAgainAfterWaiting);
             var installation = workingDir.startInstallation(() -> createTask(java("NoSuchProgram"), workingDir.directory,
                     descriptor).run(context));
-            awaitOneWaits(List.of(installation));
+            awaitWaits(installation, "the command of the other installation",
+                    () -> !other.result().isDone() && Files.exists(workingDir.held));
             // The other installation ends
             workingDir.release();
             assertTrue(other.result().get(60, TimeUnit.SECONDS), "the other installation must succeed");
@@ -159,17 +159,42 @@ public class ExecTaskTest {
     }
 
     /**
-     * Waits until one of the given installations waits for the working directory of its exec task, which another
-     * installation holds, and fails if one of them ends first: since the command of the other installation holds the
-     * directory until the test releases it, an installation which ends meanwhile ran its command without waiting.
+     * Waits until the command of the given installation holds the given file, which it holds until the test releases
+     * it, and fails with the result or the failure of the installation if it ends first, since its command then failed.
      */
-    private static void awaitOneWaits(@NotNull List<Installation> installations) throws InterruptedException {
-        for (long end = System.nanoTime() + TimeUnit.SECONDS.toNanos(30);
-             installations.stream().noneMatch(Installation::waitsForTheWorkingDir); ) {
-            assertTrue(installations.stream().noneMatch(installation -> installation.result().isDone()),
-                    "the installation must wait for the one which holds the working directory, but it ended without waiting");
-            assertTrue(System.nanoTime() < end, "the installation must wait for the one which holds the working directory");
-            Thread.sleep(10);
+    private static void awaitHolds(@NotNull Installation installation, @NotNull Path held) throws Exception {
+        for (long end = System.nanoTime() + WAIT_NANOS; !Files.exists(held); ) {
+            Optional<Boolean> result = installation.awaitResult(POLL_MILLIS);
+            if (result.isPresent()) {
+                fail("the command of the installation must hold " + held + " until the test releases it, but the "
+                        + "installation ended with " + result.get());
+            }
+            assertTrue(System.nanoTime() < end, "the command of the installation must hold " + held);
+        }
+    }
+
+    /**
+     * Waits until the given installation waits for the working directory of its exec task, while the given holder, the
+     * command of another installation or another IDE, holds the directory and its file until the test releases them.
+     * Fails if the installation ends first, since it then ran its command without waiting, or if the holder doesn't
+     * hold its file when the installation waits, since the installation then had nothing to wait for.
+     */
+    private static void awaitWaits(@NotNull Installation installation,
+                                   @NotNull String holder,
+                                   @NotNull BooleanSupplier holderHoldsItsFile) throws Exception {
+        for (long end = System.nanoTime() + WAIT_NANOS; ; ) {
+            // Looked at before the holder, which holds its file from before the installation started until the test
+            // releases it: if the holder still holds it, it held it when the installation waited
+            boolean waits = installation.waitsForTheWorkingDir();
+            assertTrue(holderHoldsItsFile.getAsBoolean(), holder + " must hold its file until the test releases it");
+            if (waits) {
+                return;
+            }
+            Optional<Boolean> result = installation.awaitResult(POLL_MILLIS);
+            if (result.isPresent()) {
+                fail("the installation must wait for " + holder + ", but it ended without waiting, with " + result.get());
+            }
+            assertTrue(System.nanoTime() < end, "the installation must wait for " + holder);
         }
     }
 
@@ -328,6 +353,18 @@ public class ExecTaskTest {
             thread.setDaemon(true);
             thread.start();
             return new Installation(thread, result);
+        }
+
+        /**
+         * Waits for the result of the installation for at most the given time, and returns it if the installation
+         * ended, or nothing if it still runs.
+         */
+        @NotNull Optional<Boolean> awaitResult(long millis) throws InterruptedException, ExecutionException {
+            try {
+                return Optional.of(result.get(millis, TimeUnit.MILLISECONDS));
+            } catch (TimeoutException e) {
+                return Optional.empty();
+            }
         }
 
         /**
