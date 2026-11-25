@@ -1528,7 +1528,9 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
      * the current one again, so that the values of the stop can be set, unless a newer event changed them: the debug
      * adapter said meanwhile that the program stopped, continued, or that a thread exited. A Step Back, Reverse
      * Continue or Reset Frame which is still pending at the stop keeps its epoch ended until the debug adapter refuses
-     * it too ({@link DAPExecutionEpoch#resumeRefused(int)}). Unless the debug adapter said that the program stopped or
+     * it too ({@link DAPExecutionEpoch#resumeRefused(int)}), and a newer resume which is still pending, as at another
+     * breakpoint which doesn't suspend, keeps the threads which it resumed running until the debug adapter refuses it
+     * too ({@link DAPThreadRunStates#resumeRefused}). Unless the debug adapter said that the program stopped or
      * continued, the session is suspended at the given suspend context, unless another stop suspended it meanwhile:
      * again, as IntelliJ resumed it before it asked for the request, or for the first time at a breakpoint which doesn't
      * suspend. The console first says why the debug adapter refused.
