@@ -49,6 +49,7 @@ import org.eclipse.lsp4j.jsonrpc.services.JsonRequest;
 import org.eclipse.lsp4j.services.LanguageClient;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.jetbrains.annotations.TestOnly;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -106,6 +107,8 @@ public class InitializeTask extends InstallerTask {
     private static final long POLL_MILLIS = 50;
 
     private final int timeout;
+    // How long the server has to answer shutdown, and then to end, which only a test changes
+    private volatile long endTimeoutMillis = END_TIMEOUT_MILLIS;
 
     public InitializeTask(@Nullable String id,
                           @Nullable String name,
@@ -153,6 +156,18 @@ public class InitializeTask extends InstallerTask {
     }
 
     /**
+     * Sets how long the server has to answer {@code shutdown} (DAP: {@code disconnect}), and then to end, before its
+     * process is destroyed, instead of {@value #END_TIMEOUT_MILLIS} ms each, so that a test sees what a server which
+     * ends once asked to gets, however slowly it runs.
+     *
+     * @param endTimeout how long the server has to answer the end, and then to end.
+     */
+    @TestOnly
+    void setEndTimeout(@NotNull Duration endTimeout) {
+        this.endTimeoutMillis = endTimeout.toMillis();
+    }
+
+    /**
      * Starts the server with the given provider, sends it {@code initialize}, and returns true if it answers it before
      * the timeout. The server is gone once this returns.
      */
@@ -188,7 +203,7 @@ public class InitializeTask extends InstallerTask {
             if (!answersInitialize(handshake, provider, deadline, context)) {
                 return false;
             }
-            end(handshake, provider, context);
+            end(handshake, provider, endTimeoutMillis, context);
             return true;
         } finally {
             destroy(provider, handshake, executor);
@@ -259,13 +274,15 @@ public class InitializeTask extends InstallerTask {
     }
 
     /**
-     * Asks the server to end, as LSP4IJ does when it stops it, and waits a moment for it to end.
+     * Asks the server to end, as LSP4IJ does when it stops it, and waits a moment for it to end: the given time for the
+     * answer, and then as long for the server to end.
      */
     private static void end(@NotNull Handshake handshake,
                             @NotNull StreamConnectionProvider provider,
+                            long endTimeoutMillis,
                             @NotNull InstallerContext context) {
         try {
-            await(handshake.requestEnd(), deadlineIn(END_TIMEOUT_MILLIS), provider, context);
+            await(handshake.requestEnd(), deadlineIn(endTimeoutMillis), provider, context);
         } catch (ExecutionException | TimeoutException | ServerEndedException e) {
             // Destroyed below, if it doesn't end
         } catch (ProcessCanceledException e) {
@@ -278,7 +295,7 @@ public class InitializeTask extends InstallerTask {
         } catch (RuntimeException e) {
             // The server ended already
         }
-        long deadline = deadlineIn(END_TIMEOUT_MILLIS);
+        long deadline = deadlineIn(endTimeoutMillis);
         while (provider.isAlive() && System.nanoTime() - deadline < 0) {
             checkCanceled(context);
             sleep(POLL_MILLIS);
