@@ -31,8 +31,8 @@ In verbose mode, the messages can be expanded for more details:
 ![LSP console Traces](./images/LSPConsole.png)
 
 A message of the language server that LSP4J can't parse, such as a notification whose params don't have the type that
-LSP gives them, is shown in the traces too, with the error, such as
-`Message could not be parsed. java.lang.NumberFormatException: Expected an int but was 4294967295 ...`.
+LSP gives them, is shown in the traces too, as `Received notification '...' that could not be parsed.`, followed by
+the error, such as `Issue: Message could not be parsed. java.lang.NumberFormatException: Expected an int but was ...`.
 
 If the language server logs messages via [window/logMessage](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#window_logMessage), you can see them in the `Logs` tab:
 

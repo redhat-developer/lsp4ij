@@ -1417,7 +1417,7 @@ For user-defined language servers, workspace folder configuration is configured 
 settings of the language server. A template can have it as a `workspaceFolderSettings.json` file, which an export
 writes, and which the New Language Server dialog gives the language server it creates:
 
-![Workspace Folders Configuration](./images/WorkspaceFoldersConfiguration.png)
+![Workspace Folders Configuration](./images/workspace-folders/RootType_PROJECT_BASE.png)
 
 The JSON configuration follows the same format as the programmatic API.
 

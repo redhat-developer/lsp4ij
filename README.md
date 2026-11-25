@@ -47,10 +47,13 @@ and use the left toolbar to `Apply` or `Reset` the settings.
 
 You can find more documentation in:
 
- * [the developer guide](./docs/DeveloperGuide.md), providing step-by-step instructions on how to integrate a language server in LSP4J in an external IntelliJ plugin.
- * [the User-defined language server documentation](./docs/UserDefinedLanguageServer.md), explaining how to integrate a language server in LSP4J with few settings. 
+ * [the developer guide](./docs/DeveloperGuide.md), providing step-by-step instructions on how to integrate a language server in LSP4IJ in an external IntelliJ plugin.
+ * [the LSP API](./docs/LSPApi.md), describing how an IntelliJ plugin customizes the LSP features of its language server.
+ * [the User-defined language server documentation](./docs/UserDefinedLanguageServer.md), explaining how to integrate a language server in LSP4IJ with few settings. 
+ * [the template documentation](./docs/UserDefinedLanguageServerTemplate.md), describing the templates of user-defined language servers and their installers.
  * [the user guide](./docs/UserGuide.md), which explains how to use LSP console and Language Server preferences.
  * [the LSP Support overview](./docs/LSPSupport.md), describing which LSP features are implemented, and how.
+ * [the DAP user guide](./docs/dap/UserGuide.md), [the DAP developer guide](./docs/dap/DeveloperGuide.md) and [the DAP Support overview](./docs/dap/DAPSupport.md), for the Debug Adapter Protocol.
 
 <!-- Plugin description end -->
 

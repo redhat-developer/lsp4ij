@@ -54,8 +54,8 @@ Current state of [Language Features]( https://microsoft.github.io/language-serve
  * ✅ [textDocument/implementation](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_implementation) (see [implementation details](#implementation))
  * ✅ [textDocument/references](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_references) (see [implementation details](#references))
  * ✅ [textDocument/prepareCallHierarchy](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_prepareCallHierarchy) (see [implementation details](#call-hierarchy))
- * ✅ [textDocument/incomingCalls](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#callHierarchy_incomingCalls).
- * ✅ [textDocument/outgoingCalls](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#callHierarchy_outgoingCalls).
+ * ✅ [callHierarchy/incomingCalls](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#callHierarchy_incomingCalls).
+ * ✅ [callHierarchy/outgoingCalls](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#callHierarchy_outgoingCalls).
  * ✅ [textDocument/prepareTypeHierarchy](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_prepareTypeHierarchy) (see [implementation details](#type-hierarchy))
  * ✅ [typeHierarchy/subtypes](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#typeHierarchy_subtypes). 
  * ✅ [typeHierarchy/supertypes](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#typeHierarchy_supertypes).
@@ -205,7 +205,7 @@ This menu action either opens the implementation in a popup or navigates to the 
 The [textDocument/typeDefinition](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_typeDefinition) is consumed with:
 
  * the `Navigate / LSP Type Definition(s)` global menu.
- * or with the `Go To/ Type Definition(s)` editor menu.
+ * or with the `Go To/ LSP Type Definition(s)` editor menu.
 
 This menu action either opens the type definition in a popup or navigates to the type definition if there are several type definitions:
 
@@ -216,7 +216,7 @@ This menu action either opens the type definition in a popup or navigates to the
 The [textDocument/declaration](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_declaration) is consumed with:
 
  * the `Navigate / LSP Declaration(s)` global menu.
- * or with the `Go To/ Declaration(s)` editor menu.
+ * or with the `Go To/ LSP Declaration(s)` editor menu.
 
 This menu action either opens the declaration in a popup or navigates to the declaration if there are several declarations:
 
@@ -299,7 +299,7 @@ The rules to retrieve the proper syntax coloration are:
 
  * if the code block defines the file extension, LSP4IJ tries to apply a matching TextMate grammar or custom syntax coloration by filename, mimetype.
  * if the code block defines a language Id (e.g. `typescript`) and the syntax coloration must be retrieved from TextMate, it will use the 
-[fileNamePatterns extension point](./DeveloperGuide.md#file-name-pattern-mapping) or [./UserDefinedLanguageServer.md#mappings-tab](fileNamePattern of User defined language server)
+[fileNamePatterns extension point](./DeveloperGuide.md#file-name-pattern-mapping) or [file name patterns of a user-defined language server](./UserDefinedLanguageServer.md#mappings-tab)
 to find the file extension (e.g. `ts`) associated with the languageId (e.g. `typescript`) 
   ~~~
      ```typescript

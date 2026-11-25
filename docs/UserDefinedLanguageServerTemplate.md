@@ -292,7 +292,7 @@ It is used:
 
 See [When the installer runs](#when-the-installer-runs).
 
-You can find a sample in the ![rust-analyzer installer tab](./images/user-defined-ls/rust-analyzer/installation_tab.png).
+You can find a sample in the [rust-analyzer installer tab](./images/user-defined-ls/rust-analyzer/installation_tab.png).
 
 It should follow this structure:
 
