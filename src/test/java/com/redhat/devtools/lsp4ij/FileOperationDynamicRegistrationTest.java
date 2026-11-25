@@ -24,6 +24,7 @@ import com.redhat.devtools.lsp4ij.mock.MockWorkspaceService;
 import org.eclipse.lsp4j.CallHierarchyRegistrationOptions;
 import org.eclipse.lsp4j.DidChangeConfigurationParams;
 import org.eclipse.lsp4j.DocumentFilter;
+import org.eclipse.lsp4j.ExecuteCommandOptions;
 import org.eclipse.lsp4j.FileOperationFilter;
 import org.eclipse.lsp4j.FileOperationOptions;
 import org.eclipse.lsp4j.FileOperationPattern;
@@ -38,15 +39,19 @@ import org.jetbrains.annotations.NotNull;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * A language server which announces no file operations in its capabilities, and registers them dynamically, is told of
  * the creations, renames and deletions of the files that the filters of its registrations match, until it unregisters
- * them. A registration which the server withdraws while it initializes, before LSP4IJ installs it, is never installed.
+ * them. A registration which the server withdraws while it initializes, before LSP4IJ installs it, is never installed,
+ * and one which it withdraws while LSP4IJ installs it is removed once installed.
  */
 public class FileOperationDynamicRegistrationTest extends LSPCodeInsightFixtureTestCase {
 
@@ -208,6 +213,65 @@ public class FileOperationDynamicRegistrationTest extends LSPCodeInsightFixtureT
                 0, workspace().getDidRenameNotifications().size());
         assertFalse("call hierarchy must not be supported for a registration withdrawn while the server initialized",
                 callHierarchy.isCallHierarchySupported(psiManager.findFile(main)));
+    }
+
+    public void testACommandRegistrationWithdrawnWhileItIsInstalledIsRemovedOnceInstalled() throws Exception {
+        var wrapper = connect(myFixture.getTempDirFixture().createFile("main.foo", ""));
+        var commandProvider = wrapper.getServerCapabilitiesSync().getExecuteCommandProvider();
+        var commands = new HeldCommands(commandProvider.getCommands());
+        commandProvider.setCommands(commands);
+        var client = MockLanguageServer.INSTANCE.getRemoteProxies().get(0);
+        try {
+            var registered = client.registerCapability(new RegistrationParams(List.of(new Registration("command",
+                    "workspace/executeCommand", new ExecuteCommandOptions(List.of("dynamic.command"))))));
+            get(commands.adding, "LSP4IJ must install the registration by adding its command");
+            // While LSP4IJ adds the command
+            get(client.unregisterCapability(new UnregistrationParams(List.of(new Unregistration("command",
+                    "workspace/executeCommand")))), "the client must answer the unregistration");
+            commands.release.complete(null);
+            get(registered, "the client must answer the registration");
+        } finally {
+            commands.release.complete(null);
+        }
+        assertFalse("a command registration withdrawn while LSP4IJ installed it must be removed once installed",
+                wrapper.getServerCapabilitiesSync().getExecuteCommandProvider().getCommands().contains("dynamic.command"));
+    }
+
+    /**
+     * The commands of the server capabilities, which LSP4IJ adds the commands of a 'workspace/executeCommand'
+     * registration to: an addition waits until the test releases it.
+     */
+    private static final class HeldCommands extends CopyOnWriteArrayList<String> {
+
+        private final CompletableFuture<Void> adding = new CompletableFuture<>();
+        private final CompletableFuture<Void> release = new CompletableFuture<>();
+
+        private HeldCommands(Collection<String> commands) {
+            super(commands);
+        }
+
+        @Override
+        public boolean add(String command) {
+            adding.complete(null);
+            try {
+                release.get(30, TimeUnit.SECONDS);
+            } catch (Exception e) {
+                throw new IllegalStateException("the test must release the addition of '" + command + "'", e);
+            }
+            return super.add(command);
+        }
+    }
+
+    /**
+     * Waits for the future without dispatching the events of the EDT, which could wait for the language server wrapper
+     * while a held installation locks it.
+     */
+    private static <T> T get(CompletableFuture<T> future, String failure) throws Exception {
+        try {
+            return future.get(10, TimeUnit.SECONDS);
+        } catch (TimeoutException e) {
+            throw new AssertionError(failure, e);
+        }
     }
 
     private static CallHierarchyRegistrationOptions callHierarchyOf(String pattern) {

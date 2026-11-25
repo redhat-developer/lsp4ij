@@ -2049,8 +2049,8 @@ public class LanguageServerWrapper implements Disposable {
                         LOGGER.warn(
                                 "Dynamic registration of 'workspace/didChangeWorkspaceFolders' ignored. It was already enabled before"); //$NON-NLS-1$);
                     } else {
-                        addRegistration(reg, () -> setWorkspaceFoldersEnablement(false));
                         setWorkspaceFoldersEnablement(true);
+                        addRegistration(reg, () -> setWorkspaceFoldersEnablement(false));
                     }
                 } else if (LSPNotificationConstants.WORKSPACE_DID_CHANGE_WATCHED_FILES.equals(reg.getMethod())) {
                     // register 'workspace/didChangeWatchedFiles' capability
@@ -2083,8 +2083,8 @@ public class LanguageServerWrapper implements Disposable {
                                 if (isDisposed() || registrationContext != currentInitializingContext) {
                                     return;
                                 }
-                                addRegistration(reg, () -> unregisterDocumentContentSchemes(schemes));
                                 registerDocumentContentSchemes(schemes);
+                                addRegistration(reg, () -> unregisterDocumentContentSchemes(schemes));
                             }
                         }
                     } catch (Exception e) {
@@ -2098,8 +2098,8 @@ public class LanguageServerWrapper implements Disposable {
                                         ExecuteCommandOptions.class);
                         List<String> newCommands = executeCommandOptions.getCommands();
                         if (newCommands != null && !newCommands.isEmpty()) {
-                            addRegistration(reg, () -> unregisterCommands(newCommands));
                             registerCommands(newCommands);
+                            addRegistration(reg, () -> unregisterCommands(newCommands));
                         }
                     } catch (Exception e) {
                         LOGGER.error("Error while getting 'workspace/executeCommand' capability", e);
@@ -2161,6 +2161,11 @@ public class LanguageServerWrapper implements Disposable {
         });
     }
 
+    /**
+     * Records the unregistration of a dynamic registration once its installation has added all that it undoes: an
+     * unregistration which finds it then undoes the whole installation, and {@link #endInstallation} undoes the
+     * installation for one which came before.
+     */
     private void addRegistration(@NotNull Registration reg, @NotNull Runnable unregistrationHandler) {
         String regId = reg.getId();
         synchronized (dynamicRegistrations) {
