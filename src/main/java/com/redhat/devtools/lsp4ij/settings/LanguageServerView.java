@@ -190,20 +190,49 @@ public class LanguageServerView implements Disposable {
     }
 
     private boolean isProjectScopeModified(LanguageServerSettings.LanguageServerDefinitionSettings settings) {
+        if (isDebugPortAndSuspendModified(settings)) {
+            return true;
+        }
         if (settings == null) {
             // There is no settings, check if the view is filled with default value
-            return !(!this.isDebugSuspend()
-                    && StringUtils.isEmpty(this.getDebugPort())
-                    && isEquals(this.getServerTrace(), ServerTrace.getDefaultValue())
+            return !(isEquals(this.getServerTrace(), ServerTrace.getDefaultValue())
                     && isEquals(this.getReportErrorKind(), ErrorReportingKind.getDefaultValue())
             );
         }
 
         // The settings exist.
         return (!(isEquals(this.getServerTrace(), settings.getServerTrace()) &&
-                isEquals(this.getReportErrorKind(), settings.getErrorReportingKind())
-                && isEquals(this.getDebugPort(), settings.getDebugPort())
-                && this.isDebugSuspend() == settings.isDebugSuspend()));
+                isEquals(this.getReportErrorKind(), settings.getErrorReportingKind())));
+    }
+
+    /**
+     * Returns true if the debug port or Suspend of the Debug tab differ from the given settings, or from their default
+     * values when there are no settings. The page of a user-defined language server doesn't show them, so they never
+     * make it modified.
+     *
+     * @param settings the project settings of the language server, or null if it has none.
+     * @return true if the debug port or Suspend differ from the given settings and false otherwise.
+     */
+    private boolean isDebugPortAndSuspendModified(@Nullable LanguageServerSettings.LanguageServerDefinitionSettings settings) {
+        if (!isShowDebugPortAndSuspend()) {
+            return false;
+        }
+        if (settings == null) {
+            return this.isDebugSuspend() || !StringUtils.isEmpty(this.getDebugPort());
+        }
+        return !(isEquals(this.getDebugPort(), settings.getDebugPort())
+                && this.isDebugSuspend() == settings.isDebugSuspend());
+    }
+
+    /**
+     * Returns true if the Debug tab shows the debug port and Suspend, which only the language server of an extension
+     * uses, when its plugin starts it with {@code JavaProcessCommandBuilder}, and false for a user-defined language
+     * server, which its own command starts.
+     *
+     * @return true if the Debug tab shows the debug port and Suspend and false otherwise.
+     */
+    private boolean isShowDebugPortAndSuspend() {
+        return !(languageServerDefinition instanceof UserDefinedLanguageServerDefinition);
     }
 
     private boolean isGlobalScopeModified(LanguageServerSettings.LanguageServerDefinitionSettings settings) {
@@ -298,6 +327,10 @@ public class LanguageServerView implements Disposable {
             if (projectSettings != null) {
                 this.setDebugPort(projectSettings.getDebugPort());
                 this.setDebugSuspend(projectSettings.isDebugSuspend());
+            } else {
+                // No saved settings: no debug port and no Suspend, as for Trace and Error reporting above
+                this.setDebugPort("");
+                this.setDebugSuspend(false);
             }
             List<LanguageServerFileAssociation> mappings = LanguageServersRegistry.getInstance().findLanguageServerDefinitionFor(languageServerId);
             List<ServerMappingSettings> languageMappings = mappings
@@ -365,8 +398,18 @@ public class LanguageServerView implements Disposable {
         ProjectLanguageServerSettings.LanguageServerDefinitionSettings projectSettings = new ProjectLanguageServerSettings.LanguageServerDefinitionSettings();
         projectSettings.setServerTrace(getServerTrace());
         projectSettings.setErrorReportingKind(getReportErrorKind());
-        projectSettings.setDebugPort(getDebugPort());
-        projectSettings.setDebugSuspend(isDebugSuspend());
+        if (isShowDebugPortAndSuspend()) {
+            projectSettings.setDebugPort(getDebugPort());
+            projectSettings.setDebugSuspend(isDebugSuspend());
+        } else {
+            // The page doesn't show them, so it keeps what is stored
+            var storedSettings = ProjectLanguageServerSettings.getInstance(project)
+                    .getLanguageServerSettings(languageServerId);
+            if (storedSettings != null) {
+                projectSettings.setDebugPort(storedSettings.getDebugPort());
+                projectSettings.setDebugSuspend(storedSettings.isDebugSuspend());
+            }
+        }
 
         // Update contribute settings
         GlobalLanguageServerSettings.LanguageServerDefinitionSettings globalSettings = new GlobalLanguageServerSettings.LanguageServerDefinitionSettings();
@@ -515,7 +558,7 @@ public class LanguageServerView implements Disposable {
 
         // Debug tab configuration
         configuration.setShowDebug(true);
-        configuration.setShowDebugPortAndSuspend(isUserDefined);
+        configuration.setShowDebugPortAndSuspend(isShowDebugPortAndSuspend());
 
         // Installer tab configuration
         configuration.setShowInstaller(isUserDefined);
