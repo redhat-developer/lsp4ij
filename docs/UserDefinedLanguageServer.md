@@ -193,7 +193,8 @@ Here are mappings samples with the [typescript-language-server](https://github.c
 
 ![TypeScript file type](images/user-defined-ls/typescript-language-server/TypeScriptServerDialog_FileType.png)
 
-* Since IntelliJ (Community) doesn't provide file type by default `TypeScript`, `React` file name patterns are used:
+* Since IntelliJ (Community) doesn't provide file type by default `TypeScript`, the file name patterns of the
+  template are used too, for the TypeScript and React files:
 
 ![TypeScript file name patterns](images/user-defined-ls/typescript-language-server/TypeScriptServerDialog_FileNamePatterns.png)
 
