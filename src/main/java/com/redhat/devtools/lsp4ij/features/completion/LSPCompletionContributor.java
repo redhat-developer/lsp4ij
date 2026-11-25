@@ -227,13 +227,28 @@ public class LSPCompletionContributor extends CompletionContributor {
         return null;
     }
 
+
+    /**
+     * Returns the text with which the given item edits the default edit range of its completion list
+     * ({@code itemDefaults.editRange}): its {@link CompletionItem#getTextEditText() textEditText}, or else its
+     * {@link CompletionItem#getLabel() label}, as the LSP 3.17 specification says: "If not provided and a list's
+     * default range is provided the label property is used as a text."
+     *
+     * @param item the completion item.
+     * @return the text edit text of the item, or else its label.
+     */
+    private String getItemText(@NotNull final CompletionItem item){
+        final String textEditText = item.getTextEditText();
+        return textEditText != null ? textEditText : item.getLabel();
+    }
+
     protected void updateWithItemDefaults(@NotNull CompletionItem item,
                                           @Nullable CompletionItemDefaults itemDefaults) {
         if (itemDefaults == null) {
             return;
         }
         // Update TextEdit with CompletionItemDefaults if needed
-        String itemText = item.getTextEditText();
+        final String itemText = getItemText(item);
         if (itemDefaults.getEditRange() != null && itemText != null) {
             if (itemDefaults.getEditRange().isLeft()) {
                 Range defaultRange = itemDefaults.getEditRange().getLeft();
