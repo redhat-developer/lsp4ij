@@ -10,10 +10,13 @@ package com.redhat.devtools.lsp4ij.settings;
 import com.intellij.openapi.ui.TextFieldWithBrowseButton;
 import com.intellij.openapi.util.Disposer;
 import com.intellij.testFramework.fixtures.BasePlatformTestCase;
+import com.intellij.ui.components.JBTabbedPane;
+import com.intellij.ui.components.JBTextField;
 import com.intellij.util.ui.UIUtil;
 import com.redhat.devtools.lsp4ij.LanguageServerBundle;
 import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
 import com.redhat.devtools.lsp4ij.server.definition.launching.UserDefinedLanguageServerDefinition;
+import com.redhat.devtools.lsp4ij.settings.ui.WorkspaceFoldersPanel;
 import org.jetbrains.annotations.NotNull;
 
 import javax.swing.*;
@@ -26,7 +29,8 @@ import java.util.UUID;
 /**
  * Tests the working directory of a user-defined language server, in the panel which its settings page and the New
  * Language Server dialog share: the line below the field says when the directory doesn't exist, in which the language
- * server can't start, without refusing it, since the installer can still create it.
+ * server can't start, without refusing it, since the installer can still create it. The empty field shows where the
+ * language server runs without one.
  */
 public class LanguageServerViewWorkingDirectoryTest extends BasePlatformTestCase {
 
@@ -97,15 +101,60 @@ public class LanguageServerViewWorkingDirectoryTest extends BasePlatformTestCase
         assertEquals("", preview().getText());
     }
 
+    public void testAnEmptyWorkingDirectoryShowsTheProjectDirectory() {
+        view.setWorkingDir(null);
+
+        assertEquals("", field().getText());
+        assertEquals(LanguageServerBundle.message("language.server.workingDir.emptyText"), emptyText());
+        assertEquals("the placeholder isn't stored", "", view.getWorkingDir());
+    }
+
+    public void testWithInstancesAnEmptyWorkingDirectoryShowsTheRootOfEachInstance() {
+        view.setWorkspaceFolderStrategyConfiguration("{\"serverInstances\": {}}");
+
+        assertEquals(LanguageServerBundle.message("language.server.workingDir.emptyText.instances"), emptyText());
+
+        view.setWorkspaceFolderStrategyConfiguration(null);
+
+        assertEquals(LanguageServerBundle.message("language.server.workingDir.emptyText"), emptyText());
+    }
+
+    public void testInstancesConfiguredInTheirTabShowOnceTheServerTabIsBack() {
+        var tabs = UIUtil.findComponentOfType(view.getComponent(), JBTabbedPane.class);
+        assertNotNull(tabs);
+        var workspaceFolders = UIUtil.findComponentOfType(view.getComponent(), WorkspaceFoldersPanel.class);
+        assertNotNull(workspaceFolders);
+        int workspaceFoldersTab = tabs.indexOfTab(LanguageServerBundle.message("language.server.tab.workspaceFolders"));
+        int serverTab = tabs.indexOfTab(LanguageServerBundle.message("language.server.tab.server"));
+        tabs.setSelectedIndex(workspaceFoldersTab);
+
+        // as the user edits the configuration in the tab
+        workspaceFolders.setJsonConfiguration("{\"serverInstances\": {}}");
+        tabs.setSelectedIndex(serverTab);
+
+        assertEquals(LanguageServerBundle.message("language.server.workingDir.emptyText.instances"), emptyText());
+    }
+
+    private @NotNull String emptyText() {
+        return ((JBTextField) field().getTextField()).getEmptyText().getText();
+    }
+
     /**
-     * Returns the line below the working directory field.
+     * Returns the working directory field.
      */
-    private @NotNull JLabel preview() {
-        var field = UIUtil.findComponentsOfType(view.getComponent(), TextFieldWithBrowseButton.class).stream()
+    private @NotNull TextFieldWithBrowseButton field() {
+        return UIUtil.findComponentsOfType(view.getComponent(), TextFieldWithBrowseButton.class).stream()
                 // the environment variables are a subclass
                 .filter(component -> component.getClass() == TextFieldWithBrowseButton.class)
                 .findFirst()
                 .orElseThrow();
+    }
+
+    /**
+     * Returns the line below the working directory field.
+     */
+    private @NotNull JLabel preview() {
+        var field = field();
         return UIUtil.findComponentsOfType(view.getComponent(), JLabel.class).stream()
                 .filter(label -> label.getLabelFor() == field && label.getText() != null && !label.getText().endsWith(":"))
                 .findFirst()
