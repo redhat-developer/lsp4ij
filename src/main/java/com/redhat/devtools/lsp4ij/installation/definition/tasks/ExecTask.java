@@ -334,11 +334,13 @@ public class ExecTask extends InstallerTask {
             boolean succeeded = result.isTimeout()
                     || result.getExitCode() == 0 && (ignoreStderr || result.getStderr().isEmpty());
             if (succeeded && outputPattern != null && !outputPattern.matcher(result.getStdout()).find()) {
-                // The log gets the output without its values which can be secrets, as the rest of the output
+                // The warning names the command and the regular expression only; the output, which can hold a secret
+                // that the log doesn't recognise, is logged at DEBUG, as the rest of the output of the command
                 context.printError("The output of '" + String.join(" ", resolvedCommand) + "' doesn't match "
-                        + outputPattern.pattern() + (result.getStdout().isBlank()
-                        ? ": it printed nothing"
-                        : ":\n" + result.getStdout().strip()));
+                        + outputPattern.pattern() + (result.getStdout().isBlank() ? ": it printed nothing" : ":"));
+                if (!result.getStdout().isBlank()) {
+                    context.print(result.getStdout().strip(), ConsoleViewContentType.ERROR_OUTPUT, Level.FINE);
+                }
                 return false;
             }
             return succeeded;

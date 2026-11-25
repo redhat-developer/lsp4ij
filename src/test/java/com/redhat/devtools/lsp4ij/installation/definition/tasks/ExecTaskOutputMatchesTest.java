@@ -67,9 +67,13 @@ public class ExecTaskOutputMatchesTest {
                 "9.0.300 [C:\\Program Files\\dotnet\\sdk]", "10.0.100-rc.2.25502.107 [C:\\Program Files\\dotnet\\sdk]"));
         assertEquals(1, context.errors().size(), "the console should say why the task fails: " + context.output());
         String error = context.errors().get(0);
-        assertTrue(error.contains(PrintOutput.class.getName()) && error.contains("doesn't match " + SDK_10_OR_LATER)
-                && error.contains("9.0.300"), "the console should name the command, the regular expression and the "
-                + "output: " + error);
+        assertTrue(error.contains(PrintOutput.class.getName()) && error.contains("doesn't match " + SDK_10_OR_LATER),
+                "the console should name the command and the regular expression: " + error);
+        // The command has the lines that it prints as arguments: the warning ends where the output would start
+        assertTrue(error.endsWith("doesn't match " + SDK_10_OR_LATER + ":"), "the warning of the IDE's log shouldn't "
+                + "hold the output, which can hold a secret: " + error);
+        assertTrue(context.failedOutput().contains("9.0.300"), "the console should show the output after the error, "
+                + "logged at DEBUG only: " + context.output());
     }
 
     @Test
@@ -187,6 +191,7 @@ public class ExecTaskOutputMatchesTest {
 
         private final List<String> output = new CopyOnWriteArrayList<>();
         private final List<String> errors = new CopyOnWriteArrayList<>();
+        private final List<String> failedOutput = new CopyOnWriteArrayList<>();
 
         RecordingContext() {
             super(null, InstallerAction.CHECK);
@@ -201,6 +206,8 @@ public class ExecTaskOutputMatchesTest {
                 // has the level FINE; the errors of the task itself are logged as warnings
                 if (contentType == ConsoleViewContentType.ERROR_OUTPUT && logLevel != Level.FINE) {
                     errors.add(message);
+                } else if (contentType == ConsoleViewContentType.ERROR_OUTPUT && !errors.isEmpty()) {
+                    failedOutput.add(message);
                 }
             }
             super.print(message, contentType, logLevel);
@@ -212,6 +219,14 @@ public class ExecTaskOutputMatchesTest {
 
         @NotNull List<String> errors() {
             return errors;
+        }
+
+        /**
+         * Returns what was printed as an error at DEBUG after the first error, as the output of a command which doesn't
+         * match.
+         */
+        @NotNull String failedOutput() {
+            return String.join("\n", failedOutput);
         }
     }
 }
