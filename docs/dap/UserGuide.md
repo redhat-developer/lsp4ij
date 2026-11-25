@@ -343,6 +343,8 @@ The DAP server then reports each thread that ended, which the tab shows as `exit
 
 The context menu of the `Frames` view has `Terminate Thread` too, which terminates the thread of the selected frame.
 
+![Terminate Thread in the Frames view](./images/DAP_terminate_thread_frames.png)
+
 The `Threads` tab shows the threads of the DAP session that stopped last, which can be a child session that the DAP
 server started with
 [startDebugging](https://microsoft.github.io/debug-adapter-protocol//specification.html#Reverse_Requests_StartDebugging),

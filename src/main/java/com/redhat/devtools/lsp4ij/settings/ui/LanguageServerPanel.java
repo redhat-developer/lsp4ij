@@ -33,6 +33,7 @@ import com.intellij.ui.components.JBLabel;
 import com.intellij.ui.components.JBScrollPane;
 import com.intellij.ui.components.JBTabbedPane;
 import com.intellij.ui.components.JBTextField;
+import com.intellij.ui.components.fields.ExtendableTextField;
 import com.intellij.ui.dsl.listCellRenderer.BuilderKt;
 import com.intellij.ui.scale.JBUIScale;
 import com.intellij.util.ui.FormBuilder;
@@ -101,6 +102,7 @@ public class LanguageServerPanel implements Disposable {
     private final List<JComponent> startedServerFields = new ArrayList<>();
     private CommandLineWidget commandLine;
     private TextFieldWithBrowseButton workingDir;
+    private JBTextField workingDirTextField;
     private @Nullable TransportFields transportFields;
     private @NotNull List<TransportSupport> supportedTransports = List.of();
     // Set while the panel shows a transport, or the transports of a template, itself: only a change of the transport
@@ -300,6 +302,10 @@ public class LanguageServerPanel implements Disposable {
 
         // Debug tab
         addDebugTab(tabbedPane, uiConfiguration);
+
+        // The Workspace Folders tab decides where a language server without a working directory runs
+        updateWorkingDirEmptyText();
+        tabbedPane.addChangeListener(e -> updateWorkingDirEmptyText());
     }
 
     private void addServerTab(@NotNull JBTabbedPane tabbedPane,
@@ -489,7 +495,9 @@ public class LanguageServerPanel implements Disposable {
     }
 
     private void createWorkingDirField(@NotNull FormBuilder builder) {
-        workingDir = new TextFieldWithBrowseButton();
+        // The text field which TextFieldWithBrowseButton creates itself, kept for its placeholder
+        workingDirTextField = new ExtendableTextField(10);
+        workingDir = new TextFieldWithBrowseButton(workingDirTextField);
         workingDir.addBrowseFolderListener(new TextBrowseFolderListener(FileChooserDescriptorFactory.createSingleFolderDescriptor(), project));
         JLabel previewWorkingDirLabel = createLabelForComponent("", workingDir);
         updatePreviewWorkingDir(workingDir, previewWorkingDirLabel, project);
@@ -497,6 +505,20 @@ public class LanguageServerPanel implements Disposable {
         builder.addLabeledComponent(workingDirLabel, workingDir);
         builder.addComponent(previewWorkingDirLabel, 0);
         startedServerFields.addAll(List.of(workingDirLabel, workingDir, previewWorkingDirLabel));
+    }
+
+    /**
+     * Shows in the empty working directory field where the language server runs without one: with several instances,
+     * the root of each instance, and otherwise the project's directory.
+     */
+    private void updateWorkingDirEmptyText() {
+        if (workingDirTextField == null) {
+            return;
+        }
+        workingDirTextField.getEmptyText().setText(LanguageServerBundle.message(hasServerInstances()
+                ? "language.server.workingDir.emptyText.instances"
+                : "language.server.workingDir.emptyText"));
+        workingDirTextField.repaint();
     }
 
     private void createTransportFields(@NotNull FormBuilder builder) {
@@ -791,9 +813,10 @@ public class LanguageServerPanel implements Disposable {
         if (workspaceFoldersPanel == null) {
             // As the tab would hold it, so that the settings of the language server show it unchanged
             this.workspaceFolderStrategyConfiguration = WorkspaceFoldersPanel.toJsonConfiguration(workspaceFolderStrategyConfiguration);
-            return;
+        } else {
+            workspaceFoldersPanel.setJsonConfiguration(workspaceFolderStrategyConfiguration);
         }
-        workspaceFoldersPanel.setJsonConfiguration(workspaceFolderStrategyConfiguration);
+        updateWorkingDirEmptyText();
     }
 
     /**

@@ -47,7 +47,7 @@ Each language server of the tree shows its state after its name, in grey, such a
 that the server reports in its response to [initialize](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#initialize)
 when it reports them, whether it is enabled, the number of its instances, and the error of an instance which failed:
 
-![LSP console server name and version](./images/LSPConsoleServerInfo.png)
+![LSP console tooltips of a language server, with its name and version, and of its process](./images/LSPConsoleServerInfo.png)
 
 Below it, each instance of the language server shows its state, and how LSP4IJ talks to it, in grey: `[stdio]`, or its
 socket, such as `[accept on port 5008]`. Hovering over an instance shows its root, when the language server has

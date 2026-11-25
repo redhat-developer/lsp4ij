@@ -45,8 +45,13 @@ fetch the latest version) using the `Reinstall` action, in the context menu of t
 The `Server tab` requires the `server name` and `command` fields to be set. A language server which runs already, and
 to which LSP4IJ attaches over a socket, needs no command, but its port (see [Transport](#transport)).
 
-Below the `Working Directory` field, a line shows the directory with its macros resolved, and says when no such directory
-exists yet: the language server can only start in one that exists, which its installer can still create.
+Without a working directory, the language server runs in the project's directory, and with
+[several instances](#several-language-server-instances), each instance in its root, so that it gets the
+[environment of that directory](#directory-specific-environment-variables). The empty `Working Directory` field shows
+this as `Project directory` or `Root of each instance`. In a project whose directory isn't on disk, the language server
+runs in the IDE's working directory. Below the field, a line shows the directory with its macros resolved, and says
+when no such directory exists yet: the language server can only start in one that exists, which its installer can still
+create.
 
 Here is a sample with the [typescript-language-server](https://github.com/typescript-language-server/typescript-language-server):
 
@@ -75,11 +80,11 @@ it the whole command in double quotes, since `sh -c` runs only the argument righ
 Since IntelliJ 2025.1, a plugin can set up the environment of a process for its working directory (the
 `commandLineEnvCustomizer` extension point), as the [mise](https://mise.jdx.dev/) plugin does from a `mise.toml`, or a
 [direnv](https://direnv.net/) plugin from an `.envrc`. The language server's process gets that environment when it starts.
-When a working directory is set, LSP4IJ also looks up the language server's command in the `PATH` of that environment, so
-that the tool which the directory selects, such as its version of `node`, is the one that starts.
+LSP4IJ also looks up the language server's command in the `PATH` of that environment, so that the tool which the
+directory selects, such as its version of `node`, is the one that starts.
 
 > [!NOTE]
-> - **Set the working directory**: the environment is the one of that directory. Without one, the directory's environment doesn't apply: the command is looked up in the `PATH` of the environment variables configured here, or else in the IDE's `PATH`.
+> - **Working directory**: the environment is the one of the language server's working directory. Without a configured one, that is the project's directory, or with [several instances](#several-language-server-instances) the root of each instance, so a `mise.toml` or `.envrc` there applies. Set a working directory for the environment of another directory. Only a language server without any working directory, as in a project whose directory isn't on disk, gets no directory's environment: its command is looked up in the `PATH` of the environment variables configured here, or else in the IDE's `PATH`.
 > - **Precedence**: the directory's environment is applied when the process starts, after the environment variables configured here, so it wins over a variable that both set.
 > - **Windows**: with a working directory, a command without its extension, such as `node` or `npx`, is looked up with the extensions in `PATHEXT`, as Windows does, so that the directory's `node.exe` or `npx.cmd` starts.
 > - **Tools not bundled**: LSP4IJ doesn't bundle mise or direnv. Install the tool and its IntelliJ plugin. The mise plugin customizes the processes of other plugins only with its `useMiseInAllCommandLines` setting, which is off by default.
@@ -104,8 +109,8 @@ LSP4IJ adds placeholders of its own:
 
  * `${instanceRoot}`, in the command and the working directory: the root of the language server. With
    [several instances](#several-language-server-instances), it is the root of each instance, and otherwise the
-   project's directory, as `$PROJECT_DIR$`. In the command, a root with spaces needs quotes, as in
-   `"${instanceRoot}/server.js"`.
+   project's directory, as `$PROJECT_DIR$`. It is also where a language server without a working directory runs. In
+   the command, a root with spaces needs quotes, as in `"${instanceRoot}/server.js"`.
  * `${port}`, in the command of a language server that LSP4IJ starts and talks to over a socket: the port of that
    socket, see [Transport](#transport).
 
@@ -376,8 +381,9 @@ Files with the same root share an instance:
  * It's initialized with its root as `rootUri`.
  * A file without a root gets no instance, so this language server provides no features for it. LSP4IJ says so once, when such a file is open in an editor.
  * With markers, the search stops at the project: a file without a marker up to its topmost content root has that content root as its root, so no instance runs above the project. In a project with content roots, a file outside all of them has no root then.
- * All instances use the same command. If no working directory is configured, an instance runs in its root. A
-   configured working directory applies to every instance, so all of them get the environment of that one directory.
+ * All instances use the same command. If no working directory is configured, an instance runs in its root, and one
+   whose root is in an archive in the project's directory. A configured working directory applies to every instance,
+   so all of them get the environment of that one directory.
    With `${instanceRoot}` in it, as in `${instanceRoot}/server`, each instance runs in a directory of its own root,
    with the environment of that directory.
  * Stop on an instance in the Language Servers view, or too many failed starts of it, switch off that instance only, and the others keep working. Restart switches it on again, and so does a changed configuration.
