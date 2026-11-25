@@ -80,6 +80,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.IntStream;
 
 /**
@@ -90,6 +91,11 @@ import java.util.stream.IntStream;
  */
 public class DAPBreakOnValueChangeSessionTest extends HeavyPlatformTestCase {
 
+    /**
+     * Bounds the waits for the session and the DAP server, so that a test fails instead of hanging, as in the other DAP
+     * session tests: a session starts slowly on a busy machine.
+     */
+    private static final int BOUND_SECONDS = 120;
     private static final int FRAME_ID = 7;
     private static final int LOCALS_REFERENCE = 1;
     private static final int COUNTER_REFERENCE = 2;
@@ -123,14 +129,14 @@ public class DAPBreakOnValueChangeSessionTest extends HeavyPlatformTestCase {
         ActionManager.getInstance().getAction("DAP.BreakOnValueChange").actionPerformed(event);
 
         // the DAP server is asked for the data of 'count' in the variables of 'counter'
-        var info = PlatformTestUtil.waitForFuture(server.dataBreakpointInfo, 10_000);
+        var info = PlatformTestUtil.waitForFuture(server.dataBreakpointInfo, TimeUnit.SECONDS.toMillis(BOUND_SECONDS));
         assertEquals(Integer.valueOf(COUNTER_REFERENCE), info.getVariablesReference());
         assertEquals("count", info.getName());
         assertEquals(Integer.valueOf(FRAME_ID), info.getFrameId());
 
         // and given a data breakpoint on that data, which IntelliJ shows by the DAP server's description
         PlatformTestUtil.waitWithEventsDispatching("the data breakpoint is sent",
-                () -> server.dataIds().equals(List.of("2:count")), 10);
+                () -> server.dataIds().equals(List.of("2:count")), BOUND_SECONDS);
         var breakpoint = dataBreakpoints().get(0);
         assertEquals("Counter.count", breakpoint.getProperties().getDescription());
         assertSame(DataBreakpointAccessType.WRITE, breakpoint.getProperties().getAccessType());
@@ -139,7 +145,7 @@ public class DAPBreakOnValueChangeSessionTest extends HeavyPlatformTestCase {
         // its data is valid in this session only
         session.stop();
         PlatformTestUtil.waitWithEventsDispatching("the data breakpoint goes with the session",
-                () -> dataBreakpoints().isEmpty(), 10);
+                () -> dataBreakpoints().isEmpty(), BOUND_SECONDS);
     }
 
     public void testBreakOnValueChangeIsHiddenWhenTheDAPServerHasNoDataBreakpoints() throws Exception {
@@ -176,7 +182,7 @@ public class DAPBreakOnValueChangeSessionTest extends HeavyPlatformTestCase {
             var sessions = XDebuggerManager.getInstance(getProject()).getDebugSessions();
             session = sessions.length == 1 ? sessions[0] : null;
             return session != null && session.isSuspended() && session.getCurrentStackFrame() instanceof DAPStackFrame;
-        }, 30);
+        }, BOUND_SECONDS);
     }
 
     /**
@@ -252,7 +258,7 @@ public class DAPBreakOnValueChangeSessionTest extends HeavyPlatformTestCase {
                                    @Nullable XDebuggerTreeNodeHyperlink link) {
             }
         });
-        return PlatformTestUtil.waitForFuture(done, 10_000);
+        return PlatformTestUtil.waitForFuture(done, TimeUnit.SECONDS.toMillis(BOUND_SECONDS));
     }
 
     /**

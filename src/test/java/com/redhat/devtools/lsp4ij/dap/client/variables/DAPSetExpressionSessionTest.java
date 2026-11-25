@@ -278,6 +278,8 @@ public class DAPSetExpressionSessionTest extends HeavyPlatformTestCase {
 
         // shown as before: its placeholder value, and the one variable which gives its value
         var node = node(result);
+        // The node applies what the value gives it on the UI thread: a link would be there once it has
+        PlatformTestUtil.dispatchAllInvocationEventsInIdeEventQueue();
         assertNull("A lazy Evaluate result has no \"Show value\" link", node.getFullValueEvaluator());
         assertFalse("A lazy Evaluate result can be expanded", node.isLeaf());
         assertEquals("41", result.getShownVariable().getValue());
