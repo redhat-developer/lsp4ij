@@ -891,14 +891,13 @@ so. This is the same for a token of the environment, of the settings or of the G
 When a download without `url` fails for one of these reasons, the notification of the failed installation says why
 too, as the console does. At the rate limit, for example:
 
-> Installation of `clojure-lsp` failed.
+> Installation of `rust-analyzer` failed.
 >
 > GitHub API rate limit reached: 60 requests an hour (HTTP 403). It resets at 15:35:07 (local time). A GitHub token in
 > Settings | Languages & Frameworks | Language Servers (LSP4IJ), or in the environment variable GITHUB_TOKEN of the
 > IDE, raises the limit to 5,000 requests an hour.
 
-<!-- TODO: a screenshot of this notification, taken from a running IDE, as
-     docs/images/user-defined-ls/GitHubRateLimitNotification.png -->
+![The notification of an installation which the rate limit of the GitHub API stopped](./images/user-defined-ls/GitHubRateLimitNotification.png)
 
 The IDE's log, `idea.log` (*Help | Show Log in Finder*, *Explorer* or *Files*), has a line for each download, with its
 URL, where the URL comes from and how long it took, and a warning for a rate limit, a refused token or a failed
