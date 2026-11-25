@@ -57,6 +57,11 @@ LSP4IJ provides built-in tasks:
 * [replaceTemplateCommand](#task-replacetemplatecommand) to set the launch command while the server still has the
   command of its template.
 
+LSP4IJ runs installers since 0.14.0, with almost all of their tasks and keys. `fileExists` works since 0.30.0, and
+`initialize`, `replaceTemplateCommand` and a few keys since 0.30.2: see
+[Compatibility with earlier versions of LSP4IJ](#compatibility-with-earlier-versions-of-lsp4ij) for what an earlier
+version does with them.
+
 To define custom tasks, you can contribute to the extension point `com.redhat.devtools.lsp4ij.installerTaskFactory`.
 
 ## Task descriptor
@@ -203,13 +208,13 @@ does. A notification closed without a click ends the task, which then fails.
 Runs a command. The task succeeds when the command exits with 0 and writes nothing on its standard error, and, with
 `outputMatches`, when its standard output matches it too.
 
-| Key             | Value                                                                                                                                                                                                                                                                                                                        | Default                                   |
-|-----------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------------------------------|
-| `command`       | the command: a string, which LSP4IJ splits at its spaces outside double quotes, or an array of its arguments; or an object of these by OS, as [`programArgs`](./UserDefinedLanguageServerTemplate.md#command). LSP4IJ expands the macros, such as `$USER_HOME$`, in each argument. Of the [properties](#properties), it replaces only a whole `${server.command}`. | none: the task fails                      |
-| `workingDir`    | the directory in which the command runs, with properties and macros. LSP4IJ creates it if it doesn't exist.                                                                                                                                                                                                                  | the project's directory                   |
-| `timeout`       | the time in milliseconds after which LSP4IJ stops the command. The task then succeeds.                                                                                                                                                                                                                                       | none: LSP4IJ waits until the command ends |
-| `ignoreStderr`  | `true` lets the task succeed when the command writes on its standard error, as `npm install` does with its warnings                                                                                                                                                                                                          | `false`                                   |
-| `outputMatches` | a [regular expression](https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/regex/Pattern.html) that the standard output of the command must match somewhere for the task to succeed, as a version, see [Output of the command](#output-of-the-command)                                                    | none: any output                          |
+| Key             | Value                                                                                                                                                                                                                                                                                                                                                                                                                                | Default                                   |
+|-----------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------------------------------|
+| `command`       | the command: a string, which LSP4IJ splits at its spaces outside double quotes (since LSP4IJ 0.30.0: an earlier version splits it at each space), or an array of its arguments; or an object of these by OS, as [`programArgs`](./UserDefinedLanguageServerTemplate.md#command). LSP4IJ expands the macros, such as `$USER_HOME$`, in each argument. Of the [properties](#properties), it replaces only a whole `${server.command}`. | none: the task fails                      |
+| `workingDir`    | the directory in which the command runs, with properties and macros. LSP4IJ creates it if it doesn't exist.                                                                                                                                                                                                                                                                                                                          | the project's directory                   |
+| `timeout`       | the time in milliseconds after which LSP4IJ stops the command. The task then succeeds.                                                                                                                                                                                                                                                                                                                                               | none: LSP4IJ waits until the command ends |
+| `ignoreStderr`  | `true` lets the task succeed when the command writes on its standard error, as `npm install` does with its warnings                                                                                                                                                                                                                                                                                                                  | `false`                                   |
+| `outputMatches` | a [regular expression](https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/regex/Pattern.html) that the standard output of the command must match somewhere for the task to succeed, as a version, see [Output of the command](#output-of-the-command). Since LSP4IJ 0.30.2                                                                                                                                       | none: any output                          |
 
 The console of the installation shows the command after `> `, and its output. The command gets the environment
 variables of the IDE and, since IntelliJ 2025.1, the environment of its working directory, as a language server does
@@ -279,6 +284,9 @@ command which ends by itself, as `node --version`.
 
 ### Output of the command
 
+**Since LSP4IJ 0.30.2.** An earlier version ignores `outputMatches`: the `exec` succeeds whatever the command
+prints, see [Compatibility with earlier versions of LSP4IJ](#compatibility-with-earlier-versions-of-lsp4ij).
+
 With `outputMatches`, the task succeeds only if the standard output of the command matches the regular expression
 somewhere, as Java's `Matcher.find()` does, besides the exit code and the standard error. Use `(?m)` for `^` and `$` to
 match at the start and the end of each line. A check can so ask for a version of a tool, which an exit code doesn't
@@ -308,10 +316,11 @@ doesn't match, the console says so, with the output, and the task fails. A comma
 succeeds only if what it printed until then matches. A regular expression which isn't valid fails the task, without
 running the command, and the console says why.
 
-LSP4IJ 0.30.1 and earlier don't know `outputMatches`, and ignore it: there, the task succeeds whatever the output, as
-an `exec` without it.
-
 ## Task initialize
+
+**Since LSP4IJ 0.30.2.** An earlier version ignores the task: in the `onSuccess` of an `exec`, it leaves the result of
+the `exec` as it is, see
+[Compatibility with earlier versions of LSP4IJ](#compatibility-with-earlier-versions-of-lsp4ij).
 
 `initialize` checks that the language server or debug adapter starts and talks its protocol. It starts the server as
 LSP4IJ starts it, with its command, working directory, environment variables and transport, sends it `initialize` (the
@@ -345,9 +354,8 @@ cancelled.
   the server, in milliseconds.
 
 The bundled installers run `initialize` as the `onSuccess` of the `exec` of `${server.command}` which they ran before,
-rather than as the `check` itself, for the LSP4IJ versions which don't know the `initialize` task. Such a version
-ignores it, as any task it doesn't know: as an `onSuccess`, the check is then the `exec` alone, as before, while as the
-`check`, the installer would have no check, and the server would count as installed. The cost is that LSP4IJ starts the
+rather than as the `check` itself, so that an earlier version still checks with the `exec` alone: as the `check`,
+`initialize` would leave it no check, and the server would count as installed. The cost is that LSP4IJ starts the
 server twice to check it: for the `timeout` of the `exec`, then for `initialize`.
 
 The `initialize` request of a language server has the initialization options of its settings, and the project's
@@ -357,6 +365,10 @@ touched: the task succeeds. A debug adapter is reached as a debug session reache
 its standard input and output.
 
 ## Task fileExists
+
+**Since LSP4IJ 0.30.0**, with the globs of `file`. An earlier version ignores the task: as the whole `check`, it leaves
+the installer no check, and the server counts as installed, see
+[Compatibility with earlier versions of LSP4IJ](#compatibility-with-earlier-versions-of-lsp4ij).
 
 Checks that a file exists, as the server that the `run` of the installer installs, so that the installation doesn't run
 again once the server is there. Example: the check of clangd, whose archive has a folder named after the version of
@@ -386,12 +398,12 @@ clangd, as `clangd_19.1.2/`:
 * `file`: the path of the file, by OS and architecture as the `url` of a [download](#task-download), with the properties
   of the installer, as `${serverDist}`, and macros, as `$USER_HOME$`. Its segments can have the globs `*` and `?`, as
   `clangd*`, and `**` for any number of folders.
-* The file found is `${check.file}` for the tasks that run after the check, as its `onSuccess`: the path as written in
-  `file`, with the properties resolved, the macros kept and the globs replaced by the names found, as
-  `$USER_HOME$/.lsp4ij/lsp/clangd_19.1.2/bin/clangd`, in the form of the `${output.dir}` of a download. Of several files
-  that the globs match, it is the last in natural order, which compares the numbers in a name by their value, from the
-  first segment on: `clangd_19.1.10/bin/clangd` after `clangd_19.1.2/bin/clangd`. A `fileExists` which finds no file
-  removes `${check.file}`.
+* The file found is `${check.file}`, since LSP4IJ 0.30.2, for the tasks that run after the check, as its `onSuccess`:
+  the path as written in `file`, with the properties resolved, the macros kept and the globs replaced by the names
+  found, as `$USER_HOME$/.lsp4ij/lsp/clangd_19.1.2/bin/clangd`, in the form of the `${output.dir}` of a download. Of
+  several files that the globs match, it is the last in natural order, which compares the numbers in a name by their
+  value, from the first segment on: `clangd_19.1.10/bin/clangd` after `clangd_19.1.2/bin/clangd`. A `fileExists` which
+  finds no file removes `${check.file}`.
 
 When the check finds the server installed, the `run` doesn't run, so a server created from the template would keep the
 command of the template: a [replaceTemplateCommand](#task-replacetemplatecommand) in the `onSuccess` of the check gives
@@ -594,6 +606,9 @@ Samples:
 
 #### GitHub token
 
+**Since LSP4IJ 0.30.2.** An earlier version sends no token, see
+[Compatibility with earlier versions of LSP4IJ](#compatibility-with-earlier-versions-of-lsp4ij).
+
 A `github` download asks the GitHub API, `api.github.com`, for the releases of the repository. Without a token, the
 GitHub API allows 60 requests an hour per IP address, which all the IDEs and tools behind one address share, as on a
 corporate network, a VPN or CI runners. When they are used up, LSP4IJ falls back to `url`, and a download without `url`
@@ -751,7 +766,9 @@ property is `$USER_HOME$/.lsp4ij/lsp/rust-analyzer`:
   which is then added to `${output.dir}`.
 * `stripRootFolder` (optional, `false` by default): extracts the content of the single root folder of the archive into
   `dir` itself, so the server is found at the same place from one version to the next, as the
-  [perl-lsp installer](../src/main/resources/templates/lsp/perl-lsp/installer.json) does.
+  [perl-lsp installer](../src/main/resources/templates/lsp/perl-lsp/installer.json) does. Since LSP4IJ 0.30.2: an
+  earlier version ignores it, and extracts the archive with its root folder, so the server isn't where a check or a
+  command that looks in `dir` itself expects it.
 * `file.name`: name of the executable file (registered as `${output.file.name}`), by OS and architecture. When it is
   set, the task fails if the file isn't in `${output.dir}` after the download. A file which isn't an archive is saved
   under this name, and without it, under its own name, the last segment of the path of the URL without its query or
@@ -778,6 +795,9 @@ Used to set the server launch command:
 
 ### Task replaceTemplateCommand
 
+**Since LSP4IJ 0.30.2.** An earlier version ignores the task: the server keeps the command of its template, and the
+check still passes, see [Compatibility with earlier versions of LSP4IJ](#compatibility-with-earlier-versions-of-lsp4ij).
+
 Sets the server launch command, as [configureServer](#task-configureServer) does, but only while the server has the
 command of its template. In the `onSuccess` of a check, which also runs from *Check installation* in the settings, it
 gives a server created from the template the command of the file that the check found, and leaves a command that the
@@ -798,5 +818,47 @@ user or a download gave the server as it is:
   On an OS without a `templateCommand`, the task never changes the command.
 * `command`: the command that replaces it, as the `command` of a `configureServer`.
 
-An earlier version of LSP4IJ, which doesn't know this task, skips it: the server keeps the command of its template, and
-the check still passes.
+## Compatibility with earlier versions of LSP4IJ
+
+LSP4IJ runs installers since 0.14.0, which has almost all the tasks and keys of this page. An earlier version ignores
+`installer.json`. These came later, and their sections say since which version:
+
+| Since  | Task or key                                                                                                                                  | What an earlier version does                                                                                                                                                     |
+|--------|----------------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| 0.30.0 | the [`fileExists`](#task-fileexists) task, with the globs `*`, `?` and `**` of its `file`                                                    | ignores it: as the whole `check`, it leaves the installer no check, so the server counts as installed and is never installed by itself                                           |
+| 0.30.0 | the `command` of an [`exec`](#task-exec) as a string with an argument in double quotes                                                       | splits the string at each space, also inside the double quotes, which stay in the arguments: give such a command as an array of its arguments                                    |
+| 0.30.2 | [`outputMatches`](#output-of-the-command) of an `exec`                                                                                       | ignores it: the `exec` succeeds whatever the command prints                                                                                                                      |
+| 0.30.2 | the [`initialize`](#task-initialize) task                                                                                                    | ignores it: in the `onSuccess` of an `exec`, it leaves the result of the `exec` as it is                                                                                         |
+| 0.30.2 | the [`replaceTemplateCommand`](#task-replacetemplatecommand) task, with its `templateCommand`                                                | ignores it: the server keeps the command of its template, and the check still passes                                                                                             |
+| 0.30.2 | `${check.file}`, the file that a [`fileExists`](#task-fileexists) found                                                                      | doesn't replace it: a `configureServer` would give the server a command with `${check.file}` in it                                                                               |
+| 0.30.2 | [`stripRootFolder`](#output-customization) of the `output` of a `download`                                                                   | ignores it: it extracts the archive with its root folder, which it adds to `${output.dir}`, so the server isn't where a check or a command that looks in `dir` itself expects it |
+| 0.30.2 | the [GitHub token](#github-token): `GITHUB_TOKEN` or `GH_TOKEN`, the token of the LSP4IJ settings, and the token of the IDE's GitHub account | sends no token: the GitHub API allows 60 requests an hour per IP address                                                                                                         |
+
+### What an earlier version does with what it doesn't know
+
+Every version from 0.14.0 to 0.30.1 treats a task or a key that it doesn't know in the same way:
+
+* A task of a type that it doesn't know is no task:
+  * in an `onSuccess` or an `onFail`, the task which has it succeeds or fails as it would without it;
+  * as the whole `check`, it leaves the installer no check, so the server counts as installed, and LSP4IJ never
+    installs it by itself;
+  * as the whole `run`, it leaves the installer nothing to install.
+* A key that it doesn't know is ignored, as is any key that LSP4IJ doesn't read.
+
+### When it matters
+
+An earlier version of LSP4IJ reads:
+
+* a template that you [export](./UserDefinedLanguageServer.md#exporting-templates) and share with someone whose LSP4IJ
+  is earlier;
+* the `installer.json` of a plugin which bundles one and supports several versions of LSP4IJ;
+* the installer that a language server keeps in the settings of the IDE, from the template it was created from, when
+  the IDE goes back to an earlier LSP4IJ.
+
+A template bundled with LSP4IJ ships with the LSP4IJ which reads it, but a language server created from it is in the
+last case.
+
+So put a task that an earlier version doesn't know in the `onSuccess` of one that it knows, as the bundled installers
+put `initialize` after the `exec` of `${server.command}`, and `replaceTemplateCommand` after a `fileExists`: an earlier
+version then decides with the task that it knows alone, while as the whole `check`, the newer task would leave it no
+check.
