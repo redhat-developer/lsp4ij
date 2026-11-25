@@ -11,20 +11,13 @@
 
 package com.redhat.devtools.lsp4ij.features.formatting;
 
-import com.intellij.openapi.project.Project;
-import com.intellij.psi.PsiFile;
 import com.intellij.util.containers.ContainerUtil;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
-import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
 import com.redhat.devtools.lsp4ij.fixtures.LSPCodeInsightFixtureTestCase;
 import com.redhat.devtools.lsp4ij.server.definition.ClientConfigurableLanguageServerDefinition;
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition;
 import com.redhat.devtools.lsp4ij.server.definition.launching.ClientConfigurationSettings;
 import org.jetbrains.annotations.NotNull;
-
-import java.util.LinkedList;
-import java.util.List;
-import java.util.concurrent.TimeUnit;
 
 /**
  * These verify that editor improvements are disabled by default in non-user-defined language servers.
@@ -41,17 +34,7 @@ abstract class AbstractTypeScriptEditorImprovementsTest extends LSPCodeInsightFi
 
     @NotNull
     protected final LanguageServerItem initializeLanguageServer() {
-        List<LanguageServerItem> languageServers = new LinkedList<>();
-        try {
-            Project project = myFixture.getProject();
-            PsiFile file = myFixture.getFile();
-            ContainerUtil.addAllNotNull(languageServers, LanguageServiceAccessor.getInstance(project)
-                    .getLanguageServers(file, null, null)
-                    .get(30, TimeUnit.SECONDS));
-        } catch (Exception e) {
-            fail(e.getMessage());
-        }
-        LanguageServerItem languageServer = ContainerUtil.getFirstItem(languageServers);
+        LanguageServerItem languageServer = ContainerUtil.getFirstItem(awaitLanguageServers(myFixture.getFile()));
         assertNotNull(languageServer);
         return languageServer;
     }

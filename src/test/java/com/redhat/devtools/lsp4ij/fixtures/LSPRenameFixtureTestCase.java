@@ -16,7 +16,6 @@ import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.JSONUtils;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
-import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
 import com.redhat.devtools.lsp4ij.features.rename.LSPRenameUnitTestMode;
 import com.redhat.devtools.lsp4ij.mock.MockLanguageServer;
 import org.eclipse.lsp4j.*;
@@ -30,7 +29,6 @@ import org.junit.Assert;
 
 import java.io.IOException;
 import java.util.List;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
@@ -194,13 +192,7 @@ public abstract class LSPRenameFixtureTestCase extends LSPCodeInsightFixtureTest
             // As rename support works only when language server is started
             // to avoid having the error "Rename... is not available during language servers starting."
             // we wait for some ms.
-            try {
-                LanguageServiceAccessor.getInstance(file.getProject())
-                        .getLanguageServers(file, null, null)
-                        .get(30, TimeUnit.SECONDS);
-            } catch (Exception e) {
-                throw new AssertionError("The language server must start", e);
-            }
+            awaitLanguageServers(file);
         }
 
         final AtomicReference<String> actualError = new AtomicReference<>();
@@ -382,13 +374,7 @@ public abstract class LSPRenameFixtureTestCase extends LSPCodeInsightFixtureTest
             // As rename support works only when language server is started
             // to avoid having the error "Rename... is not available during language servers starting."
             // we wait for some ms.
-            try {
-                LanguageServiceAccessor.getInstance(file.getProject())
-                        .getLanguageServers(file, null, null)
-                        .get(30, TimeUnit.SECONDS);
-            } catch (Exception e) {
-                throw new AssertionError("The language server must start", e);
-            }
+            awaitLanguageServers(file);
         }
 
         final AtomicReference<String> actualError = new AtomicReference<>();
@@ -456,13 +442,7 @@ public abstract class LSPRenameFixtureTestCase extends LSPCodeInsightFixtureTest
             MockLanguageServer.INSTANCE.setWillRename(workspaceEdit);
         }
 
-        try {
-            LanguageServiceAccessor.getInstance(file.getProject())
-                    .getLanguageServers(file, null, null)
-                    .get(30, TimeUnit.SECONDS);
-        } catch (Exception e) {
-            throw new AssertionError("The language server must start", e);
-        }
+        awaitLanguageServers(file);
 
         WriteCommandAction.runWriteCommandAction(file.getProject(), () -> {
             try {
