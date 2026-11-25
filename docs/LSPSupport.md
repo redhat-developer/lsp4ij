@@ -269,7 +269,7 @@ LSP4IJ supports `Syntax Coloration` on hover and completion documentation. Here 
 
 `Syntax Coloration` is supported in:
 
- * MarkDown [Fenced Code Block](https://www.markdownguide.org/extended-syntax/#fenced-code-blocks).
+ * MarkDown [Fenced Code Block](https://spec.commonmark.org/0.31.2/#fenced-code-blocks).
 
   ~~~
      ```ts
@@ -282,7 +282,7 @@ LSP4IJ supports `Syntax Coloration` on hover and completion documentation. Here 
 
 ![textDocument/hover Syntax Coloration Code Block](./images/lsp-support/textDocument_hover_syntax_coloration_codeBlock.png)
 
- * MarkDown [Indented Blockquote](https://www.markdownguide.org/basic-syntax/#blockquotes-1) (`>` following with `5 spaces`).
+ * MarkDown [Indented Blockquote](https://www.markdownguide.org/basic-syntax/#blockquotes) (`>` following with `5 spaces`).
 
   ```
   >     const s = '';
@@ -722,7 +722,7 @@ trigger characters are typed.
 
 Here is an example with [Rust Analyzer](https://rust-analyzer.github.io/) reporting an error:
 
-```markdown
+```json
 {
   "type": 1,
   "message": "Failed to discover workspace.\nConsider adding the `Cargo.toml` of the workspace to the [`linkedProjects`](https://rust-analyzer.github.io/manual.html#rust-analyzer.linkedProjects) setting.\n\nFailed to load workspaces."

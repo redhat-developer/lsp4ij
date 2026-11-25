@@ -8,5 +8,5 @@ The first time the server starts, the installer of the template downloads the as
 
 To install it yourself:
 
- * [Install the rust-analyzer language server binary](https://rust-analyzer.github.io/manual.html#rust-analyzer-language-server-binary)
+ * [Install the rust-analyzer language server binary](https://rust-analyzer.github.io/book/rust_analyzer_binary.html)
  * Set the command to it, and empty the **Installer** tab before you click **OK**, so that LSP4IJ doesn't install the server.

@@ -9,7 +9,7 @@ This section provides step-by-step instructions for contributing an LSP language
 The first step is to reference LSP4IJ. LSP4IJ uses `com.redhat.devtools.lsp4ij` as plugin Id.
 
 You
-need [to declare dependency in your plugin.xml](https://plugins.jetbrains.com/docs/intellij/plugin-dependencies.html#3-dependency-declaration-in-pluginxml)
+need [to declare dependency in your plugin.xml](https://plugins.jetbrains.com/docs/intellij/plugin-dependencies.html#dependency-declaration-in-pluginxml)
 like this:
 
 ```xml
@@ -1092,7 +1092,7 @@ Workspace folders are sent **progressively via notifications** as files are open
 
 **Initialization with empty workspace folders:**
 
-```json
+```text
 Client → Server: initialize
 {
   "workspaceFolders": []
