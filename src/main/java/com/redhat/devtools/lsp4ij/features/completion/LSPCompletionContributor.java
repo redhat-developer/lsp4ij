@@ -227,7 +227,6 @@ public class LSPCompletionContributor extends CompletionContributor {
         return null;
     }
 
-
     /**
      * Returns the text with which the given item edits the default edit range of its completion list
      * ({@code itemDefaults.editRange}): its {@link CompletionItem#getTextEditText() textEditText}, or else its
@@ -237,8 +236,8 @@ public class LSPCompletionContributor extends CompletionContributor {
      * @param item the completion item.
      * @return the text edit text of the item, or else its label.
      */
-    private String getItemText(@NotNull final CompletionItem item) {
-        final String textEditText = item.getTextEditText();
+    private static String getItemText(@NotNull CompletionItem item) {
+        String textEditText = item.getTextEditText();
         return textEditText != null ? textEditText : item.getLabel();
     }
 
@@ -249,12 +248,12 @@ public class LSPCompletionContributor extends CompletionContributor {
         }
         // Update TextEdit with CompletionItemDefaults if needed
         if (item.getTextEdit() == null && itemDefaults.getEditRange() != null) {
-            final String itemText = getItemText(item);
+            String itemText = getItemText(item);
             if (itemText != null) {
                 if (itemDefaults.getEditRange().isLeft()) {
                     Range defaultRange = itemDefaults.getEditRange().getLeft();
                     if (defaultRange != null) {
-                        item.setTextEdit(Either.forLeft(new TextEdit(defaultRange, itemText)));
+item.setTextEdit(Either.forLeft(new TextEdit(defaultRange, itemText)));
                     }
                 } else {
                     InsertReplaceRange defaultInsertReplaceRange = itemDefaults.getEditRange().getRight();
