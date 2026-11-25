@@ -21,11 +21,13 @@ import com.intellij.openapi.ui.TextBrowseFolderListener;
 import com.intellij.openapi.ui.TextFieldWithBrowseButton;
 import com.intellij.openapi.util.NlsContexts;
 import com.intellij.openapi.util.NlsSafe;
+import com.intellij.ui.DocumentAdapter;
 import com.intellij.ui.HyperlinkLabel;
 import com.intellij.ui.SimpleListCellRenderer;
 import com.intellij.ui.components.JBScrollPane;
 import com.intellij.ui.components.JBTabbedPane;
 import com.intellij.ui.components.JBTextField;
+import com.intellij.ui.components.fields.ExtendableTextField;
 import com.intellij.ui.scale.JBUIScale;
 import com.intellij.util.ui.FormBuilder;
 import com.intellij.util.ui.UIUtil;
@@ -93,6 +95,7 @@ public class DebugAdapterServerPanel implements Disposable {
     private JRadioButton attachRadioButton;
     // for launch
     private TextFieldWithBrowseButton workingDirectoryField;
+    private JBTextField workingDirectoryTextField;
     private TextFieldWithBrowseButton fileField;
     private ComboBox<LaunchConfiguration> launchCombo;
     private SchemaBackedJsonTextField launchConfigurationField;
@@ -320,7 +323,9 @@ public class DebugAdapterServerPanel implements Disposable {
     private void addConfigurationTab(JBTabbedPane tabbedPane) {
         FormBuilder configurationTab = addTab(tabbedPane, DAPBundle.message("dap.settings.editor.configuration.tab"));
 
-        workingDirectoryField = new TextFieldWithBrowseButton();
+        // The text field which TextFieldWithBrowseButton creates itself, kept for its placeholder
+        workingDirectoryTextField = new ExtendableTextField(10);
+        workingDirectoryField = new TextFieldWithBrowseButton(workingDirectoryTextField);
         workingDirectoryField.addBrowseFolderListener(new TextBrowseFolderListener(FileChooserDescriptorFactory.createSingleFolderDescriptor(), getProject()));
         configurationTab.addLabeledComponent(DAPBundle.message("dap.settings.editor.configuration.cwd.field"), workingDirectoryField);
 
@@ -330,6 +335,14 @@ public class DebugAdapterServerPanel implements Disposable {
         var fileDescriptor = new FileChooserDescriptor(true, true, true, true, false, false);
         fileField.addBrowseFolderListener(new TextBrowseFolderListener(fileDescriptor, getProject()));
         configurationTab.addLabeledComponent(DAPBundle.message("dap.settings.editor.configuration.file.field"), fileField);
+        // The file decides where the Debug Adapter runs without a working directory
+        updateWorkingDirectoryEmptyText();
+        fileField.getTextField().getDocument().addDocumentListener(new DocumentAdapter() {
+            @Override
+            protected void textChanged(@NotNull DocumentEvent e) {
+                updateWorkingDirectoryEmptyText();
+            }
+        });
 
         ButtonGroup buttonGroup = new ButtonGroup();
         launchRadioButton = new JRadioButton(DAPBundle.message("dap.settings.editor.configuration.debug.mode.launch"));
@@ -667,6 +680,17 @@ public class DebugAdapterServerPanel implements Disposable {
 
     public String getWorkingDirectory() {
         return workingDirectoryField.getText();
+    }
+
+    /**
+     * Shows in the empty working directory field where the Debug Adapter runs without one: in the directory of the
+     * file, and without a file in the project's directory.
+     */
+    private void updateWorkingDirectoryEmptyText() {
+        workingDirectoryTextField.getEmptyText().setText(DAPBundle.message(StringUtils.isBlank(fileField.getText())
+                ? "dap.settings.editor.configuration.cwd.emptyText"
+                : "dap.settings.editor.configuration.cwd.emptyText.file"));
+        workingDirectoryTextField.repaint();
     }
 
     // Configuration settings

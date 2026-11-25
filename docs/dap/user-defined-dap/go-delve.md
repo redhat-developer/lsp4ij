@@ -100,7 +100,7 @@ As you have selected `Go - Delve` server, it will automatically populate the fil
 
 1. Fill in the `Configuration` tab:
 
-- the `working directory` (usually the project's root directory) 
+- the `working directory`, or leave it empty: the debug adapter then runs in the directory of the file
 - the path to the `test.go` file.
 
 ![DAP Configuration/Configuration](../images/go-delve/configuration_tab.png)
@@ -120,7 +120,7 @@ As you have selected `Go - Delve` server, it will automatically populate the fil
 
 When the run configuration starts:
 
-- `${workspaceFolder}` will be replaced with the working directory you specified.
+- `${workspaceFolder}` will be replaced with the working directory you specified, or the project's directory without one.
 - `${file}` will be replaced with the full path to `test.go`.
 
 ## Set Breakpoint
