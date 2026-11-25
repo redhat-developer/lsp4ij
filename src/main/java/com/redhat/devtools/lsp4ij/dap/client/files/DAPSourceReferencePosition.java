@@ -14,7 +14,6 @@ import com.intellij.openapi.command.WriteCommandAction;
 import com.intellij.openapi.fileEditor.FileDocumentManager;
 import com.intellij.openapi.util.text.StringUtil;
 import com.redhat.devtools.lsp4ij.dap.client.DAPClient;
-import org.eclipse.lsp4j.debug.SourceArguments;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -112,13 +111,9 @@ public class DAPSourceReferencePosition extends DeferredSourcePosition<DAPSource
     protected CompletableFuture<Integer> loadAndResolveLineAsync(@NotNull SourceParams params,
                                                                  @NotNull DAPFile file,
                                                                  @NotNull DAPClient client) {
-        var args = new SourceArguments();
-        args.setSourceReference(params.sourceReference);
-
-        // Fetch source content from the debug adapter server
-        return client.getDebugProtocolServer()
-                .source(args)
-                .thenCompose(sourceResponse -> {
+        // Fetch source content from the debug adapter server: once for the loads of the source which run at once
+        return client
+                .loadSource(params.sourceReference(), sourceResponse -> {
                     loadedText = null;
                     if (sourceResponse != null) {
                         String content = sourceResponse.getContent() != null ? sourceResponse.getContent() : "";
