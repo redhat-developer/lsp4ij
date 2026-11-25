@@ -696,7 +696,8 @@ public class LanguageServerView implements Disposable {
 
     public void setWorkspaceFolderStrategyConfiguration(String workspaceFolderStrategyConfiguration) {
         if (languageServerPanel.getWorkspaceFoldersPanel() != null) {
-            languageServerPanel.getWorkspaceFoldersPanel().setJsonConfiguration(workspaceFolderStrategyConfiguration);
+            // Through the panel, which also shows where the language server runs without a working directory
+            languageServerPanel.setWorkspaceFolderStrategyConfiguration(workspaceFolderStrategyConfiguration);
         }
     }
 
