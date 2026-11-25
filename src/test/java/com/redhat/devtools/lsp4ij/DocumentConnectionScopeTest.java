@@ -36,7 +36,7 @@ public class DocumentConnectionScopeTest extends LSPCodeInsightFixtureTestCase {
             assertSame("An overlapping request retains the same synchronizer", connection, wrapper.getOpenedDocument(uri));
             second.close();
             PlatformTestUtil.waitWithEventsDispatching("the last scoped owner must disconnect",
-                    () -> wrapper.getOpenedDocument(uri) == null, 30);
+                    () -> wrapper.getOpenedDocument(uri) == null, IN_MEMORY_TIMEOUT_SECONDS);
         }
     }
 
@@ -107,7 +107,7 @@ public class DocumentConnectionScopeTest extends LSPCodeInsightFixtureTestCase {
             assertSame(current, wrapper.getOpenedDocument(uri));
             currentScope.close();
             PlatformTestUtil.waitWithEventsDispatching("replacement scope must disconnect its own document",
-                    () -> wrapper.getOpenedDocument(uri) == null, 30);
+                    () -> wrapper.getOpenedDocument(uri) == null, IN_MEMORY_TIMEOUT_SECONDS);
         }
     }
 

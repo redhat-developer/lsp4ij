@@ -82,8 +82,9 @@ public abstract class LSPDiagnosticsFixtureTestCase extends LSPCodeInsightFixtur
         // Open editor for a given file name and content (which declares <caret> to know where the completion is triggered).
         myFixture.configureByText(fileName, editorContentText);
 
-        // The language server publishes its diagnostics once it gets the didOpen of the file, which the pull follows
-        assertDiagnostics(publishDiagnostics, expectedEditorContentText);
+        // The language server publishes its diagnostics once it gets the didOpen of the file, which the pull follows:
+        // the wait includes its start
+        assertDiagnostics(publishDiagnostics, SERVER_START_TIMEOUT_SECONDS, expectedEditorContentText);
     }
 
     protected void publishAndAssertDiagnostics(@NotNull String publishJsonDiagnostics,
@@ -96,12 +97,13 @@ public abstract class LSPDiagnosticsFixtureTestCase extends LSPCodeInsightFixtur
     protected void publishAndAssertDiagnostics(@NotNull PublishDiagnosticsParams publishDiagnostics,
                                                @NotNull String expectedEditorContentText) {
         MockLanguageServer.INSTANCE.getTextDocumentService().publishDiagnostics(publishDiagnostics);
-        assertDiagnostics(publishDiagnostics.getDiagnostics(), expectedEditorContentText);
+        assertDiagnostics(publishDiagnostics.getDiagnostics(), IN_MEMORY_TIMEOUT_SECONDS, expectedEditorContentText);
     }
 
     private void assertDiagnostics(@NotNull List<Diagnostic> publishedDiagnostics,
+                                   int timeoutSeconds,
                                    @NotNull String expectedEditorContentText) {
-        awaitDiagnostics(publishedDiagnostics);
+        awaitDiagnostics(publishedDiagnostics, timeoutSeconds);
         // DaemonCodeAnalyzer.restart(file) can be called asynchronously by LSP4IJ to refresh IJ annotations from the LSP diagnostics.
         // To avoid having error like
 
@@ -126,15 +128,15 @@ public abstract class LSPDiagnosticsFixtureTestCase extends LSPCodeInsightFixtur
 
     /**
      * Waits until the diagnostics of the file, which reach LSP4IJ asynchronously, are the given published ones and the
-     * pulled ones, and until no refresh of them is under way.
+     * pulled ones, and until no refresh of them is under way, within the given number of seconds.
      */
-    private void awaitDiagnostics(@NotNull List<Diagnostic> publishedDiagnostics) {
+    private void awaitDiagnostics(@NotNull List<Diagnostic> publishedDiagnostics, int timeoutSeconds) {
         Set<Diagnostic> expected = new HashSet<>(publishedDiagnostics);
         expected.addAll(pulledDiagnostics);
         URI uri = LSPIJUtils.toUri(myFixture.getFile().getVirtualFile());
         PlatformTestUtil.waitWithEventsDispatching(
                 () -> "the file must get the " + expected.size() + " diagnostics of the language server, but it has " + diagnosticsOf(uri),
-                () -> expected.equals(diagnosticsOf(uri)), 30);
+                () -> expected.equals(diagnosticsOf(uri)), timeoutSeconds);
         NonBlockingReadActionImpl.waitForAsyncTaskCompletion();
     }
 
