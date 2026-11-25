@@ -22,6 +22,7 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * LSP opened document for a given language server.
@@ -36,11 +37,17 @@ public class OpenedDocument extends LSPDocumentBase {
 
     private final @Nullable DocumentContentSynchronizer synchronizer;
 
+    // Whether the next diagnostics update refreshes the file's marks though it changes none of this document's
+    // diagnostics: a connected document may replace one without a connection, whose diagnostics the file is marked
+    // with until this document is reported for the first time
+    private final AtomicBoolean refreshOnNextUpdate;
+
     public OpenedDocument(@NotNull LanguageServerItem languageServer,
                           @NotNull VirtualFile file,
                           @Nullable DocumentContentSynchronizer synchronizer) {
         this.file = file;
         this.synchronizer = synchronizer;
+        this.refreshOnNextUpdate = new AtomicBoolean(synchronizer != null);
         this.diagnosticsForServer = new LSPDiagnosticsForServer(languageServer, file, synchronizer);
     }
 
@@ -70,15 +77,15 @@ public class OpenedDocument extends LSPDocumentBase {
                 return false;
             }
         }
-        if (diagnosticsForServer.update(identifier, diagnostics)) {
-            // LSP diagnostics has changed
+        boolean changed = diagnosticsForServer.update(identifier, diagnostics);
+        if (changed | refreshOnNextUpdate.getAndSet(false)) {
+            // LSP diagnostics has changed, or this connected document is reported for the first time
 
             // Schedule reactive diagnostics refresh (apply immediately without daemon restart)
             var project = diagnosticsForServer.getClientFeatures().getProject();
             LSPDiagnosticsApplier.getInstance(project).scheduleRefresh(file, synchronizer != null ? synchronizer.getDocument() : null);
-            return true;
         }
-        return false;
+        return changed;
     }
 
     @Override

@@ -7,7 +7,12 @@ You can use [Visual Studio Code's HTML language server](https://github.com/micro
 Once Visual Studio Code is installed, it will store the HTML language server in:
 > **${BASE_DIR}/resources/app/extensions/html-language-features/server/dist/node/htmlServerMain.js**
 
-[LSP4IJ](https://github.com/redhat-developer/lsp4ij) tries to generate the proper **htmlServerMain.js** file path according to your OS, but you may have to adjust it:
+The `HTML Language Server` template is listed in `Choose template...` only in a development IDE, which runs with
+`idea.plugin.in.sandbox.mode`, as `runIde` does. Elsewhere, create the language server by hand in the
+[New Language Server dialog](../UserDefinedLanguageServer.md#new-language-server-dialog), with the command
+`node "<path of htmlServerMain.js>" --stdio`, and map it to the `HTML` language, with the language id `html`.
+
+The template sets the **htmlServerMain.js** file path according to your OS, but you may have to adjust it:
 * Windows: `$USER_HOME$/AppData/Local/Programs/Microsoft VS Code/resources/app/...`
 * macOS: `/Applications/Visual Studio Code.app/Contents/Resources/app/...`
 * Linux: `/usr/share/code/resources/app/...`

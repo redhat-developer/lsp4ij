@@ -48,6 +48,9 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.logging.Level;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.regex.PatternSyntaxException;
 
 /**
  * <pre>
@@ -89,6 +92,7 @@ public class ExecTask extends InstallerTask {
     private final @Nullable Integer timeout;
     private final @Nullable String workingDir;
     private final boolean ignoreStderr;
+    private final @Nullable String outputMatches;
 
     public ExecTask(@Nullable String id,
                     @Nullable String name,
@@ -99,12 +103,31 @@ public class ExecTask extends InstallerTask {
                     @Nullable Integer timeout,
                     boolean ignoreStderr,
                     @NotNull ServerInstallerDescriptor serverInstallerDeclaration) {
+        this(id, name, onFail, onSuccess, command, workingDir, timeout, ignoreStderr, null, serverInstallerDeclaration);
+    }
+
+    /**
+     * Creates an exec task.
+     *
+     * @param outputMatches the regular expression that the standard output of the command must match somewhere, as
+     *                      {@link Matcher#find()} does, for the task to succeed, or null to succeed whatever the output.
+     */
+    public ExecTask(@Nullable String id,
+                    @Nullable String name,
+                    @Nullable InstallerTask onFail,
+                    @Nullable InstallerTask onSuccess,
+                    @NotNull List<String> command,
+                    @Nullable String workingDir,
+                    @Nullable Integer timeout,
+                    boolean ignoreStderr,
+                    @Nullable String outputMatches,
+                    @NotNull ServerInstallerDescriptor serverInstallerDeclaration) {
         super(id, name, onFail, onSuccess, serverInstallerDeclaration);
         this.command = command;
         this.workingDir = workingDir;
         this.timeout = timeout;
         this.ignoreStderr = ignoreStderr;
-
+        this.outputMatches = outputMatches;
     }
 
     private static List<String> resolveServerCommand(@NotNull List<String> command,
@@ -120,6 +143,15 @@ public class ExecTask extends InstallerTask {
 
     @Override
     public boolean run(@NotNull InstallerContext context) {
+        Pattern outputPattern;
+        try {
+            outputPattern = outputMatches != null ? Pattern.compile(outputMatches) : null;
+        } catch (PatternSyntaxException e) {
+            // The command doesn't run: its output couldn't decide whether the task succeeds
+            context.printError("The outputMatches of the step '" + getName() + "' isn't a valid regular expression: "
+                    + e.getMessage());
+            return false;
+        }
         try (@Nullable WorkingDirLock workingDirLock = lockWorkingDir(context)) {
             if (workingDirLock != null && workingDirLock.waited() && context.isCheckAgainAfterWaiting() && checkAgain(context)) {
                 // As when the installers of the CSS and ESLint language servers start together: the one which waited
@@ -127,7 +159,7 @@ public class ExecTask extends InstallerTask {
                 context.print("The installation which ran in the working directory meanwhile installed it: the command doesn't run");
                 return true;
             }
-            return runCommand(context);
+            return runCommand(context, outputPattern);
         }
     }
 
@@ -254,7 +286,12 @@ public class ExecTask extends InstallerTask {
         }
     }
 
-    private boolean runCommand(@NotNull InstallerContext context) {
+    /**
+     * Runs the command, and returns true if it exits with 0, without writing on its standard error unless the task
+     * ignores it, or if it still runs at the timeout of the task, and, with the given pattern, if its standard output
+     * matches the pattern somewhere.
+     */
+    private boolean runCommand(@NotNull InstallerContext context, @Nullable Pattern outputPattern) {
         CapturingProcessHandler handler = null;
         try {
             @Nullable var project = context.getProject();
@@ -294,10 +331,19 @@ public class ExecTask extends InstallerTask {
             if (result.isCancelled()) {
                 throw new ProcessCanceledException();
             }
-            if (result.isTimeout()) {
-                return true;
+            boolean succeeded = result.isTimeout()
+                    || result.getExitCode() == 0 && (ignoreStderr || result.getStderr().isEmpty());
+            if (succeeded && outputPattern != null && !outputPattern.matcher(result.getStdout()).find()) {
+                // The warning names the command and the regular expression only; the output, which can hold a secret
+                // that the log doesn't recognise, is logged at DEBUG, as the rest of the output of the command
+                context.printError("The output of '" + String.join(" ", resolvedCommand) + "' doesn't match "
+                        + outputPattern.pattern() + (result.getStdout().isBlank() ? ": it printed nothing" : ":"));
+                if (!result.getStdout().isBlank()) {
+                    context.print(result.getStdout().strip(), ConsoleViewContentType.ERROR_OUTPUT, Level.FINE);
+                }
+                return false;
             }
-            return result.getExitCode() == 0 && (ignoreStderr || result.getStderr().isEmpty());
+            return succeeded;
         } catch (Exception e) {
             context.printError("", e);
             return false;

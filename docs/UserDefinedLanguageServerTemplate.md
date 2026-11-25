@@ -87,7 +87,8 @@ All its fields are listed in [Fields](#fields).
   "fileTypeMappings": [
     {
       "fileType": {
-        "name": "JavaScript"
+        "name": "JavaScript",
+        "patterns": ["*.js"]
       },
       "languageId": "javascript"
     },
@@ -128,7 +129,7 @@ This language server talks LSP over its standard input and output only, so the t
 | `url`                 | the page of the instructions, which the `Server` tab links as `Read the instructions`                                                                                                                                                                                  | `https://github.com/redhat-developer/lsp4ij/tree/main/docs/user-defined-ls/<id>.md`                            |
 | `dev`                 | `true` lists the template only when the IDE runs with `idea.plugin.in.sandbox.mode`, as `runIde` does                                                                                                                                                                  | `false`                                                                                                        |
 | `programArgs`         | the command which starts the language server, by OS, see [Command](#command). Required.                                                                                                                                                                                | none                                                                                                           |
-| `workingDir`          | the working directory, which the New Language Server dialog gives the language server it creates. An [exported](./UserDefinedLanguageServer.md#exporting-templates) language server writes it.                                                                         | none                                                                                                           |
+| `workingDir`          | the working directory, which the New Language Server dialog gives the language server it creates. An [exported](./UserDefinedLanguageServer.md#exporting-templates) language server writes it.                                                                         | none: the language server runs in the project's directory, or in the root of each instance                    |
 | `env`                 | the environment variables of the `Server` tab: `variables`, an object of names and values, and `includeSystemEnvironmentVariables`, `true` to pass the IDE's environment variables too                                                                                 | without `env`, no variables, and the IDE's are passed; `includeSystemEnvironmentVariables` is `false` when `env` doesn't set it |
 | `fileTypeMappings`    | the files of the language server: each entry has a `fileType`, with the `name` of an IntelliJ file type, file name `patterns`, or both, and the `languageId` of the files                                                                                              | none                                                                                                           |
 | `languageMappings`    | the files of the language server by IntelliJ language: each entry has the `language`, an IntelliJ language id, and the `languageId` of the files                                                                                                                       | none                                                                                                           |
@@ -291,7 +292,7 @@ It is used:
 
 See [When the installer runs](#when-the-installer-runs).
 
-You can find a sample in the ![rust-analyzer installer tab](./images/user-defined-ls/rust-analyzer/installation_tab.png).
+You can find a sample in the [rust-analyzer installer tab](./images/user-defined-ls/rust-analyzer/installation_tab.png).
 
 It should follow this structure:
 
@@ -476,14 +477,16 @@ does. A notification closed without a click ends the task, which then fails.
 
 ### Task exec
 
-Runs a command. The task succeeds when the command exits with 0 and writes nothing on its standard error.
+Runs a command. The task succeeds when the command exits with 0 and writes nothing on its standard error, and, with
+`outputMatches`, when its standard output matches it too.
 
-| Key            | Value                                                                                                                                                                                                                                                                                                                  | Default                                   |
-|----------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------------------------------|
-| `command`      | the command: a string, which LSP4IJ splits at its spaces outside double quotes, or an array of its arguments; or an object of these by OS, as [`programArgs`](#command). LSP4IJ expands the macros, such as `$USER_HOME$`, in each argument. Of the [properties](#properties), it replaces only a whole `${server.command}`. | none: the task fails                      |
-| `workingDir`   | the directory in which the command runs, with properties and macros. LSP4IJ creates it if it doesn't exist.                                                                                                                                                                                                            | the project's directory                   |
-| `timeout`      | the time in milliseconds after which LSP4IJ stops the command. The task then succeeds.                                                                                                                                                                                                                                 | none: LSP4IJ waits until the command ends |
-| `ignoreStderr` | `true` lets the task succeed when the command writes on its standard error, as `npm install` does with its warnings                                                                                                                                                                                                   | `false`                                   |
+| Key             | Value                                                                                                                                                                                                                                                                                                                        | Default                                   |
+|-----------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------------------------------|
+| `command`       | the command: a string, which LSP4IJ splits at its spaces outside double quotes, or an array of its arguments; or an object of these by OS, as [`programArgs`](#command). LSP4IJ expands the macros, such as `$USER_HOME$`, in each argument. Of the [properties](#properties), it replaces only a whole `${server.command}`. | none: the task fails                      |
+| `workingDir`    | the directory in which the command runs, with properties and macros. LSP4IJ creates it if it doesn't exist.                                                                                                                                                                                                                  | the project's directory                   |
+| `timeout`       | the time in milliseconds after which LSP4IJ stops the command. The task then succeeds.                                                                                                                                                                                                                                       | none: LSP4IJ waits until the command ends |
+| `ignoreStderr`  | `true` lets the task succeed when the command writes on its standard error, as `npm install` does with its warnings                                                                                                                                                                                                          | `false`                                   |
+| `outputMatches` | a [regular expression](https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/regex/Pattern.html) that the standard output of the command must match somewhere for the task to succeed, as a version, see [Output of the command](#output-of-the-command)                                                    | none: any output                          |
 
 The console of the installation shows the command after `> `, and its output. The command gets the environment
 variables of the IDE and, since IntelliJ 2025.1, the environment of its working directory, as a language server does
@@ -495,7 +498,8 @@ installers, which install one npm package into `$USER_HOME$/.lsp4ij/lsp/vscode-l
 An installation which started because its check failed, and waited, runs the check again once the other task is done,
 and skips the command if the check then passes. `Reinstall` and the links of the `Installer` tab don't skip it.
 
-Example using `npm` to install [typescript-language-server](https://github.com/typescript-language-server/typescript-language-server):
+Example using `npm` to install [typescript-language-server](https://github.com/typescript-language-server/typescript-language-server),
+as the bundled template does:
 
 ```json
 {
@@ -503,7 +507,7 @@ Example using `npm` to install [typescript-language-server](https://github.com/t
   "name": "TypeScript Language Server",
   "executeOnStartServer": false,
   "properties": {
-    "workingDir" : "$USER_HOME$/.lsp4ij/typescript-language-server"
+    "workingDir" : "$USER_HOME$/.lsp4ij/lsp/typescript-language-server/node_modules"
   },
   "check": {
     "exec": {
@@ -530,10 +534,9 @@ Example using `npm` to install [typescript-language-server](https://github.com/t
         "configureServer": {
           "name": "Configure TypeScript Language Server command",
           "command": {
-            "windows": "${workingDir}/node_modules/.bin/typescript-language-server.cmd --stdio",
-            "default": "${workingDir}/node_modules/.bin/typescript-language-server --stdio"
-          },
-          "update": true
+            "windows": "\"${workingDir}/.bin/typescript-language-server.cmd\" --stdio",
+            "default": "\"${workingDir}/.bin/typescript-language-server\" --stdio"
+          }
         }
       }
     }
@@ -541,10 +544,49 @@ Example using `npm` to install [typescript-language-server](https://github.com/t
 }
 ```
 
+`npm install` runs in the `node_modules` folder of the server, because npm installs into the first folder, from its
+working directory up, which has a `package.json` or a `node_modules` folder. Run in a new, empty folder, it would install
+into a parent folder which has one, such as the home directory. Run in `node_modules`, it installs into its parent,
+`$USER_HOME$/.lsp4ij/lsp/typescript-language-server`, so the command is in `${workingDir}/.bin`.
+
 An `exec` whose command still runs at its `timeout` succeeds: that's meant for a command which waits, as a language
 server does, but a command which hangs, waits for input, or fails later, succeeds too. That's why the `check` above
 runs the [initialize](#task-initialize) task once the `exec` of `${server.command}` succeeds. Use `exec` alone for a
 command which ends by itself, as `node --version`.
+
+#### Output of the command
+
+With `outputMatches`, the task succeeds only if the standard output of the command matches the regular expression
+somewhere, as Java's `Matcher.find()` does, besides the exit code and the standard error. Use `(?m)` for `^` and `$` to
+match at the start and the end of each line. A check can so ask for a version of a tool, which an exit code doesn't
+say. For instance, `dotnet --list-sdks` prints a line per .NET SDK, as `10.0.100 [/usr/local/share/dotnet/sdk]`, or
+`10.0.100 [C:\Program Files\dotnet\sdk]` on Windows, and this check asks for the .NET SDK 10 or later: a line which
+starts with a major version of two digits or more, so not `8.0.404` nor `9.0.300`, and a space after the version, so
+not a preview, as `10.0.100-rc.2.25502.107`:
+
+```json
+{
+  "exec": {
+    "name": "Check the .NET SDK 10 or later",
+    "command": "dotnet --list-sdks",
+    "outputMatches": "(?m)^[1-9]\\d+\\.\\d+\\.\\d+\\s",
+    "onFail": {
+      "showMessage": {
+        "name": ".NET SDK 10 or later not found",
+        "content": "Install the <a href=\"https://dotnet.microsoft.com/download\">.NET SDK</a> 10 or later."
+      }
+    }
+  }
+}
+```
+
+The regular expression is in a JSON string, so each `\` of the regular expression is written `\\`. When the output
+doesn't match, the console says so, with the output, and the task fails. A command which still runs at its `timeout`
+succeeds only if what it printed until then matches. A regular expression which isn't valid fails the task, without
+running the command, and the console says why.
+
+LSP4IJ 0.30.1 and earlier don't know `outputMatches`, and ignore it: there, the task succeeds whatever the output, as
+an `exec` without it.
 
 ### Task initialize
 
@@ -669,7 +711,8 @@ and the console says so. Without a URL for the OS and the architecture, the task
 LSP4IJ downloads the file into a temporary folder. An archive, such as a `.zip`, `.vsix`, `.tar`, `.tar.gz` or `.tgz`
 file, is extracted into `output.dir`, and a `.gz` file that isn't a `.tar.gz` is decompressed there, as the one that
 the rust-analyzer installer downloads on Linux and macOS. Any other file is copied there, under `output.file.name` or
-its own name, in place of the file of an earlier installation.
+its own name, in place of the file of an earlier installation. The name of the downloaded file, by which LSP4IJ also
+recognizes an archive, is the last segment of the path of the URL, without its query or fragment.
 
 Example: downloading a JAR and configuring the start command
 
@@ -688,8 +731,7 @@ Example: downloading a JAR and configuring the start command
       "onSuccess": {
         "configureServer": {
           "name": "Configure Camel Language Server command",
-          "command": "java -jar \"${output.dir}/${output.file.name}\"",
-          "update": true
+          "command": "java -jar \"${output.dir}/${output.file.name}\""
         }
       }
     }
@@ -773,7 +815,7 @@ you can use the `github` JSON object to download the proper asset:
         },
         "mac": {
           "aarch64": "clojure-lsp-native-macos-aarch64.zip",
-          "amd64": "clojure-lsp-native-macos-amd64.zip"
+          "x86_64": "clojure-lsp-native-macos-amd64.zip"
         }
       }
     }
@@ -786,7 +828,8 @@ When the download occurs, LSP4IJ requests the 100 newest releases of the reposit
 https://api.github.com/repos/clojure-lsp/clojure-lsp/releases?per_page=100. It takes the newest of them whose
 `prerelease` is the `prerelease` of the task, and in it the first asset whose name matches `asset`, and downloads its
 `browser_download_url`. When that release has no such asset, LSP4IJ doesn't look at older releases, and falls back to
-`url`. It requests the releases of a repository once per IDE session.
+`url`. It requests the releases of a repository once per IDE session. The rate limit of the GitHub API can stop it: a
+[GitHub token](#github-token) raises it.
 
  * `owner` (required) the github owner.
  * `repository` (required) the github repository. 
@@ -814,7 +857,7 @@ If there is an asset per OS and with architecture, you can write:
     },
     "mac": {
       "aarch64": "clojure-lsp-native-macos-aarch64.zip",
-      "amd64": "clojure-lsp-native-macos-amd64.zip"
+      "x86_64": "clojure-lsp-native-macos-amd64.zip"
     }
   }
 }
@@ -826,40 +869,77 @@ Samples:
 * [clojure-lsp installer](../src/main/resources/templates/lsp/clojure-lsp/installer.json)
 * [rust-analyzer installer](../src/main/resources/templates/lsp/rust-analyzer/installer.json)
 
-##### GitHub API rate limit
+##### GitHub token
 
-Without a token, the GitHub API allows 60 requests an hour per IP address, which all the IDEs and tools behind one
-address share, as on a corporate network, a VPN or CI runners. When they are used up, LSP4IJ falls back to `url`, and a
-download without `url` fails until the limit resets. With a GitHub token in the environment variable `GITHUB_TOKEN`, or
-else `GH_TOKEN`, the variable that the `gh` CLI reads, LSP4IJ sends it to the GitHub API, `api.github.com`, and the
-limit is 5,000 requests an hour. Any token works, as a fine-grained personal access token or the one that
-`gh auth token` prints: public repositories need no scope or permission. LSP4IJ doesn't send it with the download of
-the asset, nor to another host, and the console doesn't show it. The variable must be in the environment of the IDE,
-as for the commands of `exec` tasks: set in the shell that starts the IDE, or, for an IDE started from the Dock on
-macOS, in the profile of the login shell, as `~/.zprofile` or `~/.zshrc`. After setting it, restart the IDE.
+A `github` download asks the GitHub API, `api.github.com`, for the releases of the repository. Without a token, the
+GitHub API allows 60 requests an hour per IP address, which all the IDEs and tools behind one address share, as on a
+corporate network, a VPN or CI runners. When they are used up, LSP4IJ falls back to `url`, and a download without `url`
+fails until the limit resets. With a GitHub token, the limit is 5,000 requests an hour.
 
-The 5,000 requests an hour are per GitHub user: all the tokens of a user share them. In GitHub Actions, the
-`GITHUB_TOKEN` of a workflow allows 1,000 requests an hour per repository.
+Any token works, as a fine-grained personal access token, the one that `gh auth token` prints, or the one of the IDE's
+GitHub account: public repositories need no scope or permission. The 5,000 requests an hour are per GitHub user: all the
+tokens of a user share them. In GitHub Actions, the `GITHUB_TOKEN` of a workflow allows 1,000 requests an hour per
+repository.
 
-A `github` download supports public repositories only: since the token goes with the request to the GitHub API only,
-the assets of a private repository don't download.
+A token doesn't make private repositories work: a `github` download supports public repositories only. With a token
+that can read a private repository, the GitHub API lists its releases, but the token goes with the request to the GitHub
+API only, so the assets of a private repository don't download.
+
+###### Where LSP4IJ finds the token
+
+LSP4IJ takes the first of these that has a token, at each request to the GitHub API:
+
+1. **The environment variable `GITHUB_TOKEN`, or else `GH_TOKEN`**, the variable that the `gh` CLI reads. As with the
+   `gh` CLI, the environment comes before the stored settings. The variable must be in the environment of the IDE, as
+   for the commands of `exec` tasks: set in the shell that starts the IDE, or, for an IDE started from the Dock on macOS,
+   in the profile of the login shell, as `~/.zprofile` or `~/.zshrc`, which the IDE reads when it starts. After setting
+   it, restart the IDE.
+2. **The GitHub token of the LSP4IJ settings**, in *Settings | Languages & Frameworks | Language Servers (LSP4IJ)*. It
+   is kept in the IDE's Password Safe, for all the projects, never in a settings file, and the field doesn't show it.
+   Emptying the field removes it.
+3. **The token of the IDE's GitHub account**, in *Settings | Version Control | GitHub*, when the IDE has its GitHub
+   plugin, as IntelliJ IDEA and most JetBrains IDEs do. LSP4IJ takes the first account on `github.com` there. The token
+   of an account goes to its own server only: since a `github` download asks `api.github.com`, a GitHub Enterprise
+   account isn't used.
+
+Without any of them, the request has no token, as before.
+
+![The GitHub token of the LSP4IJ settings](./images/user-defined-ls/GitHubTokenSetting.png)
+
+On Windows and Linux, an IDE started from the Start menu or a desktop launcher doesn't see a token that a shell profile,
+as `~/.bashrc`, exports. The setting and the GitHub account need no environment variable: they are the way to give a
+token to such an IDE.
+
+LSP4IJ doesn't send the token with the download of the asset, nor to another host, even on a redirect. The console, the
+notifications and the log never show it: they name where it comes from, as `the token of the environment variable
+GITHUB_TOKEN`, `the token of the LSP4IJ settings` or `the token of the IDE's GitHub account octocat`.
+
+###### GitHub API rate limit
 
 When a request to the GitHub API fails, the console says why:
 
 | The console says                                     | Because                                                                                                                                                                                                      |
 |------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `GitHub API rate limit reached`                      | the 60 requests an hour, or those of the token, are used up; the console says when the limit resets                                                                                                          |
-| `GitHub API refused the token ... (HTTP 401)`        | the token is invalid or has expired                                                                                                                                                                          |
+| `GitHub API rate limit reached`                      | the 60 requests an hour, or those of the token, are used up; the console says when the limit resets, and, without a token, where to set one                                                                  |
+| `GitHub API refused the token ... (HTTP 401)`        | the token is invalid or has expired; the console says where it comes from, and how to replace it                                                                                                             |
 | `... enforces SAML single sign-on`                   | the owner of the repository is an organization which enforces SAML single sign-on, and the token isn't authorized for it; the console shows the link which authorizes it, for an hour, when GitHub gives one |
 | `the token lacks the permission ...`                 | the token, as a fine-grained one, hasn't the permissions that GitHub names                                                                                                                                   |
 | `the repository ... was not found, or it is private` | the `owner` or the `repository` of the download is wrong, or the repository is private                                                                                                                       |
 
 When GitHub refuses the token, as for these messages, or the rate limit of the token is reached, LSP4IJ tries the
 request once again without the token, since the releases of a public repository don't need one, and the console says
-so.
+so. This is the same for a token of the environment, of the settings or of the GitHub account.
 
 When a download without `url` fails for one of these reasons, the notification of the failed installation says why
-too.
+too, as the console does. At the rate limit, for example:
+
+> Installation of `rust-analyzer` failed.
+>
+> GitHub API rate limit reached: 60 requests an hour (HTTP 403). It resets at 15:35:07 (local time). A GitHub token in
+> Settings | Languages & Frameworks | Language Servers (LSP4IJ), or in the environment variable GITHUB_TOKEN of the
+> IDE, raises the limit to 5,000 requests an hour.
+
+![The notification of an installation which the rate limit of the GitHub API stopped](./images/user-defined-ls/GitHubRateLimitNotification.png)
 
 The IDE's log, `idea.log` (*Help | Show Log in Finder*, *Explorer* or *Files*), has a line for each download, with its
 URL, where the URL comes from and how long it took, and a warning for a rate limit, a refused token or a failed
@@ -951,7 +1031,8 @@ property is `$USER_HOME$/.lsp4ij/lsp/rust-analyzer`:
   [perl-lsp installer](../src/main/resources/templates/lsp/perl-lsp/installer.json) does.
 * `file.name`: name of the executable file (registered as `${output.file.name}`), by OS and architecture. When it is
   set, the task fails if the file isn't in `${output.dir}` after the download. A file which isn't an archive is saved
-  under this name, and without it, under its own name, which is then `${output.file.name}`.
+  under this name, and without it, under its own name, the last segment of the path of the URL without its query or
+  fragment, which is then `${output.file.name}`.
 * `file.executable` (optional, `false` by default): `true` makes the file of `file.name` executable.
 
 #### Task configureServer
@@ -962,8 +1043,7 @@ Used to set the server launch command:
 {
   "configureServer": {
     "name": "Configure Camel Language Server command",
-    "command": "java -jar \"${output.dir}/${output.file.name}\"",
-    "update": true
+    "command": "java -jar \"${output.dir}/${output.file.name}\""
   }
 }
 ```

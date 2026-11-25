@@ -2,8 +2,10 @@ You can use the [LemMinX XML language server](https://github.com/eclipse/lemminx
 
 ## Automatic Installation
 
-When you create a new language server from the LemMinX template, the installer automatically downloads the LemMinX uber jar
-from the [Eclipse download site](https://download.eclipse.org/justj/?file=lemminx/releases) and configures the start command.
+The LemMinX template is listed only in a development IDE, which runs with `idea.plugin.in.sandbox.mode`, as `runIde`
+does. At the first start of a language server created from it, as when you open an XML file, its installer downloads
+the LemMinX uber jar from the [Eclipse download site](https://download.eclipse.org/justj/?file=lemminx/releases) and
+configures the start command.
 It downloads LemMinX 0.31.2 into `$USER_HOME$/.lsp4ij/lsp/lemminx/org.eclipse.lemminx-uber.jar`, where the command of
 the template starts it. You need Java, with `java` on your PATH.
 

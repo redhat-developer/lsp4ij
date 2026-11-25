@@ -48,6 +48,7 @@ public class ExecTaskFactory extends InstallerTaskFactoryBase {
     private static final String TIMEOUT_JSON_PROPERTY = "timeout";
     private static final String WORKING_DIR_JSON_PROPERTY = "workingDir";
     private static final String IGNORE_STD_ERR_JSON_PROPERTY = "ignoreStderr";
+    private static final String OUTPUT_MATCHES_JSON_PROPERTY = "outputMatches";
 
     @Override
     protected @NotNull InstallerTask create(@Nullable String id,
@@ -61,6 +62,7 @@ public class ExecTaskFactory extends InstallerTaskFactoryBase {
                 getWorkingDir(json),
                 getTimeout(json),
                 getIgnoreStderr(json),
+                getOutputMatches(json),
                 serverInstallerDeclaration);
     }
 
@@ -128,6 +130,10 @@ public class ExecTaskFactory extends InstallerTaskFactoryBase {
     
     private static boolean getIgnoreStderr(@NotNull JsonObject json) {
         return JSONUtils.getBoolean(json, IGNORE_STD_ERR_JSON_PROPERTY);
+    }
+
+    private static @Nullable String getOutputMatches(@NotNull JsonObject json) {
+        return JSONUtils.getString(json, OUTPUT_MATCHES_JSON_PROPERTY);
     }
 
 }

@@ -81,7 +81,7 @@ The `${port}` argument will be replaced with a free port when the run configurat
 
 The julia `$PROJECT_DIR$` which is an Intellij macro will be replaced with your project dir.
 
-* the `Connect to the server by waiting` option is set to `Log pattern before processing` with:
+* the `Connect to the server by waiting` option is set to `Log pattern before proceeding` with:
 
  ```
  Listening on port ${port}

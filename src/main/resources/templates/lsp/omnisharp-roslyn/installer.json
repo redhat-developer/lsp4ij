@@ -1,0 +1,90 @@
+{
+  "id": "omnisharp-roslyn",
+  "name": "OmniSharp",
+  "executeOnStartServer": false,
+  "properties": {
+    "serverDist": "$USER_HOME$/.lsp4ij/lsp/omnisharp-roslyn"
+  },
+  "check": {
+    "exec": {
+      "name": "Check the .NET SDK 10 or later",
+      "command": "dotnet --list-sdks",
+      "outputMatches": "(?m)^[1-9]\\d+\\.\\d+\\.\\d+\\s",
+      "onSuccess": {
+        "fileExists": {
+          "name": "Check if OmniSharp is installed",
+          "file": "${serverDist}/OmniSharp.dll"
+        }
+      }
+    }
+  },
+  "run": {
+    "exec": {
+      "name": "Check the .NET SDK 10 or later",
+      "command": "dotnet --list-sdks",
+      "outputMatches": "(?m)^[1-9]\\d+\\.\\d+\\.\\d+\\s",
+      "onSuccess": {
+        "download": {
+          "name": "Download OmniSharp",
+          "github": {
+            "owner": "OmniSharp",
+            "repository": "omnisharp-roslyn",
+            "prerelease": false,
+            "asset": {
+              "windows": {
+                "x86_64": "omnisharp-win-x64.zip",
+                "x86": "omnisharp-win-x86.zip",
+                "arm64": "omnisharp-win-arm64.zip"
+              },
+              "unix": {
+                "x86_64": "omnisharp-linux-x64.zip",
+                "arm64": "omnisharp-linux-arm64.zip"
+              },
+              "mac": {
+                "x86_64": "omnisharp-osx-x64.zip",
+                "arm64": "omnisharp-osx-arm64.zip"
+              }
+            }
+          },
+          "url": {
+            "windows": {
+              "x86_64": "https://github.com/OmniSharp/omnisharp-roslyn/releases/download/v2.0.0/omnisharp-win-x64.zip",
+              "x86": "https://github.com/OmniSharp/omnisharp-roslyn/releases/download/v2.0.0/omnisharp-win-x86.zip",
+              "arm64": "https://github.com/OmniSharp/omnisharp-roslyn/releases/download/v2.0.0/omnisharp-win-arm64.zip"
+            },
+            "unix": {
+              "x86_64": "https://github.com/OmniSharp/omnisharp-roslyn/releases/download/v2.0.0/omnisharp-linux-x64.zip",
+              "arm64": "https://github.com/OmniSharp/omnisharp-roslyn/releases/download/v2.0.0/omnisharp-linux-arm64.zip"
+            },
+            "mac": {
+              "x86_64": "https://github.com/OmniSharp/omnisharp-roslyn/releases/download/v2.0.0/omnisharp-osx-x64.zip",
+              "arm64": "https://github.com/OmniSharp/omnisharp-roslyn/releases/download/v2.0.0/omnisharp-osx-arm64.zip"
+            }
+          },
+          "output": {
+            "dir": "${serverDist}",
+            "file": {
+              "name": "OmniSharp.dll"
+            }
+          },
+          "onSuccess": {
+            "configureServer": {
+              "name": "Configure OmniSharp command",
+              "command": "dotnet \"${output.dir}/${output.file.name}\" --languageserver",
+              "update": true
+            }
+          }
+        }
+      },
+      "onFail": {
+        "showMessage": {
+          "name": ".NET SDK 10 or later not found",
+          "content": [
+            "OmniSharp needs the <a href=\"https://dotnet.microsoft.com/download\">.NET SDK</a> 10 or later to run and to load C# projects, and the installer found none.",
+            "Install the .NET SDK 10 or later, make sure that <code>dotnet</code> is in your PATH, then restart your IDE."
+          ]
+        }
+      }
+    }
+  }
+}
