@@ -67,7 +67,7 @@ public class DAPExecutionEpochTest {
         int stop = epoch.end();
         int ended = epoch.endBeforeResuming();
 
-        epoch.resumeRefused(ended);
+        assertTrue(epoch.resumeRefused(ended), "the epoch of the stop is the current one again");
         assertNotNull(epoch.send(stop, this::setVariable));
     }
 
@@ -77,7 +77,7 @@ public class DAPExecutionEpochTest {
         int ended = epoch.endBeforeResuming();
         epoch.end();
 
-        epoch.resumeRefused(ended);
+        assertFalse(epoch.resumeRefused(ended), "the epoch of the later stop stays the current one");
         assertNull(epoch.send(stop, this::setVariable));
     }
 
@@ -138,10 +138,36 @@ public class DAPExecutionEpochTest {
         int stop = epoch.end();
         int afterTheStop = epoch.endBeforeResuming();
 
-        epoch.resumeRefused(afterTheStop);
-        epoch.resumeRefused(beforeTheStop);
+        assertTrue(epoch.resumeRefused(afterTheStop), "the epoch of the last stop is the current one again");
+        assertFalse(epoch.resumeRefused(beforeTheStop), "the program stopped since the earlier request");
         assertEquals(stop, epoch.get(), "the epoch of the last stop is the current one again, and no earlier one");
         assertNotNull(epoch.send(stop, this::setVariable));
+    }
+
+    @Test
+    void aResumeRefusedWhileAStepBackIsPendingLeavesTheEpochOfTheStopEndedUntilTheStepBackIsRefusedToo() {
+        int stop = epoch.end();
+        // Step Back leaves the session suspended until the debug adapter answers, so that Resume can be performed
+        int stepBack = epoch.endBeforeResuming();
+        int resume = epoch.endBeforeResuming();
+
+        assertTrue(epoch.resumeRefused(resume), "the program is where it was when Resume was sent: Step Back is pending");
+        assertNull(epoch.send(stop, this::setVariable), "Step Back may still run the program");
+        assertTrue(epoch.resumeRefused(stepBack), "the program is where it was when Step Back was sent");
+        assertNotNull(epoch.send(stop, this::setVariable));
+    }
+
+    @Test
+    void aStepBackRefusedWhileAResumeIsPendingLeavesTheEpochOfTheStopEndedUntilTheResumeIsRefusedToo() {
+        int stop = epoch.end();
+        int stepBack = epoch.endBeforeResuming();
+        int resume = epoch.endBeforeResuming();
+
+        assertFalse(epoch.resumeRefused(stepBack), "Resume may still run the program");
+        assertNull(epoch.send(stop, this::setVariable));
+        assertTrue(epoch.resumeRefused(resume), "the program is where it was before Step Back, once both were refused");
+        assertNotNull(epoch.send(stop, this::setVariable));
+        assertEquals(stop, epoch.get());
     }
 
     @Test

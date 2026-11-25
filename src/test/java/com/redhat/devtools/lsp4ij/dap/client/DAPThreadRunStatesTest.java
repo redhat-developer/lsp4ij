@@ -106,6 +106,45 @@ public class DAPThreadRunStatesTest {
     }
 
     @Test
+    void aRefusedResumeGivesTheThreadsTheirRunStatesBack() {
+        var stop = allStopped();
+        var resumed = stop.resumed(MAIN, false);
+
+        var refused = resumed.resumeRefused(stop, resumed);
+
+        assertStates(refused, STOPPED, STOPPED, STOPPED);
+        // The threads didn't leave the stop, whose frames the session shows again
+        assertFalse(refused.leftStopSince(stop.getVersion(), MAIN));
+        assertFalse(refused.leftStopSince(stop.getVersion(), WORKER));
+        assertTrue(refused.getVersion() > resumed.getVersion());
+    }
+
+    @Test
+    void aRefusedSingleThreadStepGivesTheThreadWhichStepsItsRunStateBack() {
+        // The worker ran, as at a stop without allThreadsStopped
+        var stop = DAPThreadRunStates.INITIAL.stopped(stopped(MAIN, false));
+        var resumed = stop.resumed(MAIN, true);
+
+        assertStates(resumed.resumeRefused(stop, resumed), STOPPED, RUNNING, RUNNING);
+    }
+
+    @Test
+    void aRefusedResumeKeepsWhatANewerEventChanged() {
+        var stop = allStopped();
+        var resumed = stop.resumed(MAIN, false);
+
+        // The worker exited after the request was sent
+        var exited = resumed.thread(thread(ThreadEventArgumentsReason.EXITED, WORKER));
+        assertStates(exited.resumeRefused(stop, resumed), STOPPED, EXITED, STOPPED);
+
+        // All threads stopped, or continued, after the request was sent
+        var stoppedAgain = resumed.stopped(stopped(WORKER, true));
+        assertSame(stoppedAgain, stoppedAgain.resumeRefused(stop, resumed));
+        var continued = resumed.continued(continued(MAIN, null));
+        assertSame(continued, continued.resumeRefused(stop, resumed));
+    }
+
+    @Test
     void aThreadWhichExitedStaysSoWhenAllThreadsStopOrRun() {
         var states = DAPThreadRunStates.INITIAL.thread(thread(ThreadEventArgumentsReason.EXITED, WORKER));
         assertStates(states, RUNNING, EXITED, RUNNING);
