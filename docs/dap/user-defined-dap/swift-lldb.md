@@ -37,7 +37,7 @@ You should see some instructions how to start lldb-dap server.
 
    ![Create a new server](../images/DAP_server_create_link.png)
 
-5. It opens a new dialog to create DAP server, select `Swift lldb-dap` template:
+5. It opens a new dialog to create DAP server: click `Choose template...` and select the `Swift lldb-dap` template:
    ![Select Template](../images/swift-lldb/select_template.png)
 
 6. After clicking on `OK` button, it will select the new server and pre-fill configurations:

@@ -48,7 +48,7 @@ DAP server listening at: 127.0.0.1:60732
 
    ![Create a new server](../images/DAP_server_create_link.png)
 
-5. It opens a new dialog to create DAP server, select `Go - Delve` template:
+5. It opens a new dialog to create DAP server: click `Choose template...` and select the `Go - Delve` template:
    ![Select Template](../images/go-delve/select_template.png)
 
 6. After clicking on `OK` button, it will select the new server and pre-fill configurations:

@@ -61,7 +61,7 @@ start_debugger()
 
    ![Create a new server](../images/DAP_server_create_link.png)
 
-6. It opens a new dialog to create DAP server, select `Julia` template:
+6. It opens a new dialog to create DAP server: click `Choose template...` and select the `Julia` template:
    ![Select Template](../images/julia/select_template.png)
 
 7. After clicking on `OK` button, it will select the new server and pre-fill configurations:
