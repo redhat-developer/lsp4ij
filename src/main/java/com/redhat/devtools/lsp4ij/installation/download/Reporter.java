@@ -34,6 +34,17 @@ public interface Reporter {
     void setText(@NotNull String text, @NotNull Exception e);
 
     /**
+     * Reports a message which explains why the operation failed, and what to do, as when the rate limit of the GitHub
+     * API is reached, after {@link #setText(String, Exception)} has shown the error. A download which has no URL to
+     * fall back to shows it in the notification of its failed installation. It never has a secret, as a token. Does
+     * nothing by default.
+     *
+     * @param reason the message which explains why the operation failed; must not be null
+     */
+    default void addFailureReason(@NotNull String reason) {
+    }
+
+    /**
      * Checks whether the current operation has been canceled.
      *
      * @throws RuntimeException if the operation has been canceled
