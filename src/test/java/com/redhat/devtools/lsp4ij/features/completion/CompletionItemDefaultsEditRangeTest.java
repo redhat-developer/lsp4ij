@@ -13,16 +13,19 @@ package com.redhat.devtools.lsp4ij.features.completion;
 import com.redhat.devtools.lsp4ij.fixtures.LSPCompletionFixtureTestCase;
 
 /**
- * Tests completion items in a list with a default edit range ({@code itemDefaults.editRange}).
- * <p>
- * The default range is {@code 0:0-0:6}, which covers all of {@code gap-px}, including the text after the caret. Without
- * the default range, choosing {@code gap-1} would give {@code gap-gap-1px} instead of {@code gap-1}.
+ * Tests how {@link LSPCompletionContributor} applies a completion list's default edit range
+ * ({@code itemDefaults.editRange}) to its items:
+ * <ul>
+ *     <li>an item with no {@code textEdit} or {@code textEditText} replaces the default range with its label,
+ *     as LSP 3.17 says;</li>
+ *     <li>an item with its own {@code textEdit} keeps it.</li>
+ * </ul>
  */
 public class CompletionItemDefaultsEditRangeTest extends LSPCompletionFixtureTestCase {
 
     private static final String TEST_FILE_NAME = "test.tsx";
 
-    // Items with only a label: they replace the default range with their label.
+    // A list with a default edit range, whose items have only a label.
     // language=json
     private static final String LABEL_ONLY_COMPLETION_JSON = """
             {
@@ -47,7 +50,8 @@ public class CompletionItemDefaultsEditRangeTest extends LSPCompletionFixtureTes
               }
             }""";
 
-    // An item with its own text edit, whose new text differs from its label: it keeps its edit.
+    // A list with a default edit range, where col-l-sm has its own text edit, whose new text differs from its label,
+    // and col-l-md has only a label.
     // language=json
     private static final String OWN_TEXT_EDIT_COMPLETION_JSON = """
             {
@@ -83,13 +87,13 @@ public class CompletionItemDefaultsEditRangeTest extends LSPCompletionFixtureTes
         super("*.tsx");
     }
 
-    public void testItemWithOnlyLabelReplacesDefaultEditRange() {
+    public void testAnItemWithOnlyALabelReplacesTheDefaultEditRangeWithItsLabel() {
         assertCompletion(TEST_FILE_NAME, "ga", LABEL_ONLY_COMPLETION_JSON, "gap-1", "gap-12");
         // Without the label fallback, this gives "gap-gap-1px"
         assertApplyCompletionItem(0, "gap-1<caret>");
     }
 
-    public void testItemWithOwnTextEditKeepsIt() {
+    public void testAnItemWithItsOwnTextEditKeepsItInsteadOfTheDefaultEditRange() {
         assertCompletion(TEST_FILE_NAME, "cl", OWN_TEXT_EDIT_COMPLETION_JSON, "col-l-sm", "col-l-md");
         // Without the textEdit guard, this gives the label "gap-px"
         assertApplyCompletionItem(0, "column-left-small");
