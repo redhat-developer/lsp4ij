@@ -685,9 +685,13 @@ once linked editing is turned on in `Settings | Editor | General | Smart Keys`. 
 ```java
 package my.language.server;
 
+import com.intellij.openapi.editor.colors.TextAttributesKey;
 import com.intellij.psi.PsiFile;
 import com.redhat.devtools.lsp4ij.client.features.LSPSemanticTokensFeature;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+
+import java.util.List;
 
 public class MyLSPSemanticTokensFeature extends LSPSemanticTokensFeature {
 
@@ -1016,11 +1020,6 @@ public class DartMessageProducer implements MessageProducer {
             Thread.currentThread().interrupt();
         }
     }
-
-    @Override
-    public void close() {
-        // no-op
-    }
 }
 ```
 
@@ -1145,6 +1144,7 @@ import com.intellij.openapi.project.Project;
 import com.redhat.devtools.lsp4ij.LanguageServerFactory;
 import com.redhat.devtools.lsp4ij.installation.ServerInstaller;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 public class MyLanguageServerFactory implements LanguageServerFactory {
 
@@ -1170,8 +1170,9 @@ public class MyLanguageServerFactory implements LanguageServerFactory {
 
     @Override
     public @NotNull LSPClientFeatures createClientFeatures() {
-        return new LSPClientFeatures()
-                .setServerInstaller(new MyLanguageServerInstaller()); // customize language server installer         
+        LSPClientFeatures clientFeatures = new LSPClientFeatures();
+        clientFeatures.setServerInstaller(new MyLanguageServerInstaller()); // customize language server installer
+        return clientFeatures;
     }
 }
 ```

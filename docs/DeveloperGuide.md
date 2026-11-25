@@ -60,6 +60,7 @@ import com.intellij.openapi.project.Project;
 import com.redhat.devtools.lsp4ij.LanguageServerFactory;
 import com.redhat.devtools.lsp4ij.client.LanguageClientImpl;
 import com.redhat.devtools.lsp4ij.server.StreamConnectionProvider;
+import org.eclipse.lsp4j.services.LanguageServer;
 import org.jetbrains.annotations.NotNull;
 
 public class MyLanguageServerFactory implements LanguageServerFactory {
@@ -88,6 +89,7 @@ In this sample `MyCustomServerAPI` interface could look like this:
 import org.eclipse.lsp4j.jsonrpc.services.JsonRequest;
 import org.eclipse.lsp4j.services.LanguageServer;
 
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
 public interface MyCustomServerAPI  extends LanguageServer {
@@ -147,11 +149,12 @@ the Node.js runtime found in "path/to/nodejs/node.exe":
 package my.language.server;
 
 import com.intellij.execution.configurations.GeneralCommandLine;
+import com.intellij.openapi.project.Project;
 import com.redhat.devtools.lsp4ij.server.OSProcessStreamConnectionProvider;
 
 public class MyLanguageServer extends OSProcessStreamConnectionProvider {
 
-    public MyLanguageServer() {
+    public MyLanguageServer(Project project) {
         GeneralCommandLine commandLine = new GeneralCommandLine("path/to/nodejs/node.exe", "path/to/my/language/server/main.js");
         super.setCommandLine(commandLine);
     }
@@ -166,6 +169,7 @@ the Node.js runtime found in "path/to/nodejs/node.exe":
 ```java
 package my.language.server;
 
+import com.intellij.openapi.project.Project;
 import com.redhat.devtools.lsp4ij.server.ProcessStreamConnectionProvider;
 
 import java.util.Arrays;
@@ -173,7 +177,7 @@ import java.util.List;
 
 public class MyLanguageServer extends ProcessStreamConnectionProvider {
 
-    public MyLanguageServer() {
+    public MyLanguageServer(Project project) {
         List<String> commands = Arrays.asList("path/to/nodejs/node.exe", "path/to/my/language/server/main.js");
         super.setCommands(commands);
     }
@@ -618,6 +622,7 @@ Here a sample which consumes custom services with [MyCustomApi](#languageserverf
 import org.eclipse.lsp4j.jsonrpc.services.JsonRequest;
 import org.eclipse.lsp4j.services.LanguageServer;
 
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
 public interface MyCustomServerAPI  extends LanguageServer {
@@ -1555,7 +1560,9 @@ import com.intellij.openapi.project.Project;
 import com.redhat.devtools.lsp4ij.LanguageServerFactory;
 import com.redhat.devtools.lsp4ij.client.LanguageClientImpl;
 import com.redhat.devtools.lsp4ij.server.StreamConnectionProvider;
+import com.redhat.devtools.lsp4ij.settings.contributors.LanguageServerSettingsContributor;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 public class MyLanguageServerFactory implements LanguageServerFactory {
 
