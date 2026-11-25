@@ -21,15 +21,18 @@ import com.intellij.openapi.util.TextRange;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
+import com.intellij.psi.PsiReference;
 import com.intellij.psi.search.SearchScope;
 import com.intellij.usageView.UsageInfo;
 import com.intellij.usages.ReadWriteAccessUsage;
 import com.intellij.usages.ReadWriteAccessUsageInfo2UsageAdapter;
 import com.intellij.usages.Usage;
 import com.intellij.usages.UsageInfo2UsageAdapter;
+import com.intellij.usages.UsageInfoToUsageConverter;
 import com.intellij.util.Processor;
 import com.intellij.util.containers.ContainerUtil;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
+import com.redhat.devtools.lsp4ij.features.LSPPsiElement;
 import org.eclipse.lsp4j.Position;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -79,6 +82,11 @@ import static com.redhat.devtools.lsp4ij.usages.LSPFindUsagesHandlerFactory.isUs
  * Results are deduplicated to remove overlapping ranges (e.g., when a definition range fully contains
  * a declaration range, only the smaller, more specific range is kept), and to remove a reference or a type
  * definition at the location of a declaration or a definition, which is that declaration or definition again.
+ * </p>
+ * <p>
+ * When the searched element is a language plugin's, whose own search also finds usages, a reference at the range of
+ * a reference of the language plugin is reported as the language plugin reports that reference, so that the usage
+ * view shows both on one line.
  * </p>
  */
 public class LSPUsageSearcher extends CustomUsageSearcher {
@@ -202,7 +210,7 @@ public class LSPUsageSearcher extends CustomUsageSearcher {
                         removeRepeatedDeclarations(filteredUsages);
 
                         for (LSPUsagePsiElement usage : filteredUsages) {
-                            processor.process(toUsage(usage));
+                            processor.process(toUsage(usage, element));
                         }
                     }, project);
                 }
@@ -268,6 +276,63 @@ public class LSPUsageSearcher extends CustomUsageSearcher {
         UsageInfo usageInfo = new UsageInfo(new LSPUsageViewElement(usage));
         ReadWriteAccessDetector.Access access = usage.getAccess();
         return access != null ? new ReadWriteAccessUsageInfo2UsageAdapter(usageInfo, access) : new UsageInfo2UsageAdapter(usageInfo);
+    }
+
+    /**
+     * Wraps a usage element, found for the given searched element, for the usage view.
+     * <p>
+     * Find Usages of a language plugin's element, such as a Scala class, lists the usages that the language plugin's
+     * own search finds as well as those of the language server. The usage view merges the usages of a line only
+     * within one group, and groups a usage by its usage type and by the PSI around it, such as its method, so that it
+     * would list the same reference twice: as, for instance, a method call of the language plugin and as a reference
+     * of the language server (#729).
+     * </p>
+     * <p>
+     * A reference at the range of a reference of the language plugin is therefore reported as the language plugin's
+     * search reports that reference: as a usage of the reference's element, converted as Find Usages converts the
+     * language plugin's usages, or with its access when that is known. The usage view then groups both alike and shows
+     * them on one line. A reference that the language plugin's search does not find is still listed, in the groups of
+     * the language plugin's reference.
+     * </p>
+     * <p>
+     * Any other usage, and any usage of an element of LSP4IJ, which no language plugin searches, is wrapped by
+     * {@link #toUsage(LSPUsagePsiElement)}.
+     * </p>
+     *
+     * @param usage           the usage element.
+     * @param searchedElement the element whose usages are searched.
+     * @return the usage to report.
+     */
+    static @NotNull Usage toUsage(@NotNull LSPUsagePsiElement usage, @NotNull PsiElement searchedElement) {
+        if (usage.getKind() == LSPUsagePsiElement.UsageKind.references && !(searchedElement instanceof LSPPsiElement)) {
+            PsiReference reference = findLanguagePluginReference(usage);
+            if (reference != null) {
+                TextRange rangeInElement = reference.getRangeInElement();
+                UsageInfo usageInfo = new UsageInfo(reference.getElement(), rangeInElement.getStartOffset(),
+                        rangeInElement.getEndOffset());
+                ReadWriteAccessDetector.Access access = usage.getAccess();
+                return access != null
+                        ? new ReadWriteAccessUsageInfo2UsageAdapter(usageInfo, access)
+                        : UsageInfoToUsageConverter.convert(new PsiElement[]{searchedElement}, usageInfo);
+            }
+        }
+        return toUsage(usage);
+    }
+
+    /**
+     * Returns the reference of a language plugin whose range is the range of the given usage element, or null if there
+     * is none.
+     *
+     * @param usage the usage element.
+     * @return the reference of a language plugin at the range of the usage element, or null if there is none.
+     */
+    private static @Nullable PsiReference findLanguagePluginReference(@NotNull LSPUsagePsiElement usage) {
+        TextRange textRange = usage.getTextRange();
+        PsiReference reference = usage.getContainingFile().findReferenceAt(textRange.getStartOffset());
+        // The references of LSP4IJ's own PSI, such as that of the semantic tokens, are not a language plugin's
+        return reference != null
+                && !(reference.getElement() instanceof LSPPsiElement)
+                && textRange.equals(reference.getAbsoluteRange()) ? reference : null;
     }
 
     /**
