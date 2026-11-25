@@ -51,7 +51,8 @@ import java.util.concurrent.atomic.AtomicInteger;
  * A language server which announces no file operations in its capabilities, and registers them dynamically, is told of
  * the creations, renames and deletions of the files that the filters of its registrations match, until it unregisters
  * them. A registration which the server withdraws while it initializes, before LSP4IJ installs it, is never installed,
- * and one which it withdraws while LSP4IJ installs it is removed once installed.
+ * and one which it withdraws while LSP4IJ installs it is removed once installed, without removing a registration of the
+ * same id that the server made since.
  */
 public class FileOperationDynamicRegistrationTest extends LSPCodeInsightFixtureTestCase {
 
@@ -217,9 +218,7 @@ public class FileOperationDynamicRegistrationTest extends LSPCodeInsightFixtureT
 
     public void testACommandRegistrationWithdrawnWhileItIsInstalledIsRemovedOnceInstalled() throws Exception {
         var wrapper = connect(myFixture.getTempDirFixture().createFile("main.foo", ""));
-        var commandProvider = wrapper.getServerCapabilitiesSync().getExecuteCommandProvider();
-        var commands = new HeldCommands(commandProvider.getCommands());
-        commandProvider.setCommands(commands);
+        var commands = holdCommands(wrapper);
         var client = MockLanguageServer.INSTANCE.getRemoteProxies().get(0);
         try {
             var registered = client.registerCapability(new RegistrationParams(List.of(new Registration("command",
@@ -235,6 +234,80 @@ public class FileOperationDynamicRegistrationTest extends LSPCodeInsightFixtureT
         }
         assertFalse("a command registration withdrawn while LSP4IJ installed it must be removed once installed",
                 wrapper.getServerCapabilitiesSync().getExecuteCommandProvider().getCommands().contains("dynamic.command"));
+    }
+
+    public void testTheEndOfAnInstallationLeavesARegistrationAgainOfAWithdrawnIdInPlace() throws Exception {
+        var psiManager = PsiManager.getInstance(myFixture.getProject());
+        var main = myFixture.getTempDirFixture().createFile("main.foo", "");
+        var other = myFixture.getTempDirFixture().createFile("other.foo", "");
+        var wrapper = connect(main);
+        var commands = holdCommands(wrapper);
+        var client = MockLanguageServer.INSTANCE.getRemoteProxies().get(0);
+        try {
+            var registered = client.registerCapability(new RegistrationParams(List.of(
+                    new Registration("hierarchy", "textDocument/prepareCallHierarchy", callHierarchyOf("**/main.foo")),
+                    new Registration("command", "workspace/executeCommand",
+                            new ExecuteCommandOptions(List.of("dynamic.command"))))));
+            // Once LSP4IJ has installed "hierarchy", while it adds the command of the next registration
+            get(commands.adding, "LSP4IJ must install the registrations up to the command");
+            get(client.unregisterCapability(new UnregistrationParams(List.of(new Unregistration("hierarchy",
+                    "textDocument/prepareCallHierarchy")))), "the client must answer the unregistration");
+            get(client.registerCapability(new RegistrationParams(List.of(new Registration("hierarchy",
+                            "textDocument/prepareCallHierarchy", callHierarchyOf("**/other.foo"))))),
+                    "the client must answer the registration again");
+            commands.release.complete(null);
+            get(registered, "the client must answer the first registration");
+        } finally {
+            commands.release.complete(null);
+        }
+        var callHierarchy = wrapper.getClientFeatures().getCallHierarchyFeature();
+        assertTrue("a registration again of a withdrawn id must stay installed once the first installation ends",
+                callHierarchy.isCallHierarchySupported(psiManager.findFile(other)));
+        assertFalse("the withdrawn registration must stay removed",
+                callHierarchy.isCallHierarchySupported(psiManager.findFile(main)));
+    }
+
+    public void testAWithdrawnInstallationLeavesARegistrationAgainOfItsIdInPlace() throws Exception {
+        var psiManager = PsiManager.getInstance(myFixture.getProject());
+        var other = myFixture.getTempDirFixture().createFile("other.foo", "");
+        var wrapper = connect(myFixture.getTempDirFixture().createFile("main.foo", ""));
+        var commands = holdCommands(wrapper);
+        var client = MockLanguageServer.INSTANCE.getRemoteProxies().get(0);
+        try {
+            var registered = client.registerCapability(new RegistrationParams(List.of(new Registration("id",
+                    "workspace/executeCommand", new ExecuteCommandOptions(List.of("dynamic.command"))))));
+            // While LSP4IJ adds the command
+            get(commands.adding, "LSP4IJ must install the registration by adding its command");
+            get(client.unregisterCapability(new UnregistrationParams(List.of(new Unregistration("id",
+                    "workspace/executeCommand")))), "the client must answer the unregistration");
+            get(client.registerCapability(new RegistrationParams(List.of(new Registration("id",
+                            "textDocument/prepareCallHierarchy", callHierarchyOf("**/other.foo"))))),
+                    "the client must answer the registration again");
+            commands.release.complete(null);
+            get(registered, "the client must answer the first registration");
+        } finally {
+            commands.release.complete(null);
+        }
+        var callHierarchy = wrapper.getClientFeatures().getCallHierarchyFeature();
+        assertFalse("a command registration withdrawn while LSP4IJ installed it must be removed once installed",
+                wrapper.getServerCapabilitiesSync().getExecuteCommandProvider().getCommands().contains("dynamic.command"));
+        assertTrue("a registration again of a withdrawn id must stay installed once the first installation ends",
+                callHierarchy.isCallHierarchySupported(psiManager.findFile(other)));
+
+        get(client.unregisterCapability(new UnregistrationParams(List.of(new Unregistration("id",
+                "textDocument/prepareCallHierarchy")))), "the client must answer the second unregistration");
+        assertFalse("the unregistration of the registration again must remove it",
+                callHierarchy.isCallHierarchySupported(psiManager.findFile(other)));
+    }
+
+    /**
+     * Holds the additions to the commands of the server capabilities until the test releases them.
+     */
+    private static HeldCommands holdCommands(LanguageServerWrapper wrapper) {
+        var commandProvider = wrapper.getServerCapabilitiesSync().getExecuteCommandProvider();
+        var commands = new HeldCommands(commandProvider.getCommands());
+        commandProvider.setCommands(commands);
+        return commands;
     }
 
     /**

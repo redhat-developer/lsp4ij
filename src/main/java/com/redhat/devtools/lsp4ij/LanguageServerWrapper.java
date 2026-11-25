@@ -2045,8 +2045,10 @@ public class LanguageServerWrapper implements Disposable {
             params.getRegistrations().forEach(reg -> pendingRegistrations.put(reg.getId(), reg));
         }
         initialization.thenRun(() -> {
-            // The registrations that the language server had not withdrawn when their installation began
-            List<Registration> installing = new ArrayList<>();
+            // The registrations that the language server had not withdrawn when their installation began, with what
+            // undoes the installation of each once it has done its work. Kept here until the installation ends, so that
+            // an installation which the server withdrew never touches what a registration again of its id recorded
+            Map<Registration, Runnable> installing = new LinkedHashMap<>();
             params.getRegistrations().forEach(reg -> {
                 synchronized (dynamicRegistrations) {
                     if (pendingRegistrations.get(reg.getId()) != reg) {
@@ -2054,7 +2056,7 @@ public class LanguageServerWrapper implements Disposable {
                         return;
                     }
                 }
-                installing.add(reg);
+                installing.put(reg, null);
                 if (LSPNotificationConstants.WORKSPACE_DID_CHANGE_WORKSPACE_FOLDERS.equals(reg.getMethod())) {
                     // register 'workspace/didChangeWorkspaceFolders' capability
                     assert serverCapabilities != null :
@@ -2067,7 +2069,7 @@ public class LanguageServerWrapper implements Disposable {
                                 "Dynamic registration of 'workspace/didChangeWorkspaceFolders' ignored. It was already enabled before"); //$NON-NLS-1$);
                     } else {
                         setWorkspaceFoldersEnablement(true);
-                        addRegistration(reg, () -> setWorkspaceFoldersEnablement(false));
+                        installing.put(reg, () -> setWorkspaceFoldersEnablement(false));
                     }
                 } else if (LSPNotificationConstants.WORKSPACE_DID_CHANGE_WATCHED_FILES.equals(reg.getMethod())) {
                     // register 'workspace/didChangeWatchedFiles' capability
@@ -2081,7 +2083,7 @@ public class LanguageServerWrapper implements Disposable {
                                 return;
                             }
                             fileListener.registerFileSystemWatchers(reg.getId(), options.getWatchers());
-                            addRegistration(reg, () -> fileListener.unregisterFileSystemWatchers(reg.getId()));
+                            installing.put(reg, () -> fileListener.unregisterFileSystemWatchers(reg.getId()));
                         }
                     } catch (Exception e) {
                         LOGGER.error("Error while getting 'workspace/didChangeWatchedFiles' capability", e);
@@ -2101,7 +2103,7 @@ public class LanguageServerWrapper implements Disposable {
                                     return;
                                 }
                                 registerDocumentContentSchemes(schemes);
-                                addRegistration(reg, () -> unregisterDocumentContentSchemes(schemes));
+                                installing.put(reg, () -> unregisterDocumentContentSchemes(schemes));
                             }
                         }
                     } catch (Exception e) {
@@ -2116,7 +2118,7 @@ public class LanguageServerWrapper implements Disposable {
                         List<String> newCommands = executeCommandOptions.getCommands();
                         if (newCommands != null && !newCommands.isEmpty()) {
                             registerCommands(newCommands);
-                            addRegistration(reg, () -> unregisterCommands(newCommands));
+                            installing.put(reg, () -> unregisterCommands(newCommands));
                         }
                     } catch (Exception e) {
                         LOGGER.error("Error while getting 'workspace/executeCommand' capability", e);
@@ -2142,7 +2144,7 @@ public class LanguageServerWrapper implements Disposable {
                                 LOGGER.debug("Dynamic registration of '{}' ignored: LSP4IJ doesn't announce it", method); //$NON-NLS-1$
                                 return;
                             }
-                            addRegistration(reg, unregistration);
+                            installing.put(reg, unregistration);
                         }
                     } catch (Exception e) {
                         LOGGER.error("Error while getting '{}' capability", method, e);
@@ -2167,51 +2169,44 @@ public class LanguageServerWrapper implements Disposable {
                                 registerOptions = new JsonObject();
                             }
                             final TextDocumentRegistrationOptions options = registry.registerCapability(registerOptions);
-                            addRegistration(reg, () -> registry.unregisterCapability(options));
+                            installing.put(reg, () -> registry.unregisterCapability(options));
                         }
                     } catch (Exception e) {
                         LOGGER.error("Error while getting '{}' capability", method, e);
                     }
                 }
             });
-            installing.forEach(reg -> endInstallation(reg, registrationContext));
+            installing.forEach((reg, unregistration) -> endInstallation(reg, unregistration, registrationContext));
         });
     }
 
     /**
-     * Records the unregistration of a dynamic registration once its installation has added all that it undoes: an
-     * unregistration which finds it then undoes the whole installation, and {@link #endInstallation} undoes the
-     * installation for one which came before.
-     */
-    private void addRegistration(@NotNull Registration reg, @NotNull Runnable unregistrationHandler) {
-        String regId = reg.getId();
-        synchronized (dynamicRegistrations) {
-            assert !dynamicRegistrations.containsKey(regId) : "Registration id is not unique"; //$NON-NLS-1$
-            dynamicRegistrations.put(regId, unregistrationHandler);
-        }
-    }
-
-    /**
-     * Ends the installation of a dynamic registration. The language server can have withdrawn it while it was
-     * installed, when its unregistration found nothing to undo yet: what the installation added is then undone here.
+     * Ends the installation of a dynamic registration, once it has done all its work. Unless the language server
+     * withdrew the registration meanwhile, this records what undoes the installation, which an unregistration of its
+     * id runs from then on. Otherwise this runs it at once, as the unregistration found nothing to undo, and leaves in
+     * place what a registration again of the id has recorded under it since.
      *
      * @param reg                 the registration
+     * @param unregistration      what undoes the installation, and null if it installed nothing
      * @param registrationContext the start whose language server asked for the registration
      */
-    private void endInstallation(@NotNull Registration reg, @NotNull InitializingContext registrationContext) {
+    private void endInstallation(@NotNull Registration reg, @Nullable Runnable unregistration,
+                                 @NotNull InitializingContext registrationContext) {
         String regId = reg.getId();
-        Runnable unregistration;
         synchronized (dynamicRegistrations) {
             if (pendingRegistrations.get(regId) == reg) {
                 // Not withdrawn
                 pendingRegistrations.remove(regId);
+                if (unregistration != null) {
+                    assert !dynamicRegistrations.containsKey(regId) : "Registration id is not unique"; //$NON-NLS-1$
+                    dynamicRegistrations.put(regId, unregistration);
+                }
                 return;
             }
             if (registrationContext != currentInitializingContext) {
-                // Dropped by a stop, which drops the registrations of its start: the same id can be a later start's
+                // Dropped by a stop, which drops the registrations of its start without undoing them
                 return;
             }
-            unregistration = dynamicRegistrations.remove(regId);
         }
         if (unregistration != null) {
             unregistration.run();
