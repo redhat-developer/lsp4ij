@@ -23,7 +23,6 @@ import com.intellij.openapi.fileEditor.FileEditorManager;
 import com.intellij.openapi.fileTypes.FileType;
 import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.project.Project;
-import com.intellij.openapi.project.ProjectManager;
 import com.intellij.openapi.roots.ProjectRootManager;
 import com.intellij.openapi.util.Disposer;
 import com.intellij.openapi.util.ModificationTracker;
@@ -94,7 +93,8 @@ public class LanguageServiceAccessor implements Disposable {
             // Bump the accessor-level modification tracker
             modificationTracker.incModificationCount();
 
-            // Check all projects for files that match the added language server and start it if necessary
+            // Check the open files of this project for files that match the added language server and start it if
+            // necessary. The accessor of each other open project does so for the files of its own project
             checkCurrentlyOpenFiles(event.serverDefinitions);
         }
 
@@ -402,22 +402,25 @@ public class LanguageServiceAccessor implements Disposable {
     }
 
     /**
-     * Check each project for open files and start an LS if matching one is found and is not started yet
+     * Checks the open files of the project of this accessor, and starts the language servers of the given definitions
+     * that match one of them, if they are not started yet.
+     * <p>
+     * Only the files of this project: the language servers started here belong to it, with its root and its workspace
+     * folders. Every project hears of the added definitions through its own accessor, and starts their language servers
+     * for its own files. A file of another open project would otherwise get a language server of this project too, as a
+     * second instance next to the one of its own project.
      *
      * @param definitions definition of the language server to match to the wrapper
      */
     private void checkCurrentlyOpenFiles(Collection<LanguageServerDefinition> definitions) {
-        if (definitions.isEmpty()) {
+        if (definitions.isEmpty() || project.isDisposed() || project.isDefault()) {
             return;
         }
         for (LanguageServerDefinition definition : definitions) {
-            Project[] projects = ProjectManager.getInstance().getOpenProjects();
-            for (Project p : projects) {
-                try {
-                    findAndStartLanguageServerIfNeeded(definition, false, p);
-                } catch (Exception e) {
-                    LOGGER.error("Error while starting language server for the language server '{}'.", definition.getDisplayName(), e);
-                }
+            try {
+                findAndStartLanguageServerIfNeeded(definition, false, project);
+            } catch (Exception e) {
+                LOGGER.error("Error while starting language server for the language server '{}'.", definition.getDisplayName(), e);
             }
         }
     }
