@@ -77,11 +77,13 @@ final class DAPOutputLocation implements HyperlinkInfo {
      * output: the source and the line where the output was produced, if the event has both and the source can be
      * opened, or else the location reference of the logged value, if the event has one.
      *
-     * @param client the DAP client which received the event, in the execution epoch of the event.
+     * @param client the DAP client which received the event.
      * @param args   the 'output' event.
+     * @param epoch  the execution epoch in which the event arrived, read before the output was decoded, so that a
+     *               resume which started meanwhile doesn't make a later epoch that of the output.
      * @return the source location of the output, or null if the event has none.
      */
-    static @Nullable DAPOutputLocation of(@NotNull DAPClient client, @NotNull OutputEventArguments args) {
+    static @Nullable DAPOutputLocation of(@NotNull DAPClient client, @NotNull OutputEventArguments args, int epoch) {
         Source source = args.getSource();
         Integer line = args.getLine();
         // As in VS Code, a source needs a line, and 0 is no location reference
@@ -92,7 +94,7 @@ final class DAPOutputLocation implements HyperlinkInfo {
         Integer reference = args.getLocationReference();
         if (reference != null && reference > 0) {
             return new DAPOutputLocation(client, DAPBundle.message("dap.output.valueSource"), null, null, null,
-                    reference, client.getExecutionEpoch());
+                    reference, epoch);
         }
         return null;
     }
