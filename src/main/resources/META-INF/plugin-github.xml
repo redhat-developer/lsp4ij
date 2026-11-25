@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<idea-plugin>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <!-- The token of the IDE's GitHub account, for the GitHub API of a github download of an installer -->
+        <applicationService
+                serviceInterface="com.redhat.devtools.lsp4ij.installation.download.GitHubAccountTokenProvider"
+                serviceImplementation="com.redhat.devtools.lsp4ij.installation.download.GitHubPluginAccountTokenProvider"/>
+    </extensions>
+
+</idea-plugin>

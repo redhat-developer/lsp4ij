@@ -22,10 +22,13 @@ import com.intellij.openapi.options.SearchableConfigurable;
 import com.intellij.openapi.project.DumbAwareAction;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.MasterDetailsComponent;
+import com.intellij.openapi.util.Disposer;
 import com.intellij.openapi.util.NlsContexts;
 import com.intellij.ui.TreeUIHelper;
 import com.intellij.ui.speedSearch.SpeedSearchSupply;
 import com.intellij.util.IconUtil;
+import com.intellij.util.ui.FormBuilder;
+import com.intellij.util.ui.JBUI;
 import com.redhat.devtools.lsp4ij.LanguageServerBundle;
 import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
 import com.redhat.devtools.lsp4ij.launching.ui.NewLanguageServerDialog;
@@ -58,6 +61,7 @@ public class LanguageServerListConfigurable extends MasterDetailsComponent imple
     private static final String ID = "LanguageServers";
     private String displayNodeName = null;
     private JSpinner fileOperationsTimeoutSpinner;
+    private GitHubTokenField gitHubTokenField;
 
     private final Project project;
     private final LanguageServerDefinitionListener listener = new LanguageServerDefinitionListener() {
@@ -102,10 +106,15 @@ public class LanguageServerListConfigurable extends MasterDetailsComponent imple
         fileOperationsTimeoutSpinner.setToolTipText(
                 LanguageServerBundle.message("language.server.fileOperations.timeout.tooltip"));
 
-        JPanel globalSettingsPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        globalSettingsPanel.add(new JLabel(
-                LanguageServerBundle.message("language.server.fileOperations.timeout")));
-        globalSettingsPanel.add(fileOperationsTimeoutSpinner);
+        JPanel timeoutRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
+        timeoutRow.add(fileOperationsTimeoutSpinner);
+        // The GitHub token of the installers, for the whole IDE (#2188)
+        gitHubTokenField = new GitHubTokenField();
+        JPanel globalSettingsPanel = gitHubTokenField.addTo(FormBuilder.createFormBuilder()
+                        .addLabeledComponent(new JLabel(
+                                LanguageServerBundle.message("language.server.fileOperations.timeout")), timeoutRow))
+                .getPanel();
+        globalSettingsPanel.setBorder(JBUI.Borders.empty(5));
 
         JPanel wrapper = new JPanel(new BorderLayout());
         wrapper.add(globalSettingsPanel, BorderLayout.NORTH);
@@ -221,6 +230,9 @@ public class LanguageServerListConfigurable extends MasterDetailsComponent imple
                 return true;
             }
         }
+        if (gitHubTokenField != null && gitHubTokenField.isModified()) {
+            return true;
+        }
         return super.isModified();
     }
 
@@ -229,6 +241,10 @@ public class LanguageServerListConfigurable extends MasterDetailsComponent imple
         if (fileOperationsTimeoutSpinner != null) {
             GlobalLanguageServerSettings.getInstance()
                     .setFileOperationsTimeout((int) fileOperationsTimeoutSpinner.getValue());
+        }
+        if (gitHubTokenField != null) {
+            // Asynchronous: a token which the Password Safe doesn't store stays modified, and the field says why
+            gitHubTokenField.apply();
         }
         super.apply();
     }
@@ -240,12 +256,18 @@ public class LanguageServerListConfigurable extends MasterDetailsComponent imple
             fileOperationsTimeoutSpinner.setValue(
                     GlobalLanguageServerSettings.getInstance().getFileOperationsTimeout());
         }
+        if (gitHubTokenField != null) {
+            gitHubTokenField.reset();
+        }
         super.reset();
     }
 
     @Override
     public void disposeUIResources() {
         super.disposeUIResources();
+        if (gitHubTokenField != null) {
+            Disposer.dispose(gitHubTokenField);
+        }
         LanguageServersRegistry.getInstance().removeLanguageServerDefinitionListener(listener);
     }
 

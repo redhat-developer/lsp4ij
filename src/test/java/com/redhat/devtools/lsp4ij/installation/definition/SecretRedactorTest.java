@@ -95,6 +95,13 @@ public class SecretRedactorTest {
                 "GitHub API rate limit reached for the token of the environment variable GITHUB_TOKEN: 5000 "
                         + "requests an hour (HTTP 403).",
                 "Setting the environment variable GITHUB_TOKEN of the IDE to a GitHub token raises the limit.",
+                "GitHub API rate limit reached (HTTP 403). A GitHub token in Settings | Languages & Frameworks | "
+                        + "Language Servers (LSP4IJ), or in the environment variable GITHUB_TOKEN of the IDE, raises "
+                        + "the limit.",
+                "> Loading GitHub releases: https://api.github.com/repos/owner/repo/releases?per_page=100 "
+                        + "(with the token of the LSP4IJ settings)",
+                "GitHub API refused the token of the IDE's GitHub account octocat (HTTP 401): the token is invalid "
+                        + "or has expired.",
                 "${server.command}=node server.js --stdio --token-file /home/user/token.txt",
                 "> npm install --prefix /home/user/.lsp4ij/lsp typescript-language-server",
                 "Asset found https://github.com/owner/repo/releases/download/v1.0/server.zip",
