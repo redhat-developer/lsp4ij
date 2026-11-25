@@ -237,7 +237,7 @@ public class LSPCompletionContributor extends CompletionContributor {
      * @param item the completion item.
      * @return the text edit text of the item, or else its label.
      */
-    private String getItemText(@NotNull final CompletionItem item){
+    private String getItemText(@NotNull final CompletionItem item) {
         final String textEditText = item.getTextEditText();
         return textEditText != null ? textEditText : item.getLabel();
     }
@@ -248,17 +248,19 @@ public class LSPCompletionContributor extends CompletionContributor {
             return;
         }
         // Update TextEdit with CompletionItemDefaults if needed
-        final String itemText = getItemText(item);
-        if (itemDefaults.getEditRange() != null && itemText != null) {
-            if (itemDefaults.getEditRange().isLeft()) {
-                Range defaultRange = itemDefaults.getEditRange().getLeft();
-                if (defaultRange != null) {
-                    item.setTextEdit(Either.forLeft(new TextEdit(defaultRange, itemText)));
-                }
-            } else {
-                InsertReplaceRange defaultInsertReplaceRange = itemDefaults.getEditRange().getRight();
-                if (defaultInsertReplaceRange != null) {
-                    item.setTextEdit(Either.forRight(new InsertReplaceEdit(itemText, defaultInsertReplaceRange.getInsert(), defaultInsertReplaceRange.getReplace())));
+        if (item.getTextEdit() == null && itemDefaults.getEditRange() != null) {
+            final String itemText = getItemText(item);
+            if (itemText != null) {
+                if (itemDefaults.getEditRange().isLeft()) {
+                    Range defaultRange = itemDefaults.getEditRange().getLeft();
+                    if (defaultRange != null) {
+                        item.setTextEdit(Either.forLeft(new TextEdit(defaultRange, itemText)));
+                    }
+                } else {
+                    InsertReplaceRange defaultInsertReplaceRange = itemDefaults.getEditRange().getRight();
+                    if (defaultInsertReplaceRange != null) {
+                        item.setTextEdit(Either.forRight(new InsertReplaceEdit(itemText, defaultInsertReplaceRange.getInsert(), defaultInsertReplaceRange.getReplace())));
+                    }
                 }
             }
         }
