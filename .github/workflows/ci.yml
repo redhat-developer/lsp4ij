@@ -69,8 +69,12 @@ jobs:
             caches/transforms-4
             caches/*/transforms
 
-      # Run tests
+      # Run tests. In the 490 runs from 2026-11-11 to 11-25, this step took at most 23 minutes, on macOS (20 with an empty
+      # Gradle cache), 16 on Linux and 14 on Windows. When test after test fails at a wait, as when each waits 30 s for a
+      # language server that doesn't start, the step stops after 45 minutes instead of running for up to GitHub's
+      # 6 hours. The log shows each test that failed until then, with its error.
       - name: Run Tests
+        timeout-minutes: 45
         run: ./gradlew check ${{ matrix.platformVersion && format('-PplatformVersion={0}', matrix.platformVersion) || '' }} ${{ matrix.platformType && format('-PplatformType={0}', matrix.platformType) || '' }}
 
       # Collect Tests Result
