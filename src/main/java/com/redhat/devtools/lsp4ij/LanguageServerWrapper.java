@@ -2066,8 +2066,16 @@ public class LanguageServerWrapper implements Disposable {
                             if (isDisposed() || registrationContext != currentInitializingContext) {
                                 return;
                             }
-                            // Undoes only the watchers of this registration: when the server withdraws it during its
-                            // installation, a registration again of the id can replace them before it is undone
+                            synchronized (dynamicRegistrations) {
+                                // Withdrawn since its installation began: a registration again of the id can have
+                                // added its watchers already, which these, registered by id, would replace
+                                if (pendingRegistrations.get(reg.getId()) != reg) {
+                                    return;
+                                }
+                            }
+                            // Undoes only the watchers of this registration: the server can still withdraw it, and a
+                            // registration again of the id, which waits for this monitor, then replaces them before
+                            // they are undone
                             installing.put(reg, fileListener.addFileSystemWatchers(reg.getId(), options.getWatchers()));
                         }
                     } catch (Exception e) {
