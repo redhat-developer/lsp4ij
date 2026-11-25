@@ -20,6 +20,8 @@ import com.intellij.execution.ui.layout.PlaceInGrid;
 import com.intellij.icons.AllIcons;
 import com.intellij.openapi.Disposable;
 import com.intellij.openapi.actionSystem.ActionManager;
+import com.intellij.openapi.actionSystem.Anchor;
+import com.intellij.openapi.actionSystem.Constraints;
 import com.intellij.openapi.actionSystem.DefaultActionGroup;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.fileEditor.OpenFileDescriptor;
@@ -74,7 +76,9 @@ import com.redhat.devtools.lsp4ij.dap.disassembly.breakpoints.DisassemblyBreakpo
 import com.redhat.devtools.lsp4ij.dap.settings.ui.DebugSessionCommandLineUpdater;
 import com.redhat.devtools.lsp4ij.dap.sources.LoadedSourcesPanel;
 import com.redhat.devtools.lsp4ij.dap.sources.ModulesPanel;
+import com.redhat.devtools.lsp4ij.dap.stepping.DAPReverseContinueAction;
 import com.redhat.devtools.lsp4ij.dap.stepping.DAPSmartStepIntoHandler;
+import com.redhat.devtools.lsp4ij.dap.stepping.DAPStepBackAction;
 import com.redhat.devtools.lsp4ij.dap.stepping.DAPStepIntoVariant;
 import com.redhat.devtools.lsp4ij.dap.stepping.DAPStepOnlyCurrentThreadAction;
 import com.redhat.devtools.lsp4ij.dap.threads.ThreadsPanel;
@@ -118,6 +122,12 @@ public class DAPDebugProcess extends XDebugProcess implements Disposable {
      * process ends, and a custom one can read it.
      */
     public static final Key<Integer> PROGRAM_EXIT_CODE = Key.create("lsp4ij.dap.programExitCode");
+
+    /**
+     * The ID of IntelliJ's "Step Out" action, which Step Back and Reverse Continue follow in the toolbar of the debug
+     * session.
+     */
+    private static final String STEP_OUT_ACTION_ID = "StepOut";
 
     /**
      * Keeps the exit code that a DAP session's 'exited' event reports on the session's process handler, under
@@ -523,6 +533,56 @@ public class DAPDebugProcess extends XDebugProcess implements Disposable {
                 client.stepIn(threadId, granularity);
             }
         }
+    }
+
+    /**
+     * Steps the thread of the given suspend context back, with the 'stepBack' request of its debug adapter, when the
+     * debug adapter supports it (supportsStepBack). As the other steps, it steps by instruction while the disassembly
+     * is shown, and resumes only its thread when "Step Only the Current Thread" is selected.
+     *
+     * @param context the suspend context of the debug session, or null when it is not suspended.
+     */
+    public void startStepBack(@Nullable XSuspendContext context) {
+        if (canRunBackwards(context) && context instanceof DAPSuspendContext dapContext) {
+            DAPClient client = dapContext.getClient();
+            client.stepBack(dapContext.getThreadId(), getSteppingGranularity(client));
+        }
+    }
+
+    /**
+     * Runs the program backwards from the thread of the given suspend context, with the 'reverseContinue' request of
+     * its debug adapter, when the debug adapter supports it (supportsStepBack).
+     *
+     * @param context the suspend context of the debug session, or null when it is not suspended.
+     */
+    public void startReverseContinue(@Nullable XSuspendContext context) {
+        if (canRunBackwards(context) && context instanceof DAPSuspendContext dapContext) {
+            dapContext.getClient().reverseContinue(dapContext.getThreadId());
+        }
+    }
+
+    /**
+     * Returns true if the program can run backwards from the given suspend context: it is a stop of a debug adapter
+     * which supports stepping back (supportsStepBack), with a thread.
+     *
+     * @param context the suspend context of the debug session, or null when it is not suspended.
+     * @return true if the program can run backwards from the given suspend context, and false otherwise.
+     */
+    public static boolean canRunBackwards(@Nullable XSuspendContext context) {
+        return context instanceof DAPSuspendContext dapContext
+                && dapContext.getThreadId() != null
+                && dapContext.getClient().isSupportsStepBack();
+    }
+
+    /**
+     * Returns true if the DAP server of this debug session, or that of a child session, supports running the program
+     * backwards (supportsStepBack), and false otherwise.
+     *
+     * @return true if the DAP server of this debug session, or that of a child session, supports stepping back, and
+     * false otherwise.
+     */
+    public boolean isSupportsStepBack() {
+        return parentClient != null && parentClient.isSupportsStepBackInSessions();
     }
 
     @Override
@@ -1137,9 +1197,19 @@ public class DAPDebugProcess extends XDebugProcess implements Disposable {
                                           @NotNull DefaultActionGroup topToolbar,
                                           @NotNull DefaultActionGroup settings) {
         super.registerAdditionalActions(leftToolbar, topToolbar, settings);
-        var stepOnlyCurrentThreadAction = ActionManager.getInstance().getAction(DAPStepOnlyCurrentThreadAction.ID);
+        var actionManager = ActionManager.getInstance();
+        var stepOnlyCurrentThreadAction = actionManager.getAction(DAPStepOnlyCurrentThreadAction.ID);
         if (stepOnlyCurrentThreadAction != null) {
             settings.add(stepOnlyCurrentThreadAction);
+        }
+        // Step Back and Reverse Continue follow the steps, and are shown when the DAP server supports them
+        var stepBackAction = actionManager.getAction(DAPStepBackAction.ID);
+        if (stepBackAction != null) {
+            topToolbar.add(stepBackAction, new Constraints(Anchor.AFTER, STEP_OUT_ACTION_ID));
+        }
+        var reverseContinueAction = actionManager.getAction(DAPReverseContinueAction.ID);
+        if (reverseContinueAction != null) {
+            topToolbar.add(reverseContinueAction, new Constraints(Anchor.AFTER, DAPStepBackAction.ID));
         }
     }
 

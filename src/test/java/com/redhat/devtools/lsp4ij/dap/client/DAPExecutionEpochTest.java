@@ -19,6 +19,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -81,6 +82,80 @@ public class DAPExecutionEpochTest {
     }
 
     @Test
+    void anEpochIsCurrentAgainOnceTheDebugAdapterRefusedEachRequestWhichResumedFromIt() {
+        int stop = epoch.end();
+        // Reverse Continue twice, before the debug adapter answers
+        int first = epoch.endBeforeResuming();
+        int second = epoch.endBeforeResuming();
+
+        // The debug adapter answers in order
+        epoch.resumeRefused(first);
+        assertNull(epoch.send(stop, this::setVariable), "the second request may still resume the program");
+        epoch.resumeRefused(second);
+        assertNotNull(epoch.send(stop, this::setVariable));
+        assertEquals(stop, epoch.get());
+    }
+
+    @Test
+    void anEpochIsCurrentAgainOnceTheDebugAdapterRefusedEachRequestInTheOtherOrder() {
+        int stop = epoch.end();
+        int first = epoch.endBeforeResuming();
+        int second = epoch.endBeforeResuming();
+
+        epoch.resumeRefused(second);
+        assertNull(epoch.send(stop, this::setVariable), "the first request may still resume the program");
+        epoch.resumeRefused(first);
+        assertNotNull(epoch.send(stop, this::setVariable));
+        assertEquals(stop, epoch.get());
+    }
+
+    @Test
+    void anEpochStaysEndedWhenTheDebugAdapterAcceptedTheFirstRequestWhichResumedFromIt() {
+        int stop = epoch.end();
+        epoch.endBeforeResuming();
+        int second = epoch.endBeforeResuming();
+
+        // The debug adapter accepts the first request, which runs the program, and refuses the second one
+        epoch.resumeRefused(second);
+        assertNull(epoch.send(stop, this::setVariable));
+    }
+
+    @Test
+    void anEpochStaysEndedWhenTheDebugAdapterAcceptedTheSecondRequestWhichResumedFromIt() {
+        int stop = epoch.end();
+        int first = epoch.endBeforeResuming();
+        epoch.endBeforeResuming();
+
+        // The debug adapter refuses the first request, and accepts the second one, which runs the program
+        epoch.resumeRefused(first);
+        assertNull(epoch.send(stop, this::setVariable));
+    }
+
+    @Test
+    void aRefusalOfARequestOfAnEarlierStopMakesNoEpochCurrentAgain() {
+        epoch.end();
+        int beforeTheStop = epoch.endBeforeResuming();
+        int stop = epoch.end();
+        int afterTheStop = epoch.endBeforeResuming();
+
+        epoch.resumeRefused(afterTheStop);
+        epoch.resumeRefused(beforeTheStop);
+        assertEquals(stop, epoch.get(), "the epoch of the last stop is the current one again, and no earlier one");
+        assertNotNull(epoch.send(stop, this::setVariable));
+    }
+
+    @Test
+    void aStopOrAContinuedEventSinceARequestWhichResumedTheProgramIsKnown() {
+        epoch.end();
+        int ended = epoch.endBeforeResuming();
+        assertFalse(epoch.stoppedOrContinuedSince(ended));
+
+        epoch.end();
+        assertTrue(epoch.stoppedOrContinuedSince(ended), "a stop or a 'continued' event since the request");
+        assertFalse(epoch.stoppedOrContinuedSince(epoch.endBeforeResuming()));
+    }
+
+    @Test
     void aResumeWaitsUntilTheRequestOfTheEpochIsWritten() throws Exception {
         int stop = epoch.end();
         var writing = new CountDownLatch(1);
@@ -107,6 +182,35 @@ public class DAPExecutionEpochTest {
         step.join(BOUND_MILLIS);
         assertEquals(List.of("setVariable", "next"), written, "the request is written before the resume");
         assertNull(epoch.send(stop, this::setVariable), "the request of the epoch isn't sent after the resume");
+    }
+
+    @Test
+    void aRefusalDoesNotWaitWhileARequestOfAnEpochIsWritten() throws Exception {
+        epoch.end();
+        int ended = epoch.endBeforeResuming();
+        int stop = epoch.end();
+        var writing = new CountDownLatch(1);
+        var mayWrite = new CountDownLatch(1);
+        // Set Value writes its request at the stop...
+        var setValue = new Thread(() -> epoch.send(stop, () -> {
+            writing.countDown();
+            await(mayWrite);
+            return setVariable();
+        }), "Set Value");
+        setValue.start();
+        assertTrue(writing.await(BOUND_MILLIS, TimeUnit.MILLISECONDS), "Set Value doesn't write its request");
+        // ... while the thread which reads the messages of the debug adapter handles the refusal of an earlier request
+        var reader = new Thread(() -> epoch.resumeRefused(ended), "DAP messages");
+        reader.start();
+        try {
+            assertEquals(Thread.State.TERMINATED, waitUntilBlockedOrEnded(reader), "the refusal waits for the request");
+        } finally {
+            mayWrite.countDown();
+            setValue.join(BOUND_MILLIS);
+            reader.join(BOUND_MILLIS);
+        }
+        assertEquals(stop, epoch.get(), "the epoch of the stop stays the current one");
+        assertEquals(List.of("setVariable"), written);
     }
 
     private CompletableFuture<String> setVariable() {

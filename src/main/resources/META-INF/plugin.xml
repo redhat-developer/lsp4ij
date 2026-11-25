@@ -1299,6 +1299,18 @@
                 class="com.redhat.devtools.lsp4ij.dap.client.variables.DAPJumpToValueSourceAction">
             <add-to-group group-id="XDebugger.ValueGroup" anchor="after" relative-to-action="XDebugger.JumpToTypeSource"/>
         </action>
+        <!-- Also added to the toolbar of a DAP debug session, after Step Out, by DAPDebugProcess.registerAdditionalActions.
+             No default shortcut, so that none conflicts with a shortcut of the IDE or of another plugin. -->
+        <action id="DAP.StepBack"
+                class="com.redhat.devtools.lsp4ij.dap.stepping.DAPStepBackAction"
+                icon="AllIcons.Actions.Back">
+            <add-to-group group-id="DebuggingActionsGroup" anchor="after" relative-to-action="StepOut"/>
+        </action>
+        <action id="DAP.ReverseContinue"
+                class="com.redhat.devtools.lsp4ij.dap.stepping.DAPReverseContinueAction"
+                icon="AllIcons.Actions.Play_back">
+            <add-to-group group-id="DebuggingActionsGroup" anchor="after" relative-to-action="DAP.StepBack"/>
+        </action>
     </actions>
 
 </idea-plugin>

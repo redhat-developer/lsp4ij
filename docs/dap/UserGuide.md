@@ -310,6 +310,22 @@ option. When it is selected, `Step Over`, `Step Into`, `Smart Step Into` and `St
 resumes only the thread that steps while the other threads stay stopped, as the `Threads` tab shows. `Resume Program`
 still resumes every thread. The choice holds for the debug session.
 
+### Step back and reverse continue
+
+When the DAP server supports running the program backwards (`supportsStepBack`), the debug session's toolbar has
+`Step Back` and `Reverse Continue` after `Step Out`, and so does the `Run | Debugging Actions` menu. While the program
+is stopped, [Step Back](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_StepBack) steps
+the current thread back, and
+[Reverse Continue](https://microsoft.github.io/debug-adapter-protocol//specification.html#Requests_ReverseContinue)
+runs the program backwards until it stops, such as at a breakpoint. `Step Back` steps by instruction while the
+disassembly is shown, and both resume only the current thread when `Step Only the Current Thread` is selected, as the
+other steps do. They have no default shortcut: you can assign one in `Settings | Keymap`.
+
+A DAP server may announce the capability only once the program runs, as CodeLLDB does for a launch configuration with
+`"reverseDebugging": true`, and Delve when its backend is [rr](https://rr-project.org/), which records programs on
+Linux. rdbg, the Ruby debugger, steps back once `record on` is typed in the Debug console. When the DAP server refuses,
+the console shows why, and the program stays stopped where it was.
+
 ### Terminate a thread
 
 When the DAP server supports the
