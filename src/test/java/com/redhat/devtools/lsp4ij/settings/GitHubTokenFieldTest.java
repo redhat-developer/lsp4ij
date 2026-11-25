@@ -33,6 +33,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
@@ -45,7 +46,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * The GitHub token of the LSP4IJ settings, which the installers send to the GitHub API, is kept in the Password Safe,
  * which the test application keeps in memory, and its field on the Language Servers page is a password field (#2188).
- * A token which the Password Safe doesn't store stays an unsaved change, and the field says why.
+ * A token which the Password Safe doesn't store stays an unsaved change, and the field says why. The last applied token
+ * wins, also over a write which is still running.
  */
 public class GitHubTokenFieldTest {
 
@@ -167,6 +169,50 @@ public class GitHubTokenFieldTest {
         } finally {
             Disposer.dispose(disposable);
         }
+    }
+
+    @Test
+    public void testAnEmptyFieldAppliedWhileATokenIsBeingStoredRemovesIt() throws Exception {
+        // A slow Password Safe: the first write waits until the test lets it go on
+        var firstWriteStarted = new CompletableFuture<Void>();
+        var releaseFirstWrite = new CompletableFuture<Void>();
+        List<String> writes = new CopyOnWriteArrayList<>();
+        var field = newField(token -> {
+            writes.add(token);
+            if (writes.size() == 1) {
+                firstWriteStarted.complete(null);
+                try {
+                    releaseFirstWrite.get(TIMEOUT, TimeUnit.SECONDS);
+                } catch (Exception e) {
+                    throw new IllegalStateException("The test didn't let the first write go on in " + TIMEOUT
+                            + " seconds", e);
+                }
+            }
+            GitHubTokenSettings.setToken(token);
+        });
+        await(field.reset(), "the field must load the empty Password Safe");
+
+        // Apply, as with the Apply button, then clear the field and apply again, as with OK, while the first write runs
+        CompletableFuture<Boolean> first;
+        CompletableFuture<Boolean> second;
+        try {
+            field.getField().setText(TOKEN);
+            first = field.apply();
+            await(firstWriteStarted, "the first write must start");
+            field.getField().setText("");
+            assertTrue(field.isModified(), "an empty field must differ from the token which is being stored");
+            second = field.apply();
+        } finally {
+            // The writes of all the fields run one after the other: the next test mustn't wait for this one
+            releaseFirstWrite.complete(null);
+        }
+
+        assertTrue(await(first, "the first write must end"));
+        assertTrue(await(second, "the second write must end"));
+        assertEquals(List.of(TOKEN, ""), writes, "the empty field must be written after the token");
+        assertNull(inBackground(GitHubTokenSettings::getToken), "the last applied value, the empty field, must win");
+        assertFalse(field.isModified(), "the field must have the stored value");
+        assertNull(getError(field));
     }
 
     /**

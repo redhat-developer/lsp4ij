@@ -50,7 +50,7 @@ import java.util.function.Supplier;
  * The token is read and written in a background thread, one operation after the other, never on the EDT, where the
  * Password Safe of 2026.3 isn't allowed: the field is disabled until the stored token is loaded. A token counts as
  * stored once the Password Safe has it: when the write fails, the field shows why and keeps the token as an unsaved
- * change, which the next apply writes again.
+ * change, which the next apply writes again. The last applied token wins, also over a write which is still running.
  */
 final class GitHubTokenField implements Disposable {
 
@@ -74,8 +74,14 @@ final class GitHubTokenField implements Disposable {
     private final CheckedDisposable uiDisposable = Disposer.newCheckedDisposable();
     private final ComponentValidator validator = new ComponentValidator(uiDisposable).installOn(field);
 
-    // The stored token, or null while it's loading: read and written on the EDT
+    // The state of the field, read and written on the EDT:
+    // the stored token, as the last write which succeeded left it, or null while it's loading;
     private @Nullable String storedToken;
+    // the token of the last apply while its write runs, or null if none runs;
+    private @Nullable String pendingToken;
+    // the number of the last write, and of the last write whose success storedToken has, as writes end in order
+    private int lastWrite;
+    private int storedWrite;
 
     GitHubTokenField() {
         this(GitHubTokenSettings::setToken);
@@ -117,6 +123,9 @@ final class GitHubTokenField implements Disposable {
      */
     @NotNull CompletableFuture<Void> reset() {
         storedToken = null;
+        // The load runs after the writes which run: it gets what they stored, and their ends change nothing
+        pendingToken = null;
+        storedWrite = lastWrite;
         field.setEnabled(false);
         showError(null);
         return inOrder(GitHubTokenSettings::getToken)
@@ -133,12 +142,13 @@ final class GitHubTokenField implements Disposable {
     }
 
     /**
-     * Returns true if the field has another token than the stored one. A field which is still loading isn't modified.
+     * Returns true if the field has another token than the last applied one: the one whose write runs, if any, or else
+     * the stored one. A field which is still loading isn't modified.
      *
-     * @return true if the field has another token than the stored one.
+     * @return true if the field has another token than the last applied one.
      */
     boolean isModified() {
-        return storedToken != null && !storedToken.equals(getToken());
+        return storedToken != null && !getToken().equals(pendingToken != null ? pendingToken : storedToken);
     }
 
     /**
@@ -153,18 +163,35 @@ final class GitHubTokenField implements Disposable {
             return CompletableFuture.completedFuture(true);
         }
         String token = getToken();
+        // The writes run one after the other: this one runs after any which still runs, and its token wins
+        int write = ++lastWrite;
+        pendingToken = token;
         return GitHubTokenField.<Void>inOrder(() -> {
                     store.accept(token);
                     return null;
                 })
                 .handleAsync((ignored, error) -> {
+                    boolean last = write == lastWrite;
+                    if (last) {
+                        pendingToken = null;
+                    }
                     if (error == null) {
-                        storedToken = token;
-                        showError(null);
+                        // An older write which ends after a newer one, or after a reset, doesn't change what's stored
+                        if (write > storedWrite) {
+                            storedWrite = write;
+                            storedToken = token;
+                        }
+                        if (last) {
+                            showError(null);
+                        }
                         return true;
                     }
                     String reason = getReason(error, token);
                     LOGGER.warn("Cannot store the GitHub token of the LSP4IJ settings in the Password Safe: {}", reason);
+                    if (!last) {
+                        // A newer apply replaces the token which wasn't stored
+                        return false;
+                    }
                     showError(reason);
                     if (!field.isShowing()) {
                         // As after OK, which closes the settings before the write fails
