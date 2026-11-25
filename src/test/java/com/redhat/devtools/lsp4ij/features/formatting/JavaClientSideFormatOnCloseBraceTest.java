@@ -39,9 +39,13 @@ public class JavaClientSideFormatOnCloseBraceTest extends LSPClientSideOnTypeFor
     {
         super.setUp();
         // Remove the native Java file type association so that it doesn't interfere
-        javaFileType = FileTypeManager.getInstance().getFileTypeByFileName(JAVA_FILE_EXTENSION);
+        javaFileType = FileTypeManager.getInstance().getFileTypeByExtension(JAVA_FILE_EXTENSION);
         assertNotNull(javaFileType);
         WriteAction.run(() -> FileTypeManager.getInstance().removeAssociatedExtension(javaFileType, JAVA_FILE_EXTENSION));
+        // IntelliJ formats a Java file itself, as the brace is typed, and asks no language server. The check names the
+        // Java file type: a test before this one can have left .java with another file type, which the removal took
+        assertNotSame("Test.java must not be a Java file", FileTypeManager.getInstance().findFileTypeByName("JAVA"),
+                FileTypeManager.getInstance().getFileTypeByFileName(TEST_FILE_NAME));
     }
 
     @Override

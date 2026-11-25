@@ -49,6 +49,10 @@ public class MockTextDocumentService implements TextDocumentService {
     private List<? extends Location> mockImplementations;
     private final List<ImplementationParams> implementationRequests = new CopyOnWriteArrayList<>();
     private List<? extends TextEdit> mockFormattingTextEdits;
+    // Counted by the threads which read the messages, and read by the tests while they wait for a request
+    public final AtomicInteger onTypeFormattingRequests = new AtomicInteger();
+    // Completes when the replies to textDocument/onTypeFormatting may be sent
+    private volatile CompletableFuture<Void> onTypeFormattingGate = CompletableFuture.completedFuture(null);
     private SignatureHelp mockSignatureHelp;
     private List<CodeLens> mockCodeLenses;
     private List<DocumentLink> mockDocumentLinks;
@@ -292,7 +296,21 @@ public class MockTextDocumentService implements TextDocumentService {
 
     @Override
     public CompletableFuture<List<? extends TextEdit>> onTypeFormatting(DocumentOnTypeFormattingParams params) {
-        return CompletableFuture.completedFuture(mockFormattingTextEdits);
+        onTypeFormattingRequests.incrementAndGet();
+        List<? extends TextEdit> textEdits = mockFormattingTextEdits;
+        return onTypeFormattingGate.thenApply(ignored -> textEdits);
+    }
+
+    /**
+     * Holds the replies to textDocument/onTypeFormatting requests until the returned future is completed, which the
+     * caller must do.
+     *
+     * @return the future that releases the held and later textDocument/onTypeFormatting replies when completed.
+     */
+    public CompletableFuture<Void> holdOnTypeFormatting() {
+        CompletableFuture<Void> gate = new CompletableFuture<>();
+        onTypeFormattingGate = gate;
+        return gate;
     }
 
     @Override
@@ -543,6 +561,8 @@ public class MockTextDocumentService implements TextDocumentService {
         this.codeActionRequests.set(0);
         this.lastCodeActionParams = null;
         this.codeActionGate = CompletableFuture.completedFuture(null);
+        this.onTypeFormattingRequests.set(0);
+        this.onTypeFormattingGate = CompletableFuture.completedFuture(null);
         this.resolveCompletionItemProcessor = null;
         this.documentLinkResolveProcessor = null;
         this.documentLinkResolveRequests.clear();

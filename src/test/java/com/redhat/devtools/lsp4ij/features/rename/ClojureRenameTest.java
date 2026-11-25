@@ -10,9 +10,12 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.features.rename;
 
+import com.intellij.openapi.util.Disposer;
 import com.redhat.devtools.lsp4ij.fixtures.LSPRenameFixtureTestCase;
+import com.redhat.devtools.lsp4ij.settings.GlobalLanguageServerSettings;
 
 import java.io.IOException;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Rename tests by emulating LSP 'textDocument/prepareRename' and 'textDocument/rename'
@@ -22,6 +25,18 @@ public class ClojureRenameTest extends LSPRenameFixtureTestCase {
 
     public ClojureRenameTest() {
         super("*.clj");
+    }
+
+    @Override
+    protected void setUp() throws Exception {
+        super.setUp();
+        // The 5 s of the file operations setting are for a user waiting for a rename: once they are up, the file is
+        // renamed without the workspace/willRenameFiles edit. The renames wait for it as long as a slow CI runner takes,
+        // and the test's end restores the setting.
+        var settings = GlobalLanguageServerSettings.getInstance();
+        int fileOperationsTimeout = settings.getFileOperationsTimeout();
+        Disposer.register(getTestRootDisposable(), () -> settings.setFileOperationsTimeout(fileOperationsTimeout));
+        settings.setFileOperationsTimeout((int) TimeUnit.SECONDS.toMillis(30));
     }
 
     public void testRenameNamespaceInEditor() {

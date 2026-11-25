@@ -85,6 +85,7 @@ import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -314,17 +315,25 @@ public class DAPJumpToDeclarationSessionTest extends HeavyPlatformTestCase {
         debug();
         var total = local("total");
         server.answersLocations = false;
+        // A wait shorter than the 3 seconds for a user leaves the search of the name nearly all of IntelliJ's 10 seconds,
+        // however slow the runner is
+        var timeout = Duration.ofMillis(100);
+        total.setDeclarationTimeout(timeout);
 
         long start = System.nanoTime();
         var position = jumpToSource(total);
-        long seconds = TimeUnit.NANOSECONDS.toSeconds(System.nanoTime() - start);
+        long millis = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start);
 
+        // The 'locations' request goes out asynchronously, and the search of the name doesn't wait until it has reached
+        // the DAP server: on a slow runner, the jump can end first
+        PlatformTestUtil.waitWithEventsDispatching("the DAP server got no 'locations' request",
+                () -> !server.locations.isEmpty(), BOUND_SECONDS);
         assertEquals(List.of(TOTAL_DECLARATION), List.copyOf(server.locations));
         // where the name is last found up to the line of the frame, once the wait for the DAP server ends
         assertEquals(sumFile, position.getFile());
         assertEquals(FRAME_LINE - 1, position.getLine());
-        assertTrue("The name is searched after the wait for the DAP server, within IntelliJ's 10 seconds: " + seconds,
-                seconds >= DAPValue.DECLARATION_TIMEOUT_SECONDS - 1 && seconds < 10);
+        assertTrue("The name is searched after the wait for the DAP server, within IntelliJ's 10 seconds: " + millis + " ms",
+                millis >= timeout.toMillis() && millis < TimeUnit.SECONDS.toMillis(10));
     }
 
     public void testJumpToSourceOnAValueOfAnEarlierStopSendsNoRequestAndSearchesTheName() throws Exception {

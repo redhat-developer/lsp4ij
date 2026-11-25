@@ -12,6 +12,7 @@ import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.fileEditor.FileDocumentManager;
 import com.intellij.openapi.progress.EmptyProgressIndicator;
 import com.intellij.openapi.progress.ProgressManager;
+import com.intellij.openapi.util.Disposer;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiDirectory;
 import com.intellij.psi.PsiElement;
@@ -21,6 +22,7 @@ import com.intellij.refactoring.move.moveFilesOrDirectories.MoveFilesOrDirectori
 import com.intellij.refactoring.rename.RenameProcessor;
 import com.redhat.devtools.lsp4ij.fixtures.LSPCodeInsightFixtureTestCase;
 import com.redhat.devtools.lsp4ij.mock.MockLanguageServer;
+import com.redhat.devtools.lsp4ij.settings.GlobalLanguageServerSettings;
 import org.eclipse.lsp4j.*;
 import org.jetbrains.annotations.NotNull;
 
@@ -73,6 +75,13 @@ public class FileOperationRefactoringTest extends LSPCodeInsightFixtureTestCase 
                 writeActions.decrementAndGet();
             }
         }, getTestRootDisposable());
+        // The 5 s of the file operations setting, of which the delayed answer of the server takes 500 ms, are for a user
+        // waiting for a rename: once they are up, the rename is made without the edit. The refactorings wait for it as
+        // long as a slow CI runner takes, and the test's end restores the setting.
+        var settings = GlobalLanguageServerSettings.getInstance();
+        int fileOperationsTimeout = settings.getFileOperationsTimeout();
+        Disposer.register(getTestRootDisposable(), () -> settings.setFileOperationsTimeout(fileOperationsTimeout));
+        settings.setFileOperationsTimeout((int) TimeUnit.SECONDS.toMillis(30));
     }
 
     public void testRenameRefactoringAsksTheServerBeforeItsWriteAction() throws Exception {

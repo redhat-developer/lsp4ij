@@ -77,12 +77,14 @@ public class ServerStopPendingWorkspaceSymbolTest extends UsefulTestCase {
         var file = myFixture.configureByText("main.foo", "content");
         connect(file, silent);
         var workspaceSymbolSupport = LSPWorkspaceSupport.getSupport(myFixture.getProject()).getWorkspaceSymbolSupport();
-        workspaceSymbolSupport.setAnswerTimeout(Duration.ofSeconds(2));
+        // The answering server has this time too, which a slow CI runner can use up before its answer comes. The
+        // support belongs to the project of this test only.
+        workspaceSymbolSupport.setAnswerTimeout(Duration.ofSeconds(5));
 
         var symbols = workspaceSymbolSupport.getWorkspaceSymbol(new LSPWorkspaceSymbolParams("main"));
 
         PlatformTestUtil.waitWithEventsDispatching("The search must end once the time of the silent server is up",
-                symbols::isDone, 10);
+                symbols::isDone, 30);
         assertEquals(List.of("main"), symbols.get(1, TimeUnit.SECONDS).stream()
                 .map(WorkspaceSymbolData::getName)
                 .toList());

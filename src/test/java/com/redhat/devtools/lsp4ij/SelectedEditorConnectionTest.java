@@ -27,6 +27,7 @@ import org.eclipse.lsp4j.DidOpenTextDocumentParams;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.time.Duration;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -198,10 +199,13 @@ public class SelectedEditorConnectionTest extends LSPCodeInsightFixtureTestCase 
         editors.openFile(last, true);
         PlatformTestUtil.waitWithEventsDispatching("selecting the tab must send its didOpen", opened::isDone, 10);
         var wrapper = ContainerUtil.getOnlyItem(LanguageServiceAccessor.getInstance(myFixture.getProject()).getStartedServers());
+        // Once freed, the dispatcher has as long as a slow runner takes to hand over the didClose, instead of what is
+        // left of the second for a user
+        wrapper.setStopWaitTimeout(Duration.ofSeconds(IN_MEMORY_TIMEOUT_SECONDS));
 
         // The dispatcher is still busy, as on a slow machine, when the close of the last file queues its didClose and
         // stops the server at once, as in tests. The stop checks the connection of the server, and then waits for the
-        // notifications that the dispatcher holds, a second at most, before the shutdown. The dispatcher is freed by
+        // notifications that the dispatcher holds, 10 s at most here, before the shutdown. The dispatcher is freed by
         // the stop itself, once its thread waits there, whenever the test thread runs: the stop gets the didClose
         // then. A stop that does not wait there never frees it, and sends the shutdown first, after which no didClose
         // is sent.

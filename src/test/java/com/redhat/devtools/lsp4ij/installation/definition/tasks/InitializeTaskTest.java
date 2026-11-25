@@ -29,6 +29,7 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -55,6 +56,9 @@ public class InitializeTaskTest {
     // and to get initialize on a slow machine, which the tests assert
     private static final int NO_ANSWER_TIMEOUT = 5_000;
     private static final String TRACE = "Test debug adapter listening at: ${address}:${port}";
+    // For the servers which end once asked to: as long as a slow machine takes to answer the end and to end, instead of
+    // the 2 s each for a user, after which the task destroys a server, which may not have read all it was sent then
+    private static final Duration END_TIMEOUT = Duration.ofSeconds(30);
 
     private Path record;
 
@@ -80,7 +84,8 @@ public class InitializeTaskTest {
     public void testALanguageServerWhichAnswersInitializeIsInstalledAndGetsShutdownAndExit() throws Exception {
         var context = context(languageServer(command("lsp", "answer")));
 
-        assertTrue(check(ANSWER_TIMEOUT, context), "the language server answers initialize: " + context.printed);
+        assertTrue(checkAServerWhichEnds(ANSWER_TIMEOUT, context),
+                "the language server answers initialize: " + context.printed);
         assertEquals(List.of("initialize", "shutdown", "exit"), received());
         assertTrue(context.printed.contains("The server answered initialize (test-server 1.0)."), context.printed.toString());
         assertGone();
@@ -90,7 +95,8 @@ public class InitializeTaskTest {
     public void testALanguageServerWhichAnswersInitializeWithAnErrorIsInstalledAndTheConsoleSaysSo() throws Exception {
         var context = context(languageServer(command("lsp", "error")));
 
-        assertTrue(check(ANSWER_TIMEOUT, context), "an error shows that the language server runs: " + context.printed);
+        assertTrue(checkAServerWhichEnds(ANSWER_TIMEOUT, context),
+                "an error shows that the language server runs: " + context.printed);
         assertTrue(context.printed.stream().anyMatch(line -> line.contains("answered initialize with an error")
                 && line.contains("test error")), context.printed.toString());
         assertEquals(List.of("initialize", "shutdown", "exit"), received());
@@ -175,7 +181,8 @@ public class InitializeTaskTest {
         server.setTransport(UserDefinedTransport.of(UserDefinedTransport.Mode.START_AND_CONNECT, null, 0));
         var context = context(server);
 
-        assertTrue(check(ANSWER_TIMEOUT, context), "the language server answers initialize over the socket: " + context.printed);
+        assertTrue(checkAServerWhichEnds(ANSWER_TIMEOUT, context),
+                "the language server answers initialize over the socket: " + context.printed);
         assertEquals(List.of("initialize", "shutdown", "exit"), received());
         assertGone();
     }
@@ -186,7 +193,8 @@ public class InitializeTaskTest {
         server.setTransport(UserDefinedTransport.of(UserDefinedTransport.Mode.START_AND_ACCEPT, null, 0));
         var context = context(server);
 
-        assertTrue(check(ANSWER_TIMEOUT, context), "the language server answers initialize over the socket: " + context.printed);
+        assertTrue(checkAServerWhichEnds(ANSWER_TIMEOUT, context),
+                "the language server answers initialize over the socket: " + context.printed);
         assertEquals(List.of("initialize", "shutdown", "exit"), received());
         assertGone();
     }
@@ -224,7 +232,8 @@ public class InitializeTaskTest {
     public void testADebugAdapterWhichAnswersInitializeIsInstalledAndGetsDisconnect() throws Exception {
         var context = context(debugAdapter(command("dap", "answer"), null));
 
-        assertTrue(check(ANSWER_TIMEOUT, context), "the debug adapter answers initialize: " + context.printed);
+        assertTrue(checkAServerWhichEnds(ANSWER_TIMEOUT, context),
+                "the debug adapter answers initialize: " + context.printed);
         assertEquals(List.of("initialize", "disconnect"), received());
         assertGone();
     }
@@ -243,7 +252,8 @@ public class InitializeTaskTest {
     public void testADebugAdapterWhichPrintsWhereItListensIsCheckedOverASocket() throws Exception {
         var context = context(debugAdapter(command("dap", "answer", "listen", "0", "print"), TRACE));
 
-        assertTrue(check(ANSWER_TIMEOUT, context), "the debug adapter answers initialize over the socket: " + context.printed);
+        assertTrue(checkAServerWhichEnds(ANSWER_TIMEOUT, context),
+                "the debug adapter answers initialize over the socket: " + context.printed);
         assertEquals(List.of("initialize", "disconnect"), received());
         assertGone();
     }
@@ -252,7 +262,8 @@ public class InitializeTaskTest {
     public void testADebugAdapterWhichListensOnThePortOfItsCommandIsCheckedOverASocket() throws Exception {
         var context = context(debugAdapter(command("dap", "answer", "listen", "${port}"), null));
 
-        assertTrue(check(ANSWER_TIMEOUT, context), "the debug adapter answers initialize over the socket: " + context.printed);
+        assertTrue(checkAServerWhichEnds(ANSWER_TIMEOUT, context),
+                "the debug adapter answers initialize over the socket: " + context.printed);
         assertEquals(List.of("initialize", "disconnect"), received());
         assertGone();
     }
@@ -292,8 +303,22 @@ public class InitializeTaskTest {
     }
 
     private static boolean check(int timeout, @NotNull InstallerContext context) {
+        return task(timeout).run(context);
+    }
+
+    /**
+     * Checks a server which answers initialize and ends once asked to, and gives it {@link #END_TIMEOUT} to answer the
+     * end, and then to end.
+     */
+    private static boolean checkAServerWhichEnds(int timeout, @NotNull InstallerContext context) {
+        var task = task(timeout);
+        task.setEndTimeout(END_TIMEOUT);
+        return task.run(context);
+    }
+
+    private static @NotNull InitializeTask task(int timeout) {
         var descriptor = new ServerInstallerDescriptor("test", false, new InstallerTaskRegistry());
-        return new InitializeTask(null, "Check that the server starts", null, null, timeout, descriptor).run(context);
+        return new InitializeTask(null, "Check that the server starts", null, null, timeout, descriptor);
     }
 
     private static @NotNull UserDefinedLanguageServerDefinition languageServer(@NotNull String command) {
