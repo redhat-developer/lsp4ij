@@ -477,14 +477,16 @@ does. A notification closed without a click ends the task, which then fails.
 
 ### Task exec
 
-Runs a command. The task succeeds when the command exits with 0 and writes nothing on its standard error.
+Runs a command. The task succeeds when the command exits with 0 and writes nothing on its standard error, and, with
+`outputMatches`, when its standard output matches it too.
 
-| Key            | Value                                                                                                                                                                                                                                                                                                                  | Default                                   |
-|----------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------------------------------|
-| `command`      | the command: a string, which LSP4IJ splits at its spaces outside double quotes, or an array of its arguments; or an object of these by OS, as [`programArgs`](#command). LSP4IJ expands the macros, such as `$USER_HOME$`, in each argument. Of the [properties](#properties), it replaces only a whole `${server.command}`. | none: the task fails                      |
-| `workingDir`   | the directory in which the command runs, with properties and macros. LSP4IJ creates it if it doesn't exist.                                                                                                                                                                                                            | the project's directory                   |
-| `timeout`      | the time in milliseconds after which LSP4IJ stops the command. The task then succeeds.                                                                                                                                                                                                                                 | none: LSP4IJ waits until the command ends |
-| `ignoreStderr` | `true` lets the task succeed when the command writes on its standard error, as `npm install` does with its warnings                                                                                                                                                                                                   | `false`                                   |
+| Key             | Value                                                                                                                                                                                                                                                                                                                        | Default                                   |
+|-----------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------------------------------|
+| `command`       | the command: a string, which LSP4IJ splits at its spaces outside double quotes, or an array of its arguments; or an object of these by OS, as [`programArgs`](#command). LSP4IJ expands the macros, such as `$USER_HOME$`, in each argument. Of the [properties](#properties), it replaces only a whole `${server.command}`. | none: the task fails                      |
+| `workingDir`    | the directory in which the command runs, with properties and macros. LSP4IJ creates it if it doesn't exist.                                                                                                                                                                                                                  | the project's directory                   |
+| `timeout`       | the time in milliseconds after which LSP4IJ stops the command. The task then succeeds.                                                                                                                                                                                                                                       | none: LSP4IJ waits until the command ends |
+| `ignoreStderr`  | `true` lets the task succeed when the command writes on its standard error, as `npm install` does with its warnings                                                                                                                                                                                                          | `false`                                   |
+| `outputMatches` | a [regular expression](https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/regex/Pattern.html) that the standard output of the command must match somewhere for the task to succeed, as a version, see [Output of the command](#output-of-the-command)                                                    | none: any output                          |
 
 The console of the installation shows the command after `> `, and its output. The command gets the environment
 variables of the IDE and, since IntelliJ 2025.1, the environment of its working directory, as a language server does
@@ -551,6 +553,40 @@ An `exec` whose command still runs at its `timeout` succeeds: that's meant for a
 server does, but a command which hangs, waits for input, or fails later, succeeds too. That's why the `check` above
 runs the [initialize](#task-initialize) task once the `exec` of `${server.command}` succeeds. Use `exec` alone for a
 command which ends by itself, as `node --version`.
+
+#### Output of the command
+
+With `outputMatches`, the task succeeds only if the standard output of the command matches the regular expression
+somewhere, as Java's `Matcher.find()` does, besides the exit code and the standard error. Use `(?m)` for `^` and `$` to
+match at the start and the end of each line. A check can so ask for a version of a tool, which an exit code doesn't
+say. For instance, `dotnet --list-sdks` prints a line per .NET SDK, as `10.0.100 [/usr/local/share/dotnet/sdk]`, or
+`10.0.100 [C:\Program Files\dotnet\sdk]` on Windows, and this check asks for the .NET SDK 10 or later: a line which
+starts with a major version of two digits or more, so not `8.0.404` nor `9.0.300`, and a space after the version, so
+not a preview, as `10.0.100-rc.2.25502.107`:
+
+```json
+{
+  "exec": {
+    "name": "Check the .NET SDK 10 or later",
+    "command": "dotnet --list-sdks",
+    "outputMatches": "(?m)^[1-9]\\d+\\.\\d+\\.\\d+\\s",
+    "onFail": {
+      "showMessage": {
+        "name": ".NET SDK 10 or later not found",
+        "content": "Install the <a href=\"https://dotnet.microsoft.com/download\">.NET SDK</a> 10 or later."
+      }
+    }
+  }
+}
+```
+
+The regular expression is in a JSON string, so each `\` of the regular expression is written `\\`. When the output
+doesn't match, the console says so, with the output, and the task fails. A command which still runs at its `timeout`
+succeeds only if what it printed until then matches. A regular expression which isn't valid fails the task, without
+running the command, and the console says why.
+
+LSP4IJ 0.30.1 and earlier don't know `outputMatches`, and ignore it: there, the task succeeds whatever the output, as
+an `exec` without it.
 
 ### Task initialize
 
