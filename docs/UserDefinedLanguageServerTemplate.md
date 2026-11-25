@@ -87,7 +87,8 @@ All its fields are listed in [Fields](#fields).
   "fileTypeMappings": [
     {
       "fileType": {
-        "name": "JavaScript"
+        "name": "JavaScript",
+        "patterns": ["*.js"]
       },
       "languageId": "javascript"
     },
@@ -495,7 +496,8 @@ installers, which install one npm package into `$USER_HOME$/.lsp4ij/lsp/vscode-l
 An installation which started because its check failed, and waited, runs the check again once the other task is done,
 and skips the command if the check then passes. `Reinstall` and the links of the `Installer` tab don't skip it.
 
-Example using `npm` to install [typescript-language-server](https://github.com/typescript-language-server/typescript-language-server):
+Example using `npm` to install [typescript-language-server](https://github.com/typescript-language-server/typescript-language-server),
+as the bundled template does:
 
 ```json
 {
@@ -503,7 +505,7 @@ Example using `npm` to install [typescript-language-server](https://github.com/t
   "name": "TypeScript Language Server",
   "executeOnStartServer": false,
   "properties": {
-    "workingDir" : "$USER_HOME$/.lsp4ij/typescript-language-server"
+    "workingDir" : "$USER_HOME$/.lsp4ij/lsp/typescript-language-server/node_modules"
   },
   "check": {
     "exec": {
@@ -530,8 +532,8 @@ Example using `npm` to install [typescript-language-server](https://github.com/t
         "configureServer": {
           "name": "Configure TypeScript Language Server command",
           "command": {
-            "windows": "${workingDir}/node_modules/.bin/typescript-language-server.cmd --stdio",
-            "default": "${workingDir}/node_modules/.bin/typescript-language-server --stdio"
+            "windows": "\"${workingDir}/.bin/typescript-language-server.cmd\" --stdio",
+            "default": "\"${workingDir}/.bin/typescript-language-server\" --stdio"
           },
           "update": true
         }
@@ -540,6 +542,11 @@ Example using `npm` to install [typescript-language-server](https://github.com/t
   }
 }
 ```
+
+`npm install` runs in the `node_modules` folder of the server, because npm installs into the first folder, from its
+working directory up, which has a `package.json` or a `node_modules` folder. Run in a new, empty folder, it would install
+into a parent folder which has one, such as the home directory. Run in `node_modules`, it installs into its parent,
+`$USER_HOME$/.lsp4ij/lsp/typescript-language-server`, so the command is in `${workingDir}/.bin`.
 
 An `exec` whose command still runs at its `timeout` succeeds: that's meant for a command which waits, as a language
 server does, but a command which hangs, waits for input, or fails later, succeeds too. That's why the `check` above
@@ -669,7 +676,8 @@ and the console says so. Without a URL for the OS and the architecture, the task
 LSP4IJ downloads the file into a temporary folder. An archive, such as a `.zip`, `.vsix`, `.tar`, `.tar.gz` or `.tgz`
 file, is extracted into `output.dir`, and a `.gz` file that isn't a `.tar.gz` is decompressed there, as the one that
 the rust-analyzer installer downloads on Linux and macOS. Any other file is copied there, under `output.file.name` or
-its own name, in place of the file of an earlier installation.
+its own name, in place of the file of an earlier installation. The name of the downloaded file, by which LSP4IJ also
+recognizes an archive, is the last segment of the path of the URL, without its query or fragment.
 
 Example: downloading a JAR and configuring the start command
 
@@ -951,7 +959,8 @@ property is `$USER_HOME$/.lsp4ij/lsp/rust-analyzer`:
   [perl-lsp installer](../src/main/resources/templates/lsp/perl-lsp/installer.json) does.
 * `file.name`: name of the executable file (registered as `${output.file.name}`), by OS and architecture. When it is
   set, the task fails if the file isn't in `${output.dir}` after the download. A file which isn't an archive is saved
-  under this name, and without it, under its own name, which is then `${output.file.name}`.
+  under this name, and without it, under its own name, the last segment of the path of the URL without its query or
+  fragment, which is then `${output.file.name}`.
 * `file.executable` (optional, `false` by default): `true` makes the file of `file.name` executable.
 
 #### Task configureServer

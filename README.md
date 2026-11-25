@@ -373,14 +373,15 @@ by opening the `Languages & Frameworks / Language Servers (LSP4IJ)` preferences:
 
 You can select:
  * `None` : in this case the language server error will be ignored.
- * `In notification` (default value) : in this case the language server error appear as a `notification`:
+ * `As notification` (default value) : in this case the language server error appear as a `notification`:
 ![Error in notification](./docs/images/troubleshooting/LanguageServerErrorInNotification.png)
  The error notification shows 3 possible actions:
    * `Disable error reporting` : sets the error reporting to `None`.
    * `Report error in Log` : sets the error reporting to `In log`. 
    * `Open LSP4IJ documentation` : opens this documentation. 
- * `In log` : in this case the language server error will be logged in the standard `IntelliJ log`:
-![Error in log](./docs/images/troubleshooting/LanguageServerErrorInLog.png)
+ * `In log` : in this case the language server error is logged as a warning in `idea.log`, the standard IntelliJ log,
+   as `Error while consuming 'textDocument/hover' with language server 'My Language Server'` followed by the error.
+   No IDE error dialog opens.
 
 You can see this error's details in the [LSP Consoles view](./docs/UserGuide.md#lsp-console) (by setting the `Debug / Trace` combo box in `verbose`):
 
