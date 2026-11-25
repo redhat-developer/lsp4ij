@@ -38,6 +38,9 @@ import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.nio.file.Files;
+import java.nio.file.InvalidPathException;
+import java.nio.file.Path;
 import java.util.Map;
 
 import static com.redhat.devtools.lsp4ij.server.definition.launching.CommandUtils.createCommandLine;
@@ -55,7 +58,7 @@ public class UserDefinedLanguageServerDefinition extends LanguageServerDefinitio
     /**
      * The root of the language server in its command and its working directory: with {@code serverInstances}, the
      * root of each instance, and otherwise the project's directory, as {@code $PROJECT_DIR$}. A root in an archive is
-     * the project's directory too.
+     * the project's directory too. A language server without a configured working directory runs in its root.
      */
     public static final @NotNull String INSTANCE_ROOT_MACRO = "${instanceRoot}";
     private final String templateId;
@@ -146,24 +149,36 @@ public class UserDefinedLanguageServerDefinition extends LanguageServerDefinitio
     @Override
     public @NotNull StreamConnectionProvider createConnectionProvider(@NotNull Project project) {
         // The one language server of the project has the project's directory as root
-        return createConnectionProvider(project, project.getBasePath(), null, transport);
+        return createConnectionProvider(project, project.getBasePath(), transport);
     }
 
     @Override
     public @NotNull StreamConnectionProvider createConnectionProvider(@NotNull Project project,
                                                                       @NotNull WorkspaceFolder instanceRoot) {
-        // Without a configured working directory, an instance runs in its root, unless that is inside an archive
         var root = LSPIJUtils.findResourceFor(instanceRoot.getUri());
         String directory = root != null && root.isInLocalFileSystem() ? root.getPath() : null;
         // A root in an archive is no directory to run in or to name: the project's directory stands for it
-        return createConnectionProvider(project, directory != null ? directory : project.getBasePath(), directory, transport);
+        return createConnectionProvider(project, directory != null ? directory : project.getBasePath(), transport);
     }
 
+    /**
+     * Creates the connection provider of the language server with the given root. Without a configured working
+     * directory, the language server runs in its root, so that it gets the environment of that directory, as with mise
+     * or direnv: the root of its instance, or the project's directory. A root which is no directory on disk gives none,
+     * as before, so that the language server still starts.
+     *
+     * @param project   the project.
+     * @param root      the root of the language server, as {@link #INSTANCE_ROOT_MACRO}, or null if it has none, as
+     *                  the default project.
+     * @param transport how LSP4IJ talks to the language server.
+     * @return the connection provider.
+     */
     private @NotNull StreamConnectionProvider createConnectionProvider(@NotNull Project project,
                                                                        @Nullable String root,
-                                                                       @Nullable String defaultWorkingDir,
                                                                        @NotNull UserDefinedTransport transport) {
-        String resolvedWorkingDir = workingDir != null && !workingDir.isBlank() ? resolve(workingDir, project, root) : defaultWorkingDir;
+        String resolvedWorkingDir = workingDir != null && !workingDir.isBlank()
+                ? resolve(workingDir, project, root)
+                : existingDirectory(root);
         return switch (transport.mode()) {
             case STDIO -> new UserDefinedStreamConnectionProvider(resolve(commandLine, project, root),
                     resolvedWorkingDir,
@@ -192,6 +207,23 @@ public class UserDefinedLanguageServerDefinition extends LanguageServerDefinitio
                     this,
                     project);
         };
+    }
+
+    /**
+     * Returns the given directory if it exists, and null otherwise, as for a project whose directory isn't on disk.
+     *
+     * @param directory the directory, or null.
+     * @return the directory if it exists, and null otherwise.
+     */
+    private static @Nullable String existingDirectory(@Nullable String directory) {
+        if (directory == null) {
+            return null;
+        }
+        try {
+            return Files.isDirectory(Path.of(directory)) ? directory : null;
+        } catch (InvalidPathException e) {
+            return null;
+        }
     }
 
     /**
@@ -282,7 +314,7 @@ public class UserDefinedLanguageServerDefinition extends LanguageServerDefinitio
             // Read once, so that the check and the connection have the same transport, also while the settings change it
             var transport = this.transport;
             return transport.startsLanguageServer()
-                    ? createConnectionProvider(project, project.getBasePath(), null, transport)
+                    ? createConnectionProvider(project, project.getBasePath(), transport)
                     : null;
         });
     }

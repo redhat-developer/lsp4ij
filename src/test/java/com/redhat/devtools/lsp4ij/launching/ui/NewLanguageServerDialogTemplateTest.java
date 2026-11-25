@@ -8,7 +8,10 @@
 package com.redhat.devtools.lsp4ij.launching.ui;
 
 import com.intellij.openapi.ui.DialogWrapper;
+import com.intellij.openapi.ui.TextFieldWithBrowseButton;
 import com.intellij.testFramework.fixtures.BasePlatformTestCase;
+import com.intellij.ui.components.JBTextField;
+import com.intellij.util.ui.UIUtil;
 import com.redhat.devtools.lsp4ij.LanguageServerBundle;
 import com.redhat.devtools.lsp4ij.LanguageServersRegistry;
 import com.redhat.devtools.lsp4ij.launching.UserDefinedLanguageServerSettings;
@@ -18,6 +21,8 @@ import com.redhat.devtools.lsp4ij.server.definition.launching.UserDefinedTranspo
 import com.redhat.devtools.lsp4ij.templates.ServerTemplate;
 import org.jetbrains.annotations.NotNull;
 
+import javax.swing.JComponent;
+import java.awt.Component;
 import java.util.Map;
 import java.util.function.Consumer;
 
@@ -89,6 +94,36 @@ public class NewLanguageServerDialogTemplateTest extends BasePlatformTestCase {
         } finally {
             dialog.close(DialogWrapper.CANCEL_EXIT_CODE);
         }
+    }
+
+    public void testAnEmptyWorkingDirectoryShowsWhereTheLanguageServerRuns() {
+        var dialog = new NewLanguageServerDialog(getProject());
+        try {
+            dialog.loadFromTemplate(template(template -> template.setWorkingDir(null)));
+            assertEquals(LanguageServerBundle.message("language.server.workingDir.emptyText"), workingDirEmptyText(dialog));
+
+            dialog.loadFromTemplate(template(template -> template.setWorkspaceFolderConfiguration("{\"serverInstances\": {}}")));
+            assertEquals(LanguageServerBundle.message("language.server.workingDir.emptyText.instances"), workingDirEmptyText(dialog));
+        } finally {
+            dialog.close(DialogWrapper.CANCEL_EXIT_CODE);
+        }
+    }
+
+    /**
+     * Returns the placeholder of the dialog's working directory field. The server name field is in the dialog's form,
+     * and without a window, the top of the form is the topmost parent of that field.
+     */
+    private static @NotNull String workingDirEmptyText(@NotNull NewLanguageServerDialog dialog) {
+        Component top = dialog.getPreferredFocusedComponent();
+        while (top.getParent() != null) {
+            top = top.getParent();
+        }
+        var field = UIUtil.findComponentsOfType((JComponent) top, TextFieldWithBrowseButton.class).stream()
+                // the environment variables are a subclass
+                .filter(component -> component.getClass() == TextFieldWithBrowseButton.class)
+                .findFirst()
+                .orElseThrow();
+        return ((JBTextField) field.getTextField()).getEmptyText().getText();
     }
 
     private @NotNull UserDefinedLanguageServerDefinition add(@NotNull Consumer<LanguageServerTemplate> templateSetup) {

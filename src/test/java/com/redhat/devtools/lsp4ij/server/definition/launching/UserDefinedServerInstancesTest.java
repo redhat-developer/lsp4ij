@@ -115,19 +115,22 @@ public class UserDefinedServerInstancesTest extends BasePlatformTestCase {
         assertEquals(new File(workingDirectory.getPath()), workDirectoryOfInstance(folder));
     }
 
-    public void testAnInstanceWithARootInAnArchiveGetsNoWorkingDirectory() throws IOException {
+    public void testAnInstanceWithARootInAnArchiveRunsInTheProjectDirectory() throws IOException {
+        createProjectDirectory();
         var folder = archiveRoot();
         addDefinition(null, "{\"serverInstances\": {}}");
 
-        assertNull(workDirectoryOfInstance(folder));
+        // as ${instanceRoot} is the project's directory for it
+        assertEquals(new File(getProject().getBasePath()), workDirectoryOfInstance(folder));
     }
 
-    public void testOneInstancePerProjectGetsNoWorkingDirectoryOfItsOwn() {
+    public void testOneInstancePerProjectRunsInTheProjectDirectory() throws IOException {
+        createProjectDirectory();
         addDefinition(null, null);
 
         var provider = (OSProcessStreamConnectionProvider) definition.createConnectionProvider(getProject());
 
-        assertNull(provider.getCommandLine().getWorkDirectory());
+        assertEquals(new File(getProject().getBasePath()), provider.getCommandLine().getWorkDirectory());
     }
 
     public void testTheInstanceRootMacroIsTheRootOfEachInstance() throws IOException {
@@ -214,6 +217,18 @@ public class UserDefinedServerInstancesTest extends BasePlatformTestCase {
         LanguageServersRegistry.getInstance().updateServerDefinition(new LanguageServersRegistry.UpdateServerDefinitionRequest(
                 getProject(), definition, definition.getDisplayName(), null, definition.getCommandLine(), null, Map.of(), false,
                 MAPPINGS, null, null, configuration, definition.getTransport()), false);
+    }
+
+    /**
+     * Creates the directory of the project until the end of the test: that of the light project of the tests isn't on
+     * disk, and a language server only runs in a directory which is.
+     */
+    private void createProjectDirectory() throws IOException {
+        Path directory = Path.of(getProject().getBasePath());
+        if (!Files.isDirectory(directory)) {
+            Files.createDirectories(directory);
+            Disposer.register(getTestRootDisposable(), () -> FileUtil.delete(directory.toFile()));
+        }
     }
 
     private @NotNull VirtualFile localDirectory() throws IOException {
