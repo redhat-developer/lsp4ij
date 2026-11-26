@@ -27,8 +27,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
 
-      # Free GitHub Actions Environment Disk Space
+      # Free GitHub Actions Environment Disk Space, for main, which verifies the plugin against every release since the
+      # oldest. A pull request verifies it against two IDEs only, for which the runner's free disk (87 GB in November
+      # 2026) is plenty, so it skips this step, which takes 1.5 to 2.5 minutes.
       - name: Maximize Build Space
+        if: github.event_name != 'pull_request'
         uses: jlumbroso/free-disk-space@ceedf095f4ec1a097402bc6bd80831f2e1a6fde6 # v2.0.0
         with:
           preinstalled-runtimes: false
