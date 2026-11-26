@@ -16,9 +16,17 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Whether a pull request changes only documentation, which needs no tests
+  changes:
+    uses: ./.github/workflows/changes.yml
+    permissions:
+      pull-requests: read
+
   # Run tests and upload a code coverage report
   test:
     name: Test (${{ matrix.os }}${{ matrix.platformVersion && format(', {0}', matrix.platformVersion) || '' }})
+    needs: changes
+    if: needs.changes.outputs.docs_only != 'true'
     runs-on: ${{ matrix.os }}
 
     # Codecov authenticates uploads with a short-lived OIDC token instead of a
