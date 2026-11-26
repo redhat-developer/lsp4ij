@@ -134,6 +134,25 @@ public class DownloadTaskArchiveRootTest {
         assertFalse(Files.exists(serverDist.resolve(ROOT_FOLDER)), "the root folder must be stripped");
     }
 
+    @Test
+    public void testStripRootFolderReplacesTheFileAndTheFolderOfAnEarlierInstall() throws IOException {
+        // As an earlier install left them: the server, and a folder with files that the new release no longer has
+        Files.createDirectories(serverDist.resolve("lib").resolve("nested"));
+        Files.writeString(serverDist.resolve(SERVER), "old server");
+        Files.writeString(serverDist.resolve("lib").resolve("old.jar"), "old");
+        Files.writeString(serverDist.resolve("lib").resolve("nested").resolve("old.txt"), "old");
+        Path asset = tarGz("cpp_ls-darwin-x64.tar.gz", ROOT_FOLDER + "/", ROOT_FOLDER + "/" + SERVER,
+                ROOT_FOLDER + "/lib/", ROOT_FOLDER + "/lib/new.jar");
+
+        assertInstalled(asset, true, serverDist);
+        assertEquals("server", Files.readString(serverDist.resolve("lib").resolve("new.jar")),
+                "the folder of the new release must be installed");
+        assertFalse(Files.exists(serverDist.resolve("lib").resolve("old.jar")),
+                "the folder of the earlier install must be replaced, not merged");
+        assertFalse(Files.exists(serverDist.resolve("lib").resolve("nested")),
+                "the folders inside the folder of the earlier install must be deleted too");
+    }
+
     /**
      * Runs the bundled cpp_ls installer, which downloads the given archive into a temp folder, with or without
      * {@code stripRootFolder}, and asserts that it installs the server into the given folder, which is its
