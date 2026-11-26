@@ -80,7 +80,8 @@ public class MockTextDocumentService implements TextDocumentService {
 
     private final List<OpenCloseNotification> openCloseNotifications = new CopyOnWriteArrayList<>();
     private CompletableFuture<DidSaveTextDocumentParams> didSaveCallback;
-    private CompletableFuture<DidCloseTextDocumentParams> didCloseCallback;
+    // Set by the test thread, taken by the thread of the language server
+    private final AtomicReference<CompletableFuture<DidCloseTextDocumentParams>> didCloseCallback = new AtomicReference<>();
     private List<TextEdit> mockWillSaveWaitUntilTextEdits;
     private volatile CompletableFuture<Void> willSaveWaitUntilGate = CompletableFuture.completedFuture(null);
     private ConcurrentLinkedQueue<DidChangeTextDocumentParams> didChangeEvents = new ConcurrentLinkedQueue<>();
@@ -328,8 +329,10 @@ public class MockTextDocumentService implements TextDocumentService {
     public void didOpen(DidOpenTextDocumentParams params) {
         String opened = params.getTextDocument().getUri();
         MockLanguageServer.INSTANCE.record("didOpen:" + opened.substring(opened.lastIndexOf('/') + 1));
-        openCloseNotifications.add(new OpenCloseNotification(true, URI.create(opened)));
+        // Read before the notification is recorded: a test that sees it recorded and then sets a callback must not have
+        // that callback completed by this notification. The callback is still completed after the record.
         var expectation = didOpenExpectation.get();
+        openCloseNotifications.add(new OpenCloseNotification(true, URI.create(opened)));
         if (expectation != null && expectation.filter().test(params)
                 && didOpenExpectation.compareAndSet(expectation, null)) {
             expectation.future().complete(params);
@@ -361,10 +364,12 @@ public class MockTextDocumentService implements TextDocumentService {
 
     @Override
     public void didClose(DidCloseTextDocumentParams params) {
+        // Read before the notification is recorded, as in didOpen
+        var callback = didCloseCallback.get();
         openCloseNotifications.add(new OpenCloseNotification(false, URI.create(params.getTextDocument().getUri())));
-        if (didCloseCallback != null) {
-            didCloseCallback.complete(params);
-            didCloseCallback = null;
+        // A callback that the test set meanwhile is kept for the next didClose
+        if (callback != null && didCloseCallback.compareAndSet(callback, null)) {
+            callback.complete(params);
         }
     }
 
@@ -472,7 +477,7 @@ public class MockTextDocumentService implements TextDocumentService {
     }
 
     public void setDidCloseCallback(CompletableFuture<DidCloseTextDocumentParams> didCloseExpectation) {
-        this.didCloseCallback = didCloseExpectation;
+        this.didCloseCallback.set(didCloseExpectation);
     }
 
     public void setMockHover(Hover hover) {
