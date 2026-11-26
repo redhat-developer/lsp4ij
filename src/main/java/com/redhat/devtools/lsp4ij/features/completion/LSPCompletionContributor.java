@@ -253,7 +253,7 @@ public class LSPCompletionContributor extends CompletionContributor {
                 if (itemDefaults.getEditRange().isLeft()) {
                     Range defaultRange = itemDefaults.getEditRange().getLeft();
                     if (defaultRange != null) {
-item.setTextEdit(Either.forLeft(new TextEdit(defaultRange, itemText)));
+                        item.setTextEdit(Either.forLeft(new TextEdit(defaultRange, itemText)));
                     }
                 } else {
                     InsertReplaceRange defaultInsertReplaceRange = itemDefaults.getEditRange().getRight();

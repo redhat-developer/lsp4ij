@@ -25,7 +25,8 @@ public class CompletionItemDefaultsEditRangeTest extends LSPCompletionFixtureTes
 
     private static final String TEST_FILE_NAME = "test.tsx";
 
-    // A list with a default edit range, whose items have only a label.
+    // A list whose default edit range covers "ga-tail", more than the word before the caret, and whose items have only
+    // a label.
     // language=json
     private static final String LABEL_ONLY_COMPLETION_JSON = """
             {
@@ -50,7 +51,7 @@ public class CompletionItemDefaultsEditRangeTest extends LSPCompletionFixtureTes
               "itemDefaults": {
                 "editRange": {
                   "start": { "line": 0, "character": 0 },
-                  "end": { "line": 0, "character": 6 }
+                  "end": { "line": 0, "character": 7 }
                 }
               }
             }""";
@@ -69,7 +70,7 @@ public class CompletionItemDefaultsEditRangeTest extends LSPCompletionFixtureTes
                   "textEdit": {
                     "range": {
                       "start": { "line": 0, "character": 0 },
-                      "end": { "line": 0, "character": 8 }
+                      "end": { "line": 0, "character": 2 }
                     },
                     "newText": "column-left-small"
                   }
@@ -88,7 +89,7 @@ public class CompletionItemDefaultsEditRangeTest extends LSPCompletionFixtureTes
               "itemDefaults": {
                 "editRange": {
                   "start": { "line": 0, "character": 0 },
-                  "end": { "line": 0, "character": 8 }
+                  "end": { "line": 0, "character": 2 }
                 }
               }
             }""";
@@ -98,7 +99,8 @@ public class CompletionItemDefaultsEditRangeTest extends LSPCompletionFixtureTes
     }
 
     public void testAnItemWithOnlyALabelReplacesTheDefaultEditRangeWithItsLabel() {
-        assertCompletion(TEST_FILE_NAME, "ga<caret>", LABEL_ONLY_COMPLETION_JSON, "gap-1", "gap-12");
+        // Without the default edit range, the label would replace only the word before the caret: gap-1-tail
+        assertCompletion(TEST_FILE_NAME, "ga<caret>-tail", LABEL_ONLY_COMPLETION_JSON, "gap-1", "gap-12");
         assertApplyCompletionItem(0, "gap-1<caret>");
     }
 
