@@ -518,6 +518,9 @@
         <!-- Refreshes the JAR of the LSP and DAP templates in a development build, so that a rebuilt JAR gives its own templates -->
         <postStartupActivity
                 implementation="com.redhat.devtools.lsp4ij.templates.TemplateJarRefreshActivity"/>
+        <!-- Marks the files whose document changes, for the check of a workspace edit's targets; also a VFS listener below -->
+        <editorFactoryDocumentListener
+                implementation="com.redhat.devtools.lsp4ij.WorkspaceEditSnapshot$TextChanges"/>
 
         <!-- LSP project services -->
         <projectService
@@ -1154,6 +1157,10 @@
         <listener
                 topic="com.intellij.openapi.fileEditor.FileDocumentManagerListener"
                 class="com.redhat.devtools.lsp4ij.LSPDocumentSaveListener"/>
+        <!-- Marks the files that VFS events change, for the check of a workspace edit's targets -->
+        <listener
+                topic="com.intellij.openapi.vfs.newvfs.BulkFileListener"
+                class="com.redhat.devtools.lsp4ij.WorkspaceEditSnapshot$TextChanges"/>
         <listener topic="com.intellij.ide.AppLifecycleListener"
                   class="com.redhat.devtools.lsp4ij.client.indexing.ProjectIndexingAppLifecycleListener"/>
     </applicationListeners>
