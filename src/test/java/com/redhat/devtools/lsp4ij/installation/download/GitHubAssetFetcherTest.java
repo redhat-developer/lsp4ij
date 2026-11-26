@@ -7,7 +7,6 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.installation.download;
 
-import com.redhat.devtools.lsp4ij.installation.download.GitHubAccountTokenProvider.AccountToken;
 import com.redhat.devtools.lsp4ij.installation.download.LocalHttpServer.Request;
 import com.redhat.devtools.lsp4ij.installation.download.LocalHttpServer.Response;
 import org.jetbrains.annotations.NotNull;
@@ -39,15 +38,13 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * The lookup of a GitHub release asks the GitHub API for the most releases it gives on one page, 100 instead of 30,
  * so that the latest release of a repository with many prereleases is among them (#1961). It sends the GitHub token of
- * the environment variable {@code GITHUB_TOKEN}, or else {@code GH_TOKEN} (#2142), or else of the LSP4IJ settings, or
- * else of the IDE's GitHub account on the server of the GitHub API (#2188), to the GitHub API only, and never shows it.
+ * the environment variable {@code GITHUB_TOKEN}, or else {@code GH_TOKEN} (#2142), or else of the LSP4IJ settings
+ * (#2188), to the GitHub API only, and never shows it.
  */
 public class GitHubAssetFetcherTest {
 
     static final String TOKEN = "ghp_test0123456789abcdefTOKEN";
     static final String OTHER_TOKEN = "github_pat_test0123456789OTHER";
-    // As the OAuth token of the IDE's GitHub account
-    static final String ACCOUNT_TOKEN = "gho_test0123456789abcdefACCOUNT";
 
     // What the console says of a token of the LSP4IJ settings which GitHub refuses, after "(HTTP 401)"
     static final String SETTINGS_RENEWAL = ": the token is invalid or has expired. Set a valid token in Settings | "
@@ -636,7 +633,7 @@ public class GitHubAssetFetcherTest {
         api.answer(RELEASES_PATH, Response.ok(releases(api.url() + "/download/server.jar")));
 
         var reporter = new RecordingReporter();
-        String downloadUrl = fetch(Map.of(), () -> " " + TOKEN + " ", new RecordingAccounts(null), reporter);
+        String downloadUrl = fetch(Map.of(), () -> " " + TOKEN + " ", reporter);
 
         assertEquals(api.url() + "/download/server.jar", downloadUrl);
         assertEquals(List.of(new Request(RELEASES_PATH, "Bearer " + TOKEN)), api.requests());
@@ -646,22 +643,20 @@ public class GitHubAssetFetcherTest {
     }
 
     @Test
-    void theVariablesTakePrecedenceOverTheSettingsAndTheAccount() {
+    void theVariablesTakePrecedenceOverTheSettings() {
         for (String variable : List.of("GITHUB_TOKEN", "GH_TOKEN")) {
             try (var server = new LocalHttpServer()) {
                 server.answer(RELEASES_PATH, Response.ok(releases(server.url() + "/download/server.jar")));
                 var settings = new RecordingSettings(OTHER_TOKEN);
-                var accounts = new RecordingAccounts(new AccountToken("octocat", ACCOUNT_TOKEN));
 
                 var reporter = new RecordingReporter();
-                new GitHubAssetFetcher("owner", "repo", server.url(), Map.of(variable, TOKEN)::get, settings, accounts)
+                new GitHubAssetFetcher("owner", "repo", server.url(), Map.of(variable, TOKEN)::get, settings)
                         .getDownloadUrl(new GitHubAssetFetcher.AssetMatcher("server.jar"), reporter);
 
                 assertEquals(List.of(new Request(RELEASES_PATH, "Bearer " + TOKEN)), server.requests(), variable);
                 assertTrue(reporter.output().contains("(with the token of the environment variable " + variable + ")"),
                         reporter.output());
                 assertEquals(0, settings.reads, "the Password Safe must not be read when " + variable + " is set");
-                assertEquals(List.of(), accounts.apiUrls, "the account must not be asked when " + variable + " is set");
             } catch (IOException e) {
                 throw new UncheckedIOException(e);
             }
@@ -669,34 +664,14 @@ public class GitHubAssetFetcherTest {
     }
 
     @Test
-    void theSettingsTakePrecedenceOverTheAccount() {
+    void blankVariablesLeaveTheTokenToTheSettings() {
         api.answer(RELEASES_PATH, Response.ok(releases(api.url() + "/download/server.jar")));
-        var accounts = new RecordingAccounts(new AccountToken("octocat", ACCOUNT_TOKEN));
 
         var reporter = new RecordingReporter();
-        fetch(Map.of("GITHUB_TOKEN", " ", "GH_TOKEN", ""), () -> TOKEN, accounts, reporter);
+        fetch(Map.of("GITHUB_TOKEN", " ", "GH_TOKEN", ""), () -> TOKEN, reporter);
 
         assertEquals(List.of(new Request(RELEASES_PATH, "Bearer " + TOKEN)), api.requests());
-        assertEquals(List.of(), accounts.apiUrls, "the account must not be asked when the settings have a token");
         assertNoToken(reporter, TOKEN);
-    }
-
-    @Test
-    void theTokenOfTheAccountIsSentWithoutTheVariablesNorTheSettings() {
-        api.answer(RELEASES_PATH, Response.ok(releases(api.url() + "/download/server.jar")));
-        var accounts = new RecordingAccounts(new AccountToken("octocat", ACCOUNT_TOKEN));
-
-        var reporter = new RecordingReporter();
-        // An empty setting, as after its field was cleared, leaves it to the account
-        String downloadUrl = fetch(Map.of(), () -> " ", accounts, reporter);
-
-        assertEquals(api.url() + "/download/server.jar", downloadUrl);
-        assertEquals(List.of(new Request(RELEASES_PATH, "Bearer " + ACCOUNT_TOKEN)), api.requests());
-        assertEquals(List.of(api.url()), accounts.apiUrls, "the account must be asked for its token on the server of "
-                + "the GitHub API only");
-        assertEquals("> Loading GitHub releases: " + api.url() + RELEASES_PATH + "?per_page=100 (with the token of "
-                + "the IDE's GitHub account octocat)", reporter.lines().get(0));
-        assertNoToken(reporter, ACCOUNT_TOKEN);
     }
 
     @Test
@@ -704,7 +679,8 @@ public class GitHubAssetFetcherTest {
         api.answer(RELEASES_PATH, Response.ok(releases(api.url() + "/download/server.jar")));
 
         var reporter = new RecordingReporter();
-        fetch(Map.of(), () -> null, new RecordingAccounts(null), reporter);
+        // An empty setting, as after its field was cleared, is no token
+        fetch(Map.of(), () -> " ", reporter);
 
         assertEquals(List.of(new Request(RELEASES_PATH, null)), api.requests());
         // As before
@@ -717,11 +693,12 @@ public class GitHubAssetFetcherTest {
         api.answer(RELEASES_PATH, Response.ok(releases(api.url() + "/download/server.jar")));
 
         try (var log = new LogRecorder()) {
-            fetch(Map.of(), () -> {
+            String downloadUrl = fetch(Map.of(), () -> {
                 throw new IllegalStateException("The Password Safe is locked");
-            }, new RecordingAccounts(new AccountToken("octocat", ACCOUNT_TOKEN)), new RecordingReporter());
+            }, new RecordingReporter());
 
-            assertEquals(List.of(new Request(RELEASES_PATH, "Bearer " + ACCOUNT_TOKEN)), api.requests());
+            assertEquals(api.url() + "/download/server.jar", downloadUrl);
+            assertEquals(List.of(new Request(RELEASES_PATH, null)), api.requests());
             assertTrue(log.lines().stream().anyMatch(line -> line.startsWith(
                     "WARNING Cannot read the GitHub token of the LSP4IJ settings\njava.lang.IllegalStateException: "
                             + "The Password Safe is locked")), log.output());
@@ -733,12 +710,11 @@ public class GitHubAssetFetcherTest {
         api.answer(RELEASES_PATH, Response.ok(releases(api.url() + "/download/server.jar")));
 
         var reporter = new RecordingReporter();
-        fetch(Map.of(), () -> TOKEN + "\nX-Injected: " + OTHER_TOKEN,
-                new RecordingAccounts(new AccountToken("octocat", ACCOUNT_TOKEN)), reporter);
+        fetch(Map.of(), () -> TOKEN + "\nX-Injected: " + OTHER_TOKEN, reporter);
 
         assertEquals("The token of the LSP4IJ settings has characters which a GitHub token doesn't have: LSP4IJ "
                 + "doesn't send it to GitHub", reporter.lines().get(0));
-        assertEquals(List.of(new Request(RELEASES_PATH, "Bearer " + ACCOUNT_TOKEN)), api.requests());
+        assertEquals(List.of(new Request(RELEASES_PATH, null)), api.requests());
         assertNoToken(reporter, TOKEN);
         assertNoToken(reporter, OTHER_TOKEN);
     }
@@ -749,7 +725,7 @@ public class GitHubAssetFetcherTest {
                 Response.ok(releases(api.url() + "/download/server.jar")));
 
         var reporter = new RecordingReporter();
-        String downloadUrl = fetch(Map.of(), () -> TOKEN, new RecordingAccounts(null), reporter);
+        String downloadUrl = fetch(Map.of(), () -> TOKEN, reporter);
 
         assertEquals(api.url() + "/download/server.jar", downloadUrl);
         assertEquals(List.of(new Request(RELEASES_PATH, "Bearer " + TOKEN), new Request(RELEASES_PATH, null)),
@@ -761,52 +737,17 @@ public class GitHubAssetFetcherTest {
     }
 
     @Test
-    void aTokenOfTheAccountThatGitHubRefusesIsNamedAndNotNeededForAPublicRepository() {
-        api.answer(RELEASES_PATH, new Response(401, Map.of(), "{\"message\": \"Bad credentials\"}"),
-                Response.ok(releases(api.url() + "/download/server.jar")));
+    void theRateLimitOfATokenOfTheSettingsNamesIt() {
+        api.answer(RELEASES_PATH, rateLimit(403, 5000, RESET), rateLimit(403, 60, RESET));
 
         var reporter = new RecordingReporter();
-        try (var log = new LogRecorder()) {
-            String downloadUrl = fetch(Map.of(), () -> null,
-                    new RecordingAccounts(new AccountToken("octocat", ACCOUNT_TOKEN)), reporter);
+        assertNull(fetch(Map.of(), () -> TOKEN, reporter));
 
-            assertEquals(api.url() + "/download/server.jar", downloadUrl);
-            assertEquals(List.of(new Request(RELEASES_PATH, "Bearer " + ACCOUNT_TOKEN),
-                    new Request(RELEASES_PATH, null)), api.requests());
-            assertEquals("Error while loading GitHub releases: GitHub API refused the token of the IDE's GitHub "
-                            + "account octocat (HTTP 401): the token is invalid or has expired. Log in to the account "
-                            + "again in Settings | Version Control | GitHub, or remove it there." + RETRY,
-                    reporter.lines().get(1).strip());
-            assertTrue(log.lines().contains("INFO GitHub releases of owner/repo: trying again anonymously, since GitHub "
-                    + "refused the token of the IDE's GitHub account octocat"), log.output());
-            assertNoToken(reporter, ACCOUNT_TOKEN);
-            assertNoToken(log, ACCOUNT_TOKEN);
-        }
-    }
-
-    @Test
-    void theRateLimitOfATokenOfTheSettingsOrOfTheAccountNamesIt() {
-        for (var source : List.of(Map.entry("the LSP4IJ settings", new AccountToken("unused", TOKEN)),
-                Map.entry("the IDE's GitHub account octocat", new AccountToken("octocat", ACCOUNT_TOKEN)))) {
-            try (var server = new LocalHttpServer()) {
-                server.answer(RELEASES_PATH, rateLimit(403, 5000, RESET), rateLimit(403, 60, RESET));
-                boolean settings = source.getKey().equals("the LSP4IJ settings");
-                AccountToken token = source.getValue();
-
-                var reporter = new RecordingReporter();
-                assertNull(new GitHubAssetFetcher("owner", "repo", server.url(), name -> null,
-                        () -> settings ? token.token() : null, new RecordingAccounts(settings ? null : token))
-                        .getDownloadUrl(new GitHubAssetFetcher.AssetMatcher("server.jar"), reporter));
-
-                assertEquals("Error while loading GitHub releases: GitHub API rate limit reached for the token of "
-                                + source.getKey() + ": 5000 requests an hour (HTTP 403). It resets at "
-                                + localTime(RESET) + " (local time)." + RETRY,
-                        reporter.lines().get(1).strip());
-                assertNoToken(reporter, token.token());
-            } catch (IOException e) {
-                throw new UncheckedIOException(e);
-            }
-        }
+        assertEquals("Error while loading GitHub releases: GitHub API rate limit reached for the token of the LSP4IJ "
+                        + "settings: 5000 requests an hour (HTTP 403). It resets at " + localTime(RESET)
+                        + " (local time)." + RETRY,
+                reporter.lines().get(1).strip());
+        assertNoToken(reporter, TOKEN);
     }
 
     @Test
@@ -816,14 +757,13 @@ public class GitHubAssetFetcherTest {
                 releases(api.url() + "/download/server.jar")));
 
         try (var log = new LogRecorder()) {
-            var fetcher = new GitHubAssetFetcher("owner", "repo", api.url(), name -> null, () -> null,
-                    new RecordingAccounts(new AccountToken("octocat", ACCOUNT_TOKEN)));
+            var fetcher = new GitHubAssetFetcher("owner", "repo", api.url(), name -> null, () -> TOKEN);
             fetcher.getDownloadUrl(new GitHubAssetFetcher.AssetMatcher("server.jar"), new RecordingReporter());
 
             assertTrue(log.lines().get(0).startsWith("FINE GitHub API request " + api.url() + RELEASES_PATH
-                    + "?per_page=100 with the token of the IDE's GitHub account octocat: HTTP 200 in "), log.output());
-            assertEquals("the GitHub API, with the token of the IDE's GitHub account octocat", fetcher.getSource());
-            assertNoToken(log, ACCOUNT_TOKEN);
+                    + "?per_page=100 with the token of the LSP4IJ settings: HTTP 200 in "), log.output());
+            assertEquals("the GitHub API, with the token of the LSP4IJ settings", fetcher.getSource());
+            assertNoToken(log, TOKEN);
             assertFalse(log.output().contains("Bearer"), log.output());
         }
     }
@@ -843,14 +783,13 @@ public class GitHubAssetFetcherTest {
 
     /**
      * Returns the download URL of the asset {@code server.jar} of the latest release of {@code owner/repo}, which a new
-     * fetcher finds through the local GitHub API, with the given environment variables, token of the LSP4IJ settings
-     * and GitHub accounts of the IDE.
+     * fetcher finds through the local GitHub API, with the given environment variables and token of the LSP4IJ
+     * settings.
      */
     private @Nullable String fetch(@NotNull Map<String, String> environment,
                                    @NotNull Supplier<String> settingsToken,
-                                   @NotNull GitHubAccountTokenProvider accounts,
                                    @NotNull Reporter reporter) {
-        return new GitHubAssetFetcher("owner", "repo", api.url(), environment::get, settingsToken, accounts)
+        return new GitHubAssetFetcher("owner", "repo", api.url(), environment::get, settingsToken)
                 .getDownloadUrl(new GitHubAssetFetcher.AssetMatcher("server.jar"), reporter);
     }
 
@@ -869,26 +808,6 @@ public class GitHubAssetFetcherTest {
         @Override
         public @Nullable String get() {
             reads++;
-            return token;
-        }
-    }
-
-    /**
-     * The GitHub accounts of the IDE, which have the given token for any server, and record which servers they are
-     * asked for.
-     */
-    static final class RecordingAccounts implements GitHubAccountTokenProvider {
-
-        private final @Nullable AccountToken token;
-        private final List<String> apiUrls = new ArrayList<>();
-
-        RecordingAccounts(@Nullable AccountToken token) {
-            this.token = token;
-        }
-
-        @Override
-        public @Nullable AccountToken findToken(@NotNull String apiUrl) {
-            apiUrls.add(apiUrl);
             return token;
         }
     }
