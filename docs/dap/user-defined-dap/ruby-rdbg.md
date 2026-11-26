@@ -80,15 +80,20 @@ As you have selected `Ruby Debug` server, it will automatically populate the `At
 ![DAP Configuration/Configuration](../images/ruby-rdbg/configuration_tab.png)
 
 1. Select `Attach` as `Debug mode`: the template also has a launch configuration, so the dialog opens on `Launch`.
-2. The DAP parameters of the launch should look like this:
+2. The DAP parameters of the attach configuration should look like this:
 
 ```json
 {
   "type": "rdbg",
   "name": "Attach with rdbg",
-  "request": "attach"
+  "request": "attach",
+  "localfs": true
 }
 ```
+
+`localfs` tells rdbg that the program runs on the same file system as the IDE. When it attaches, rdbg maps the files of
+the program to the local files only with `localfs` or `localfsMap`, so without it no breakpoint is hit. For a program on
+another machine, use `localfsMap` instead.
 
 `Port input` is pre-filled with `$port`, which means that the `port` of the JSON configuration is used as the port.
 The configuration of the template has no `port`, so add the port of `rdbg` to it, `"port": 12345` for the command
