@@ -155,6 +155,11 @@ intellijPlatform {
     // (JetBrains/intellij-platform-gradle-plugin#2294)
     instrumentCode = false
 
+    // check builds the plugin, and so its searchable options, which start an IDE when the build cache hasn't got them.
+    // The Test jobs of a pull request leave them out with -PbuildSearchableOptions=false, as no test reads them; every
+    // other build has them, as on main, in the Build Plugin zip workflow and in releases.
+    buildSearchableOptions = properties("buildSearchableOptions").map(String::toBooleanStrict).orElse(true)
+
     pluginConfiguration {
         name = properties("pluginName")
 

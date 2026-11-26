@@ -81,9 +81,11 @@ jobs:
       # Gradle cache), 16 on Linux and 14 on Windows. When test after test fails at a wait, as when each waits 30 s for a
       # language server that doesn't start, the step stops after 45 minutes instead of running for up to GitHub's
       # 6 hours. The log shows each test that failed until then, with its error.
+      # A pull request leaves out the plugin's searchable options, which no test reads, and which start an IDE when the
+      # build cache hasn't got them. A push to main builds them, as do the Build Plugin zip workflow and releases.
       - name: Run Tests
         timeout-minutes: 45
-        run: ./gradlew check ${{ matrix.platformVersion && format('-PplatformVersion={0}', matrix.platformVersion) || '' }} ${{ matrix.platformType && format('-PplatformType={0}', matrix.platformType) || '' }}
+        run: ./gradlew check ${{ matrix.platformVersion && format('-PplatformVersion={0}', matrix.platformVersion) || '' }} ${{ matrix.platformType && format('-PplatformType={0}', matrix.platformType) || '' }} ${{ github.event_name == 'pull_request' && '-PbuildSearchableOptions=false' || '' }}
 
       # Collect Tests Result
       - name: Collect Tests Result
