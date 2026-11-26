@@ -17,7 +17,6 @@ import com.google.gson.JsonParser;
 import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.util.EnvironmentUtil;
 import com.redhat.devtools.lsp4ij.JSONUtils;
-import com.redhat.devtools.lsp4ij.installation.download.GitHubAccountTokenProvider.AccountToken;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
@@ -159,8 +158,8 @@ public class GitHubAssetFetcher implements AssetFetcher {
     /**
      * The environment variables which can hold a GitHub token, in order of precedence: {@code GITHUB_TOKEN}, and
      * {@code GH_TOKEN}, which the gh CLI reads. With a token, the GitHub API allows 5,000 requests an hour, instead of
-     * 60 an hour by IP address (#2142). They come before the token of the LSP4IJ settings and the one of the IDE's
-     * GitHub account, as the environment comes before the stored configuration of the gh CLI (#2188).
+     * 60 an hour by IP address (#2142). They come before the token of the LSP4IJ settings, as the environment comes
+     * before the stored configuration of the gh CLI (#2188).
      */
     private static final List<String> TOKEN_VARIABLES = List.of("GITHUB_TOKEN", "GH_TOKEN");
 
@@ -182,7 +181,6 @@ public class GitHubAssetFetcher implements AssetFetcher {
     private final @NotNull String apiUrl;
     private final @NotNull Function<String, String> environment;
     private final @NotNull Supplier<String> settingsToken;
-    private final @NotNull GitHubAccountTokenProvider accountTokens;
     private @Nullable JsonArray releases;
     // Where the releases come from, for the log: never the token
     private volatile @NotNull String source = "the GitHub API";
@@ -195,12 +193,8 @@ public class GitHubAssetFetcher implements AssetFetcher {
      */
     public GitHubAssetFetcher(@NotNull String owner, @NotNull String repository) {
         // The environment of the IDE, as the commands of the exec tasks get it: on macOS, with the variables of the
-        // login shell when the IDE was started from the Dock. The GitHub plugin is looked up at each request, since it
-        // can be disabled
-        this(owner, repository, GITHUB_API_URL, EnvironmentUtil::getValue, GitHubTokenSettings::getToken, apiUrl -> {
-            GitHubAccountTokenProvider provider = GitHubAccountTokenProvider.getInstance();
-            return provider != null ? provider.findToken(apiUrl) : null;
-        });
+        // login shell when the IDE was started from the Dock
+        this(owner, repository, GITHUB_API_URL, EnvironmentUtil::getValue, GitHubTokenSettings::getToken);
     }
 
     /**
@@ -216,32 +210,29 @@ public class GitHubAssetFetcher implements AssetFetcher {
                        @NotNull String repository,
                        @NotNull String apiUrl,
                        @NotNull Function<String, String> environment) {
-        this(owner, repository, apiUrl, environment, () -> null, url -> null);
+        this(owner, repository, apiUrl, environment, () -> null);
     }
 
     /**
      * Constructs a GitHubAssetFetcher for a given repository owner and name, which requests the given GitHub API, and
-     * finds a GitHub token in the given environment, else in the LSP4IJ settings, else in a GitHub account of the IDE.
+     * finds a GitHub token in the given environment, else in the LSP4IJ settings.
      *
      * @param owner         the GitHub repository owner
      * @param repository    the GitHub repository name
      * @param apiUrl        the URL of the GitHub API, without a trailing slash
      * @param environment   the value of an environment variable, by name, or null if it isn't set
      * @param settingsToken the GitHub token of the LSP4IJ settings, or null if there is none
-     * @param accountTokens the token of a GitHub account of the IDE for a GitHub API
      */
     GitHubAssetFetcher(@NotNull String owner,
                        @NotNull String repository,
                        @NotNull String apiUrl,
                        @NotNull Function<String, String> environment,
-                       @NotNull Supplier<String> settingsToken,
-                       @NotNull GitHubAccountTokenProvider accountTokens) {
+                       @NotNull Supplier<String> settingsToken) {
         this.owner = owner;
         this.repository = repository;
         this.apiUrl = apiUrl;
         this.environment = environment;
         this.settingsToken = settingsToken;
-        this.accountTokens = accountTokens;
     }
 
     /**
@@ -302,8 +293,7 @@ public class GitHubAssetFetcher implements AssetFetcher {
 
     /**
      * Returns where the releases of the last download URL come from: the GitHub API, with the token of an environment
-     * variable, by its name, of the LSP4IJ settings or of the IDE's GitHub account, by its login, or anonymously. Never
-     * the token.
+     * variable, by its name, or of the LSP4IJ settings, or anonymously. Never the token.
      *
      * @return where the releases of the last download URL come from.
      */
@@ -351,8 +341,8 @@ public class GitHubAssetFetcher implements AssetFetcher {
     }
 
     /**
-     * Where a GitHub token comes from, as the console and the log name it: an environment variable, the LSP4IJ
-     * settings, or a GitHub account of the IDE.
+     * Where a GitHub token comes from, as the console and the log name it: an environment variable, or the LSP4IJ
+     * settings.
      *
      * @param name    the name which follows "the token of", as "the environment variable GITHUB_TOKEN".
      * @param subject the name at the start of a sentence, as "The environment variable GITHUB_TOKEN".
@@ -366,11 +356,6 @@ public class GitHubAssetFetcher implements AssetFetcher {
         static @NotNull TokenSource variable(@NotNull String variable) {
             return new TokenSource("the environment variable " + variable, "The environment variable " + variable,
                     "Set " + variable + " to a valid token, or unset it.");
-        }
-
-        static @NotNull TokenSource account(@NotNull String login) {
-            return new TokenSource("the IDE's GitHub account " + login, "The token of the IDE's GitHub account " + login,
-                    "Log in to the account again in Settings | Version Control | GitHub, or remove it there.");
         }
     }
 
@@ -390,8 +375,8 @@ public class GitHubAssetFetcher implements AssetFetcher {
 
     /**
      * Returns the GitHub token of the first of these which has one: the environment variables of
-     * {@link #TOKEN_VARIABLES}, the LSP4IJ settings, and a GitHub account of the IDE on the server of the GitHub API.
-     * The token is without the spaces around it, and a blank one counts as none. Returns null if there is none.
+     * {@link #TOKEN_VARIABLES}, and the LSP4IJ settings. The token is without the spaces around it, and a blank one
+     * counts as none. Returns null if there is none.
      *
      * @param reporter an object to report progress or status messages
      * @return the GitHub token, or null if there is none.
@@ -403,13 +388,7 @@ public class GitHubAssetFetcher implements AssetFetcher {
                 return token;
             }
         }
-        Token settings = toToken(read(settingsToken, TokenSource.SETTINGS.name()), TokenSource.SETTINGS, reporter);
-        if (settings != null) {
-            return settings;
-        }
-        // The token of an account goes to the server of the account only, as github.com for api.github.com
-        AccountToken account = read(() -> accountTokens.findToken(apiUrl), "the IDE's GitHub account");
-        return account != null ? toToken(account.token(), TokenSource.account(account.login()), reporter) : null;
+        return toToken(read(settingsToken, TokenSource.SETTINGS.name()), TokenSource.SETTINGS, reporter);
     }
 
     /**
