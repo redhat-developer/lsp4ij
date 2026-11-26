@@ -14,6 +14,7 @@ import com.google.gson.JsonObject;
 import com.intellij.execution.ui.ConsoleViewContentType;
 import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.util.io.FileUtil;
+import com.intellij.openapi.util.io.NioFiles;
 import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.util.ExceptionUtil;
 import com.intellij.util.system.CpuArch;
@@ -282,7 +283,7 @@ public class DownloadTask extends InstallerTask {
         try (Stream<Path> children = Files.list(renamed)) {
             for (Path child : children.toList()) {
                 Path target = parent.resolve(child.getFileName().toString());
-                FileUtil.delete(target);
+                NioFiles.deleteRecursively(target);
                 Files.move(child, target);
             }
         }
