@@ -615,10 +615,9 @@ GitHub API allows 60 requests an hour per IP address, which all the IDEs and too
 corporate network, a VPN or CI runners. When they are used up, LSP4IJ falls back to `url`, and a download without `url`
 fails until the limit resets. With a GitHub token, the limit is 5,000 requests an hour.
 
-Any token works, as a fine-grained personal access token, the one that `gh auth token` prints, or the one of the IDE's
-GitHub account: public repositories need no scope or permission. The 5,000 requests an hour are per GitHub user: all the
-tokens of a user share them. In GitHub Actions, the `GITHUB_TOKEN` of a workflow allows 1,000 requests an hour per
-repository.
+Any token works, as a fine-grained personal access token, or the one that `gh auth token` prints: public repositories
+need no scope or permission. The 5,000 requests an hour are per GitHub user: all the tokens of a user share them. In
+GitHub Actions, the `GITHUB_TOKEN` of a workflow allows 1,000 requests an hour per repository.
 
 A token doesn't make private repositories work: a `github` download supports public repositories only. With a token
 that can read a private repository, the GitHub API lists its releases, but the token goes with the request to the GitHub
@@ -636,22 +635,17 @@ LSP4IJ takes the first of these that has a token, at each request to the GitHub 
 2. **The GitHub token of the LSP4IJ settings**, in *Settings | Languages & Frameworks | Language Servers (LSP4IJ)*. It
    is kept in the IDE's Password Safe, for all the projects, never in a settings file, and the field doesn't show it.
    Emptying the field removes it.
-3. **The token of the IDE's GitHub account**, in *Settings | Version Control | GitHub*, when the IDE has its GitHub
-   plugin, as IntelliJ IDEA and most JetBrains IDEs do. LSP4IJ takes the first account on `github.com` there. The token
-   of an account goes to its own server only: since a `github` download asks `api.github.com`, a GitHub Enterprise
-   account isn't used.
 
 Without any of them, the request has no token, as before.
 
 ![The GitHub token of the LSP4IJ settings](./images/user-defined-ls/GitHubTokenSetting.png)
 
 On Windows and Linux, an IDE started from the Start menu or a desktop launcher doesn't see a token that a shell profile,
-as `~/.bashrc`, exports. The setting and the GitHub account need no environment variable: they are the way to give a
-token to such an IDE.
+as `~/.bashrc`, exports. The setting needs no environment variable: it is the way to give a token to such an IDE.
 
 LSP4IJ doesn't send the token with the download of the asset, nor to another host, even on a redirect. The console, the
 notifications and the log never show it: they name where it comes from, as `the token of the environment variable
-GITHUB_TOKEN`, `the token of the LSP4IJ settings` or `the token of the IDE's GitHub account octocat`.
+GITHUB_TOKEN` or `the token of the LSP4IJ settings`.
 
 ##### GitHub API rate limit
 
@@ -667,7 +661,7 @@ When a request to the GitHub API fails, the console says why:
 
 When GitHub refuses the token, as for these messages, or the rate limit of the token is reached, LSP4IJ tries the
 request once again without the token, since the releases of a public repository don't need one, and the console says
-so. This is the same for a token of the environment, of the settings or of the GitHub account.
+so. This is the same for a token of the environment or of the settings.
 
 When a download without `url` fails for one of these reasons, the notification of the failed installation says why
 too, as the console does. At the rate limit, for example:
@@ -833,7 +827,7 @@ LSP4IJ runs installers since 0.14.0, which has almost all the tasks and keys of 
 | 0.30.2 | the [`replaceTemplateCommand`](#task-replacetemplatecommand) task, with its `templateCommand`                                                | ignores it: the server keeps the command of its template, and the check still passes                                                                                             |
 | 0.30.2 | `${check.file}`, the file that a [`fileExists`](#task-fileexists) found                                                                      | doesn't replace it: a `configureServer` would give the server a command with `${check.file}` in it                                                                               |
 | 0.30.2 | [`stripRootFolder`](#output-customization) of the `output` of a `download`                                                                   | ignores it: it extracts the archive with its root folder, which it adds to `${output.dir}`, so the server isn't where a check or a command that looks in `dir` itself expects it |
-| 0.30.2 | the [GitHub token](#github-token): `GITHUB_TOKEN` or `GH_TOKEN`, the token of the LSP4IJ settings, and the token of the IDE's GitHub account | sends no token: the GitHub API allows 60 requests an hour per IP address                                                                                                         |
+| 0.30.2 | the [GitHub token](#github-token): `GITHUB_TOKEN` or `GH_TOKEN`, and the token of the LSP4IJ settings                                        | sends no token: the GitHub API allows 60 requests an hour per IP address                                                                                                         |
 
 ### What an earlier version does with what it doesn't know
 
