@@ -301,6 +301,12 @@ tasks.withType<Test>().configureEach {
     environment("GRADLE_RELEASE_REPOSITORY","https://services.gradle.org/distributions")
     systemProperty("idea.log.leaked.projects.in.tests", "false")
     systemProperty( "idea.maven.test.mirror", "https://repo1.maven.org/maven2")
+    // Since 2026.3, IntelliJ writes <pid>-ide-instance.json, which tells external tools about a running IDE, to the
+    // user's own JetBrains data directory (PathManager.getCommonDataPath()/discovery) each time a project opens or
+    // closes. It also deletes the stale files of other IDEs there. The write on a close is launched and not awaited,
+    // so the thread leak check of a test that closes its project can find it still running. The tests need none of
+    // it. The property, misspelled as in IntelliJ, has no effect on older versions.
+    systemProperty("jetbrains.ide.builtin.descovery.enabled", "false")
 }
 
 // Configure Gradle Kover Plugin - read more: https://github.com/Kotlin/kotlinx-kover#configuration
