@@ -8,7 +8,6 @@
 package com.redhat.devtools.lsp4ij.settings.ui;
 
 import com.intellij.openapi.application.ApplicationManager;
-import com.intellij.openapi.application.impl.NonBlockingReadActionImpl;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.Disposer;
 import com.intellij.openapi.util.io.FileUtil;
@@ -370,18 +369,19 @@ public class WorkspaceFoldersPanelTest extends BasePlatformTestCase {
     }
 
     /**
-     * Waits until the preview has computed where its folders and files go, which it does off the UI thread, and shows
-     * them.
+     * Waits until the preview shows the last update of the panel, which computes where its folders and files go off the
+     * UI thread. An update that replaces the computation of another, as the debounced update after a change of the
+     * JSON does, is waited for too.
      */
-    private static void waitForThePreview() {
-        PlatformTestUtil.dispatchAllEventsInIdeEventQueue();
-        NonBlockingReadActionImpl.waitForAsyncTaskCompletion();
-        PlatformTestUtil.dispatchAllEventsInIdeEventQueue();
+    private void waitForThePreview() {
+        PlatformTestUtil.waitWithEventsDispatching("The preview must show the last update of the panel",
+                () -> !panel.isUpdatingThePreview(), TIMEOUT);
     }
 
     private int cursorOverTheRowOf(@NotNull VirtualFile folder) {
-        var row = ContainerUtil.indexOf(rows(), text -> text.contains(folder.getPath()));
-        assertTrue(rows().toString(), row >= 0);
+        var rows = rows();
+        var row = ContainerUtil.indexOf(rows, text -> text.contains(folder.getPath()));
+        assertTrue(rows.toString(), row >= 0);
         var tree = panel.getWorkspaceFoldersTree();
         var bounds = tree.getRowBounds(row);
         var moved = new MouseEvent(tree, MouseEvent.MOUSE_MOVED, 0, 0, bounds.x + 1, bounds.y + 1, 0, false);
