@@ -219,7 +219,15 @@ public final class TestForkSandbox implements LauncherInterceptor {
                                                               @NotNull BasicFileAttributes attributes) throws IOException {
                         Path copy = to.resolve(from.relativize(file).toString());
                         if (Files.notExists(copy) || attributes.lastModifiedTime().compareTo(Files.getLastModifiedTime(copy)) > 0) {
-                            Files.copy(file, copy, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.COPY_ATTRIBUTES);
+                            try {
+                                Files.copy(file, copy, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.COPY_ATTRIBUTES);
+                            } catch (NoSuchFileException e) {
+                                // Slot 1 deleted the file after its attributes were read. A file that is still there
+                                // failed for another reason, such as its copy, which must not go unnoticed.
+                                if (Files.exists(file)) {
+                                    throw e;
+                                }
+                            }
                         }
                         return FileVisitResult.CONTINUE;
                     }
@@ -228,6 +236,15 @@ public final class TestForkSandbox implements LauncherInterceptor {
                     public @NotNull FileVisitResult visitFileFailed(@NotNull Path file, @NotNull IOException e) throws IOException {
                         // A file which the test JVM of slot 1 deletes while this one copies the config
                         if (e instanceof NoSuchFileException) {
+                            return FileVisitResult.CONTINUE;
+                        }
+                        throw e;
+                    }
+
+                    @Override
+                    public @NotNull FileVisitResult postVisitDirectory(@NotNull Path directory, @Nullable IOException e) throws IOException {
+                        // A directory which the test JVM of slot 1 deletes while this one lists it
+                        if (e == null || e instanceof NoSuchFileException && Files.notExists(directory)) {
                             return FileVisitResult.CONTINUE;
                         }
                         throw e;
