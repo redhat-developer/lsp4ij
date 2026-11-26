@@ -15,6 +15,8 @@ if __FILE__ == $0
 end
 ```
 
+![Set Breakpoint](../images/ruby-rdbg/set_breakpoint.png)
+
 ## Configure DAP server
 
 1. [install Ruby](https://www.ruby-lang.org/en/documentation/installation/). 
@@ -60,6 +62,10 @@ the command is empty.
 
 If you wish to show DAP request/response traces when you will debug, you need to select `Trace` with `verbose`.
 
+![Show DAP traces](../images/ruby-rdbg/traces_in_console.png)
+
+![Set verbose traces](../images/ruby-rdbg/set_traces.png)
+
 ## Configure file mappings
 
 To allows settings breakpoints to Ruby files, you need configure mappings in the `Mappings` tab.
@@ -70,6 +76,8 @@ As you have selected `Ruby Debug` server, it will automatically populate the fil
 ## Configure the Ruby file to run/debug with attach
 
 As you have selected `Ruby Debug` server, it will automatically populate the `Attach` configuration like this:
+
+![DAP Configuration/Configuration](../images/ruby-rdbg/configuration_tab.png)
 
 1. Select `Attach` as `Debug mode`: the template also has a launch configuration, so the dialog opens on `Launch`.
 2. The DAP parameters of the launch should look like this:
@@ -86,12 +94,18 @@ As you have selected `Ruby Debug` server, it will automatically populate the `At
 The configuration of the template has no `port`, so add the port of `rdbg` to it, `"port": 12345` for the command
 below. You can see on the right of the inputs the real value of the address and port.
 
+![Attach fields preview](../images/ruby-rdbg/attach_fields_preview.png)
+
 If you don't want to use JSON configuration, you can fill directly the real value.
+
+![Attach fields forced](../images/ruby-rdbg/attach_fields_forced.png)
 
 ## Set Breakpoint
 
 After applying the run configuration, you should set a breakpoint to files which matches file mappings.
 Set a breakpoint in the `hello.rb` file.
+
+![Set Breakpoint](../images/ruby-rdbg/set_breakpoint.png)
 
 ## Start Ruby program in a Terminal
 
@@ -104,9 +118,22 @@ rdbg --open --port 12345 hello.rb
 
 This will make the script wait for a debugger to attach.
 
+![Start program](../images/ruby-rdbg/start_program.png)
+
 ## Debugging
 
 Before starting the configuration, check that your address and port are correct.
 
+![Start program and attach](../images/ruby-rdbg/start_program_and_attach.png)
+
 You can start the run configuration in either Run or Debug mode. Once started, you should see DAP traces in the console.
+
+![Debugging / Console](../images/ruby-rdbg/traces_in_console.png)
+
 You will also see `Threads` and `Variables`.
+
+![Debugging / Threads](../images/ruby-rdbg/debug_threads_tab.png)
+
+As [rdbg](https://github.com/ruby/debug) supports completion, you can use it while debugging:
+
+![Completion](../images/ruby-rdbg/completion.png)
