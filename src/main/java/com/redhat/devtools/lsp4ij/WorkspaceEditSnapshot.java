@@ -11,6 +11,7 @@ import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.event.DocumentEvent;
 import com.intellij.openapi.editor.event.DocumentListener;
+import com.intellij.openapi.editor.ex.DocumentEx;
 import com.intellij.openapi.fileEditor.FileDocumentManager;
 import com.intellij.openapi.util.Key;
 import com.intellij.openapi.vfs.VirtualFile;
@@ -41,9 +42,9 @@ import java.util.function.BooleanSupplier;
  * Capture before sending a rename request, then validate the response inside the write command
  * that applies it. For an incoming {@code workspace/applyEdit}, capture when the request arrives.
  * <p>
- * Two independent checks are needed: editor modification stamps detect typing while a reply is
- * pending, and LSP versions identify the text the server used. A matching version alone is not
- * enough when local changes have not yet been synchronized. Synchronizer identity also detects
+ * Two independent checks are needed: editor modification stamps and sequences detect typing while a reply is
+ * pending, an undone change included, and LSP versions identify the text the server used. A matching version
+ * alone is not enough when local changes have not yet been synchronized. Synchronizer identity also detects
  * a close/reopen, even if IntelliJ reuses the same {@link com.intellij.openapi.editor.Document}.
  * <p>
  * All text targets are checked before any mutation. This prevents partial application due to a
@@ -90,10 +91,13 @@ public final class WorkspaceEditSnapshot {
             var synchronizer = opened.getSynchronizer();
             URI uri = wrapper.toUri(opened.getFile());
             if (synchronizer != null && uri != null) {
-                // The stamp is read first: a change between the two reads either leaves the text unsent
-                // or changes the stamp, and both refuse an edit with a placeholder version.
-                long stamp = synchronizer.getDocument().getModificationStamp();
-                states.put(uri, new DocumentState(synchronizer, stamp, request && synchronizer.isCurrentTextSent()));
+                // The sequence and then the stamp are read first: a change after these reads either leaves the text
+                // unsent or changes them, and both refuse an edit with a placeholder version.
+                Document document = synchronizer.getDocument();
+                int sequence = DocumentState.modificationSequence(document);
+                long stamp = document.getModificationStamp();
+                states.put(uri, new DocumentState(synchronizer, sequence, stamp,
+                        request && synchronizer.isCurrentTextSent()));
             }
         }
         this.documents = Map.copyOf(states);
@@ -122,9 +126,9 @@ public final class WorkspaceEditSnapshot {
                                                           @Nullable LanguageServer server,
                                                           @NotNull BooleanSupplier ownerActive,
                                                           boolean request) {
-        // Only thread-safe state is read: the opened-document map, the synchronizers and the documents'
-        // volatile modification stamps, the sequence of TextChanges, and for a request whether the text was sent,
-        // under the synchronizer's briefly held monitor. So the capture never waits for a write action:
+        // Only thread-safe state is read: the opened-document map, the synchronizers and the documents' volatile
+        // modification stamps and sequences, the sequence of TextChanges, and for a request whether the text was
+        // sent, under the synchronizer's briefly held monitor. So the capture never waits for a write action:
         // workspace/applyEdit captures on LSP4J's message thread, which must keep reading replies a write action
         // may wait for.
         return new WorkspaceEditSnapshot(wrapper, server, ownerActive, request);
@@ -202,7 +206,8 @@ public final class WorkspaceEditSnapshot {
         var opened = wrapper.getOpenedDocument(uri);
         var synchronizer = opened != null ? opened.getSynchronizer() : null;
         var state = documents.get(uri);
-        // Identity detects close/reopen; the stamp detects changes even if the text was restored.
+        // Identity detects close/reopen; the stamp and the modification sequence detect changes even if the text was
+        // restored, by an undo too.
         if (state != null && !state.matches(synchronizer)) {
             return LanguageServerBundle.message("lsp.workspace.edit.document.changed", uriString);
         }
@@ -259,9 +264,30 @@ public final class WorkspaceEditSnapshot {
         return uri.endsWith("/") ? uri.substring(0, uri.length() - 1) : uri;
     }
 
-    private record DocumentState(DocumentContentSynchronizer synchronizer, long modificationStamp, boolean textSent) {
+    /**
+     * The state at capture of a document that the server had open. An undo gives the document back the stamp of its
+     * text before the change it undoes, so the stamp alone misses a change since capture that was undone, though the
+     * server may have been sent the changed text. The document's modification sequence counts every change, an undone
+     * one too. Unlike the synchronizer's version, it does not rise when a change made before capture, or the didOpen,
+     * is sent after it, and unlike {@link TextChanges}, not when the file is saved.
+     */
+    private record DocumentState(DocumentContentSynchronizer synchronizer, int modificationSequence,
+                                 long modificationStamp, boolean textSent) {
         boolean matches(@Nullable DocumentContentSynchronizer current) {
-            return current == synchronizer && synchronizer.getDocument().getModificationStamp() == modificationStamp;
+            if (current != synchronizer) {
+                return false;
+            }
+            Document document = synchronizer.getDocument();
+            return document.getModificationStamp() == modificationStamp
+                    && modificationSequence(document) == modificationSequence;
+        }
+
+        /**
+         * Returns the number of changes made to the document, or 0 for a document that doesn't count them, which the
+         * stamp alone then checks. It is read as the stamp is, without a lock or a read action.
+         */
+        static int modificationSequence(@NotNull Document document) {
+            return document instanceof DocumentEx documentEx ? documentEx.getModificationSequence() : 0;
         }
     }
 
