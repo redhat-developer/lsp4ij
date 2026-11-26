@@ -54,6 +54,7 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.TestOnly;
 import org.jetbrains.annotations.VisibleForTesting;
+import org.jetbrains.concurrency.CancellablePromise;
 
 import javax.swing.*;
 import javax.swing.tree.DefaultMutableTreeNode;
@@ -75,6 +76,7 @@ import java.nio.file.Paths;
 import java.util.*;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Panel for configuring workspace folders with testing capabilities.
@@ -100,6 +102,10 @@ public class WorkspaceFoldersPanel extends JPanel implements Disposable {
     private JBCheckBox sendAtInitCheckbox;
 
     private Alarm updateAlarm;
+    // The updates posted to the UI thread and not run yet, and the computation of the preview of the last update, on
+    // the UI thread: until there is no update left, the preview can still change
+    private final AtomicInteger postedUpdates = new AtomicInteger();
+    private @Nullable CancellablePromise<Preview> previewComputation;
 
     public WorkspaceFoldersPanel(@NotNull Project project, @Nullable WorkspaceFolderStrategy strategy) {
         super(new BorderLayout());
@@ -146,11 +152,7 @@ public class WorkspaceFoldersPanel extends JPanel implements Disposable {
                 @Override
                 public void documentChanged(@NotNull DocumentEvent event) {
                     updateAlarm.cancelAllRequests();
-                    updateAlarm.addRequest(() -> {
-                        com.intellij.openapi.application.ApplicationManager.getApplication().invokeLater(() -> {
-                            updateWorkspaceFoldersDisplay();
-                        });
-                    }, 500);
+                    updateAlarm.addRequest(() -> postUpdate(), 500);
                 }
             }, this);
 
@@ -258,9 +260,7 @@ public class WorkspaceFoldersPanel extends JPanel implements Disposable {
             sendAtInitCheckbox = new JBCheckBox("", false);
             sendAtInitCheckbox.setOpaque(false);
             sendAtInitCheckbox.setToolTipText(LanguageServerBundle.message("language.server.workspaceFolders.sendAtInit.tooltip"));
-            sendAtInitCheckbox.addActionListener(e -> {
-                ApplicationManager.getApplication().invokeLater(this::updateWorkspaceFoldersDisplay);
-            });
+            sendAtInitCheckbox.addActionListener(e -> postUpdate());
             dropZone.add(sendAtInitCheckbox);
 
             // Create label with clickable link
@@ -638,7 +638,7 @@ public class WorkspaceFoldersPanel extends JPanel implements Disposable {
         boolean showInitFolders = isShowingInitFolders();
         var files = List.copyOf(openedFiles);
         // The strategy can do I/O for each folder and file, as for markers, so not on the UI thread
-        ReadAction.nonBlocking(() -> computePreview(showInitFolders, files))
+        previewComputation = ReadAction.nonBlocking(() -> computePreview(showInitFolders, files))
                 .coalesceBy(this)
                 .expireWith(this)
                 .finishOnUiThread(ModalityState.any(), this::showPreview)
@@ -809,9 +809,35 @@ public class WorkspaceFoldersPanel extends JPanel implements Disposable {
         } else {
             jsonEditor.setText(jsonConfiguration);
         }
-        com.intellij.openapi.application.ApplicationManager.getApplication().invokeLater(() -> {
+        // The update below shows the new configuration: the one that the change of the text scheduled would only compute
+        // the same preview again, and replace it, 500 ms later
+        updateAlarm.cancelAllRequests();
+        postUpdate();
+    }
+
+    /**
+     * Updates the preview on the UI thread, after the events posted before.
+     */
+    private void postUpdate() {
+        postedUpdates.incrementAndGet();
+        ApplicationManager.getApplication().invokeLater(() -> {
+            postedUpdates.decrementAndGet();
             updateWorkspaceFoldersDisplay();
         });
+    }
+
+    /**
+     * Returns whether the preview can still change, on the UI thread: an update is scheduled after a change of the
+     * JSON, or posted, or the preview of the last update is computed and not shown yet. The preview of a coalesced
+     * update is never shown, but the update which replaces it is the last one.
+     *
+     * @return true if an update of the preview is pending.
+     */
+    @TestOnly
+    boolean isUpdatingThePreview() {
+        return (updateAlarm != null && !updateAlarm.isEmpty())
+                || postedUpdates.get() > 0
+                || (previewComputation != null && !previewComputation.isDone());
     }
 
     @Override
