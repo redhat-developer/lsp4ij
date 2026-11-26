@@ -15,16 +15,19 @@ import com.intellij.ide.plugins.IdeaPluginDescriptor;
 import com.intellij.openapi.extensions.PluginDescriptor;
 import com.redhat.devtools.lsp4ij.internal.PluginUtils;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.VisibleForTesting;
 import org.jetbrains.plugins.textmate.api.TextMateBundleProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.util.List;
 import java.util.Objects;
 
@@ -58,21 +61,41 @@ public class DisassemblyTextMateBundleProvider implements TextMateBundleProvider
         }
     }
 
-    private Path copyResourceDirectory(@NotNull String target, List<String> fileNames) throws IOException {
+    /**
+     * Copies the given resources of the bundle into the target directory, if they aren't there yet.
+     *
+     * <p>Several processes can copy them at once, such as test JVMs that share the plugin directory, or IDEs that
+     * share a plugin installation. So each file is written to a temporary file of its own first, then moved into
+     * place in one step: no one reads a part of a file, and a file that another process wrote meanwhile, with the
+     * same content, is kept.</p>
+     */
+    @VisibleForTesting
+    static Path copyResourceDirectory(@NotNull String target, List<String> fileNames) throws IOException {
         Path targetPath = Paths.get(target);
-        if (Files.notExists(targetPath)) {
-            Files.createDirectories(targetPath);
-        }
+        Files.createDirectories(targetPath);
         for (String fileName: fileNames) {
             Path pathToCopyFile = new File(target + "/" + fileName).toPath();
             if (Files.notExists(pathToCopyFile)) {
                 var dir = pathToCopyFile.getParent();
-                if (Files.notExists(dir)) {
-                    Files.createDirectories(dir);
+                Files.createDirectories(dir);
+                Path temporaryFile = Files.createTempFile(dir, pathToCopyFile.getFileName().toString(), ".tmp");
+                try {
+                    try (InputStream resource = Objects.requireNonNull(
+                            DisassemblyTextMateBundleProvider.class.getResourceAsStream(RESOURCE_PATH + "/" + fileName))) {
+                        Files.copy(resource, temporaryFile, StandardCopyOption.REPLACE_EXISTING);
+                    }
+                    try {
+                        Files.move(temporaryFile, pathToCopyFile, StandardCopyOption.ATOMIC_MOVE);
+                    } catch (IOException ex) {
+                        // Another process moved its copy into place first. On Windows, a file that is open can't
+                        // be replaced.
+                        if (Files.notExists(pathToCopyFile)) {
+                            throw ex;
+                        }
+                    }
+                } finally {
+                    Files.deleteIfExists(temporaryFile);
                 }
-                Files.copy(
-                        Objects.requireNonNull(DisassemblyTextMateBundleProvider.class.getResourceAsStream(RESOURCE_PATH + "/" + fileName)),
-                        pathToCopyFile);
             }
         }
         return targetPath;
