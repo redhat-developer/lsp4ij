@@ -1,5 +1,6 @@
 {
   "type": "rdbg",
   "name": "Attach with rdbg",
-  "request": "attach"
+  "request": "attach",
+  "localfs": true
 }
