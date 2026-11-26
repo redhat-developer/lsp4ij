@@ -44,6 +44,7 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Function;
 
@@ -154,9 +155,24 @@ public class CallHierarchyWriteActionTest extends LSPCodeInsightFixtureTestCase 
         assertTrue("the computation of the children must send " + requests.method + " before it ends, but it ended "
                 + computation.getNow(null), requests.requested.isDone());
 
-        // IntelliJ cancels the read action of the computation, and the write action waits until it ends
-        WriteAction.run(() -> {
-        });
+        // IntelliJ cancels the read action of the computation, and the write action waits until it ends. Should the
+        // computation not end when it is cancelled, but wait for the language server's answer, the write action would
+        // wait for it forever: a watchdog then answers the held request after the bound, so that the computation and
+        // the write action end, and the test fails instead of hanging
+        var watchdogAnswered = new AtomicBoolean();
+        var watchdog = AppExecutorUtil.getAppScheduledExecutorService().schedule(() -> {
+            if (requests.answer.complete(answer)) {
+                watchdogAnswered.set(true);
+            }
+        }, IN_MEMORY_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+        try {
+            WriteAction.run(() -> {
+            });
+        } finally {
+            watchdog.cancel(false);
+        }
+        assertFalse("the computation of the children must end when a write action cancels it, not wait for the "
+                + "answer of " + requests.method, watchdogAnswered.get());
 
         Outcome outcome = await(computation, "the computation of the children must end once a write action cancels it");
         assertTrue("the computation of the children must end with a ProcessCanceledException, for IntelliJ to "
