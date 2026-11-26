@@ -8,7 +8,15 @@
 package com.redhat.devtools.lsp4ij;
 
 import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.editor.Document;
+import com.intellij.openapi.editor.event.DocumentEvent;
+import com.intellij.openapi.editor.event.DocumentListener;
+import com.intellij.openapi.fileEditor.FileDocumentManager;
+import com.intellij.openapi.util.Key;
 import com.intellij.openapi.vfs.VirtualFile;
+import com.intellij.openapi.vfs.newvfs.BulkFileListener;
+import com.intellij.openapi.vfs.newvfs.events.VFileCopyEvent;
+import com.intellij.openapi.vfs.newvfs.events.VFileEvent;
 import com.redhat.devtools.lsp4ij.client.features.FileUriSupport;
 import org.eclipse.lsp4j.CreateFile;
 import org.eclipse.lsp4j.DeleteFile;
@@ -23,7 +31,9 @@ import org.jetbrains.annotations.Nullable;
 import java.net.URI;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.BooleanSupplier;
 
 /**
@@ -47,6 +57,11 @@ import java.util.function.BooleanSupplier;
  * text; it is refused, as VS Code does. Documents that were not synchronized with
  * this server at capture have no captured buffer state, so edits to them retain the existing
  * behavior unless this server has opened them since.
+ * <p>
+ * The targets of a reply are not known at capture, so a document that this server opened since is checked
+ * against {@link TextChanges}: until it was opened, the server could only read the file, and after, it was sent
+ * the document. The edit applies to it only if both are the text the file had at capture: the document has no
+ * unsaved changes, and neither it nor the file has changed since.
  */
 @ApiStatus.Internal
 public final class WorkspaceEditSnapshot {
@@ -54,6 +69,9 @@ public final class WorkspaceEditSnapshot {
     private final LanguageServerWrapper wrapper;
     private final @Nullable LanguageServer server;
     private final BooleanSupplier ownerActive;
+    private final boolean request;
+    // The TextChanges sequence at capture
+    private final long changes;
     private final Map<URI, DocumentState> documents;
 
     private WorkspaceEditSnapshot(@NotNull LanguageServerWrapper wrapper,
@@ -63,6 +81,9 @@ public final class WorkspaceEditSnapshot {
         this.wrapper = wrapper;
         this.server = server;
         this.ownerActive = ownerActive;
+        this.request = request;
+        // Read before the documents: a change after it counts as one since capture
+        this.changes = TextChanges.current();
         // Rename replies can edit other files, so the targets are not known at capture time.
         var states = new HashMap<URI, DocumentState>();
         for (var opened : wrapper.getOpenedDocuments()) {
@@ -102,9 +123,10 @@ public final class WorkspaceEditSnapshot {
                                                           @NotNull BooleanSupplier ownerActive,
                                                           boolean request) {
         // Only thread-safe state is read: the opened-document map, the synchronizers and the documents'
-        // volatile modification stamps, and for a request whether the text was sent, under the synchronizer's
-        // briefly held monitor. So the capture never waits for a write action: workspace/applyEdit captures on
-        // LSP4J's message thread, which must keep reading replies a write action may wait for.
+        // volatile modification stamps, the sequence of TextChanges, and for a request whether the text was sent,
+        // under the synchronizer's briefly held monitor. So the capture never waits for a write action:
+        // workspace/applyEdit captures on LSP4J's message thread, which must keep reading replies a write action
+        // may wait for.
         return new WorkspaceEditSnapshot(wrapper, server, ownerActive, request);
     }
 
@@ -184,25 +206,36 @@ public final class WorkspaceEditSnapshot {
         if (state != null && !state.matches(synchronizer)) {
             return LanguageServerBundle.message("lsp.workspace.edit.document.changed", uriString);
         }
-        // Without a captured state, a document this server opened since has no request-time stamp.
-        if (state == null && synchronizer != null) {
+        // Without a captured state, a document this server opened since has no request-time stamp. The server read
+        // the file until the open, and was sent the document after it, so both must still be the file's text at capture.
+        if (state == null && synchronizer != null && !isUnchangedSinceCapture(opened.getFile(), synchronizer.getDocument())) {
             return LanguageServerBundle.message("lsp.workspace.edit.document.opened", uriString);
         }
         // Documents that were never synchronized retain the existing behavior, as before.
-        if (version != null && state != null) {
+        if (version != null && synchronizer != null) {
             if (version > 0) {
                 // A supplied version must describe the current buffer, including pending local edits.
                 if (!synchronizer.isCurrentVersion(version)) {
                     return LanguageServerBundle.message("lsp.workspace.edit.version.changed", uriString);
                 }
-            } else if (!state.textSent()) {
+            } else if (state != null ? !state.textSent() : !request) {
                 // A version below 1 was never sent by LSP4IJ, so it can't tell which text the server used. A reply
                 // describes the captured text if that was sent before its request, and the stamp above shows it is
-                // still the document's. An incoming edit follows no request, so its placeholder is refused.
+                // still the document's. A document opened since had one text from the request on, checked above.
+                // An incoming edit follows no request, so its placeholder is refused.
                 return LanguageServerBundle.message("lsp.workspace.edit.version.changed", uriString);
             }
         }
         return null;
+    }
+
+    /**
+     * Returns whether the text of a document that this server opened since capture is the file's text at capture:
+     * the document has no unsaved changes, so its text is the file's, and neither the document nor the file has
+     * changed since. A change that is undone still counts, since the server may have been sent the changed text.
+     */
+    private boolean isUnchangedSinceCapture(@NotNull VirtualFile file, @NotNull Document document) {
+        return !FileDocumentManager.getInstance().isDocumentUnsaved(document) && !TextChanges.changedSince(file, changes);
     }
 
     /**
@@ -229,6 +262,64 @@ public final class WorkspaceEditSnapshot {
     private record DocumentState(DocumentContentSynchronizer synchronizer, long modificationStamp, boolean textSent) {
         boolean matches(@Nullable DocumentContentSynchronizer current) {
             return current == synchronizer && synchronizer.getDocument().getModificationStamp() == modificationStamp;
+        }
+    }
+
+    /**
+     * Marks a file each time its text may change: when its document changes, and when a VFS event changes,
+     * creates, copies, moves, renames or deletes it, with the next number of a sequence. A snapshot records the
+     * sequence at capture, so it can tell whether a file it had no state for changed since. Modification stamps
+     * can't tell: an undo restores an earlier one. A mark is set after its change, so a file marked with a number
+     * the snapshot had seen changed before the capture. A file in a directory marked since then counts as changed.
+     */
+    @ApiStatus.Internal
+    public static final class TextChanges implements BulkFileListener, DocumentListener {
+
+        private static final AtomicLong SEQUENCE = new AtomicLong();
+        private static final Key<Long> CHANGED = Key.create("lsp4ij.workspaceEdit.textChanged");
+
+        static long current() {
+            return SEQUENCE.get();
+        }
+
+        /**
+         * Returns whether the file, or a directory that contains it, may have changed since the given sequence.
+         */
+        static boolean changedSince(@NotNull VirtualFile file, long sequence) {
+            for (VirtualFile current = file; current != null; current = current.getParent()) {
+                Long changed = current.getUserData(CHANGED);
+                if (changed != null && changed > sequence) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        @Override
+        public void documentChanged(@NotNull DocumentEvent event) {
+            VirtualFile file = FileDocumentManager.getInstance().getFile(event.getDocument());
+            if (file != null) {
+                mark(file, SEQUENCE.incrementAndGet());
+            }
+        }
+
+        @Override
+        public void after(@NotNull List<? extends @NotNull VFileEvent> events) {
+            long sequence = SEQUENCE.incrementAndGet();
+            for (VFileEvent event : events) {
+                // A copy creates a file, which a create event would have named
+                VirtualFile file = event instanceof VFileCopyEvent copy ? copy.findCreatedFile() : event.getFile();
+                if (file != null) {
+                    mark(file, sequence);
+                }
+            }
+        }
+
+        private static void mark(@NotNull VirtualFile file, long sequence) {
+            // A deleted file has no text: the target's URI then finds another file or none
+            if (file.isValid()) {
+                file.putUserData(CHANGED, sequence);
+            }
         }
     }
 }

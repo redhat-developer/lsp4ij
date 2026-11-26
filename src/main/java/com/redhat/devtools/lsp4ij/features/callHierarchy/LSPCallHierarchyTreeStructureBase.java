@@ -69,6 +69,8 @@ public abstract class LSPCallHierarchyTreeStructureBase extends LSPHierarchyTree
         } catch (ProcessCanceledException ex) {
             // cancel the LSP requests textDocument/prepareCallHierarchy
             prepareCallHierarchySupport.cancel();
+            // IntelliJ computes the children again only when their computation ends cancelled
+            throw ex;
         } catch (CancellationException ex) {
             // cancel the LSP requests textDocument/prepareCallHierarchy
             prepareCallHierarchySupport.cancel();
