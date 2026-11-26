@@ -54,6 +54,8 @@ public class LSPCallHierarchyIncomingCallsTreeStructure extends LSPCallHierarchy
         } catch (ProcessCanceledException ex) {
             // cancel the LSP requests callHierarchy/incomingCalls
             callHierarchyIncomingCallsSupport.cancel();
+            // IntelliJ computes the children again only when their computation ends cancelled
+            throw ex;
         } catch (CancellationException ex) {
             // cancel the LSP requests callHierarchy/incomingCalls
             callHierarchyIncomingCallsSupport.cancel();
