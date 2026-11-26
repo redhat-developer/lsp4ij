@@ -30,7 +30,7 @@ selects are:
 | Windows | x64 and arm64 | `luau-lsp-win64.zip`        |
 
 The installer has no fallback URL: when GitHub can't be reached, or its rate limit is reached, the installation fails,
-see [GitHub API rate limit](../UserDefinedLanguageServerTemplate.md#github-api-rate-limit).
+see [GitHub API rate limit](../Installer.md#github-api-rate-limit).
 
 To install `luau-lsp` yourself, download and extract the asset of your OS from the
 [luau-lsp releases](https://github.com/JohnnyMorganz/luau-lsp/releases), set the path of `luau-lsp` in the command,

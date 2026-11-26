@@ -33,7 +33,7 @@ The first time the server starts, the installer of the template:
 
 1. checks that the .NET SDK 10 or later is installed: `dotnet --list-sdks` must print an SDK whose major version has
    two digits or more, as `10.0.100 [/usr/local/share/dotnet/sdk]`, which its
-   [`outputMatches`](../UserDefinedLanguageServerTemplate.md#output-of-the-command),
+   [`outputMatches`](../Installer.md#output-of-the-command),
    `(?m)^[1-9]\d+\.\d+\.\d+\s`, says. An SDK has the .NET runtime of its version, so this also checks the runtime
    that OmniSharp runs on. Without it, a notification, ".NET SDK 10 or later not found", says that OmniSharp needs it,
    and the installer downloads nothing; once you installed it, restart your IDE, or click **Install if Needed** in the

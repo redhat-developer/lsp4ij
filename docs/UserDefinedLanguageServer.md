@@ -30,10 +30,10 @@ Once you clicked on either of them, the dialog will appear:
 
 When you click the `OK` button, the language server will be created.
 
-If the language server definition [declares an installer](UserDefinedLanguageServerTemplate.md#installer-descriptor)
+If the language server definition [declares an installer](./Installer.md)
 in the [Installer tab](#installer-tab), the installer runs at the first start of the language server: it checks the
 installation, installs the language server if the check fails, and then starts it. See
-[When the installer runs](./UserDefinedLanguageServerTemplate.md#when-the-installer-runs).
+[When the installer runs](./Installer.md#when-the-installer-runs).
 
 You can check the installation again with the `Install if Needed` action, or reinstall the server at any time (e.g. to
 fetch the latest version) using the `Reinstall` action, in the context menu of the language server in the LSP console:
@@ -249,10 +249,10 @@ with task to execute like:
 ![Installer tab](images/user-defined-ls/InstallUserDefinedLanguageServer.png)
 
 A language server created with this JSON runs it at its first start, see
-[When the installer runs](UserDefinedLanguageServerTemplate.md#when-the-installer-runs). In the LSP console, the tab
+[When the installer runs](./Installer.md#when-the-installer-runs). In the LSP console, the tab
 also has the links `Check Installation`, `Run Installation` and `Check / Run Installation`, which run the JSON of the
 tab and show its output next to it; a link whose task the JSON doesn't have says that there is nothing to check or to
-install. See [here](UserDefinedLanguageServerTemplate.md#installer-descriptor)
+install. See [here](./Installer.md)
 to understand how to write this JSON installer descriptor.
 
 ### Workspace Folders tab
@@ -445,24 +445,24 @@ and potential configuration.
 ![New Language Server with Default Template](./images/user-defined-ls/NewLanguageServerWithDefaultTemplate.png)
 
 * [Ada Language Server](./user-defined-ls/ada_language_server.md)
-* [Camel Language Server](./user-defined-ls/camel-lsp-server.md)
 * [Astro Language Server](./user-defined-ls/astro-ls.md)
 * [C# Language Server (OmniSharp)](./user-defined-ls/omnisharp-roslyn.md)
-* [Candor Language Server](./user-defined-ls/candor-lsp.md)
 * [CSS Language Server](./user-defined-ls/vscode-css-language-server.md)
+* [Camel Language Server](./user-defined-ls/camel-lsp-server.md)
+* [Candor Language Server](./user-defined-ls/candor-lsp.md)
 * [Clangd](./user-defined-ls/clangd.md) 
 * [Clojure LSP](./user-defined-ls/clojure-lsp.md)
 * [Cpp Language Server](./user-defined-ls/cpp_ls.md)
 * [Dart LSP server](./user-defined-ls/dart-lsp.md) 
 * [Docker Language Server](./user-defined-ls/docker-language-server.md)
-* [LSP Server for EOLANG](./user-defined-ls/eo-lsp-server.md) 
+* [ESLint Language Server](./user-defined-ls/vscode-eslint-language-server.md) 
 * [Erlang Language Platform (ELP)](./user-defined-ls/erlang-elp.md)
 * [Erlang Language Server (erlang_ls, discontinued October 2024)](./user-defined-ls/erlang-ls.md)
-* [ESLint Language Server](./user-defined-ls/vscode-eslint-language-server.md) 
 * [Go Language Server](./user-defined-ls/gopls.md)
 * [Harper Language Server](./user-defined-ls/harper-ls.md)
 * [JQ Language Server](./user-defined-ls/jq-lsp.md)
 * [Julia Language Server](./user-defined-ls/julia.md)
+* [LSP Server for EOLANG](./user-defined-ls/eo-lsp-server.md) 
 * [Luau Language Server](./user-defined-ls/luau-lsp.md)
 * [Perl Language Server](./user-defined-ls/perl-lsp.md)
 * [Ruby LSP](./user-defined-ls/ruby-lsp.md)

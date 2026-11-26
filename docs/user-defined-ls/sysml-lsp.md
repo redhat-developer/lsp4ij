@@ -20,7 +20,7 @@ If `sysml-lsp` is already on your PATH (for example after `go install github.com
 If the installation fails or if you need another version of the language server, you can customize the installation settings in the **Installer** tab,
 then click on the **Run Installation** hyperlink to reinstall the server.
 
-See [Installer descriptor](../UserDefinedLanguageServerTemplate.md#installer-descriptor) for more information.
+See [Installer descriptor](../Installer.md) for more information.
 
 ---
 
