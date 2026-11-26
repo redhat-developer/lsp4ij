@@ -381,6 +381,21 @@ tasks {
     test {
         // They run in testJavaScript, with the JavaScript plugin
         exclude(javaScriptPluginTests)
+        // -PtestShard=<k>/<n> runs only the k-th of n parts of the test classes, so that CI can run them in n jobs on a
+        // runner that holds only one test JVM. A class belongs to the part that the hash of its name gives, with its
+        // nested classes, so the parts divide the classes without a list to keep up to date, and about evenly.
+        properties("testShard").orNull?.let { shard ->
+            val (part, parts) = shard.split("/").mapNotNull(String::toIntOrNull).takeIf { it.size == 2 }
+                ?.takeIf { (k, n) -> k in 1..n }
+                ?: throw GradleException("-PtestShard=$shard is no <k>/<n> with k from 1 to n")
+            exclude { element ->
+                !element.isDirectory && element.path.endsWith(".class")
+                        && Math.floorMod(element.path.substringBefore('$').removeSuffix(".class").hashCode(), parts) != part - 1
+            }
+            doFirst {
+                logger.lifecycle("$path runs part $part of $parts of the test classes (-PtestShard=$shard)")
+            }
+        }
     }
 
     // TODO: Once LSP4IJ no longer supports 2023.*, the hotswap JVM args can be added unconditionally
