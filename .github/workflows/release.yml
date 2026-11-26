@@ -54,7 +54,7 @@ jobs:
         run: |
           PLUGIN_VERSION=$(./set_release_version.sh)
           echo "Release version: $PLUGIN_VERSION"
-          echo "PLUGIN_VERSION=${PLUGIN_VERSION}" >> $GITHUB_ENV
+          echo "PLUGIN_VERSION=${PLUGIN_VERSION}" >> "$GITHUB_ENV"
 
       # A run which failed after it pushed the tag can be run again, or started again: it then goes on from the commit
       # that the tag points to, so that it builds the plugin that it published
@@ -91,8 +91,8 @@ jobs:
           git config user.email "action@github.com"
           git config user.name "GitHub Action"
           git commit -sam "chore(skip-release): set version to $PLUGIN_VERSION"
-          git tag $PLUGIN_VERSION
-          git push origin $PLUGIN_VERSION
+          git tag "$PLUGIN_VERSION"
+          git push origin "$PLUGIN_VERSION"
 
       # Set next SNAPSHOT version, unless main already has it, from an earlier run of this release or from a commit
       - name: Increment Plugin Version
@@ -133,7 +133,7 @@ jobs:
           if gh release view "${PLUGIN_VERSION}" > /dev/null 2>&1; then
             echo "The GitHub release ${PLUGIN_VERSION} already exists"
           else
-            gh release create ${PLUGIN_VERSION} \
+            gh release create "${PLUGIN_VERSION}" \
               --title "${PLUGIN_VERSION}" \
               --notes "$(cat << 'EOM'
           ${{ steps.changelog.outputs.changelog }}
@@ -145,4 +145,4 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         # --clobber replaces the asset that an earlier run of this release uploaded
-        run: gh release upload ${PLUGIN_VERSION} ./build/distributions/* --clobber
+        run: gh release upload "${PLUGIN_VERSION}" ./build/distributions/* --clobber
