@@ -32,7 +32,7 @@ console.log(s);
 
    ![Create a new server](../images/DAP_server_create_link.png)
 
-5. It opens a new dialog to create DAP server, select `VSCode JS Debug` template:
+5. It opens a new dialog to create DAP server: click `Choose template...` and select the `VSCode JS Debug` template:
    ![Select Template](../images/vscode-js-debug/select_template.png)
 
 6. After clicking on `OK` button, it will select the new server and pre-fill configurations:

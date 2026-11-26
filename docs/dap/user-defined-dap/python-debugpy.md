@@ -44,7 +44,7 @@ if __name__ == "__main__":
 
    ![Create a new server](../images/DAP_server_create_link.png)
 
-6. It opens a new dialog to create DAP server, select `Python - Debugpy` template:
+6. It opens a new dialog to create DAP server: click `Choose template...` and select the `Python - Debugpy` template:
    ![Select Template](../images/python-debugpy/select_template.png)
 
 7. After clicking on `OK` button, it will select the new server and pre-fill configurations:
