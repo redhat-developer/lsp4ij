@@ -156,7 +156,7 @@ assigned to it in `Settings / Keymap`, and [Find Usages](./UserGuide.md#find-usa
 
 This menu action either opens the reference in a popup or navigates to the reference if there are several references:
 
-![textDocument/implementation popup](./images/lsp-support/textDocument_references_popup.png)
+![textDocument/references popup](./images/lsp-support/textDocument_references_popup.png)
 
 [textDocument/references](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_references) is used also via [Find Usages](./UserGuide.md#find-usages) to show references.
 

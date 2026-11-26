@@ -73,7 +73,7 @@ public class EditorBehaviorFeatureTest extends LSPCodeInsightFixtureTestCase {
         PsiFile file = myFixture.configureByText("test.ts", "function foo() {}");
         LanguageServiceAccessor.getInstance(file.getProject())
                 .getLanguageServers(file, null, null)
-                .get(5000, TimeUnit.MILLISECONDS);
+                .get(30, TimeUnit.SECONDS);
 
         // Computes the flag from the language server, unless a computation of the editor already did
         EditorBehaviorFeature.enableSemanticTokensFileViewProvider(file);

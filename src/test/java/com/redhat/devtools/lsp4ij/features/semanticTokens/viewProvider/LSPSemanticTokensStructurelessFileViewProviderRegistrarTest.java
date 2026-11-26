@@ -17,12 +17,10 @@ import com.intellij.openapi.fileTypes.impl.AbstractFileType;
 import com.intellij.openapi.project.Project;
 import com.intellij.psi.PsiFile;
 import com.intellij.psi.PsiFileFactory;
-import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
 import com.redhat.devtools.lsp4ij.fixtures.LSPSemanticTokensFileViewProviderFixtureTestCase;
 import com.redhat.devtools.lsp4ij.mock.MockLanguageServer;
 
 import java.util.Objects;
-import java.util.concurrent.TimeUnit;
 
 /**
  * Tests the semantic tokens-based file view provider registrar that associates the view provider factory with abstract
@@ -42,13 +40,7 @@ public class LSPSemanticTokensStructurelessFileViewProviderRegistrarTest extends
 
         // Initialize the language server
         Project project = cssFile.getProject();
-        try {
-            LanguageServiceAccessor.getInstance(project)
-                    .getLanguageServers(cssFile, null, null)
-                    .get(5000, TimeUnit.MILLISECONDS);
-        } catch (Exception e) {
-            fail(e.getMessage());
-        }
+        awaitLanguageServers(cssFile);
 
         // Confirm that the CSS file uses our view provider
         assertInstanceOf(cssFile.getViewProvider(), LSPSemanticTokensStructurelessFileViewProvider.class);

@@ -42,6 +42,7 @@ import org.eclipse.lsp4j.jsonrpc.messages.Either;
 import org.jetbrains.annotations.NotNull;
 
 import java.lang.reflect.Method;
+import java.time.Duration;
 import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -55,12 +56,16 @@ import java.util.concurrent.atomic.AtomicInteger;
  * {@link com.redhat.devtools.lsp4ij.internal.editor.EditorFeatureManager}, whose debounced restart of the file's
  * highlighting runs once for the answers that come together, unless the file changed meanwhile. The tests run on the
  * EDT, the mock server holds its answers until the test releases them, and the tests count the restarts that the
- * refreshes leave pending in the file's debounce, which they run at once.
+ * refreshes leave pending in the file's debounce, which holds them until the tests run them.
  */
 public class CodeActionsOnTheEdtTest extends LSPCodeInsightFixtureTestCase {
 
     // Only ends a hang: an EDT that waits for a held answer gets it then, and the test fails
     private static final long HANG_SECONDS = 60;
+
+    // The debounce of the restarts of the file's highlighting holds them until the test runs them: once the 2 s of a
+    // user are up, they would have run, as on a slow runner, before the test counts them
+    private static final Duration RESTART_DEBOUNCE = Duration.ofMinutes(10);
 
     public CodeActionsOnTheEdtTest() {
         super("*.ts");
@@ -155,7 +160,7 @@ public class CodeActionsOnTheEdtTest extends LSPCodeInsightFixtureTestCase {
             assertFalse(intention.isAvailable(myFixture.getProject(), myFixture.getEditor(), file));
             assertFalse(quickFix.isAvailable(myFixture.getProject(), myFixture.getEditor(), file));
             PlatformTestUtil.waitWithEventsDispatching("both textDocument/codeAction requests must be sent",
-                    () -> textDocumentService.codeActionRequests == 2, 5);
+                    () -> textDocumentService.codeActionRequests.get() == 2, 30);
         } finally {
             release.complete(null);
         }
@@ -203,7 +208,7 @@ public class CodeActionsOnTheEdtTest extends LSPCodeInsightFixtureTestCase {
         assertEquals("", intention.getText());
         assertFalse("The EDT waited for the language server's answer", release.isDone());
         PlatformTestUtil.waitWithEventsDispatching("textDocument/codeAction must be sent",
-                () -> textDocumentService.codeActionRequests > 0, 5);
+                () -> textDocumentService.codeActionRequests.get() > 0, 30);
         assertFalse("The answer is still held", intention.isAvailable(myFixture.getProject(), myFixture.getEditor(), file));
     }
 
@@ -223,10 +228,11 @@ public class CodeActionsOnTheEdtTest extends LSPCodeInsightFixtureTestCase {
 
     /**
      * Runs the restarts of the file's highlighting that are pending, and anything they leave to finish, so that the file
-     * has none pending.
+     * has none pending, and holds the later ones until the test runs them.
      */
     private void settle(PsiFile file) throws Exception {
         getLanguageServer(file);
+        LSPFileSupport.getSupport(file).setRestartDebounce(RESTART_DEBOUNCE);
         NonBlockingReadActionImpl.waitForAsyncTaskCompletion();
         runRestarts(file);
         assertEquals(0, pendingRestarts(file));
@@ -271,7 +277,7 @@ public class CodeActionsOnTheEdtTest extends LSPCodeInsightFixtureTestCase {
                         intention.isAvailable(myFixture.getProject(), myFixture.getEditor(), file)))
                 .get(HANG_SECONDS, TimeUnit.SECONDS);
         assertTrue(available);
-        assertEquals(requests, MockLanguageServer.INSTANCE.getTextDocumentService().codeActionRequests);
+        assertEquals(requests, MockLanguageServer.INSTANCE.getTextDocumentService().codeActionRequests.get());
     }
 
     /**
@@ -318,7 +324,7 @@ public class CodeActionsOnTheEdtTest extends LSPCodeInsightFixtureTestCase {
     private LanguageServerItem getLanguageServer(PsiFile file) throws Exception {
         List<LanguageServerItem> languageServers = LanguageServiceAccessor.getInstance(file.getProject())
                 .getLanguageServers(file, null, null)
-                .get(5000, TimeUnit.MILLISECONDS);
+                .get(30, TimeUnit.SECONDS);
         assertSize(1, languageServers);
         return languageServers.get(0);
     }

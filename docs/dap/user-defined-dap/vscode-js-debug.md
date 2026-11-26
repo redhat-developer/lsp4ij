@@ -32,7 +32,7 @@ console.log(s);
 
    ![Create a new server](../images/DAP_server_create_link.png)
 
-5. It opens a new dialog to create DAP server, select `VSCode JS Debug` template:
+5. It opens a new dialog to create DAP server: click `Choose template...` and select the `VSCode JS Debug` template:
    ![Select Template](../images/vscode-js-debug/select_template.png)
 
 6. After clicking on `OK` button, it will select the new server and pre-fill configurations:
@@ -96,7 +96,7 @@ As you have selected `VSCode JS Debug` server, it will automatically populate th
 
 1. Fill in the `Configuration` tab:
 
-- the `working directory` (usually the project's root directory) 
+- the `working directory`, or leave it empty: the debug adapter then runs in the directory of the file
 - the path to the `test.js` file.
 
 ![DAP Configuration Type/Configuration](../images/vscode-js-debug/configuration_tab.png)
@@ -116,7 +116,7 @@ As you have selected `VSCode JS Debug` server, it will automatically populate th
 
 When the run configuration starts:
 
-- `${workspaceFolder}` will be replaced with the working directory you specified.
+- `${workspaceFolder}` will be replaced with the working directory you specified, or the project's directory without one.
 - `${file}` will be replaced with the full path to `test.js`.
 
 ### Set Breakpoint

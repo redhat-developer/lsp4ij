@@ -57,6 +57,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.channels.Channels;
 import java.nio.channels.Pipe;
+import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -278,6 +279,9 @@ public class CancelRequestAfterShutdownTest extends UsefulTestCase {
         var servers = LanguageServiceAccessor.getInstance(file.getProject())
                 .getLanguageServers(file, null, null).get(30, TimeUnit.SECONDS);
         assertSize(1, servers);
+        // The stop waits for the message writer to send exit as long as a slow runner takes, instead of the second for
+        // a user, after which it closes the connection: the language server would read no exit
+        servers.get(0).getServerWrapper().setStopWaitTimeout(Duration.ofSeconds(10));
         return servers.get(0);
     }
 

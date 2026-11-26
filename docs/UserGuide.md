@@ -80,6 +80,12 @@ The `Debug` tab allows to configure language servers debugging and tracing:
 
 ![Language Server preferences - Debug](./images/LanguageServerPreferencesDebug.png)
 
+`Debug port` and `Suspend and wait for a debugger?` are shown for a language server which a plugin integrates: the
+plugin starts it with them when it builds its command with
+[JavaProcessCommandBuilder](./DeveloperGuide.md#processstreamconnectionprovider).
+A [user-defined language server](./UserDefinedLanguageServer.md#debug-tab) is started by its own command, so its
+`Debug` tab doesn't show them.
+
 ### Files served twice
 
 IntelliJ IDEA 2026.3 has a language server client of its own, configured in

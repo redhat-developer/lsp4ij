@@ -193,7 +193,8 @@ Here are mappings samples with the [typescript-language-server](https://github.c
 
 ![TypeScript file type](images/user-defined-ls/typescript-language-server/TypeScriptServerDialog_FileType.png)
 
-* Since IntelliJ (Community) doesn't provide file type by default `TypeScript`, `React` file name patterns are used:
+* Since IntelliJ (Community) doesn't provide file type by default `TypeScript`, the file name patterns of the
+  template are used too, for the TypeScript and React files:
 
 ![TypeScript file name patterns](images/user-defined-ls/typescript-language-server/TypeScriptServerDialog_FileNamePatterns.png)
 
@@ -233,7 +234,8 @@ the LSP console show the error.
 ### Debug tab
 
 The `Debug tab` is available when you have created the language server definition. It allows to customize the 
-level Trace used in LSP console.
+level Trace used in LSP console. It has no debug port: to debug the language server, add its debug options to its
+command in the `Server` tab.
 
 ### Installer tab
 

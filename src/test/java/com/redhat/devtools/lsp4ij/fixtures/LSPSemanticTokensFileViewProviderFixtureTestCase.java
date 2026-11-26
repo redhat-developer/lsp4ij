@@ -12,7 +12,6 @@
 package com.redhat.devtools.lsp4ij.fixtures;
 
 import com.intellij.lang.ASTNode;
-import com.intellij.openapi.project.Project;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
 import com.intellij.psi.PsiReference;
@@ -21,7 +20,6 @@ import com.intellij.util.ThreeState;
 import com.intellij.util.containers.ContainerUtil;
 import com.redhat.devtools.lsp4ij.JSONUtils;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
-import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
 import com.redhat.devtools.lsp4ij.features.semanticTokens.viewProvider.LSPSemanticTokenPsiElement;
 import com.redhat.devtools.lsp4ij.features.semanticTokens.viewProvider.LSPSemanticTokensFileViewProvider;
 import com.redhat.devtools.lsp4ij.mock.MockLanguageServer;
@@ -34,10 +32,7 @@ import org.eclipse.lsp4j.ServerCapabilities;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.LinkedList;
-import java.util.List;
 import java.util.Map;
-import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
@@ -179,16 +174,7 @@ public abstract class LSPSemanticTokensFileViewProviderFixtureTestCase extends L
         PsiFile file = myFixture.configureByText(fileName, fileBody);
 
         // Initialize the language server
-        List<LanguageServerItem> languageServers = new LinkedList<>();
-        try {
-            Project project = file.getProject();
-            ContainerUtil.addAllNotNull(languageServers, LanguageServiceAccessor.getInstance(project)
-                    .getLanguageServers(file, null, null)
-                    .get(5000, TimeUnit.MILLISECONDS));
-        } catch (Exception e) {
-            fail(e.getMessage());
-        }
-        LanguageServerItem languageServer = ContainerUtil.getFirstItem(languageServers);
+        LanguageServerItem languageServer = ContainerUtil.getFirstItem(awaitLanguageServers(file));
         assertNotNull(languageServer);
 
         // Enable or disable the view provider as requested

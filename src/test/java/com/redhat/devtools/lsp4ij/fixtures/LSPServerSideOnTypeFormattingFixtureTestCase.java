@@ -21,7 +21,6 @@ import com.intellij.testFramework.EditorTestUtil;
 import com.intellij.util.containers.ContainerUtil;
 import com.redhat.devtools.lsp4ij.JSONUtils;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
-import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
 import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
 import com.redhat.devtools.lsp4ij.mock.MockLanguageServer;
 import com.redhat.devtools.lsp4ij.server.definition.ClientConfigurableLanguageServerDefinition;
@@ -36,7 +35,6 @@ import org.jetbrains.annotations.Nullable;
 import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -88,14 +86,7 @@ public abstract class LSPServerSideOnTypeFormattingFixtureTestCase extends LSPCo
         Editor editor = myFixture.getEditor();
 
         // Initialize the language server
-        List<LanguageServerItem> languageServers = new LinkedList<>();
-        try {
-            ContainerUtil.addAllNotNull(languageServers, LanguageServiceAccessor.getInstance(project)
-                    .getLanguageServers(file, null, null)
-                    .get(5000, TimeUnit.MILLISECONDS));
-        } catch (Exception e) {
-            fail(e.getMessage());
-        }
+        List<LanguageServerItem> languageServers = awaitLanguageServers(file);
 
         // Configure the language server for client-side on-type formatting
         LanguageServerItem languageServer = ContainerUtil.getFirstItem(languageServers);

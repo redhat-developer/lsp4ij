@@ -16,9 +16,17 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Whether a pull request changes only documentation, which needs no tests
+  changes:
+    uses: ./.github/workflows/changes.yml
+    permissions:
+      pull-requests: read
+
   # Run tests and upload a code coverage report
   test:
     name: Test (${{ matrix.os }}${{ matrix.platformVersion && format(', {0}', matrix.platformVersion) || '' }})
+    needs: changes
+    if: needs.changes.outputs.docs_only != 'true'
     runs-on: ${{ matrix.os }}
 
     # Codecov authenticates uploads with a short-lived OIDC token instead of a
@@ -69,8 +77,12 @@ jobs:
             caches/transforms-4
             caches/*/transforms
 
-      # Run tests
+      # Run tests. In the 490 runs from 2026-11-11 to 11-25, this step took at most 23 minutes, on macOS (20 with an empty
+      # Gradle cache), 16 on Linux and 14 on Windows. When test after test fails at a wait, as when each waits 30 s for a
+      # language server that doesn't start, the step stops after 45 minutes instead of running for up to GitHub's
+      # 6 hours. The log shows each test that failed until then, with its error.
       - name: Run Tests
+        timeout-minutes: 45
         run: ./gradlew check ${{ matrix.platformVersion && format('-PplatformVersion={0}', matrix.platformVersion) || '' }} ${{ matrix.platformType && format('-PplatformType={0}', matrix.platformType) || '' }}
 
       # Collect Tests Result

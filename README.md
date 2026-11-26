@@ -380,7 +380,8 @@ You can select:
  * `None` : in this case the language server error will be ignored.
  * `As notification` (default value) : in this case the language server error appear as a `notification`:
 ![Error in notification](./docs/images/troubleshooting/LanguageServerErrorInNotification.png)
- The error notification shows 3 possible actions:
+ The error notification shows 4 possible actions:
+   * `Show Logs` : shows the `Logs` tab of the language server in the [LSP console](./docs/UserGuide.md#lsp-console).
    * `Disable error reporting` : sets the error reporting to `None`.
    * `Report error in Log` : sets the error reporting to `In log`. 
    * `Open LSP4IJ documentation` : opens this documentation. 

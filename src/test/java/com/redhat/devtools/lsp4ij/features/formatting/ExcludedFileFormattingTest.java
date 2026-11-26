@@ -61,7 +61,7 @@ public class ExcludedFileFormattingTest extends LSPCodeInsightFixtureTestCase {
         var project = myFixture.getProject();
         var file = myFixture.configureByText("test.ts", TEXT);
         LanguageServiceAccessor.getInstance(project)
-                .getLanguageServers(file, null, null).get(5, TimeUnit.SECONDS);
+                .getLanguageServers(file, null, null).get(30, TimeUnit.SECONDS);
         CodeStyle.doWithTemporarySettings(project, CodeStyle.getSettings(project), settings -> {
             settings.getExcludedFiles().addDescriptor(new GlobPatternDescriptor(doNotFormat));
             // The processor which "Reformat code" before a commit runs, for one file

@@ -22,6 +22,7 @@ import org.eclipse.lsp4j.TextDocumentSyncOptions;
 import org.eclipse.lsp4j.TextEdit;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
@@ -52,6 +53,10 @@ public class WillSaveTest extends LSPCodeInsightFixtureTestCase {
         serverAsks(false, true);
         MockLanguageServer.INSTANCE.getTextDocumentService().setWillSaveWaitUntilCallback(
                 List.of(new TextEdit(new Range(new Position(0, 0), new Position(0, 0)), "formatted ")));
+        // The save waits for the answer as long as a slow CI runner takes to give it: once the 1.5 s for a user are up,
+        // the document is saved without the edits. The tests that let the budget run out keep those 1.5 s, which each
+        // of their timeouts uses up.
+        LSPDocumentSaveListener.setWillSaveWaitUntilTimeout(Duration.ofSeconds(30), getTestRootDisposable());
         var file = open("text");
         type("more ");
 

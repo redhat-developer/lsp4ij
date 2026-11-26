@@ -55,7 +55,9 @@ import org.eclipse.lsp4j.jsonrpc.CancelChecker;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.jetbrains.annotations.TestOnly;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Callable;
@@ -70,6 +72,11 @@ public class LSPFileSupport extends UserDataHolderBase implements Disposable {
     public static final @NotNull CancelChecker NO_CANCELLABLE_CHECKER = () -> {
     };
     private static final Key<LSPFileSupport> LSP_FILE_SUPPORT_KEY = Key.create("lsp.file.support");
+    /**
+     * How long a restart of the highlighting of the file waits for more requests to restart it, which it then runs with,
+     * in milliseconds.
+     */
+    private static final long RESTART_DEBOUNCE_MILLIS = 2000;
     private final PsiFile file;
     private final LSPCodeLensSupport codeLensSupport;
     private final LSPInlayHintsSupport inlayHintsSupport;
@@ -103,6 +110,8 @@ public class LSPFileSupport extends UserDataHolderBase implements Disposable {
     private final LSPTypeHierarchySupertypesSupport typeHierarchySupertypesSupport;
     private final List<Key<?>> keys = new ArrayList<>();
     private volatile Alarm refreshPsiFileAlarm = null;
+    // How long a restart of the highlighting of the file waits for more requests, which only a test changes
+    private volatile long restartDebounceMillis = RESTART_DEBOUNCE_MILLIS;
     private boolean disposed;
 
     private LSPFileSupport(@NotNull PsiFile file) {
@@ -523,7 +532,19 @@ public class LSPFileSupport extends UserDataHolderBase implements Disposable {
                 action.inSmartMode(project);
             }
             action.submit(AppExecutorUtil.getAppExecutorService());
-        }, 2000);
+        }, restartDebounceMillis);
+    }
+
+    /**
+     * Sets how long a restart of the highlighting of this file waits for more requests to restart it, which it then runs
+     * with, instead of {@value #RESTART_DEBOUNCE_MILLIS} ms, so that a test can count the restarts that are pending
+     * however slowly it runs: they would have run once that time is up.
+     *
+     * @param debounce how long a restart waits for more requests to restart the highlighting of this file.
+     */
+    @TestOnly
+    public void setRestartDebounce(@NotNull Duration debounce) {
+        this.restartDebounceMillis = debounce.toMillis();
     }
 
     private Alarm getRefreshPsiFileAlarm() {

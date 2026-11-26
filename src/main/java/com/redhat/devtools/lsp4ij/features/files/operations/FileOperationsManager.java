@@ -10,6 +10,8 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.features.files.operations;
 
+import com.redhat.devtools.lsp4ij.LSPNotificationConstants;
+import com.redhat.devtools.lsp4ij.LSPRequestConstants;
 import com.redhat.devtools.lsp4ij.LanguageServerWrapper;
 import org.eclipse.lsp4j.FileOperationOptions;
 import org.eclipse.lsp4j.FileOperationsServerCapabilities;
@@ -19,7 +21,10 @@ import org.jetbrains.annotations.Nullable;
 
 import java.net.URI;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
  * Manages support for file operations (create, delete, rename) declared
@@ -37,6 +42,10 @@ import java.util.Map;
  * Internally, this class maintains a cache of {@link FileOperationMatcher}
  * instances, one per {@link FileOperationOptions}, to efficiently test
  * whether a given URI matches the file filters declared by the server.
+ * <p>
+ * The filters of the file operations that the server registers dynamically
+ * (see {@link #registerFileOperation(String, FileOperationOptions)}) apply
+ * next to those of its capabilities.
  *
  * @see org.eclipse.lsp4j.FileOperationsServerCapabilities
  * @see org.eclipse.lsp4j.FileOperationOptions
@@ -44,12 +53,31 @@ import java.util.Map;
  */
 public class FileOperationsManager {
 
+    // The methods of the file operations, which a language server can register dynamically
+    private static final Set<String> FILE_OPERATION_METHODS = Set.of(
+            LSPRequestConstants.WORKSPACE_WILL_CREATE_FILES,
+            LSPNotificationConstants.WORKSPACE_DID_CREATE_FILES,
+            LSPRequestConstants.WORKSPACE_WILL_RENAME_FILES,
+            LSPNotificationConstants.WORKSPACE_DID_RENAME_FILES,
+            LSPRequestConstants.WORKSPACE_WILL_DELETE_FILES,
+            LSPNotificationConstants.WORKSPACE_DID_DELETE_FILES);
+
     private final LanguageServerWrapper languageServerWrapper;
     @Nullable
     private ServerCapabilities serverCapabilities;
 
     @NotNull
     private final Map<FileOperationOptions, FileOperationMatcher> matchers;
+
+    // The matchers of the filters that the language server registered dynamically, by the method of the file
+    // operation, for the file operations that LSP4IJ announces in its client capabilities. Copy-on-write lists, which
+    // are read while a registration changes them, as in the registries of the text document features
+    @NotNull
+    private final Map<String, List<FileOperationMatcher>> dynamicMatchers = Map.of(
+            LSPNotificationConstants.WORKSPACE_DID_CREATE_FILES, new CopyOnWriteArrayList<>(),
+            LSPRequestConstants.WORKSPACE_WILL_RENAME_FILES, new CopyOnWriteArrayList<>(),
+            LSPNotificationConstants.WORKSPACE_DID_RENAME_FILES, new CopyOnWriteArrayList<>(),
+            LSPNotificationConstants.WORKSPACE_DID_DELETE_FILES, new CopyOnWriteArrayList<>());
 
     /**
      * Creates a new {@code FileOperationsManager} bound to the given language server.
@@ -62,13 +90,45 @@ public class FileOperationsManager {
     }
 
     /**
-     * Updates the current {@link ServerCapabilities} and clears any cached file matchers.
+     * Updates the current {@link ServerCapabilities} and clears any cached file matchers, and the filters of the
+     * dynamic registrations.
      *
      * @param serverCapabilities the capabilities to use, or {@code null} if not available.
      */
     public void setServerCapabilities(@Nullable ServerCapabilities serverCapabilities) {
         this.serverCapabilities = serverCapabilities;
         this.matchers.clear();
+        this.dynamicMatchers.values().forEach(List::clear);
+    }
+
+    /**
+     * Returns {@code true} if the given method is the method of a file operation, such as
+     * {@code workspace/didRenameFiles}, which a language server can register dynamically.
+     *
+     * @param method the method of a registration.
+     * @return {@code true} if the method is the method of a file operation, {@code false} otherwise.
+     */
+    public static boolean isFileOperation(@Nullable String method) {
+        return method != null && FILE_OPERATION_METHODS.contains(method);
+    }
+
+    /**
+     * Adds the filters of a dynamic registration of a file operation next to the filters of the server capabilities.
+     *
+     * @param method  the method of the file operation, such as {@code workspace/didRenameFiles}.
+     * @param options the registration options, which hold the filters.
+     * @return the action that removes the filters again, when the language server unregisters the file operation, or
+     * {@code null} if LSP4IJ doesn't announce the file operation, as {@code workspace/willCreateFiles}, and ignores
+     * its registration.
+     */
+    public @Nullable Runnable registerFileOperation(@NotNull String method, @NotNull FileOperationOptions options) {
+        var registered = dynamicMatchers.get(method);
+        if (registered == null) {
+            return null;
+        }
+        var matcher = new FileOperationMatcher(options.getFilters() != null ? options.getFilters() : List.of());
+        registered.add(matcher);
+        return () -> registered.remove(matcher);
     }
 
     // -------------------------------------------------------------------------
@@ -109,7 +169,8 @@ public class FileOperationsManager {
      */
     public boolean canDidCreateFiles(@NotNull URI fileUri, boolean isFolder) {
         var capabilities = getFileOperationsServerCapabilities();
-        return capabilities != null && canSupportFileOperation(fileUri, isFolder, capabilities.getDidCreate());
+        return capabilities != null && canSupportFileOperation(fileUri, isFolder, capabilities.getDidCreate())
+                || isMatchedDynamically(LSPNotificationConstants.WORKSPACE_DID_CREATE_FILES, fileUri, isFolder);
     }
 
     /**
@@ -120,7 +181,8 @@ public class FileOperationsManager {
      */
     public boolean canDidCreateFiles() {
         var capabilities = getFileOperationsServerCapabilities();
-        return capabilities != null && hasFilters(capabilities.getDidCreate());
+        return capabilities != null && hasFilters(capabilities.getDidCreate())
+                || isRegisteredDynamically(LSPNotificationConstants.WORKSPACE_DID_CREATE_FILES);
     }
 
     // -------------------------------------------------------------------------
@@ -161,7 +223,8 @@ public class FileOperationsManager {
      */
     public boolean canDidDeleteFiles(@NotNull URI fileUri, boolean isFolder) {
         var capabilities = getFileOperationsServerCapabilities();
-        return capabilities != null && canSupportFileOperation(fileUri, isFolder, capabilities.getDidDelete());
+        return capabilities != null && canSupportFileOperation(fileUri, isFolder, capabilities.getDidDelete())
+                || isMatchedDynamically(LSPNotificationConstants.WORKSPACE_DID_DELETE_FILES, fileUri, isFolder);
     }
 
     /**
@@ -172,7 +235,8 @@ public class FileOperationsManager {
      */
     public boolean canDidDeleteFiles() {
         var capabilities = getFileOperationsServerCapabilities();
-        return capabilities != null && hasFilters(capabilities.getDidDelete());
+        return capabilities != null && hasFilters(capabilities.getDidDelete())
+                || isRegisteredDynamically(LSPNotificationConstants.WORKSPACE_DID_DELETE_FILES);
     }
 
     // -------------------------------------------------------------------------
@@ -189,7 +253,8 @@ public class FileOperationsManager {
      */
     public boolean canWillRenameFiles(@NotNull URI fileUri, boolean isFolder) {
         var capabilities = getFileOperationsServerCapabilities();
-        return capabilities != null && canSupportFileOperation(fileUri, isFolder, capabilities.getWillRename());
+        return capabilities != null && canSupportFileOperation(fileUri, isFolder, capabilities.getWillRename())
+                || isMatchedDynamically(LSPRequestConstants.WORKSPACE_WILL_RENAME_FILES, fileUri, isFolder);
     }
 
     /**
@@ -200,7 +265,8 @@ public class FileOperationsManager {
      */
     public boolean canWillRenameFiles() {
         var capabilities = getFileOperationsServerCapabilities();
-        return capabilities != null && hasFilters(capabilities.getWillRename());
+        return capabilities != null && hasFilters(capabilities.getWillRename())
+                || isRegisteredDynamically(LSPRequestConstants.WORKSPACE_WILL_RENAME_FILES);
     }
 
     /**
@@ -213,7 +279,8 @@ public class FileOperationsManager {
      */
     public boolean canDidRenameFiles(@NotNull URI fileUri, boolean isFolder) {
         var capabilities = getFileOperationsServerCapabilities();
-        return capabilities != null && canSupportFileOperation(fileUri, isFolder, capabilities.getDidRename());
+        return capabilities != null && canSupportFileOperation(fileUri, isFolder, capabilities.getDidRename())
+                || isMatchedDynamically(LSPNotificationConstants.WORKSPACE_DID_RENAME_FILES, fileUri, isFolder);
     }
 
     /**
@@ -224,7 +291,8 @@ public class FileOperationsManager {
      */
     public boolean canDidRenameFiles() {
         var capabilities = getFileOperationsServerCapabilities();
-        return capabilities != null && hasFilters(capabilities.getDidRename());
+        return capabilities != null && hasFilters(capabilities.getDidRename())
+                || isRegisteredDynamically(LSPNotificationConstants.WORKSPACE_DID_RENAME_FILES);
     }
 
     // -------------------------------------------------------------------------
@@ -246,6 +314,29 @@ public class FileOperationsManager {
             return false;
         }
         return getMatcher(fileOperationOptions).isMatch(fileUri, isFolder);
+    }
+
+    /**
+     * Returns {@code true} if a dynamic registration of the given file operation has a filter that matches the given
+     * file or folder URI.
+     *
+     * @param method   the method of the file operation.
+     * @param fileUri  the URI of the file or folder.
+     * @param isFolder {@code true} if the target is a folder, {@code false} otherwise.
+     * @return {@code true} if a registered filter matches the URI, {@code false} otherwise.
+     */
+    private boolean isMatchedDynamically(@NotNull String method, @NotNull URI fileUri, boolean isFolder) {
+        return dynamicMatchers.get(method).stream().anyMatch(matcher -> matcher.isMatch(fileUri, isFolder));
+    }
+
+    /**
+     * Returns {@code true} if the language server registered the given file operation dynamically.
+     *
+     * @param method the method of the file operation.
+     * @return {@code true} if a registration of the file operation is in effect, {@code false} otherwise.
+     */
+    private boolean isRegisteredDynamically(@NotNull String method) {
+        return !dynamicMatchers.get(method).isEmpty();
     }
 
     /**

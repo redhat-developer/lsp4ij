@@ -10,6 +10,7 @@ package com.redhat.devtools.lsp4ij.server;
 import com.intellij.execution.configurations.GeneralCommandLine;
 import com.intellij.openapi.application.PathManager;
 import com.intellij.testFramework.LightPlatformTestCase;
+import com.intellij.testFramework.PlatformTestUtil;
 import com.redhat.devtools.lsp4ij.server.SocketTestServers.ConnectingServer;
 import com.redhat.devtools.lsp4ij.server.SocketTestServers.EndingServer;
 import com.redhat.devtools.lsp4ij.server.SocketTestServers.IPv4ConnectingServer;
@@ -260,9 +261,10 @@ public class SocketStreamConnectionProviderTest extends LightPlatformTestCase {
             provider.start();
             writeLine(provider.getOutputStream(), "bye");
 
-            // it ends, which closes the connection
+            // it ends, which closes the connection, and the stop is reported, by the read which finds the end of the
+            // connection or by the end of the process, on its own thread, whichever comes first
             assertEquals(-1, provider.getInputStream().read(new byte[8]));
-            assertEquals(1, stops.get());
+            PlatformTestUtil.waitWithEventsDispatching("the stop must be reported", () -> stops.get() == 1, 30);
             // its last line has no line feed
             awaitLog(log, "error: ended");
             awaitExit(provider);

@@ -37,7 +37,7 @@ You should see some instructions how to start lldb-dap server.
 
    ![Create a new server](../images/DAP_server_create_link.png)
 
-5. It opens a new dialog to create DAP server, select `Swift lldb-dap` template:
+5. It opens a new dialog to create DAP server: click `Choose template...` and select the `Swift lldb-dap` template:
    ![Select Template](../images/swift-lldb/select_template.png)
 
 6. After clicking on `OK` button, it will select the new server and pre-fill configurations:
@@ -91,7 +91,7 @@ This command should generate an executable according your swift project settings
 
 1. Fill in the `Configuration` tab:
 
-- the `working directory` (usually the project's root directory)
+- the `working directory`, or leave it empty: the debug adapter then runs in the directory of the file
 - the path to the executable file.
 
 ![DAP Configuration/Configuration](../images/swift-lldb/configuration_tab.png)
@@ -111,7 +111,7 @@ This command should generate an executable according your swift project settings
 
 When the run configuration starts:
 
-- `${workspaceFolder}` will be replaced with the working directory you specified.
+- `${workspaceFolder}` will be replaced with the working directory you specified, or the project's directory without one.
 - `${file}` will be replaced with the full path to your executable.
 
 ## Set Breakpoint

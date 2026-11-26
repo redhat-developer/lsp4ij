@@ -61,7 +61,7 @@ start_debugger()
 
    ![Create a new server](../images/DAP_server_create_link.png)
 
-6. It opens a new dialog to create DAP server, select `Julia` template:
+6. It opens a new dialog to create DAP server: click `Choose template...` and select the `Julia` template:
    ![Select Template](../images/julia/select_template.png)
 
 7. After clicking on `OK` button, it will select the new server and pre-fill configurations:
@@ -115,7 +115,7 @@ As you have selected `Julia` server, it will automatically populate the file map
 
 1. Fill in the `Configuration` tab:
 
-- the `working directory` (usually the project's root directory)
+- the `working directory`, or leave it empty: the debug adapter then runs in the directory of the file
 - the path to the `test.jl` file.
 
 ![DAP Configuration/Configuration](../images/julia/configuration_tab.png)
@@ -138,7 +138,7 @@ As you have selected `Julia` server, it will automatically populate the file map
 
 When the run configuration starts:
 
-- `${workspaceFolder}` will be replaced with the working directory you specified.
+- `${workspaceFolder}` will be replaced with the working directory you specified, or the project's directory without one.
 - `${file}` will be replaced with the full path to `test.jl`.
 
 ## Set Breakpoint

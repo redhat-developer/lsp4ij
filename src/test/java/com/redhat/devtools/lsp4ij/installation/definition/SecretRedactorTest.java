@@ -100,8 +100,8 @@ public class SecretRedactorTest {
                         + "the limit.",
                 "> Loading GitHub releases: https://api.github.com/repos/owner/repo/releases?per_page=100 "
                         + "(with the token of the LSP4IJ settings)",
-                "GitHub API refused the token of the IDE's GitHub account octocat (HTTP 401): the token is invalid "
-                        + "or has expired.",
+                "GitHub API refused the token of the LSP4IJ settings (HTTP 401): the token is invalid or has "
+                        + "expired.",
                 "${server.command}=node server.js --stdio --token-file /home/user/token.txt",
                 "> npm install --prefix /home/user/.lsp4ij/lsp typescript-language-server",
                 "Asset found https://github.com/owner/repo/releases/download/v1.0/server.zip",

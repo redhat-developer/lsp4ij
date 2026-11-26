@@ -15,7 +15,6 @@ import com.intellij.execution.configurations.ConfigurationType;
 import com.intellij.execution.configurations.RunConfiguration;
 import com.intellij.openapi.components.BaseState;
 import com.intellij.openapi.project.Project;
-import com.intellij.openapi.project.ProjectUtil;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -37,12 +36,9 @@ public class DAPConfigurationFactory extends ConfigurationFactory {
     @Override
     public RunConfiguration createTemplateConfiguration(
             @NotNull Project project) {
-        var config = new DAPRunConfiguration(project, this, "DAP");
-        var projectDir = ProjectUtil.guessProjectDir(project);
-        if (projectDir != null) {
-            config.setWorkingDirectory(projectDir.getPath());
-        }
-        return config;
+        // Without a working directory: the Debug Adapter then runs in the directory of the configuration's file, or
+        // in the project's directory without a file, which the empty field shows
+        return new DAPRunConfiguration(project, this, "DAP");
     }
 
     @Nullable

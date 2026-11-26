@@ -13,7 +13,6 @@ import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiElement;
 import com.intellij.refactoring.listeners.RefactoringEventData;
 import com.intellij.refactoring.listeners.RefactoringEventListener;
-import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -81,8 +80,7 @@ public final class WillRenameFilesPreparation {
      */
     static boolean isWillRenameFilesSupported(@NotNull Project project) {
         return LanguageServiceAccessor.getInstance(project).getStartedServers().stream()
-                .anyMatch(server -> server.isActive() &&
-                        LanguageServerItem.isWillRenameFilesSupported(server.getServerCapabilitiesSync()));
+                .anyMatch(server -> server.isActive() && server.canWillRenameFiles());
     }
 
     void plan(@NotNull FileRenamePlan rename) {

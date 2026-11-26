@@ -209,7 +209,10 @@ public class MyLanguageServer extends ProcessStreamConnectionProvider {
 ```
 
 This builder takes care of filling command with the current Java runtime, and adds additional debug flags if the settings of the
-language server `myLanguageServerId` defines a debug port.
+language server `myLanguageServerId` defines a debug port. The `Debug` tab of the language server, in the
+[Language Servers preferences](./UserGuide.md#language-servers-preferences) and in the [LSP console](./UserGuide.md#lsp-console),
+sets this `Debug port`, and `Suspend and wait for a debugger?`, which makes the language server wait for a debugger
+before it runs.
 
 You can see a complete example
 with the [QuteServer](https://github.com/redhat-developer/intellij-quarkus/blob/main/src/main/java/com/redhat/devtools/intellij/qute/lsp/QuteServer.java) implementation.

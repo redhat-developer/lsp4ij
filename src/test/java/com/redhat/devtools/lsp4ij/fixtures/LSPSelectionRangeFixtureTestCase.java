@@ -18,13 +18,11 @@ import com.intellij.openapi.editor.SelectionModel;
 import com.intellij.psi.PsiFile;
 import com.intellij.util.ArrayUtil;
 import com.redhat.devtools.lsp4ij.JSONUtils;
-import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
 import com.redhat.devtools.lsp4ij.mock.MockLanguageServer;
 import org.eclipse.lsp4j.SelectionRange;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
-import java.util.concurrent.TimeUnit;
 
 /**
  * Base class test case to test LSP 'textDocument/selectionRange' feature.
@@ -59,13 +57,7 @@ public abstract class LSPSelectionRangeFixtureTestCase extends LSPCodeInsightFix
         caretModel.moveToOffset(setCaretBeforeOffset);
 
         // Initialize the language server
-        try {
-            LanguageServiceAccessor.getInstance(file.getProject())
-                    .getLanguageServers(file, null, null)
-                    .get(5000, TimeUnit.MILLISECONDS);
-        } catch (Exception e) {
-            fail(e.getMessage());
-        }
+        awaitLanguageServers(file);
 
         // Trigger the Extend Selection action repeatedly and confirm selections
         for (String expectedSelection : selections) {

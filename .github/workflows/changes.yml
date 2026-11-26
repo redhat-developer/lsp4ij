@@ -1,0 +1,37 @@
+name: Changes
+
+# Tells the workflows that call it whether a pull request changes only documentation: the files under docs/ and the
+# Markdown files at the root. No test reads them, so such a pull request needs no tests and no plugin verification. The
+# Build Plugin zip workflow still runs, since the plugin's description comes from README.md. A push to main is never
+# documentation only, and neither is a pull request that changes any other file, such as a workflow.
+on:
+  workflow_call:
+    outputs:
+      docs_only:
+        description: "'true' when the pull request changes only documentation"
+        value: ${{ jobs.changes.outputs.docs_only }}
+
+jobs:
+  changes:
+    name: Documentation only?
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: read
+    outputs:
+      docs_only: ${{ steps.files.outputs.docs_only }}
+    steps:
+      - name: List the changed files
+        id: files
+        if: github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        # A renamed file counts with its old path too, so that moving a file out of src/ is a change of src/
+        run: |
+          files=$(gh api --paginate "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER/files" \
+            --jq '.[] | .filename, (.previous_filename // empty)')
+          echo "$files"
+          if [ -n "$files" ] && ! grep -qvE '^docs/|^[^/]+\.md$' <<< "$files"; then
+            echo "docs_only=true" >> "$GITHUB_OUTPUT"
+            echo "Only documentation changed: the tests and the plugin verification are skipped." >> "$GITHUB_STEP_SUMMARY"
+          fi

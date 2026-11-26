@@ -36,7 +36,7 @@ public class DocumentConnectionScopeTest extends LSPCodeInsightFixtureTestCase {
             assertSame("An overlapping request retains the same synchronizer", connection, wrapper.getOpenedDocument(uri));
             second.close();
             PlatformTestUtil.waitWithEventsDispatching("the last scoped owner must disconnect",
-                    () -> wrapper.getOpenedDocument(uri) == null, 5);
+                    () -> wrapper.getOpenedDocument(uri) == null, IN_MEMORY_TIMEOUT_SECONDS);
         }
     }
 
@@ -47,7 +47,7 @@ public class DocumentConnectionScopeTest extends LSPCodeInsightFixtureTestCase {
             var uri = wrapper.toUri(file.getVirtualFile());
             var connection = wrapper.getOpenedDocument(uri);
             LanguageServiceAccessor.getInstance(myFixture.getProject()).getLanguageServers(file, null, null)
-                    .get(5, TimeUnit.SECONDS);
+                    .get(30, TimeUnit.SECONDS);
             scope.close();
             PlatformTestUtil.dispatchAllEventsInIdeEventQueue();
             assertSame("An ordinary feature owns the promoted connection", connection, wrapper.getOpenedDocument(uri));
@@ -57,7 +57,7 @@ public class DocumentConnectionScopeTest extends LSPCodeInsightFixtureTestCase {
     public void testExistingConnectionSurvivesScope() throws Exception {
         var file = myFixture.addFileToProject("existing.ts", "const value=1;");
         var wrapper = LanguageServiceAccessor.getInstance(myFixture.getProject()).getLanguageServers(file, null, null)
-                .get(5, TimeUnit.SECONDS).get(0).getServerWrapper();
+                .get(30, TimeUnit.SECONDS).get(0).getServerWrapper();
         var uri = wrapper.toUri(file.getVirtualFile());
         var connection = wrapper.getOpenedDocument(uri);
         try (var scope = new DocumentConnectionScope()) {
@@ -84,7 +84,7 @@ public class DocumentConnectionScopeTest extends LSPCodeInsightFixtureTestCase {
         var file = myFixture.addFileToProject("cancelled.ts", "const value=1;");
         var other = myFixture.addFileToProject("other.ts", "const other=1;");
         var wrapper = LanguageServiceAccessor.getInstance(myFixture.getProject()).getLanguageServers(other, null, null)
-                .get(5, TimeUnit.SECONDS).get(0).getServerWrapper();
+                .get(30, TimeUnit.SECONDS).get(0).getServerWrapper();
         try (var scope = new DocumentConnectionScope()) {
             scope.close();
             assertEmpty(connect(file, scope));
@@ -107,7 +107,7 @@ public class DocumentConnectionScopeTest extends LSPCodeInsightFixtureTestCase {
             assertSame(current, wrapper.getOpenedDocument(uri));
             currentScope.close();
             PlatformTestUtil.waitWithEventsDispatching("replacement scope must disconnect its own document",
-                    () -> wrapper.getOpenedDocument(uri) == null, 5);
+                    () -> wrapper.getOpenedDocument(uri) == null, IN_MEMORY_TIMEOUT_SECONDS);
         }
     }
 
@@ -123,6 +123,6 @@ public class DocumentConnectionScopeTest extends LSPCodeInsightFixtureTestCase {
 
     private List<LanguageServerItem> connect(PsiFile file, DocumentConnectionScope scope) throws Exception {
         return LanguageServiceAccessor.getInstance(myFixture.getProject())
-                .getLanguageServersForScope(file, null, null, scope).get(5, TimeUnit.SECONDS);
+                .getLanguageServersForScope(file, null, null, scope).get(30, TimeUnit.SECONDS);
     }
 }

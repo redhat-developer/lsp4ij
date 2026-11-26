@@ -105,6 +105,9 @@ public class LanguageServerWrapper implements Disposable {
 
     private static final int MAX_NUMBER_OF_RESTART_ATTEMPTS = 20; // TODO move this max value in settings
 
+    // How long a stop waits for the notifications that the dispatcher holds, and then for the message writer, each
+    private static final Duration STOP_WAIT_TIMEOUT = Duration.ofSeconds(1);
+
     /**
      * The most LSP traces that wait for the LSP console to show them.
      */
@@ -165,12 +168,20 @@ public class LanguageServerWrapper implements Disposable {
     private @NotNull CompletableFuture<LanguageServer> lastNotification = CompletableFuture.completedFuture(null);
     private final ExecutorService listener;
     private final ExecutorService messageWriter;
+    // The waits of a stop for the dispatcher and the message writer, which only a test changes
+    private volatile @NotNull Duration stopWaitTimeout = STOP_WAIT_TIMEOUT;
     private final SimpleModificationTracker modificationTracker = new SimpleModificationTracker();
     /**
      * Map containing unregistration handlers for dynamic capability registrations.
      */
     private final @NotNull
     Map<String, Runnable> dynamicRegistrations = new HashMap<>();
+    /**
+     * The dynamic registrations that wait for their installation, by id, guarded by {@link #dynamicRegistrations}. The
+     * language server gets its answer before LSP4IJ installs them, which waits until the server is initialized, and can
+     * unregister one meanwhile: the unregistration removes it from here, and its installation then installs nothing.
+     */
+    private final @NotNull Map<String, Registration> pendingRegistrations = new HashMap<>();
     private final LSPFileListener fileListener;
     private final AtomicInteger keepAliveCounter = new AtomicInteger();
     // The starts that connect the open documents again, as a restart does: until then the language server has none,
@@ -209,6 +220,9 @@ public class LanguageServerWrapper implements Disposable {
     private List<String> currentProcessCommandLines;
     private String connectionDescription;
     private boolean initiallySupportsWorkspaceFolders = false;
+    // The dynamic 'workspace/didChangeWorkspaceFolders' registrations of the current server capabilities that hold the
+    // workspace folders on, guarded by this wrapper
+    private int workspaceFoldersRegistrations;
     private FileOperationsManager fileOperationsManager;
     private WorkspaceFolderNotificationManager workspaceFolderNotificationManager;
 
@@ -837,6 +851,7 @@ public class LanguageServerWrapper implements Disposable {
                             syncOptions = createSyncOptions();
                             getClientFeatures().setServerCapabilities(serverCapabilities);
                             this.initiallySupportsWorkspaceFolders = supportsWorkspaceFolders(serverCapabilities);
+                            this.workspaceFoldersRegistrations = 0;
                             initializingContext.languageServer.initialized(new InitializedParams());
                         }
                         return initializingContext;
@@ -939,6 +954,18 @@ public class LanguageServerWrapper implements Disposable {
         // No more doublings than it takes to reach any pause in practice, so that it never overflows
         Duration pause = first.multipliedBy(1L << Math.min(restarts - 1, 20));
         return pause.compareTo(max) > 0 ? max : pause;
+    }
+
+    /**
+     * Sets how long a stop of this language server waits for the notifications that its dispatcher holds, and then for
+     * its message writer, each, instead of a second, so that a test sees the messages that the stop waits for however
+     * slowly the dispatcher and the writer run.
+     *
+     * @param stopWaitTimeout how long a stop waits for the dispatcher, and then for the message writer.
+     */
+    @TestOnly
+    public void setStopWaitTimeout(@NotNull Duration stopWaitTimeout) {
+        this.stopWaitTimeout = stopWaitTimeout;
     }
 
     @TestOnly
@@ -2016,8 +2043,24 @@ public class LanguageServerWrapper implements Disposable {
             // A registration from a connection that has stopped, as after a restart
             return;
         }
+        // Recorded before the language server gets its answer, which comes before the installation while the server
+        // initializes: an unregistration meanwhile then withdraws the registration
+        synchronized (dynamicRegistrations) {
+            params.getRegistrations().forEach(reg -> pendingRegistrations.put(reg.getId(), reg));
+        }
         initialization.thenRun(() -> {
+            // The registrations that the language server had not withdrawn when their installation began, with what
+            // undoes the installation of each once it has done its work. Kept here until the installation ends, so that
+            // an installation which the server withdrew never touches what a registration again of its id recorded
+            Map<Registration, Runnable> installing = new LinkedHashMap<>();
             params.getRegistrations().forEach(reg -> {
+                synchronized (dynamicRegistrations) {
+                    if (pendingRegistrations.get(reg.getId()) != reg) {
+                        // Withdrawn by the language server before its installation, which installs nothing
+                        return;
+                    }
+                }
+                installing.put(reg, null);
                 if (LSPNotificationConstants.WORKSPACE_DID_CHANGE_WORKSPACE_FOLDERS.equals(reg.getMethod())) {
                     // register 'workspace/didChangeWorkspaceFolders' capability
                     assert serverCapabilities != null :
@@ -2025,12 +2068,9 @@ public class LanguageServerWrapper implements Disposable {
                     if (initiallySupportsWorkspaceFolders) {
                         // Can treat this as a NOP since nothing can disable it dynamically if it was
                         // enabled on initialization.
-                    } else if (supportsWorkspaceFolders(serverCapabilities)) {
-                        LOGGER.warn(
-                                "Dynamic registration of 'workspace/didChangeWorkspaceFolders' ignored. It was already enabled before"); //$NON-NLS-1$);
                     } else {
-                        addRegistration(reg, () -> setWorkspaceFoldersEnablement(false));
-                        setWorkspaceFoldersEnablement(true);
+                        registerWorkspaceFolders();
+                        installing.put(reg, this::unregisterWorkspaceFolders);
                     }
                 } else if (LSPNotificationConstants.WORKSPACE_DID_CHANGE_WATCHED_FILES.equals(reg.getMethod())) {
                     // register 'workspace/didChangeWatchedFiles' capability
@@ -2043,8 +2083,17 @@ public class LanguageServerWrapper implements Disposable {
                             if (isDisposed() || registrationContext != currentInitializingContext) {
                                 return;
                             }
-                            fileListener.registerFileSystemWatchers(reg.getId(), options.getWatchers());
-                            addRegistration(reg, () -> fileListener.unregisterFileSystemWatchers(reg.getId()));
+                            synchronized (dynamicRegistrations) {
+                                // Withdrawn since its installation began: a registration again of the id can have
+                                // added its watchers already, which these, registered by id, would replace
+                                if (pendingRegistrations.get(reg.getId()) != reg) {
+                                    return;
+                                }
+                            }
+                            // Undoes only the watchers of this registration: the server can still withdraw it, and a
+                            // registration again of the id, which waits for this monitor, then replaces them before
+                            // they are undone
+                            installing.put(reg, fileListener.addFileSystemWatchers(reg.getId(), options.getWatchers()));
                         }
                     } catch (Exception e) {
                         LOGGER.error("Error while getting 'workspace/didChangeWatchedFiles' capability", e);
@@ -2063,8 +2112,8 @@ public class LanguageServerWrapper implements Disposable {
                                 if (isDisposed() || registrationContext != currentInitializingContext) {
                                     return;
                                 }
-                                addRegistration(reg, () -> unregisterDocumentContentSchemes(schemes));
                                 registerDocumentContentSchemes(schemes);
+                                installing.put(reg, () -> unregisterDocumentContentSchemes(schemes));
                             }
                         }
                     } catch (Exception e) {
@@ -2078,11 +2127,37 @@ public class LanguageServerWrapper implements Disposable {
                                         ExecuteCommandOptions.class);
                         List<String> newCommands = executeCommandOptions.getCommands();
                         if (newCommands != null && !newCommands.isEmpty()) {
-                            addRegistration(reg, () -> unregisterCommands(newCommands));
                             registerCommands(newCommands);
+                            installing.put(reg, () -> unregisterCommands(newCommands));
                         }
                     } catch (Exception e) {
                         LOGGER.error("Error while getting 'workspace/executeCommand' capability", e);
+                    }
+                } else if (FileOperationsManager.isFileOperation(reg.getMethod())) {
+                    // register 'workspace/didCreateFiles', 'workspace/didDeleteFiles', 'workspace/willRenameFiles'
+                    // or 'workspace/didRenameFiles' capability
+                    String method = reg.getMethod();
+                    try {
+                        JsonObject registerOptions = (JsonObject) reg.getRegisterOptions();
+                        FileOperationOptions options = registerOptions != null
+                                ? JSONUtils.getLsp4jGson().fromJson(registerOptions, FileOperationOptions.class)
+                                : new FileOperationOptions(List.of());
+                        synchronized (LanguageServerWrapper.this) {
+                            // The callback can run once its server has stopped, whose filters must not reach the file
+                            // operations of the next connection
+                            if (isDisposed() || registrationContext != currentInitializingContext
+                                    || fileOperationsManager == null) {
+                                return;
+                            }
+                            Runnable unregistration = fileOperationsManager.registerFileOperation(method, options);
+                            if (unregistration == null) {
+                                LOGGER.debug("Dynamic registration of '{}' ignored: LSP4IJ doesn't announce it", method); //$NON-NLS-1$
+                                return;
+                            }
+                            installing.put(reg, unregistration);
+                        }
+                    } catch (Exception e) {
+                        LOGGER.error("Error while getting '{}' capability", method, e);
                     }
                 } else {
                     String method = reg.getMethod();
@@ -2104,21 +2179,47 @@ public class LanguageServerWrapper implements Disposable {
                                 registerOptions = new JsonObject();
                             }
                             final TextDocumentRegistrationOptions options = registry.registerCapability(registerOptions);
-                            addRegistration(reg, () -> registry.unregisterCapability(options));
+                            installing.put(reg, () -> registry.unregisterCapability(options));
                         }
                     } catch (Exception e) {
                         LOGGER.error("Error while getting '{}' capability", method, e);
                     }
                 }
             });
+            installing.forEach((reg, unregistration) -> endInstallation(reg, unregistration, registrationContext));
         });
     }
 
-    private void addRegistration(@NotNull Registration reg, @NotNull Runnable unregistrationHandler) {
+    /**
+     * Ends the installation of a dynamic registration, once it has done all its work. Unless the language server
+     * withdrew the registration meanwhile, this records what undoes the installation, which an unregistration of its
+     * id runs from then on. Otherwise this runs it at once, as the unregistration found nothing to undo, and leaves in
+     * place what a registration again of the id has recorded under it since.
+     *
+     * @param reg                 the registration
+     * @param unregistration      what undoes the installation, and null if it installed nothing
+     * @param registrationContext the start whose language server asked for the registration
+     */
+    private void endInstallation(@NotNull Registration reg, @Nullable Runnable unregistration,
+                                 @NotNull InitializingContext registrationContext) {
         String regId = reg.getId();
         synchronized (dynamicRegistrations) {
-            assert !dynamicRegistrations.containsKey(regId) : "Registration id is not unique"; //$NON-NLS-1$
-            dynamicRegistrations.put(regId, unregistrationHandler);
+            if (pendingRegistrations.get(regId) == reg) {
+                // Not withdrawn
+                pendingRegistrations.remove(regId);
+                if (unregistration != null) {
+                    assert !dynamicRegistrations.containsKey(regId) : "Registration id is not unique"; //$NON-NLS-1$
+                    dynamicRegistrations.put(regId, unregistration);
+                }
+                return;
+            }
+            if (registrationContext != currentInitializingContext) {
+                // Dropped by a stop, which drops the registrations of its start without undoing them
+                return;
+            }
+        }
+        if (unregistration != null) {
+            unregistration.run();
         }
     }
 
@@ -2139,6 +2240,26 @@ public class LanguageServerWrapper implements Disposable {
         folders.setSupported(enable);
     }
 
+    /**
+     * Turns the workspace folders on for a dynamic 'workspace/didChangeWorkspaceFolders' registration, until
+     * {@link #unregisterWorkspaceFolders()} has undone each such registration.
+     */
+    synchronized void registerWorkspaceFolders() {
+        workspaceFoldersRegistrations++;
+        setWorkspaceFoldersEnablement(true);
+    }
+
+    /**
+     * Turns the workspace folders off once no dynamic 'workspace/didChangeWorkspaceFolders' registration holds them on.
+     * A registration which the language server withdrew while LSP4IJ installed it is undone only once installed, when
+     * the server can have registered them again.
+     */
+    synchronized void unregisterWorkspaceFolders() {
+        if (--workspaceFoldersRegistrations == 0) {
+            setWorkspaceFoldersEnablement(false);
+        }
+    }
+
     synchronized void registerCommands(@NotNull List<String> newCommands) {
         ServerCapabilities serverCapabilities = this.getServerCapabilitiesSync();
         if (serverCapabilities != null) {
@@ -2149,7 +2270,8 @@ public class LanguageServerWrapper implements Disposable {
             }
             List<String> existingCommands = commandProvider.getCommands();
             for (String newCmd : newCommands) {
-                assert !existingCommands.contains(newCmd) : "Command already registered '" + newCmd + "'"; //$NON-NLS-1$ //$NON-NLS-2$
+                // Can be there already: a registration which the language server withdrew while LSP4IJ installed it
+                // keeps its commands until its installation ends, and the server can register them again meanwhile
                 existingCommands.add(newCmd);
             }
         }
@@ -2162,6 +2284,8 @@ public class LanguageServerWrapper implements Disposable {
             synchronized (dynamicRegistrations) {
                 unregisters = dynamicRegistrations.get(id);
                 dynamicRegistrations.remove(id);
+                // A registration that waits for its installation is withdrawn
+                pendingRegistrations.remove(id);
             }
             if (unregisters != null) {
                 unregisters.run();
@@ -2175,7 +2299,8 @@ public class LanguageServerWrapper implements Disposable {
             ExecuteCommandOptions commandProvider = serverCapabilities.getExecuteCommandProvider();
             if (commandProvider != null) {
                 List<String> existingCommands = commandProvider.getCommands();
-                existingCommands.removeAll(commands);
+                // Once per registered command: a later registration can have added the same command
+                commands.forEach(existingCommands::remove);
             }
         }
     }
@@ -2526,6 +2651,17 @@ public class LanguageServerWrapper implements Disposable {
 
     public boolean canRenameFilesSupported() {
         return fileOperationsManager != null && (fileOperationsManager.canWillRenameFiles() || fileOperationsManager.canDidRenameFiles());
+    }
+
+    /**
+     * Returns true if the language server may ask for 'workspace/willRenameFiles', in its server capabilities or with a
+     * dynamic registration, and false otherwise. Each renamed file is then checked against the filters.
+     *
+     * @return true if the language server may ask for 'workspace/willRenameFiles' and false otherwise.
+     */
+    public boolean canWillRenameFiles() {
+        var manager = fileOperationsManager;
+        return manager != null && manager.canWillRenameFiles();
     }
 
     /**
@@ -2945,7 +3081,10 @@ public class LanguageServerWrapper implements Disposable {
                     this.initializeFuture = null;
                 }
                 this.serverCapabilities = null;
-                this.dynamicRegistrations.clear();
+                synchronized (dynamicRegistrations) {
+                    this.dynamicRegistrations.clear();
+                    this.pendingRegistrations.clear();
+                }
                 // Dropping the registrations does not run their unregistration, so drop the watchers they added
                 fileListener.clearFileSystemWatchers();
                 if (clientFeatures != null) {
@@ -3133,9 +3272,9 @@ public class LanguageServerWrapper implements Disposable {
     }
 
     /**
-     * Waits until the dispatcher has handed the given notifications to the message writer, for a second at most, so
-     * that a request sent after this is written after them. A disposed language server sends no messages, and isn't
-     * waited for.
+     * Waits until the dispatcher has handed the given notifications to the message writer, for a second at most
+     * ({@link #STOP_WAIT_TIMEOUT}), so that a request sent after this is written after them. A disposed language
+     * server sends no messages, and isn't waited for.
      *
      * @param notifications the last of the notifications to wait for, as {@link #getLastNotification()} gave it, or
      *                      null for none.
@@ -3145,7 +3284,7 @@ public class LanguageServerWrapper implements Disposable {
             return;
         }
         try {
-            notifications.get(1, TimeUnit.SECONDS);
+            notifications.get(stopWaitTimeout.toMillis(), TimeUnit.MILLISECONDS);
         } catch (InterruptedException ex) {
             Thread.currentThread().interrupt();
         } catch (ExecutionException | CancellationException | TimeoutException ex) {
@@ -3164,8 +3303,8 @@ public class LanguageServerWrapper implements Disposable {
     }
 
     /**
-     * Waits until the message writer has sent the messages queued so far, for a second at most. A disposed language
-     * server sends no messages, and isn't waited for.
+     * Waits until the message writer has sent the messages queued so far, for a second at most
+     * ({@link #STOP_WAIT_TIMEOUT}). A disposed language server sends no messages, and isn't waited for.
      */
     private void waitForTheMessageWriter() {
         if (isDisposed()) {
@@ -3174,7 +3313,7 @@ public class LanguageServerWrapper implements Disposable {
         try {
             // The writer has one thread, so it runs this once the messages before it are sent
             CompletableFuture.runAsync(() -> {
-            }, messageWriter).get(1, TimeUnit.SECONDS);
+            }, messageWriter).get(stopWaitTimeout.toMillis(), TimeUnit.MILLISECONDS);
         } catch (InterruptedException ex) {
             Thread.currentThread().interrupt();
         } catch (ExecutionException | TimeoutException | RejectedExecutionException ex) {

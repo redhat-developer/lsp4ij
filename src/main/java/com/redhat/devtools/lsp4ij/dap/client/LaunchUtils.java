@@ -19,6 +19,7 @@ import com.intellij.openapi.actionSystem.CommonDataKeys;
 import com.intellij.openapi.actionSystem.DataContext;
 import com.intellij.openapi.actionSystem.impl.SimpleDataContext;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.project.ProjectUtil;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.redhat.devtools.lsp4ij.dap.configurations.DAPRunConfigurationOptions;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
@@ -26,6 +27,9 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.lang.reflect.Type;
+import java.nio.file.Files;
+import java.nio.file.InvalidPathException;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -81,7 +85,7 @@ public class LaunchUtils {
             @Nullable VirtualFile selectedFile) {
 
         LaunchContext context = new LaunchContext(
-                dapOptions.getFile(), dapOptions.getWorkingDirectory());
+                dapOptions.getFile(), getWorkspaceFolder(dapOptions.getWorkingDirectory(), project));
 
         Map<String, Object> parameters =
                 getDapParameters(dapOptions.getDapParameters(), context);
@@ -145,6 +149,94 @@ public class LaunchUtils {
         }
 
         return value;
+    }
+
+    /**
+     * Returns the folder which {@code ${workspaceFolder}} names in the DAP parameters: the working directory of the
+     * configuration if one is set, and otherwise the project's directory. It doesn't follow the directory of the
+     * configuration's file, where a Debug Adapter without a working directory runs (see
+     * {@link #getWorkingDirectory(String, String, Project)}), so that a launch configuration keeps the
+     * {@code ${workspaceFolder}} which a configuration created from a file had when it stored the project's directory
+     * as its working directory.
+     *
+     * @param workingDirectory the working directory of the configuration, or null or blank if none is set.
+     * @param project          the project, or null if it isn't known.
+     * @return the folder which {@code ${workspaceFolder}} names, or null if there is none, as in the default project.
+     */
+    public static @Nullable String getWorkspaceFolder(@Nullable String workingDirectory,
+                                                      @Nullable Project project) {
+        if (StringUtils.isNotBlank(workingDirectory)) {
+            return workingDirectory;
+        }
+        VirtualFile projectDir = project != null ? ProjectUtil.guessProjectDir(project) : null;
+        return projectDir != null ? projectDir.getPath() : null;
+    }
+
+    /**
+     * Returns the working directory of the Debug Adapter's process. A working directory set in the configuration wins.
+     * Without one, the Debug Adapter runs in the directory of the configuration's file (the file itself when it is a
+     * folder), so that it gets the environment of that directory, as with mise or direnv, and without a file in the
+     * project's directory. A file whose directory isn't on disk, as one in an archive, gives the project's directory,
+     * and a project's directory which isn't on disk, or the default project, gives none, so that the process still
+     * starts.
+     *
+     * @param workingDirectory the working directory of the configuration, or null or blank if none is set.
+     * @param file             the file of the configuration, or null or blank if it has none.
+     * @param project          the project, or null if it isn't known.
+     * @return the working directory of the Debug Adapter's process, or null if it has none.
+     */
+    public static @Nullable String getWorkingDirectory(@Nullable String workingDirectory,
+                                                       @Nullable String file,
+                                                       @Nullable Project project) {
+        if (StringUtils.isNotBlank(workingDirectory)) {
+            return workingDirectory;
+        }
+        String fileDirectory = getDirectoryOnDisk(file);
+        if (fileDirectory != null) {
+            return fileDirectory;
+        }
+        VirtualFile projectDir = project != null ? ProjectUtil.guessProjectDir(project) : null;
+        // Not one in an archive, nor the one in memory of the light tests
+        return projectDir != null && projectDir.isInLocalFileSystem() && isDirectoryOnDisk(projectDir.getPath())
+                ? projectDir.getPath()
+                : null;
+    }
+
+    /**
+     * Returns the directory of the given file on disk: the file itself if it is a folder, and otherwise its parent.
+     *
+     * @param file the absolute path of the file, or null.
+     * @return the directory of the file, or null if it isn't on disk.
+     */
+    private static @Nullable String getDirectoryOnDisk(@Nullable String file) {
+        if (StringUtils.isBlank(file)) {
+            return null;
+        }
+        if (isDirectoryOnDisk(file)) {
+            // A folder to debug, such as a Go package
+            return file;
+        }
+        try {
+            Path parent = Path.of(file).getParent();
+            return parent != null && isDirectoryOnDisk(parent.toString()) ? parent.toString() : null;
+        } catch (InvalidPathException e) {
+            return null;
+        }
+    }
+
+    /**
+     * Returns true if the given absolute path is a directory on disk.
+     *
+     * @param path the path.
+     * @return true if the given absolute path is a directory on disk, and false otherwise.
+     */
+    private static boolean isDirectoryOnDisk(@NotNull String path) {
+        try {
+            Path directory = Path.of(path);
+            return directory.isAbsolute() && Files.isDirectory(directory);
+        } catch (InvalidPathException e) {
+            return false;
+        }
     }
 
     @Nullable

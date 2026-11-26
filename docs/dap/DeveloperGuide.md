@@ -173,7 +173,8 @@ public class TypeScriptDebugAdapterDescriptor extends DebugAdapterDescriptor {
                 }
                 """;
         String file = ((FileOptionConfigurable) options).getFile();
-        String workspaceFolder = ((WorkingDirectoryConfigurable) options).getWorkingDirectory();
+        String workspaceFolder = LaunchUtils.getWorkspaceFolder(((WorkingDirectoryConfigurable) options).getWorkingDirectory(),
+                environment.getProject());
         LaunchUtils.LaunchContext context = new LaunchUtils.LaunchContext(file, workspaceFolder);
         return LaunchUtils.getDapParameters(launchJson, context);
     }
@@ -195,7 +196,8 @@ public class TypeScriptDebugAdapterDescriptor extends DebugAdapterDescriptor {
 * `getDapParameters()` returns the arguments of the `launch` request. `LaunchUtils.getDapParameters` replaces
   `${file}` and `${workspaceFolder}` in the JSON with the values of the `LaunchContext`. Here they come from the
   options of the generic DAP Run/Debug configuration, which implement `FileOptionConfigurable` and
-  `WorkingDirectoryConfigurable`.
+  `WorkingDirectoryConfigurable`. A configuration created from a file has no working directory:
+  `LaunchUtils.getWorkspaceFolder` then gives the project's directory, as the generic configuration does.
 * `getServerReadyConfig(DebugMode)` makes the client wait until the server writes `Debug server listening at `
   before it connects (see [Wait for the DAP server](#wait-for-the-dap-server)).
 * `getFileType()` returns the file type of the editors where the user types expressions: Evaluate, watches and
@@ -305,6 +307,8 @@ It should start your DAP server and execute the TypeScript file.
 * `createStartServerCommandLine(command)` parses the command and replaces `${port}` with a free port, which the client
   then uses. `createStartServerCommandLine(workingDirectory, command, environmentVariables, includeSystemEnvironment)`
   sets the working directory and the environment variables of the process too.
+  `LaunchUtils.getWorkingDirectory(workingDirectory, file, project)` gives the working directory of the generic
+  configuration: the one it sets, and without one the directory of its file, or the project's directory.
 * `startServer(GeneralCommandLine)` starts the process. When the process ends, the console shows its exit code.
 
 If you create the `ProcessHandler` in another way, call `DAPProcessTerminatedListener.attach(processHandler)` to

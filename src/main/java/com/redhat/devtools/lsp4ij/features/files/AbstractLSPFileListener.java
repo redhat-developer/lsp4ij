@@ -386,8 +386,7 @@ public abstract class AbstractLSPFileListener implements FileEditorManagerListen
      */
     void sendWillRenameFiles(@NotNull List<FileRenamePlan> renames) {
         var ls = languageServerWrapper.getLanguageServer();
-        if (ls == null || !languageServerWrapper.isActive() ||
-                !LanguageServerItem.isWillRenameFilesSupported(languageServerWrapper.getServerCapabilitiesSync())) {
+        if (ls == null || !languageServerWrapper.isActive() || !languageServerWrapper.canWillRenameFiles()) {
             return;
         }
         var fileRenames = new ArrayList<FileRename>();
@@ -819,6 +818,14 @@ public abstract class AbstractLSPFileListener implements FileEditorManagerListen
      */
     public void registerFileSystemWatchers(String id, List<FileSystemWatcher> watchers) {
         fileSystemWatcherManager.registerFileSystemWatchers(id, watchers);
+    }
+
+    /**
+     * Registers new file system watchers with a given ID, in place of those registered with it before, and returns what
+     * unregisters them, unless a later registration of the ID has replaced them, or null if none were registered.
+     */
+    public @Nullable Runnable addFileSystemWatchers(String id, List<FileSystemWatcher> watchers) {
+        return fileSystemWatcherManager.addFileSystemWatchers(id, watchers);
     }
 
     /**

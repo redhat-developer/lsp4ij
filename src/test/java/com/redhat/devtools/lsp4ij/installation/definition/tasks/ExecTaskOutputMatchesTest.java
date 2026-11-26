@@ -110,21 +110,25 @@ public class ExecTaskOutputMatchesTest {
 
     @Test
     public void testACommandWhichStillRunsAtItsTimeoutPassesOnlyIfWhatItPrintedMatches() throws Exception {
-        // HoldFile prints nothing and runs for two seconds, which a timeout of 500 ms ends whatever the machine
+        // HoldFile prints nothing and runs until the test releases it, which it does only once the timeout of 500 ms
+        // has ended the command, whatever the machine
         Path directory = Files.createTempDirectory("lsp4ij-exec");
+        Path release = directory.resolve("release");
         try {
             var descriptor = new ServerInstallerDescriptor("test", false, new InstallerTaskRegistry());
             var context = new RecordingContext();
             assertFalse(new ExecTask(null, "Check the .NET SDK 10 or later", null, null,
-                    java(HoldFile.class.getName(), directory.resolve("held").toString()), null, 500, true,
-                    SDK_10_OR_LATER, descriptor).run(context), "nothing printed until the timeout matches");
+                    java(HoldFile.class.getName(), directory.resolve("held").toString(), release.toString()), null,
+                    500, true, SDK_10_OR_LATER, descriptor).run(context), "nothing printed until the timeout matches");
             assertEquals(1, context.errors().size(), context.output());
             // Another file: the program that the timeout ended couldn't delete its own
             assertTrue(new ExecTask(null, "Wait", null, null,
-                    java(HoldFile.class.getName(), directory.resolve("held-again").toString()), null, 500, true,
-                    descriptor).run(new RecordingContext()),
+                    java(HoldFile.class.getName(), directory.resolve("held-again").toString(), release.toString()),
+                    null, 500, true, descriptor).run(new RecordingContext()),
                     "without outputMatches, a command which still runs at its timeout passes");
         } finally {
+            // Releases a program that outlived its command, then removes the files
+            Files.createFile(release);
             NioFiles.deleteRecursively(directory);
         }
     }

@@ -13,9 +13,17 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Whether a pull request changes only documentation, which needs no plugin verification
+  changes:
+    uses: ./.github/workflows/changes.yml
+    permissions:
+      pull-requests: read
+
   # Run plugin structure verification along with IntelliJ Plugin Verifier
   verify:
     name: Verify plugin
+    needs: changes
+    if: needs.changes.outputs.docs_only != 'true'
     runs-on: ubuntu-latest
     steps:
 

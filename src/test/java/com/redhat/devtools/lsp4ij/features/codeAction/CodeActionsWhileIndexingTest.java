@@ -72,6 +72,6 @@ public class CodeActionsWhileIndexingTest extends LSPCodeActionFixtureTestCase {
     }
 
     private static int codeActionRequests() {
-        return MockLanguageServer.INSTANCE.getTextDocumentService().codeActionRequests;
+        return MockLanguageServer.INSTANCE.getTextDocumentService().codeActionRequests.get();
     }
 }

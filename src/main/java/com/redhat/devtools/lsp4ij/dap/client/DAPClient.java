@@ -71,6 +71,7 @@ import java.util.List;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ExecutionException;
@@ -189,6 +190,9 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
     // Decodes the ANSI escape sequences of the 'output' events of this session, whose styles continue from one event
     // to the next of the same category
     private final DAPOutputDecoder outputDecoder = new DAPOutputDecoder();
+    // The answers to the 'source' requests of the loads of source references which are in flight, by source reference:
+    // a load which starts before the one which asked has stored its answer gets that answer, without asking again
+    private final Map<Integer, CompletableFuture<SourceResponse>> sourceLoads = new ConcurrentHashMap<>();
 
     public DAPClient(@NotNull DAPDebugProcess debugProcess,
                      @NotNull Map<String, Object> dapParameters,
@@ -486,6 +490,51 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
 
     public IDebugProtocolServer getDebugProtocolServer() {
         return debugProtocolServer;
+    }
+
+    /**
+     * Loads the text of the given source reference: asks the debug adapter for it with a 'source' request, and gives
+     * its answer to the given function, which stores it, as in the document of a file. Loads of the same source
+     * reference which run at once ask once: a load which starts before the one which asked has stored its answer, as
+     * when the session and the Frames view ask for the position of a frame at the same time, or two frames of the
+     * source do, gets that answer. A load which starts once it is stored, or once the request failed, asks again, as
+     * the debug adapter may give another text.
+     *
+     * @param sourceReference the source reference.
+     * @param store           stores the answer of the debug adapter, and returns the future of the store.
+     * @param <T>             the type of the result of the store.
+     * @return the future of the store of the answer.
+     */
+    public <T> @NotNull CompletableFuture<T> loadSource(int sourceReference,
+                                                        @NotNull Function<SourceResponse, CompletableFuture<T>> store) {
+        var answer = new CompletableFuture<SourceResponse>();
+        var inFlight = sourceLoads.putIfAbsent(sourceReference, answer);
+        if (inFlight != null) {
+            // Not on the thread of the caller, as the EDT asking for the position of a frame, when the answer is there
+            return inFlight.thenComposeAsync(store, AppExecutorUtil.getAppExecutorService());
+        }
+        var args = new SourceArguments();
+        args.setSourceReference(sourceReference);
+        CompletableFuture<SourceResponse> request;
+        try {
+            request = getDebugProtocolServer().source(args);
+        } catch (RuntimeException e) {
+            sourceLoads.remove(sourceReference, answer);
+            answer.completeExceptionally(e);
+            throw e;
+        }
+        request.whenComplete((response, error) -> {
+            if (error != null) {
+                answer.completeExceptionally(error);
+            } else {
+                answer.complete(response);
+            }
+        });
+        // The load ends once its answer is stored, or once the request or the store failed: the next load asks again.
+        // It ends before the returned future completes, which is a copy: cancelling it doesn't keep the load in flight.
+        return request.thenCompose(store)
+                .whenComplete((stored, error) -> sourceLoads.remove(sourceReference, answer))
+                .copy();
     }
 
 

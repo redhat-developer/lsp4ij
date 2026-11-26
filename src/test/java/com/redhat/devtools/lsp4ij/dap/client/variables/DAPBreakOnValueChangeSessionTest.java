@@ -80,6 +80,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.TimeUnit;
+import java.util.function.BooleanSupplier;
 import java.util.stream.IntStream;
 
 /**
@@ -90,12 +92,24 @@ import java.util.stream.IntStream;
  */
 public class DAPBreakOnValueChangeSessionTest extends HeavyPlatformTestCase {
 
+    /**
+     * Bounds the start of the session, until the program stops, so that a test fails instead of hanging, as in the
+     * other DAP session tests: a session starts slowly on a busy machine.
+     */
+    private static final int STARTUP_SECONDS = 120;
+    /**
+     * Bounds all that a test waits for once the program stopped, together: the values, the data breakpoint and its
+     * removal, which the DAP server, in the test's process, answers at once.
+     */
+    private static final int SCENARIO_SECONDS = 30;
     private static final int FRAME_ID = 7;
     private static final int LOCALS_REFERENCE = 1;
     private static final int COUNTER_REFERENCE = 2;
 
     private CounterServer server;
     private XDebugSession session;
+    // The System.nanoTime() by which the test is done with the stopped program
+    private long scenarioDeadline;
 
     @Override
     protected void tearDown() throws Exception {
@@ -123,14 +137,14 @@ public class DAPBreakOnValueChangeSessionTest extends HeavyPlatformTestCase {
         ActionManager.getInstance().getAction("DAP.BreakOnValueChange").actionPerformed(event);
 
         // the DAP server is asked for the data of 'count' in the variables of 'counter'
-        var info = PlatformTestUtil.waitForFuture(server.dataBreakpointInfo, 10_000);
+        var info = await("the dataBreakpointInfo request", server.dataBreakpointInfo);
         assertEquals(Integer.valueOf(COUNTER_REFERENCE), info.getVariablesReference());
         assertEquals("count", info.getName());
         assertEquals(Integer.valueOf(FRAME_ID), info.getFrameId());
 
         // and given a data breakpoint on that data, which IntelliJ shows by the DAP server's description
-        PlatformTestUtil.waitWithEventsDispatching("the data breakpoint is sent",
-                () -> server.dataIds().equals(List.of("2:count")), 10);
+        await("the setDataBreakpoints request with the data breakpoint",
+                () -> server.dataIds().equals(List.of("2:count")));
         var breakpoint = dataBreakpoints().get(0);
         assertEquals("Counter.count", breakpoint.getProperties().getDescription());
         assertSame(DataBreakpointAccessType.WRITE, breakpoint.getProperties().getAccessType());
@@ -138,8 +152,7 @@ public class DAPBreakOnValueChangeSessionTest extends HeavyPlatformTestCase {
 
         // its data is valid in this session only
         session.stop();
-        PlatformTestUtil.waitWithEventsDispatching("the data breakpoint goes with the session",
-                () -> dataBreakpoints().isEmpty(), 10);
+        await("the removal of the data breakpoint with the session", () -> dataBreakpoints().isEmpty());
     }
 
     public void testBreakOnValueChangeIsHiddenWhenTheDAPServerHasNoDataBreakpoints() throws Exception {
@@ -176,21 +189,51 @@ public class DAPBreakOnValueChangeSessionTest extends HeavyPlatformTestCase {
             var sessions = XDebuggerManager.getInstance(getProject()).getDebugSessions();
             session = sessions.length == 1 ? sessions[0] : null;
             return session != null && session.isSuspended() && session.getCurrentStackFrame() instanceof DAPStackFrame;
-        }, 30);
+        }, STARTUP_SECONDS);
+        scenarioDeadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(SCENARIO_SECONDS);
+    }
+
+    /**
+     * Waits, dispatching events, until the given condition holds, within what is left of the time of the scenario.
+     *
+     * @param operation what makes the condition hold, which the failure names.
+     * @param condition the condition.
+     */
+    private void await(String operation, BooleanSupplier condition) {
+        long remainingNanos = scenarioDeadline - System.nanoTime();
+        // waitWithEventsDispatching counts whole seconds, and checks the condition once, at least
+        int remainingSeconds = (int) Math.max(0, TimeUnit.NANOSECONDS.toSeconds(remainingNanos + 999_999_999L));
+        PlatformTestUtil.waitWithEventsDispatching(() -> operation + " didn't come within the " + SCENARIO_SECONDS
+                + " s that a test has once the program stopped", condition, remainingSeconds);
+    }
+
+    /**
+     * Waits, dispatching events, for the given future, within what is left of the time of the scenario.
+     *
+     * @param operation what completes the future, which the failure names.
+     * @param future    the future.
+     * @return the result of the future.
+     */
+    private <T> T await(String operation, CompletableFuture<T> future) {
+        await(operation, future::isDone);
+        return future.join();
     }
 
     /**
      * Returns the DAP value at the given path in the locals of the stopped frame, as the Variables view gets it.
      */
     private @NotNull DAPValue value(String... path) {
-        XValueContainer container = children(session.getCurrentStackFrame()).getBottomGroups().get(0);
+        XValueContainer container = children("the scopes of the stopped frame", session.getCurrentStackFrame())
+                .getBottomGroups().get(0);
+        String parent = "the locals";
         for (String name : path) {
-            var children = children(container);
+            var children = children("the variables of " + parent, container);
             container = IntStream.range(0, children.size())
                     .filter(i -> children.getName(i).equals(name))
                     .mapToObj(children::getValue)
                     .findFirst()
                     .orElseThrow(() -> new AssertionError("No variable " + name));
+            parent = "'" + name + "'";
         }
         return (DAPValue) container;
     }
@@ -215,7 +258,14 @@ public class DAPBreakOnValueChangeSessionTest extends HeavyPlatformTestCase {
                 .getBreakpoints(DAPDataBreakpointType.class));
     }
 
-    private static @NotNull XValueChildrenList children(@NotNull XValueContainer container) {
+    /**
+     * Returns the children of the given container, as the Variables view gets them.
+     *
+     * @param operation what gives the children, which a failure names.
+     * @param container the container.
+     * @return the children.
+     */
+    private @NotNull XValueChildrenList children(String operation, @NotNull XValueContainer container) {
         var all = new XValueChildrenList();
         var done = new CompletableFuture<XValueChildrenList>();
         container.computeChildren(new XCompositeNode() {
@@ -252,7 +302,7 @@ public class DAPBreakOnValueChangeSessionTest extends HeavyPlatformTestCase {
                                    @Nullable XDebuggerTreeNodeHyperlink link) {
             }
         });
-        return PlatformTestUtil.waitForFuture(done, 10_000);
+        return await(operation, done);
     }
 
     /**

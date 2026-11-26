@@ -41,8 +41,14 @@ import java.util.concurrent.TimeUnit;
  * running.
  */
 public class KeepAliveDuringPendingStopTest extends UsefulTestCase {
+    // How long a stop scheduled after the last document stays pending: until the test runs it, or the tear down cancels
+    // it, however slow the runner is. Only the stop at once comes due by itself.
+    private static final int PENDING_STOP_SECONDS = (int) TimeUnit.HOURS.toSeconds(1);
+
     private LSPCodeInsightTestFixture fixture;
     private KeptServer definition;
+    // The language servers whose stop the test scheduled
+    private final List<LanguageServerWrapper> scheduledStops = new CopyOnWriteArrayList<>();
 
     @Override
     protected void setUp() throws Exception {
@@ -59,6 +65,10 @@ public class KeepAliveDuringPendingStopTest extends UsefulTestCase {
     protected void tearDown() throws Exception {
         try {
             try {
+                // A stop that the test left pending must not come due in a later test
+                for (var wrapper : scheduledStops) {
+                    stopAlarm(wrapper).cancelAllRequests();
+                }
                 if (fixture != null && definition != null) {
                     LanguageServersRegistry.getInstance().removeServerDefinition(fixture.getProject(), definition);
                 }
@@ -330,7 +340,8 @@ public class KeepAliveDuringPendingStopTest extends UsefulTestCase {
         return item;
     }
 
-    private static void startStopTimer(LanguageServerWrapper wrapper) throws ReflectiveOperationException {
+    private void startStopTimer(LanguageServerWrapper wrapper) throws ReflectiveOperationException {
+        scheduledStops.add(wrapper);
         var method = LanguageServerWrapper.class.getDeclaredMethod("startStopTimer");
         method.setAccessible(true);
         method.invoke(wrapper);
@@ -394,7 +405,7 @@ public class KeepAliveDuringPendingStopTest extends UsefulTestCase {
 
         @Override
         public int getLastDocumentDisconnectedTimeout() {
-            return stopAtOnce ? 0 : super.getLastDocumentDisconnectedTimeout();
+            return stopAtOnce ? 0 : PENDING_STOP_SECONDS;
         }
 
         @Override

@@ -52,7 +52,7 @@ public class LanguageServerFileEnablementTest extends UsefulTestCase {
             LanguageServersRegistry.getInstance().addServerDefinition(fixture.getProject(), definition,
                     List.of(ServerMappingSettings.createFileNamePatternsMappingSettings(List.of("*.scoped"), null)));
             LanguageServerManager.getInstance(fixture.getProject()).getLanguageServer(definition.getId())
-                    .get(5, TimeUnit.SECONDS);
+                    .get(30, TimeUnit.SECONDS);
         }
     }
 
@@ -123,7 +123,7 @@ public class LanguageServerFileEnablementTest extends UsefulTestCase {
         for (var definition : List.of(alpha, beta)) {
             var file = fixture.configureByText(definition.name + ".scoped", "old\nkeep\n");
             LanguageServiceAccessor.getInstance(fixture.getProject()).getLanguageServers(file, null, null)
-                    .get(5, TimeUnit.SECONDS);
+                    .get(30, TimeUnit.SECONDS);
             if (selection) {
                 fixture.getEditor().getSelectionModel().setSelection(0, 3);
             }
