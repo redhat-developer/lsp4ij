@@ -316,17 +316,13 @@ public class WorkspaceFoldersPanelTest extends BasePlatformTestCase {
 
     public void testAFolderWithoutTheRootOfAnInstanceGetsNone() throws IOException {
         var root = localContentRoot();
-        try {
-            // The project's directories are the workspace folders, and the source roots the roots of the instances
-            configure("{\"serverInstances\": {\"rootType\": \"SOURCE_ROOTS\"}, \"rootType\": \"PROJECT_BASE\"}");
+        // The project's directories are the workspace folders, and the source roots the roots of the instances
+        configure("{\"serverInstances\": {\"rootType\": \"SOURCE_ROOTS\"}, \"rootType\": \"PROJECT_BASE\"}");
 
-            var rows = rows();
-            int noInstance = ContainerUtil.indexOf(rows, row -> row.contains("(No root: no language server instance)"));
-            int folder = ContainerUtil.indexOf(rows, row -> row.contains(root.getPath()));
-            assertTrue(rows.toString(), noInstance >= 0 && folder > noInstance);
-        } finally {
-            PsiTestUtil.removeContentEntry(getModule(), root);
-        }
+        var rows = rows();
+        int noInstance = ContainerUtil.indexOf(rows, row -> row.contains("(No root: no language server instance)"));
+        int folder = ContainerUtil.indexOf(rows, row -> row.contains(root.getPath()));
+        assertTrue(rows.toString(), noInstance >= 0 && folder > noInstance);
     }
 
     public void testTheInitializeModeSaysWhyItDoesNotApplyWithInstances() {
@@ -410,9 +406,14 @@ public class WorkspaceFoldersPanelTest extends BasePlatformTestCase {
         return root;
     }
 
+    /**
+     * Returns a new directory, which is a content root of the project until the end of the test: the light project is
+     * kept for the next test and test class, which would get the root too.
+     */
     private @NotNull VirtualFile localContentRoot() throws IOException {
         var root = localFile(localDirectory());
         PsiTestUtil.addContentRoot(getModule(), root);
+        Disposer.register(getTestRootDisposable(), () -> PsiTestUtil.removeContentEntry(getModule(), root));
         return root;
     }
 
