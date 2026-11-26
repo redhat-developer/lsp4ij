@@ -1,4 +1,6 @@
 import com.adarshr.gradle.testlogger.theme.ThemeType
+import com.sun.management.OperatingSystemMXBean
+import java.lang.management.ManagementFactory
 import org.jetbrains.changelog.markdownToHTML
 import org.jetbrains.intellij.platform.gradle.IntelliJPlatformType
 import org.jetbrains.intellij.platform.gradle.tasks.VerifyPluginTask.FailureLevel.*
@@ -296,6 +298,29 @@ intellijPlatformTesting {
     }
 }
 
+/**
+ * How many test JVMs a test task runs at once when -PtestForks doesn't say: half the CPUs, rounded up, since a test JVM
+ * keeps more than one CPU busy, and no more than the memory holds, at 3 GB a JVM once 4 GB are left to Gradle and the OS.
+ * A test JVM gets the -Xmx2048m and -XX:ReservedCodeCacheSize=512m of the IDE's vmoptions, and takes up to about 3 GB
+ * with its metaspace and native memory. That makes 5 on a Mac with 10 CPUs and 64 GB, 2 on GitHub's Linux and Windows
+ * runners (4 CPUs, 16 GB), and 1 on its macOS runner (3 CPUs, 7 GB). As a ValueSource, it's computed again when the build
+ * reuses its configuration cache, as on another machine.
+ */
+abstract class MachineTestForks : ValueSource<Int, ValueSourceParameters.None> {
+    override fun obtain(): Int {
+        val byCpus = (Runtime.getRuntime().availableProcessors() + 1) / 2
+        val memoryMb = (ManagementFactory.getOperatingSystemMXBean() as? OperatingSystemMXBean)?.totalMemorySize?.div(1024 * 1024)
+        val byMemory = memoryMb?.let { ((it - 4096) / 3072).toInt() } ?: byCpus
+        return byCpus.coerceAtMost(byMemory).coerceAtLeast(1)
+    }
+}
+
+// With more than one fork, TestForkSandbox gives each test JVM a sandbox of its own
+val testForks = properties("testForks")
+    .map { it.toIntOrNull()?.takeIf { forks -> forks >= 1 } ?: throw GradleException("-PtestForks=$it is no number of test JVMs, 1 or more") }
+    .orElse(providers.of(MachineTestForks::class) {})
+    .get()
+
 tasks.withType<Test>().configureEach {
     useJUnitPlatform()
     environment("GRADLE_RELEASE_REPOSITORY","https://services.gradle.org/distributions")
@@ -307,6 +332,16 @@ tasks.withType<Test>().configureEach {
     // so the thread leak check of a test that closes its project can find it still running. The tests need none of
     // it. The property, misspelled as in IntelliJ, has no effect on older versions.
     systemProperty("jetbrains.ide.builtin.descovery.enabled", "false")
+    maxParallelForks = testForks
+    if (testForks > 1) {
+        systemProperty("lsp4ij.test.forks", testForks)
+        systemProperty("junit.platform.launcher.interceptors.enabled", "true")
+    }
+    // Local copy: the configuration cache can't store a reference to the build script
+    val jvms = if (testForks == 1) "1 test JVM" else "up to $testForks test JVMs at once"
+    doFirst {
+        logger.lifecycle("$path runs its test classes in $jvms (-PtestForks=<n> sets how many)")
+    }
 }
 
 // Configure Gradle Kover Plugin - read more: https://github.com/Kotlin/kotlinx-kover#configuration
