@@ -92,6 +92,10 @@ public class LSPCompletionProposal extends LookupElement implements Pointer<LSPC
 
     private volatile CompletableFuture<CompletionItem> resolvedCompletionItemFuture;
 
+    // char which accepts the item, set by handleInsert for apply(Document, int), which keeps its signature for the
+    // subclasses that override it: Tab replaces the whole word of an InsertReplaceEdit, any other char inserts
+    private char completionChar = Lookup.NORMAL_SELECT_CHAR;
+
     public LSPCompletionProposal(@NotNull CompletionItem item,
                                  @NotNull LSPCompletionFeature.LSPCompletionContext completionContext,
                                  @NotNull LSPCompletionFeature completionFeature) {
@@ -140,7 +144,12 @@ public class LSPCompletionProposal extends LookupElement implements Pointer<LSPC
         }
 
         // Apply all text edits
-        apply(context.getDocument(), context.getOffset(CompletionInitializationContext.SELECTION_END_OFFSET), context.getCompletionChar());
+        this.completionChar = context.getCompletionChar();
+        try {
+            apply(context.getDocument(), context.getOffset(CompletionInitializationContext.SELECTION_END_OFFSET));
+        } finally {
+            this.completionChar = Lookup.NORMAL_SELECT_CHAR;
+        }
 
         // Just move to the first tab stop if there's a single invocation argument with no default value
         if (shouldMoveToFirstTabStop(template)) {
@@ -318,7 +327,7 @@ public class LSPCompletionProposal extends LookupElement implements Pointer<LSPC
         return item.getDetail() == null && completionContext.isResolveCompletionSupported();
     }
 
-    protected void apply(Document document, int offset, char completionChar) {
+    protected void apply(Document document, int offset) {
         String insertText = null;
         Either<TextEdit, InsertReplaceEdit> eitherTextEdit = item.getTextEdit();
         TextEdit textEdit = null;

@@ -62,6 +62,49 @@ public class CompletionInsertReplaceTest extends LSPCompletionFixtureTestCase {
               }
             ]""";
 
+    // 'foo-|Bar;': the server range governs the replaced text, not the default identifier end of the IDE, which stops at '-'
+    // language=json
+    private static final String HYPHENATED_INSERT_REPLACE_JSON = """
+            [
+              {
+                "label": "foo-baz",
+                "textEdit": {
+                  "newText": "foo-baz",
+                  "insert":  { "start": {"line": 0, "character": 0}, "end": {"line": 0, "character": 4} },
+                  "replace": { "start": {"line": 0, "character": 0}, "end": {"line": 0, "character": 7} }
+                }
+              }
+            ]""";
+
+    // 'foo|Bar': the ranges come from the default edit range of the completion list
+    // language=json
+    private static final String ITEM_DEFAULTS_INSERT_REPLACE_JSON = """
+            {
+              "isIncomplete": false,
+              "items": [ { "label": "fooBaz" } ],
+              "itemDefaults": {
+                "editRange": {
+                  "insert":  { "start": {"line": 0, "character": 0}, "end": {"line": 0, "character": 3} },
+                  "replace": { "start": {"line": 0, "character": 0}, "end": {"line": 0, "character": 6} }
+                }
+              }
+            }""";
+
+    // 'foo|Bar': a snippet with an InsertReplaceEdit
+    // language=json
+    private static final String SNIPPET_INSERT_REPLACE_JSON = """
+            [
+              {
+                "label": "fooBaz",
+                "insertTextFormat": 2,
+                "textEdit": {
+                  "newText": "fooBaz${1:value}",
+                  "insert":  { "start": {"line": 0, "character": 0}, "end": {"line": 0, "character": 3} },
+                  "replace": { "start": {"line": 0, "character": 0}, "end": {"line": 0, "character": 6} }
+                }
+              }
+            ]""";
+
     public CompletionInsertReplaceTest() {
         super("*.ts");
     }
@@ -97,6 +140,39 @@ public class CompletionInsertReplaceTest extends LSPCompletionFixtureTestCase {
         myFixture.type("oo");
         assertNotNull("the lookup is still shown", myFixture.getLookup());
         assertApplyCompletionItem(0, "fooBaz<caret>Bar");
+    }
+
+    public void testTabReplacesTheWholeWordOfTheDefaultEditRangeOfTheList() {
+        assertCompletion("test.ts", "foo<caret>Bar", ITEM_DEFAULTS_INSERT_REPLACE_JSON, "fooBaz");
+        acceptWithTab();
+        assertEquals("fooBaz", myFixture.getEditor().getDocument().getText());
+    }
+
+    public void testEnterInsertsWithTheDefaultEditRangeOfTheList() {
+        assertCompletion("test.ts", "foo<caret>Bar", ITEM_DEFAULTS_INSERT_REPLACE_JSON, "fooBaz");
+        assertApplyCompletionItem(0, "fooBaz<caret>Bar");
+    }
+
+    public void testTabReplacesTheWholeHyphenatedWordOfTheServer() {
+        assertCompletion("test.ts", "foo-<caret>Bar;", HYPHENATED_INSERT_REPLACE_JSON, "foo-baz");
+        acceptWithTab();
+        assertEquals("foo-baz;", myFixture.getEditor().getDocument().getText());
+    }
+
+    public void testEnterInsertsInAHyphenatedWord() {
+        assertCompletion("test.ts", "foo-<caret>Bar;", HYPHENATED_INSERT_REPLACE_JSON, "foo-baz");
+        assertApplyCompletionItem(0, "foo-baz<caret>Bar;");
+    }
+
+    public void testTabReplacesTheWholeWordWithASnippet() {
+        assertCompletion("test.ts", "foo<caret>Bar", SNIPPET_INSERT_REPLACE_JSON, "fooBaz");
+        acceptWithTab();
+        assertEquals("fooBazvalue", myFixture.getEditor().getDocument().getText());
+    }
+
+    public void testEnterInsertsWithASnippet() {
+        assertCompletion("test.ts", "foo<caret>Bar", SNIPPET_INSERT_REPLACE_JSON, "fooBaz");
+        assertApplyCompletionItem(0, "fooBazvalueBar");
     }
 
     private void acceptWithTab() {
