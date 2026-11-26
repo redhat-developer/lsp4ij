@@ -40,7 +40,7 @@ import java.util.function.Function;
 public class PromiseToCompletableFuture<R> extends CompletableFuture<R> {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(PromiseToCompletableFuture.class);
-    private boolean cancelled;
+    private volatile boolean cancelled;
 
     private class ResultOrError<R> {
 
@@ -66,7 +66,7 @@ public class PromiseToCompletableFuture<R> extends CompletableFuture<R> {
     private final AtomicInteger nbAttempt;
 
     private final Object[] coalesceBy;
-    private CancellablePromise<ResultOrError<R>> nonBlockingReadActionPromise;
+    private volatile CancellablePromise<ResultOrError<R>> nonBlockingReadActionPromise;
 
     public PromiseToCompletableFuture(@NotNull Function<ProgressIndicator, R> code, @NotNull String progressTitle, @NotNull Project project, @Nullable Disposable parentDisposable, Object... coalesceBy) {
         this.code = code;
@@ -126,6 +126,11 @@ public class PromiseToCompletableFuture<R> extends CompletableFuture<R> {
                         if (!cancelled) {
                             var newPromise = nonBlockingReadActionPromise(true);
                             bind(newPromise);
+                            if (cancelled) {
+                                // cancel() ran after the check above, and may have read the previous promise
+                                // instead of this one
+                                newPromise.cancel();
+                            }
                         }
                     }, delayMs, TimeUnit.MILLISECONDS);
                 }
@@ -200,10 +205,12 @@ public class PromiseToCompletableFuture<R> extends CompletableFuture<R> {
     @Override
     public boolean cancel(boolean mayInterruptIfRunning) {
         this.cancelled = true;
-        if (nonBlockingReadActionPromise != null) {
+        // Read the promise once: a retry may replace it meanwhile, and then cancels the new one itself
+        var promise = nonBlockingReadActionPromise;
+        if (promise != null) {
             // cancel the current promise
-            if (!nonBlockingReadActionPromise.isDone()) {
-                nonBlockingReadActionPromise.cancel();
+            if (!promise.isDone()) {
+                promise.cancel();
             }
         }
         try {
