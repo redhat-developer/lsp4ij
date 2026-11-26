@@ -16,6 +16,7 @@ import com.intellij.psi.PsiManager;
 import com.intellij.testFramework.PlatformTestUtil;
 import com.redhat.devtools.lsp4ij.fixtures.LSPCodeInsightFixtureTestCase;
 import com.redhat.devtools.lsp4ij.mock.MockLanguageServer;
+import com.redhat.devtools.lsp4ij.mock.MockTextDocumentService.OpenCloseNotification;
 import org.eclipse.lsp4j.DidCloseTextDocumentParams;
 import org.eclipse.lsp4j.DidOpenTextDocumentParams;
 
@@ -139,6 +140,11 @@ public class DirectoryDocumentMoveTest extends LSPCodeInsightFixtureTestCase {
         var servers = LanguageServiceAccessor.getInstance(myFixture.getProject())
                 .getLanguageServers(file, null, null).get(30, TimeUnit.SECONDS);
         var wrapper = servers.get(0).getServerWrapper();
+        // The language servers are returned once LSP4IJ has sent the didOpen of the file, which the mock language
+        // server reads later, on a thread of its own. Read after a step has set its callbacks, it would complete them
+        var opened = new OpenCloseNotification(true, wrapper.toUri(virtualFile));
+        PlatformTestUtil.waitWithEventsDispatching("the language server must read the didOpen of the file",
+                () -> MockLanguageServer.INSTANCE.getTextDocumentService().getOpenCloseNotifications().contains(opened), 10);
         WriteCommandAction.writeCommandAction(myFixture.getProject()).run(() -> myFixture.getEditor().getDocument().setText("unsaved"));
         return new Context(virtualFile, wrapper);
     }
