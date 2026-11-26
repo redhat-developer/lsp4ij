@@ -10,6 +10,7 @@ package com.redhat.devtools.lsp4ij.features.rename;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.ModalityState;
 import com.intellij.openapi.command.WriteCommandAction;
+import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.LanguageServerBundle;
 import com.redhat.devtools.lsp4ij.LanguageServerItem;
 import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
@@ -134,5 +135,28 @@ public class RenameVersionTest extends LSPCodeInsightFixtureTestCase {
 
         assertEquals("new typing", editor.getDocument().getText());
         assertEquals(LanguageServerBundle.message("lsp.workspace.edit.document.changed", uri), error.get());
+    }
+
+    public void testAFileOpenedWhileRenameIsPendingIsEditedWhileItsTextIsUnchanged() throws Exception {
+        var servers = open();
+        var file = myFixture.getFile();
+        var wrapper = servers.get(0).getServerWrapper();
+        String uri = wrapper.toUri(file.getVirtualFile()).toString();
+        var other = myFixture.addFileToProject("other.foo", "before");
+        String otherUri = wrapper.toUri(other.getVirtualFile()).toString();
+        assertNull(wrapper.getOpenedDocument(URI.create(otherUri)));
+        // The other file is opened while the server computes the rename, whose reply edits it without a version
+        MockLanguageServer.INSTANCE.setRenameProcessor(params -> {
+            LanguageServiceAccessor.getInstance(myFixture.getProject())
+                    .getLanguageServers(other, null, null).orTimeout(30, TimeUnit.SECONDS).join();
+            return new WorkspaceEdit(Map.of(otherUri, List.of(replacement())));
+        });
+
+        LSPRenameRefactoringDialog.doRename(renameParams(uri, servers), file, myFixture.getEditor());
+
+        assertNotNull("the other file must have been opened while the rename was pending",
+                wrapper.getOpenedDocument(URI.create(otherUri)));
+        assertNull(error.get());
+        assertEquals("after", LSPIJUtils.getDocument(other.getVirtualFile()).getText());
     }
 }

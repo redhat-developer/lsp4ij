@@ -7,8 +7,14 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij;
 
+import com.intellij.openapi.application.WriteAction;
 import com.intellij.openapi.command.WriteCommandAction;
+import com.intellij.openapi.editor.Document;
+import com.intellij.openapi.fileEditor.FileDocumentManager;
+import com.intellij.openapi.vfs.VfsUtil;
+import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiFile;
+import com.intellij.psi.PsiManager;
 import com.redhat.devtools.lsp4ij.fixtures.LSPCodeInsightFixtureTestCase;
 import org.eclipse.lsp4j.CreateFile;
 import org.eclipse.lsp4j.CreateFileOptions;
@@ -96,8 +102,19 @@ public class WorkspaceEditSnapshotTest extends LSPCodeInsightFixtureTestCase {
     }
 
     private void type(String text) {
-        WriteCommandAction.runWriteCommandAction(myFixture.getProject(), () ->
-                myFixture.getEditor().getDocument().setText(text));
+        type(myFixture.getEditor().getDocument(), text);
+    }
+
+    private void type(Document document, String text) {
+        WriteCommandAction.runWriteCommandAction(myFixture.getProject(), () -> document.setText(text));
+    }
+
+    private PsiFile psiFile(VirtualFile file) {
+        return PsiManager.getInstance(myFixture.getProject()).findFile(file);
+    }
+
+    private String opened(String uri) {
+        return LanguageServerBundle.message("lsp.workspace.edit.document.opened", uri);
     }
 
     public void testUnchangedDocumentIsCurrent() throws Exception {
@@ -204,15 +221,111 @@ public class WorkspaceEditSnapshotTest extends LSPCodeInsightFixtureTestCase {
                 validate(snapshot, unversioned(uri)));
     }
 
-    public void testTargetOpenedAfterRequestIsRefused() throws Exception {
+    public void testTargetOpenedAfterRequestAppliesWhileItsTextIsUnchanged() throws Exception {
         var server = open();
         var other = myFixture.addFileToProject("other.foo", "before");
-        var snapshot = WorkspaceEditSnapshot.capture(server);
-        connect(other);
         String uri = uri(server, other);
+        assertNull(server.getServerWrapper().getOpenedDocument(URI.create(uri)));
+        var request = WorkspaceEditSnapshot.capture(server);
+        var incoming = WorkspaceEditSnapshot.capture(server.getServerWrapper(), () -> true);
+        // as when the user opens the file in an editor while the reply is pending
+        connect(other);
+        int version = server.getServerWrapper().getOpenedDocument(URI.create(uri)).getSynchronizer().getVersion();
 
-        assertEquals(LanguageServerBundle.message("lsp.workspace.edit.document.opened", uri),
-                validate(snapshot, unversioned(uri)));
+        // The server read the file until it was opened, and was sent the same text then
+        assertNull(validate(request, unversioned(uri)));
+        assertNull(validate(request, versioned(uri, version)));
+        assertNull(validate(request, versioned(uri, 0)));
+        assertEquals(LanguageServerBundle.message("lsp.workspace.edit.version.changed", uri),
+                validate(request, versioned(uri, version + 1)));
+        // An incoming edit is checked since its receipt, and its placeholder version is refused as for any document
+        assertNull(validate(incoming, unversioned(uri)));
+        assertEquals(LanguageServerBundle.message("lsp.workspace.edit.version.changed", uri),
+                validate(incoming, versioned(uri, 0)));
+    }
+
+    public void testTargetChangedSinceItWasOpenedIsRefused() throws Exception {
+        var server = open();
+        var other = myFixture.addFileToProject("other.foo", "before");
+        String uri = uri(server, other);
+        var request = WorkspaceEditSnapshot.capture(server);
+        var incoming = WorkspaceEditSnapshot.capture(server.getServerWrapper(), () -> true);
+        connect(other);
+        var document = server.getServerWrapper().getOpenedDocument(URI.create(uri)).getSynchronizer().getDocument();
+        // The text is restored, but the server was sent the changed text, which it may have answered for
+        type(document, "changed");
+        type(document, "before");
+
+        assertEquals(opened(uri), validate(request, unversioned(uri)));
+        assertEquals(opened(uri), validate(incoming, unversioned(uri)));
+    }
+
+    public void testTargetLoadedAtRequestAppliesOnceOpenedWhileUnchanged() throws Exception {
+        var server = open();
+        var file = myFixture.addFileToProject("other.foo", "before").getVirtualFile();
+        assertNotNull(FileDocumentManager.getInstance().getDocument(file));
+        String uri = uri(server, psiFile(file));
+        assertNull(server.getServerWrapper().getOpenedDocument(URI.create(uri)));
+        var snapshot = WorkspaceEditSnapshot.capture(server);
+        connect(psiFile(file));
+
+        assertNull(validate(snapshot, unversioned(uri)));
+    }
+
+    public void testTargetLoadedAtRequestAndChangedBeforeItIsOpenedIsRefused() throws Exception {
+        var server = open();
+        var file = myFixture.addFileToProject("other.foo", "before").getVirtualFile();
+        var document = FileDocumentManager.getInstance().getDocument(file);
+        String uri = uri(server, psiFile(file));
+        var snapshot = WorkspaceEditSnapshot.capture(server);
+        // Saved, so that it has no unsaved changes: the server may have read the file before the change
+        type(document, "changed");
+        FileDocumentManager.getInstance().saveDocument(document);
+        assertFalse(FileDocumentManager.getInstance().isDocumentUnsaved(document));
+        connect(psiFile(file));
+
+        assertEquals(opened(uri), validate(snapshot, unversioned(uri)));
+    }
+
+    public void testTargetWithUnsavedChangesAtRequestIsRefusedOnceOpened() throws Exception {
+        var server = open();
+        var file = myFixture.addFileToProject("other.foo", "before").getVirtualFile();
+        var document = FileDocumentManager.getInstance().getDocument(file);
+        type(document, "unsaved");
+        String uri = uri(server, psiFile(file));
+        assertNull(server.getServerWrapper().getOpenedDocument(URI.create(uri)));
+        // The server read the file, which hasn't the document's text
+        var snapshot = WorkspaceEditSnapshot.capture(server);
+        connect(psiFile(file));
+
+        assertEquals(opened(uri), validate(snapshot, unversioned(uri)));
+    }
+
+    public void testTargetChangedOnDiskSinceRequestIsRefusedOnceOpened() throws Exception {
+        var server = open();
+        var file = myFixture.getTempDirFixture().createFile("other.foo", "before");
+        String uri = uri(server, psiFile(file));
+        // No document is loaded at the request, and the one the server is sent is loaded from the changed file
+        assertNull(FileDocumentManager.getInstance().getCachedDocument(file));
+        var snapshot = WorkspaceEditSnapshot.capture(server);
+        WriteAction.run(() -> VfsUtil.saveText(file, "changed"));
+        connect(psiFile(file));
+        assertEquals("changed", FileDocumentManager.getInstance().getDocument(file).getText());
+
+        assertEquals(opened(uri), validate(snapshot, unversioned(uri)));
+    }
+
+    public void testTargetInADirectoryMovedThereSinceRequestIsRefusedOnceOpened() throws Exception {
+        var server = open();
+        var file = myFixture.getTempDirFixture().createFile("moved/other.foo", "before");
+        var snapshot = WorkspaceEditSnapshot.capture(server);
+        // The server's edit names the file's place after the move, where it wasn't at the request
+        WriteAction.run(() -> file.getParent().rename(this, "target"));
+        connect(psiFile(file));
+        String uri = uri(server, psiFile(file));
+        assertTrue(uri, uri.endsWith("/target/other.foo"));
+
+        assertEquals(opened(uri), validate(snapshot, unversioned(uri)));
     }
 
     public void testUnsynchronizedTargetRetainsExistingBehavior() throws Exception {

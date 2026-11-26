@@ -11,12 +11,17 @@ import com.intellij.codeInsight.intention.IntentionAction;
 import com.intellij.openapi.actionSystem.IdeActions;
 import com.intellij.openapi.command.WriteCommandAction;
 import com.intellij.openapi.editor.Document;
+import com.intellij.openapi.fileEditor.FileEditorManager;
+import com.intellij.openapi.vfs.VirtualFile;
+import com.intellij.psi.PsiManager;
 import com.intellij.testFramework.PlatformTestUtil;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
+import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
 import com.redhat.devtools.lsp4ij.fixtures.LSPCodeActionFixtureTestCase;
 import com.redhat.devtools.lsp4ij.mock.MockLanguageServer;
 import org.eclipse.lsp4j.CodeAction;
 import org.eclipse.lsp4j.Command;
+import org.eclipse.lsp4j.DidOpenTextDocumentParams;
 import org.eclipse.lsp4j.Position;
 import org.eclipse.lsp4j.Range;
 import org.eclipse.lsp4j.TextEdit;
@@ -24,7 +29,9 @@ import org.eclipse.lsp4j.WorkspaceEdit;
 
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 /**
  * A code action without an edit is resolved when it is invoked, and its edit arrives after the
@@ -63,6 +70,36 @@ public class ResolvedCodeActionTest extends LSPCodeActionFixtureTestCase {
         PlatformTestUtil.dispatchAllEventsInIdeEventQueue();
 
         assertEquals("world!", document().getText());
+    }
+
+    public void testAResolvedEditAppliesToAFileOpenedMeanwhileWhoseTextIsUnchanged() throws Exception {
+        var intention = greetingIntention();
+        var other = myFixture.addFileToProject("other.greeting", "world").getVirtualFile();
+        MockLanguageServer.INSTANCE.setResolvedCodeAction(resolved(other, "hello "));
+        assertFalse("the language server must not have the other file open yet", isOpenInTheServer(other));
+
+        invoke(intention);
+        // opened in an editor after the code action was resolved, before its edit is applied
+        openInEditor(other);
+        PlatformTestUtil.dispatchAllEventsInIdeEventQueue();
+
+        assertEquals("hello world", LSPIJUtils.getDocument(other).getText());
+    }
+
+    public void testAResolvedEditIsNotAppliedToAFileOpenedAndChangedMeanwhile() throws Exception {
+        var intention = greetingIntention();
+        var other = myFixture.addFileToProject("other.greeting", "world").getVirtualFile();
+        MockLanguageServer.INSTANCE.setResolvedCodeAction(resolved(other, "hello "));
+
+        invoke(intention);
+        openInEditor(other);
+        // typed in the opened file before the edit is applied
+        var document = LSPIJUtils.getDocument(other);
+        WriteCommandAction.runWriteCommandAction(myFixture.getProject(), "Typing", null,
+                () -> document.insertString(document.getTextLength(), "!"));
+        PlatformTestUtil.dispatchAllEventsInIdeEventQueue();
+
+        assertEquals("world!", document.getText());
     }
 
     public void testACodeActionWithACommandIsResolvedForItsEditWhichIsAppliedBeforeTheCommand() throws Exception {
@@ -114,6 +151,33 @@ public class ResolvedCodeActionTest extends LSPCodeActionFixtureTestCase {
                 () -> intention.invoke(myFixture.getProject(), myFixture.getEditor(), myFixture.getFile()));
     }
 
+    /**
+     * Opens the file in an editor, as a user does, and waits until its language server has received its didOpen.
+     * The editor connects the file asynchronously, so its servers are asked for here too, which connects it if the
+     * editor hasn't yet. Neither wait dispatches events, which would apply the resolved edit first.
+     */
+    private void openInEditor(VirtualFile file) throws Exception {
+        var opened = new CompletableFuture<DidOpenTextDocumentParams>();
+        MockLanguageServer.INSTANCE.getTextDocumentService().setDidOpenCallback(opened,
+                params -> params.getTextDocument().getUri().endsWith("/" + file.getName()));
+        FileEditorManager.getInstance(myFixture.getProject()).openFile(file, true);
+        var psiFile = PsiManager.getInstance(myFixture.getProject()).findFile(file);
+        try {
+            LanguageServiceAccessor.getInstance(myFixture.getProject())
+                    .getLanguageServers(psiFile, null, null).get(30, TimeUnit.SECONDS);
+            opened.get(30, TimeUnit.SECONDS);
+        } catch (TimeoutException e) {
+            throw new AssertionError("the language server didn't receive the didOpen of " + file.getName(), e);
+        }
+        assertTrue(isOpenInTheServer(file));
+    }
+
+    private boolean isOpenInTheServer(VirtualFile file) {
+        return MockLanguageServer.INSTANCE.getTextDocumentService().getOpenCloseNotifications().stream()
+                .anyMatch(notification -> notification.open()
+                        && notification.uri().getPath().endsWith("/" + file.getName()));
+    }
+
     private void type(String text) {
         WriteCommandAction.runWriteCommandAction(myFixture.getProject(), "Typing", null,
                 () -> document().insertString(document().getTextLength(), text));
@@ -125,8 +189,13 @@ public class ResolvedCodeActionTest extends LSPCodeActionFixtureTestCase {
 
     /** Returns the resolved code action, whose edit inserts the given text at the start of the file. */
     private CodeAction resolved(String insertion) {
+        return resolved(myFixture.getFile().getVirtualFile(), insertion);
+    }
+
+    /** Returns the resolved code action, whose edit inserts the given text at the start of the given file. */
+    private static CodeAction resolved(VirtualFile file, String insertion) {
         var resolved = new CodeAction(TITLE);
-        resolved.setEdit(new WorkspaceEdit(Map.of(LSPIJUtils.toUriAsString(myFixture.getFile()),
+        resolved.setEdit(new WorkspaceEdit(Map.of(LSPIJUtils.toUriAsString(file),
                 List.of(new TextEdit(new Range(new Position(0, 0), new Position(0, 0)), insertion)))));
         return resolved;
     }
