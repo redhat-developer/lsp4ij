@@ -115,6 +115,7 @@ public class LSPCompletionProposal extends LookupElement implements Pointer<LSPC
      *
      * @return true if the lookup must not select this item and false otherwise.
      */
+    @ApiStatus.Internal
     public boolean isPreselectSkipped() {
         return preselectSkipped;
     }
@@ -125,6 +126,7 @@ public class LSPCompletionProposal extends LookupElement implements Pointer<LSPC
      *
      * @param preselectSkipped true if the lookup must not select this item.
      */
+    @ApiStatus.Internal
     public void setPreselectSkipped(boolean preselectSkipped) {
         this.preselectSkipped = preselectSkipped;
     }

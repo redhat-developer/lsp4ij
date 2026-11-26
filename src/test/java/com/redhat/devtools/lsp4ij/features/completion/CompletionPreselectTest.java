@@ -8,6 +8,7 @@
 package com.redhat.devtools.lsp4ij.features.completion;
 
 import com.intellij.codeInsight.lookup.LookupElement;
+import com.intellij.codeInsight.lookup.LookupElementBuilder;
 import com.redhat.devtools.lsp4ij.fixtures.LSPCompletionFixtureTestCase;
 import org.jetbrains.annotations.NotNull;
 
@@ -63,6 +64,23 @@ public class CompletionPreselectTest extends LSPCompletionFixtureTestCase {
         assertNotNull("the lookup is still shown", myFixture.getLookup());
         assertEquals(List.of("fa1", "fa2"), lookupStrings());
         assertEquals("fa1", myFixture.getLookup().getCurrentItem().getLookupString());
+    }
+
+    public void testAnExactMatchOfTheTypedTextIsSelectedOverThePreselectedItem() {
+        assertCompletion("test.ts", "Zebra<caret>", """
+                [
+                  {"label": "Zebra", "sortText": "1"},
+                  {"label": "ZebraFish", "sortText": "2", "preselect": true}
+                ]""", "Zebra", "ZebraFish");
+
+        assertEquals("Zebra", myFixture.getLookup().getCurrentItem().getLookupString());
+    }
+
+    public void testAnItemOfAnotherCompletionContributorIsNotSkipped() {
+        var skipper = new LSPCompletionPreselectSkipper();
+        LookupElement other = LookupElementBuilder.create("other");
+
+        assertFalse(skipper.skipElement(other, null));
     }
 
     private @NotNull List<String> lookupStrings() {
