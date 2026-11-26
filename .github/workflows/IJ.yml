@@ -65,7 +65,7 @@ jobs:
           # one that ci.yml tests on.
           ./gradlew verifyPlugin -Dplugin.verifier.home.dir=~/.pluginVerifier ${{ github.event_name == 'pull_request' && '-PverifiedIdes=2024.2,2026.3' || '' }}
           REPORTS=$(cat ${{ github.workspace }}/build/reports/pluginVerifier/*/report.md | sed 's/^#/##/')
-          echo "$REPORTS" >> $GITHUB_STEP_SUMMARY
+          echo "$REPORTS" >> "$GITHUB_STEP_SUMMARY"
 
       # Collect Plugin Verifier Result
       - name: Collect Plugin Verifier Result
