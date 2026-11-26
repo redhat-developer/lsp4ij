@@ -94,9 +94,12 @@ jobs:
       # 6 hours. The log shows each test that failed until then, with its error.
       # A pull request leaves out the plugin's searchable options, which no test reads, and which start an IDE when the
       # build cache hasn't got them. A push to main builds them, as do the Build Plugin zip workflow and releases.
+      # GitHub's Linux and Windows runners (4 CPUs, 16 GB) run 3 test JVMs, where the CPUs would give 2. On #2291, at
+      # least 4.7 GB stayed available and no swap was used, with the 4 JVMs of the IU job, and the jobs took 0.4 to 2
+      # minutes less on Linux and 1.6 on Windows. The build's own default, as used locally, stays at half the CPUs.
       - name: Run Tests
         timeout-minutes: 45
-        run: ./gradlew check ${{ matrix.platformVersion && format('-PplatformVersion={0}', matrix.platformVersion) || '' }} ${{ matrix.platformType && format('-PplatformType={0}', matrix.platformType) || '' }} ${{ github.event_name == 'pull_request' && '-PbuildSearchableOptions=false' || '' }} ${{ matrix.part && format('-PtestShard={0}/2', matrix.part) || '' }}
+        run: ./gradlew check ${{ matrix.platformVersion && format('-PplatformVersion={0}', matrix.platformVersion) || '' }} ${{ matrix.platformType && format('-PplatformType={0}', matrix.platformType) || '' }} ${{ github.event_name == 'pull_request' && '-PbuildSearchableOptions=false' || '' }} ${{ matrix.part && format('-PtestShard={0}/2', matrix.part) || '' }} ${{ (runner.os == 'Linux' || runner.os == 'Windows') && '-PtestForks=3' || '' }}
 
       # Collect Tests Result
       - name: Collect Tests Result
