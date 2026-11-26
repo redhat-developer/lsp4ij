@@ -9,13 +9,17 @@ package com.redhat.devtools.lsp4ij;
 
 import com.intellij.openapi.application.WriteAction;
 import com.intellij.openapi.command.WriteCommandAction;
+import com.intellij.openapi.command.undo.UndoManager;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.fileEditor.FileDocumentManager;
+import com.intellij.openapi.fileEditor.impl.text.TextEditorProvider;
 import com.intellij.openapi.vfs.VfsUtil;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiFile;
 import com.intellij.psi.PsiManager;
+import com.intellij.testFramework.PlatformTestUtil;
 import com.redhat.devtools.lsp4ij.fixtures.LSPCodeInsightFixtureTestCase;
+import com.redhat.devtools.lsp4ij.mock.MockLanguageServer;
 import org.eclipse.lsp4j.CreateFile;
 import org.eclipse.lsp4j.CreateFileOptions;
 import org.eclipse.lsp4j.DeleteFile;
@@ -107,6 +111,17 @@ public class WorkspaceEditSnapshotTest extends LSPCodeInsightFixtureTestCase {
 
     private void type(Document document, String text) {
         WriteCommandAction.runWriteCommandAction(myFixture.getProject(), () -> document.setText(text));
+    }
+
+    /**
+     * Undoes the last change in the test's editor, as Ctrl+Z does, which gives the document back the modification
+     * stamp of its text before that change.
+     */
+    private void undo() {
+        var undoManager = UndoManager.getInstance(myFixture.getProject());
+        var editor = TextEditorProvider.getInstance().getTextEditor(myFixture.getEditor());
+        assertTrue("the change must be undoable in the editor", undoManager.isUndoAvailable(editor));
+        undoManager.undo(editor);
     }
 
     private PsiFile psiFile(VirtualFile file) {
@@ -208,6 +223,101 @@ public class WorkspaceEditSnapshotTest extends LSPCodeInsightFixtureTestCase {
 
         assertEquals(LanguageServerBundle.message("lsp.workspace.edit.document.changed", uri),
                 validate(snapshot, unversioned(uri)));
+    }
+
+    public void testATargetChangedAndUndoneSinceCaptureIsRefused() throws Exception {
+        var server = open();
+        dispatched(server);
+        String uri = uri(server, myFixture.getFile());
+        var document = myFixture.getEditor().getDocument();
+        var synchronizer = server.getServerWrapper().getOpenedDocument(URI.create(uri)).getSynchronizer();
+        long stamp = document.getModificationStamp();
+        int version = synchronizer.getVersion();
+        // as while a rename, a codeAction/resolve or an incoming workspace/applyEdit is pending
+        var request = WorkspaceEditSnapshot.capture(server);
+        var incoming = WorkspaceEditSnapshot.capture(server.getServerWrapper(), () -> true);
+
+        // The server is sent the changed text, which it may answer for, and then the text before it
+        type("changed");
+        dispatched(server);
+        undo();
+        dispatched(server);
+        assertEquals("before", document.getText());
+        assertEquals("the undo must give back the stamp of the text before the change", stamp, document.getModificationStamp());
+        assertTrue("the server must have been sent the change and its undo", synchronizer.getVersion() > version);
+
+        String changed = LanguageServerBundle.message("lsp.workspace.edit.document.changed", uri);
+        assertEquals(changed, validate(request, unversioned(uri)));
+        assertEquals(changed, validate(request, versioned(uri, 0)));
+        assertEquals(changed, validate(incoming, unversioned(uri)));
+        // Captured after the undo, the same edits apply
+        assertNull(validate(WorkspaceEditSnapshot.capture(server), unversioned(uri)));
+        assertNull(validate(WorkspaceEditSnapshot.capture(server), versioned(uri, 0)));
+    }
+
+    public void testAChangeSentBeforeCaptureStillApplies() throws Exception {
+        var server = open();
+        String uri = uri(server, myFixture.getFile());
+        type("changed");
+        dispatched(server);
+        var request = WorkspaceEditSnapshot.capture(server);
+        var incoming = WorkspaceEditSnapshot.capture(server.getServerWrapper(), () -> true);
+        int version = server.getServerWrapper().getOpenedDocument(URI.create(uri)).getSynchronizer().getVersion();
+
+        assertNull(validate(request, unversioned(uri)));
+        assertNull(validate(request, versioned(uri, version)));
+        assertNull(validate(request, versioned(uri, 0)));
+        assertNull(validate(incoming, unversioned(uri)));
+        assertNull(validate(incoming, versioned(uri, version)));
+    }
+
+    public void testASaveSinceCaptureStillApplies() throws Exception {
+        var server = open();
+        String uri = uri(server, myFixture.getFile());
+        var document = myFixture.getEditor().getDocument();
+        // Unsaved changes, sent before capture, which the save writes to the file
+        type("changed");
+        dispatched(server);
+        assertTrue(FileDocumentManager.getInstance().isDocumentUnsaved(document));
+        var request = WorkspaceEditSnapshot.capture(server);
+        var incoming = WorkspaceEditSnapshot.capture(server.getServerWrapper(), () -> true);
+        int version = server.getServerWrapper().getOpenedDocument(URI.create(uri)).getSynchronizer().getVersion();
+        MockLanguageServer.INSTANCE.getNotifications().clear();
+
+        // as an autosave when the IDE loses the focus while codeAction/resolve is pending
+        FileDocumentManager.getInstance().saveDocument(document);
+        assertFalse("the document must be saved", FileDocumentManager.getInstance().isDocumentUnsaved(document));
+        PlatformTestUtil.waitWithEventsDispatching("the server must be sent the didSave of the save",
+                () -> MockLanguageServer.INSTANCE.getNotifications().contains("didSave"), 30);
+
+        assertNull(validate(request, unversioned(uri)));
+        assertNull(validate(request, versioned(uri, version)));
+        assertNull(validate(request, versioned(uri, 0)));
+        assertNull(validate(incoming, unversioned(uri)));
+        assertNull(validate(incoming, versioned(uri, version)));
+    }
+
+    public void testATargetWhoseDidOpenIsSentAfterCaptureStillApplies() throws Exception {
+        var server = open();
+        var wrapper = server.getServerWrapper();
+        var file = myFixture.addFileToProject("other.foo", "before").getVirtualFile();
+        var document = FileDocumentManager.getInstance().getDocument(file);
+        // Connected as from a write action, which doesn't wait for the didOpen: the next request sends it
+        wrapper.connect(file, wrapper.createFileConnectionInfo(file, document, false)).get(30, TimeUnit.SECONDS);
+        URI uri = wrapper.toUri(file);
+        var synchronizer = wrapper.getOpenedDocument(uri).getSynchronizer();
+        assertEquals("the didOpen must not be sent before capture", 0, synchronizer.getVersion());
+        var request = WorkspaceEditSnapshot.capture(server);
+        var incoming = WorkspaceEditSnapshot.capture(wrapper, () -> true);
+
+        // The didOpen gives the document a version, though not its text, which the server read from the file before
+        synchronizer.flushPendingChanges().get(30, TimeUnit.SECONDS);
+        int version = synchronizer.getVersion();
+        assertTrue("the didOpen must give the document a version", version > 0);
+
+        assertNull(validate(request, unversioned(uri.toString())));
+        assertNull(validate(request, versioned(uri.toString(), version)));
+        assertNull(validate(incoming, unversioned(uri.toString())));
     }
 
     public void testReopenDoesNotReuseRequestOwnership() throws Exception {
