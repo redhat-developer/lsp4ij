@@ -141,6 +141,26 @@ public class EditorWindowConnectionTest extends LSPCodeInsightFixtureTestCase {
     }
 
     /**
+     * The marker that the platform's editor manager puts on a file whose editor closes to open again is the one that
+     * LSP4IJ reads, by its name, as no public field has it in 2024.2 (#2274).
+     */
+    @SuppressWarnings("deprecation")
+    public void testTheMarkerOfTheEditorManagerTellsThatAnEditorClosesToReopen() {
+        var file = otherFile();
+        assertFalse("a file without the marker must not be closing to reopen",
+                ConnectDocumentToLanguageServerSetupParticipant.isClosingToReopen(file));
+        file.putUserData(FileEditorManagerImpl.CLOSING_TO_REOPEN, true);
+        try {
+            assertTrue("the marker of the platform's editor manager must tell that the editor closes to reopen",
+                    ConnectDocumentToLanguageServerSetupParticipant.isClosingToReopen(file));
+        } finally {
+            file.putUserData(FileEditorManagerImpl.CLOSING_TO_REOPEN, null);
+        }
+        assertFalse("a file whose marker is removed must not be closing to reopen",
+                ConnectDocumentToLanguageServerSetupParticipant.isClosingToReopen(file));
+    }
+
+    /**
      * Opens a new file in an editor and connects it as a feature of the editor does, once the server has read its
      * didOpen.
      */
