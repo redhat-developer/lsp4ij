@@ -92,6 +92,10 @@ public class LSPCompletionProposal extends LookupElement implements Pointer<LSPC
 
     private volatile CompletableFuture<CompletionItem> resolvedCompletionItemFuture;
 
+    // true when another item of the same completion result is preselected by the language server
+    // and this one is not: the lookup must not select it (see LSPCompletionPreselectSkipper)
+    private volatile boolean preselectSkipped;
+
     public LSPCompletionProposal(@NotNull CompletionItem item,
                                  @NotNull LSPCompletionFeature.LSPCompletionContext completionContext,
                                  @NotNull LSPCompletionFeature completionFeature) {
@@ -103,6 +107,26 @@ public class LSPCompletionProposal extends LookupElement implements Pointer<LSPC
         this.prefixStartOffset = getPrefixStartOffset(editor.getDocument(), completionOffset);
         this.completionFeature = completionFeature;
         putUserData(CodeCompletionHandlerBase.DIRECT_INSERTION, true);
+    }
+
+    /**
+     * Returns true if the lookup must not select this item because the language server preselects another item
+     * of the same completion result, and false otherwise.
+     *
+     * @return true if the lookup must not select this item and false otherwise.
+     */
+    public boolean isPreselectSkipped() {
+        return preselectSkipped;
+    }
+
+    /**
+     * Set to true if the lookup must not select this item because the language server preselects another item
+     * of the same completion result.
+     *
+     * @param preselectSkipped true if the lookup must not select this item.
+     */
+    public void setPreselectSkipped(boolean preselectSkipped) {
+        this.preselectSkipped = preselectSkipped;
     }
 
     @Override

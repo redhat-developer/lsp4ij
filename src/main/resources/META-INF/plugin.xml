@@ -556,6 +556,8 @@
                 language="any"
                 implementationClass="com.redhat.devtools.lsp4ij.features.completion.LSPCompletionContributor"
                 order="first, before wordCompletion"/>
+        <completion.skip
+                implementation="com.redhat.devtools.lsp4ij.features.completion.LSPCompletionPreselectSkipper"/>
 
         <!-- LSP textDocument/inlineCompletion request support (LSP 3.18.0) -->
         <inline.completion.provider

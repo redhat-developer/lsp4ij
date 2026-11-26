@@ -378,6 +378,10 @@ When a language server returns an incomplete list (`isIncomplete: true`), or no 
 When the token at the caret spans whitespace, such as a comment that a language plugin keeps as one token, a completion
 item without a `textEdit` is matched against, and replaces, the word before the caret instead of the whole token: after
 `foo.ba`, the item `foo.bar` replaces `foo.ba`, and the item `bar` replaces `ba`.
+When a language server preselects a completion item (`preselect: true`), that item is the one selected when the list
+shows, as the specification asks. The order of the items doesn't change. Only the items of the same language server
+response are affected, never those of other completion contributors. A client feature can turn it off
+(see [LSP Completion Feature](./LSPApi.md#lsp-completion-feature)).
 
 Here is an example with the [Qute language server](https://github.com/redhat-developer/quarkus-ls/tree/master/qute.ls) showing method completion:
 

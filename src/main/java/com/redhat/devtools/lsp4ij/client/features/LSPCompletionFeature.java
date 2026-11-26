@@ -313,6 +313,22 @@ public class LSPCompletionFeature extends AbstractLSPDocumentFeature {
     }
 
     /**
+     * Returns true if the lookup must select the given LSP completion item when the language server preselects it
+     * ({@link CompletionItem#getPreselect()}) and false otherwise.
+     *
+     * <p>
+     * The list is not reordered: the items of the same completion result which are not preselected are only skipped
+     * when the lookup chooses the item to select.
+     * </p>
+     *
+     * @param item the LSP completion item.
+     * @return true if the lookup must select the given item when the language server preselects it.
+     */
+    public boolean isPreselect(@NotNull CompletionItem item) {
+        return Boolean.TRUE.equals(item.getPreselect());
+    }
+
+    /**
      * Whether or not an editor template should be used for invocation-only snippets.
      *
      * @param file the file
