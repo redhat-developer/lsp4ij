@@ -22,6 +22,7 @@ import org.jetbrains.jps.model.fileTypes.FileNameMatcherFactory;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.CancellationException;
 
 /**
@@ -112,7 +113,10 @@ public final class JetBrainsLanguageServers {
     private static @Nullable ClassLoader getClassLoaderOfPage(@NotNull Project project) {
         for (ConfigurableEP<Configurable> page : Configurable.PROJECT_CONFIGURABLE.getExtensions(project)) {
             if (CONFIGURABLE_ID.equals(page.id)) {
-                return page.getPluginDescriptor().getClassLoader();
+                var descriptor = page.getPluginDescriptor();
+                // As the deprecated PluginDescriptor.getClassLoader() does
+                return Objects.requireNonNullElse(descriptor.getPluginClassLoader(),
+                        descriptor.getClass().getClassLoader());
             }
         }
         return null;
