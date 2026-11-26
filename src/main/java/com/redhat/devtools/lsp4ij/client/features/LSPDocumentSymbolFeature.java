@@ -182,7 +182,11 @@ public class LSPDocumentSymbolFeature extends AbstractLSPDocumentFeature {
      * @param documentSymbolData the document symbol data
      * @param psiElement the PSI element to compare with
      * @return true if the document symbol represents the given PSI element (text ranges match), false otherwise
+     * @deprecated the {@code Structure} view no longer needs to match a document symbol with a PSI element: since
+     * 0.20.0, it selects the {@link DocumentSymbolData} that contains the caret, and compares document symbols with each
+     * other. The method is still called in this release, and is to be removed.
      */
+    @Deprecated(since = "0.30.2", forRemoval = true)
     public boolean matchesPsiElement(@NotNull DocumentSymbolData documentSymbolData,
                                      @NotNull PsiElement psiElement) {
         TextRange textRange = documentSymbolData.getSelectionTextRange() != null
