@@ -16,6 +16,7 @@ import com.intellij.openapi.progress.ProgressIndicator;
 import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.project.DumbService;
 import com.intellij.openapi.project.IndexNotReadyException;
+import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.Disposer;
 import com.intellij.testFramework.DumbModeTestUtils;
 import com.intellij.testFramework.fixtures.BasePlatformTestCase;
@@ -24,6 +25,7 @@ import com.redhat.devtools.lsp4ij.client.IndexAwareLanguageClient;
 import com.redhat.devtools.lsp4ij.client.LSPCompletableFuture;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.jetbrains.concurrency.CancellablePromise;
 
 import java.time.Duration;
 import java.util.List;
@@ -54,7 +56,7 @@ import java.util.stream.IntStream;
  *     <li>a write action, which cancels the running read action, restarts the computation without using up one of its
  *     attempts, however many write actions there are: 0.13.0 counted each of them as an attempt;</li>
  *     <li>the failures which count still make the future give up after 5 attempts, and cancelling the future stops
- *     the retries.</li>
+ *     the retries, even a retry which starts as the future is cancelled.</li>
  * </ul>
  * The tests run outside the EDT, as the computation is requested on a background thread, so that the EDT is free for
  * the write actions and the start and end of indexing.
@@ -222,6 +224,27 @@ public class PromiseToCompletableFutureTest extends BasePlatformTestCase {
         assertTrue(future.isCancelled());
     }
 
+    /**
+     * A cancellation of the future while a retry starts, after the retry checked that the future isn't cancelled and
+     * before it records the read action it starts, used to cancel the read action which had failed, and not the new one,
+     * which then ran on.
+     */
+    public void testCancellingTheFutureWhileARetryStartsCancelsTheRetry() {
+        var computation = new Computation().failNext(1, IndexNotReadyException::create);
+        computations.add(computation);
+        var future = new CancelledAsItRetriesFuture(computation, getProject());
+        futures.add(future);
+        var first = readActionOf(future);
+
+        await("the future didn't retry its computation", () -> readActionOf(future) != first, null);
+        var retry = readActionOf(future);
+
+        await("the read action of the retry, which started as the future was cancelled, wasn't cancelled",
+                retry::isDone, null);
+        assertTrue(retry.isCancelled());
+        assertTrue(future.isCancelled());
+    }
+
     public void testCancellingTheFutureCancelsItsRunningComputation() {
         var computation = new Computation().hold();
         var future = start(computation);
@@ -316,6 +339,19 @@ public class PromiseToCompletableFutureTest extends BasePlatformTestCase {
         }
     }
 
+    /**
+     * Returns the read action which the given future started last.
+     */
+    private static CancellablePromise<?> readActionOf(PromiseToCompletableFuture<?> future) {
+        try {
+            var field = PromiseToCompletableFuture.class.getDeclaredField("nonBlockingReadActionPromise");
+            field.setAccessible(true);
+            return (CancellablePromise<?>) field.get(future);
+        } catch (ReflectiveOperationException e) {
+            throw new AssertionError("the future has no read action field", e);
+        }
+    }
+
     private static ExecutionAttemptLimitReachedException failureOf(CompletableFuture<?> future) {
         try {
             var result = future.get(TIMEOUT.toMillis(), TimeUnit.MILLISECONDS);
@@ -332,6 +368,32 @@ public class PromiseToCompletableFutureTest extends BasePlatformTestCase {
 
     private static @Nullable Throwable failureOrNull(CompletableFuture<?> future) {
         return future.handle((result, failure) -> failure).getNow(null);
+    }
+
+    /**
+     * A future which is cancelled as it retries its computation: after it checked that it isn't cancelled, and before
+     * it starts the read action of the retry, as when another thread cancels it then. It holds the retry, so that only
+     * a cancellation ends it.
+     */
+    private static final class CancelledAsItRetriesFuture extends PromiseToCompletableFuture<String> {
+
+        private final Computation computation;
+        private final AtomicInteger attempts = new AtomicInteger();
+
+        CancelledAsItRetriesFuture(Computation computation, Project project) {
+            super(computation, TITLE, project, null, (Object) null);
+            this.computation = computation;
+            init();
+        }
+
+        @Override
+        protected ProgressIndicator createProgressIndicator() {
+            if (attempts.incrementAndGet() == 2) {
+                computation.hold();
+                cancel(true);
+            }
+            return super.createProgressIndicator();
+        }
     }
 
     /**
