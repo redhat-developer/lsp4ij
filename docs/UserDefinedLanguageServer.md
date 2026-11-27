@@ -77,8 +77,8 @@ it the whole command in double quotes, since `sh -c` runs only the argument righ
 
 ##### Directory-specific environment variables
 
-Since IntelliJ 2025.1, a plugin can set up the environment of a process for its working directory (the
-`commandLineEnvCustomizer` extension point), as the [mise](https://mise.jdx.dev/) plugin does from a `mise.toml`, or a
+A plugin can set up the environment of a process for its working directory (the `commandLineEnvCustomizer` extension
+point), as the [mise](https://mise.jdx.dev/) plugin does from a `mise.toml`, or a
 [direnv](https://direnv.net/) plugin from an `.envrc`. The language server's process gets that environment when it starts.
 LSP4IJ also looks up the language server's command in the `PATH` of that environment, so that the tool which the
 directory selects, such as its version of `node`, is the one that starts.
@@ -88,7 +88,6 @@ directory selects, such as its version of `node`, is the one that starts.
 > - **Precedence**: the directory's environment is applied when the process starts, after the environment variables configured here, so it wins over a variable that both set.
 > - **Windows**: with a working directory, a command without its extension, such as `node` or `npx`, is looked up with the extensions in `PATHEXT`, as Windows does, so that the directory's `node.exe` or `npx.cmd` starts.
 > - **Tools not bundled**: LSP4IJ doesn't bundle mise or direnv. Install the tool and its IntelliJ plugin. The mise plugin customizes the processes of other plugins only with its `useMiseInAllCommandLines` setting, which is off by default.
-> - **IntelliJ 2024.x** has no such extension point, so the environment is as before. The command is looked up as described above, also with the extensions in `PATHEXT` on Windows.
 
 #### Macro syntax
 

@@ -133,8 +133,8 @@ An `OSProcessStreamConnectionProvider` starts one process: LSP4IJ creates a new 
 for each start of the language server, and `start()` throws a `CannotStartProcessException` when the provider has
 already been started or stopped.
 
-Since IntelliJ 2025.1, a plugin can set up the environment of a process for its working directory (the
-`commandLineEnvCustomizer` extension point), as the [mise](https://mise.jdx.dev/) plugin does. A command line with a
+A plugin can set up the environment of a process for its working directory (the `commandLineEnvCustomizer` extension
+point), as the [mise](https://mise.jdx.dev/) plugin does. A command line with a
 working directory (`withWorkDirectory`) gets that environment when it starts, and `start()` looks its command up in
 the `PATH` of that environment, as for a
 [user-defined language server](./UserDefinedLanguageServer.md#directory-specific-environment-variables). A command
