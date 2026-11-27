@@ -478,8 +478,10 @@ public class DAPRefusedResumeSessionTest extends HeavyPlatformTestCase {
 
     /**
      * Starts debugging, attached to a new {@link RefusingServer} which refuses the given requests, and waits for the
-     * session to be suspended where the program first stopped. With a breakpoint which doesn't suspend, the debug
-     * adapter is the {@link RefusingServerDefinition} of the file which has that breakpoint, and the DAP server has it.
+     * session to be suspended where the program first stopped, and for IntelliJ to have told the listeners of the
+     * session that it paused there, so that the pauses which {@link #recordPauses()} records from then on don't
+     * include it. With a breakpoint which doesn't suspend, the debug adapter is the {@link RefusingServerDefinition} of
+     * the file which has that breakpoint, and the DAP server has it.
      */
     private void debug(boolean withBreakpointWhichDoesNotSuspend, @NotNull String... refused) throws Exception {
         server = new RefusingServer(Set.of(refused));
@@ -499,20 +501,33 @@ public class DAPRefusedResumeSessionTest extends HeavyPlatformTestCase {
         PlatformTestUtil.withSystemProperty("intellij.progress.task.ignoreHeadless", "true", () ->
                 ExecutionEnvironmentBuilder.create(getProject(), DefaultDebugExecutor.getDebugExecutorInstance(), configuration)
                         .buildAndExecute());
-        if (withBreakpointWhichDoesNotSuspend) {
-            // The session sends its breakpoints as it starts, which may be once the configuration is done: the program
-            // stops at the breakpoint once the DAP server has it. The client handles the answer to 'setBreakpoints'
-            // before those of the requests which a stop sends
-            PlatformTestUtil.waitWithEventsDispatching("the DAP server is configured, and has the breakpoint which doesn't suspend",
-                    () -> server.configured && server.setBreakpoints.stream().anyMatch(args -> args.getBreakpoints().length > 0),
-                    BOUND_SECONDS);
-        }
-        PlatformTestUtil.waitWithEventsDispatching("the program stops, and the session is suspended where it stopped", () -> {
+        // The session sends its breakpoints as it starts, which may be once the configuration is done: the program
+        // first stops once the DAP server has them. The client handles the answer to 'setBreakpoints' before those of
+        // the requests which a stop sends
+        PlatformTestUtil.waitWithEventsDispatching(withBreakpointWhichDoesNotSuspend ?
+                "the session starts, and the DAP server is configured and has the breakpoint which doesn't suspend" :
+                "the session starts, and the DAP server is configured", () -> {
             // no session tab is selected in tests, so there is no current session
             var sessions = XDebuggerManager.getInstance(getProject()).getDebugSessions();
             session = sessions.length == 1 ? sessions[0] : null;
-            return session != null && session.isSuspended() && currentFrameId() == 1;
+            return session != null && server.configured && (!withBreakpointWhichDoesNotSuspend
+                    || server.setBreakpoints.stream().anyMatch(args -> args.getBreakpoints().length > 0));
         }, BOUND_SECONDS);
+        // IntelliJ tells the listeners of the session that it paused only after the session shows the stop, on the
+        // thread which suspended it: a listener which a test adds once the stop shows, as recordPauses() does, may
+        // still be told of it, as of a newer pause. So the program first stops once a listener of the session is
+        // there, and the test goes on once IntelliJ has told it: a listener added from then on isn't told of that pause
+        var firstPause = new CompletableFuture<Void>();
+        session.addSessionListener(new XDebugSessionListener() {
+            @Override
+            public void sessionPaused() {
+                firstPause.complete(null);
+            }
+        }, getTestRootDisposable());
+        server.stop(StoppedEventArgumentsReason.PAUSE);
+        PlatformTestUtil.waitWithEventsDispatching("the program stops, the session is suspended where it stopped, and "
+                        + "IntelliJ has told the listeners of the session that it paused there",
+                () -> firstPause.isDone() && session.isSuspended() && currentFrameId() == 1, BOUND_SECONDS);
         client = ((DAPSuspendContext) session.getSuspendContext()).getClient();
     }
 
@@ -763,8 +778,8 @@ public class DAPRefusedResumeSessionTest extends HeavyPlatformTestCase {
     }
 
     /**
-     * A DAP server of a program with one thread, 'main', or with 'worker' too when the test says, which stops once
-     * configured, and then when the test says: all threads, or one alone at the breakpoint. At its n-th stop, counted
+     * A DAP server of a program with one thread, 'main', or with 'worker' too when the test says, which stops, once
+     * configured, when the test says: all threads, or one alone at the breakpoint. At its n-th stop, counted
      * from 1, the thread is in the frame n, whose locals are 'answer' = 41. It answers the requests which resume the
      * program that the test names with an error, and can set variables. It supports stepping back, and answers the
      * requests which the test names only when the test says.
@@ -944,10 +959,9 @@ public class DAPRefusedResumeSessionTest extends HeavyPlatformTestCase {
 
         @Override
         public CompletableFuture<Void> configurationDone(ConfigurationDoneArguments args) {
-            return CompletableFuture.completedFuture(null).thenRun(() -> {
-                configured = true;
-                stop(StoppedEventArgumentsReason.PAUSE);
-            });
+            // The program first stops when the test says
+            configured = true;
+            return CompletableFuture.completedFuture(null);
         }
 
         @Override
