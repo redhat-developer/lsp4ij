@@ -133,6 +133,17 @@ public class DAPThreadRunStateSessionTest extends HeavyPlatformTestCase {
             public void settingsChanged() {
                 settingsChanged.incrementAndGet();
             }
+
+            /**
+             * Leaves out the views which the frontend of IntelliJ builds again, as it does once it has created the
+             * session tab: IntelliJ 2026.3 tells the listeners of that with this method, which calls
+             * {@link #settingsChanged()} by default, at any time after the session started, as after the stop. It
+             * overrides nothing in IntelliJ 2024.2 and 2025.3, which build the views of a new tab again at once, as
+             * the session starts.
+             */
+            @SuppressWarnings("unused")
+            public void settingsChangedFromFrontend() {
+            }
         }, getTestRootDisposable());
 
         // The DAP server holds its answer to 'threads', which the client asks for once the worker continued: the
@@ -148,7 +159,8 @@ public class DAPThreadRunStateSessionTest extends HeavyPlatformTestCase {
         assertEquals("Frames not available: the thread is running", workerFrames.error());
         // The views of the stop are built again: the Frames view asks again for the frames of the stack which it shows,
         // and forgets those which it kept of the others
-        assertTrue("The views of the stop are built again", settingsChanged.get() > 0);
+        PlatformTestUtil.waitWithEventsDispatching("the views of the stop are built again",
+                () -> settingsChanged.get() > 0, BOUND_SECONDS);
         assertEquals(List.of(MAIN_FRAME, MAIN_CALLER_FRAME), frameIdsOf(framesOf(getStack("main"))));
         assertTrue("The session stays suspended where 'main' stopped", session.isSuspended());
         assertEquals(MAIN_FRAME, currentFrameId());
