@@ -83,6 +83,8 @@ it up. Most templates install their language server the first time it starts.
 
 ### Debug adapters
 
+The guides of the Debug Adapter Protocol are together in the [`dap` folder](./dap/README.md).
+
 - [DAP user guide](./dap/UserGuide.md): the `Debug Adapter Protocol` run/debug configuration, breakpoints of every
   kind, stepping, stepping back, evaluating expressions, variables and their values, the debug console, the debugged
   process, Run In Terminal, disassembly, and the templates of debug adapters.
