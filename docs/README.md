@@ -47,7 +47,7 @@ it up. Most templates install their language server the first time it starts.
 
 | Template                                                                                       | For                                                        |
 |------------------------------------------------------------------------------------------------|------------------------------------------------------------|
-| [Ada Language Server](./user-defined-ls/ada_language_server.md)                                | Ada                                                        |
+| [Ada Language Server](./user-defined-ls/ada-language-server.md)                                | Ada                                                        |
 | [Astro Language Server](./user-defined-ls/astro-ls.md)                                         | Astro                                                      |
 | [C# Language Server (OmniSharp)](./user-defined-ls/omnisharp-roslyn.md)                        | C#                                                         |
 | [CSS Language Server](./user-defined-ls/vscode-css-language-server.md)                         | CSS, SCSS and Less                                         |
@@ -55,7 +55,7 @@ it up. Most templates install their language server the first time it starts.
 | [Candor Language Server](./user-defined-ls/candor-lsp.md)                                      | the side effects of each function                          |
 | [Clangd](./user-defined-ls/clangd.md)                                                          | C, C++, CUDA and Objective-C                               |
 | [Clojure LSP](./user-defined-ls/clojure-lsp.md)                                                | Clojure                                                    |
-| [Cpp Language Server](./user-defined-ls/cpp_ls.md)                                             | C, C++ and CUDA                                            |
+| [Cpp Language Server](./user-defined-ls/cpp-ls.md)                                             | C, C++ and CUDA                                            |
 | [Dart LSP server](./user-defined-ls/dart-lsp.md)                                               | Dart                                                       |
 | [Docker Language Server](./user-defined-ls/docker-language-server.md)                          | Dockerfiles, Compose files and Bake files                  |
 | [ESLint Language Server](./user-defined-ls/vscode-eslint-language-server.md)                   | JavaScript and TypeScript, with ESLint                     |
