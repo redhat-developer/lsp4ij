@@ -14,6 +14,7 @@
 package com.redhat.devtools.lsp4ij.dap.definitions.userdefined;
 
 import com.intellij.openapi.progress.ProgressIndicator;
+import com.redhat.devtools.lsp4ij.dap.DAPDebugProcess;
 import com.redhat.devtools.lsp4ij.dap.definitions.DebugAdapterServerDefinition;
 import com.redhat.devtools.lsp4ij.dap.installation.DeclarativeDebugAdapterServerInstaller;
 import com.redhat.devtools.lsp4ij.dap.settings.ui.UICommandLineUpdater;
@@ -58,7 +59,9 @@ public class UserDefinedDebugAdapterServerInstaller extends DeclarativeDebugAdap
     }
 
     /**
-     * Creates an installer context and attaches a UI-based command-line updater.
+     * Creates an installer context and attaches a UI-based command-line updater. When the installer runs for a
+     * project, the notification which says that the installation failed shows the "Installer" tab of the debug
+     * session, which has what the installer printed at its start.
      *
      * @param action    the installer action (CHECK or RUN)
      * @param indicator the progress indicator
@@ -71,6 +74,10 @@ public class UserDefinedDebugAdapterServerInstaller extends DeclarativeDebugAdap
         var serverDefinition = getUserDefinedLanguageServerDefinition();
         if (serverDefinition != null) {
             context.setCommandLineUpdater(new UICommandLineUpdater(serverDefinition));
+            var project = getProject();
+            if (project != null) {
+                context.addFailureNotificationAction(DAPDebugProcess.createShowInstallerTabAction(project, serverDefinition));
+            }
         }
         return context;
     }

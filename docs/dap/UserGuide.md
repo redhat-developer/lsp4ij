@@ -85,7 +85,9 @@ the DAP server, as its [template](#templates) gives it. Before the first debug s
 session, LSP4IJ runs the `check` of the installer, and its `run` if the check fails, in a console, and then starts the
 debug session (see [When the installer runs](../Installer.md#when-the-installer-runs)). The
 `Installer` tab of the debug session has the links `Check Installation`, `Run Installation` and
-`Check / Run Installation`, which run the installer again.
+`Check / Run Installation`, which run the installer again. Its console shows the `check` and the `run` which ran at the
+start of the session, with the directory, the `PATH` and the exit code of each command, and the notification of an
+installation which failed shows the tab with `Show Installer Tab`.
 
 ### IntelliJ macro expansion
 

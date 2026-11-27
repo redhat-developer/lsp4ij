@@ -10,6 +10,7 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.installation.definition;
 
+import com.intellij.ide.actions.ShowLogAction;
 import com.intellij.notification.Notification;
 import com.intellij.notification.NotificationListener;
 import com.intellij.notification.NotificationType;
@@ -109,6 +110,14 @@ public class ServerInstallerManager extends InstallerTaskRegistry implements Dis
                 message,
                 hasError ? NotificationType.ERROR : NotificationType.INFORMATION);
         notification.setListener(NotificationListener.URL_OPENING_LISTENER);
+        if (hasError) {
+            // What the installation printed, and the IDE's log, which has each step, as its command, its exit code and
+            // the output of a step which failed (#2296)
+            context.getFailureNotificationActions().forEach(notification::addAction);
+            if (ShowLogAction.isSupported()) {
+                notification.addAction(ShowLogAction.notificationAction());
+            }
+        }
         return notification;
     }
 

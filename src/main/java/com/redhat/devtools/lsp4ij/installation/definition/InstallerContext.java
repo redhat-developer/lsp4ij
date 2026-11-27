@@ -11,6 +11,7 @@
 package com.redhat.devtools.lsp4ij.installation.definition;
 
 import com.intellij.execution.ui.ConsoleViewContentType;
+import com.intellij.openapi.actionSystem.AnAction;
 import com.intellij.openapi.progress.ProgressIndicator;
 import com.intellij.openapi.project.Project;
 import com.intellij.util.EnvironmentUtil;
@@ -76,6 +77,8 @@ public class InstallerContext implements Reporter {
     private boolean checkAgainAfterWaiting;
     // The name of the installer, which the log puts before each line
     private @Nullable String installerName;
+    // The actions of the notification which says that the installation failed, before the one which shows the log
+    private final @NotNull List<AnAction> failureNotificationActions = new ArrayList<>();
 
     /**
      * Constructs a new {@code InstallerContext}.
@@ -433,6 +436,26 @@ public class InstallerContext implements Reporter {
      */
     public void setCheckAgainAfterWaiting(boolean checkAgainAfterWaiting) {
         this.checkAgainAfterWaiting = checkAgainAfterWaiting;
+    }
+
+    /**
+     * Adds an action to the notification which says that the installation failed, as one which shows the console that
+     * has the output of the installation. The notification also has an action which shows the IDE's log, which has
+     * each step of the installation.
+     *
+     * @param action the action of the notification.
+     */
+    public void addFailureNotificationAction(@NotNull AnAction action) {
+        failureNotificationActions.add(action);
+    }
+
+    /**
+     * Returns the actions which {@link #addFailureNotificationAction(AnAction)} added, in that order.
+     *
+     * @return the actions of the notification which says that the installation failed.
+     */
+    public @NotNull List<AnAction> getFailureNotificationActions() {
+        return Collections.unmodifiableList(failureNotificationActions);
     }
 
     /**
