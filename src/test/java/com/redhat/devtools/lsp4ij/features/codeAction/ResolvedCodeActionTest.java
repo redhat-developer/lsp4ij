@@ -9,6 +9,7 @@ package com.redhat.devtools.lsp4ij.features.codeAction;
 
 import com.intellij.codeInsight.intention.IntentionAction;
 import com.intellij.openapi.actionSystem.IdeActions;
+import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.command.WriteCommandAction;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.fileEditor.FileEditorManager;
@@ -32,6 +33,7 @@ import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * A code action without an edit is resolved when it is invoked, and its edit arrives after the
@@ -52,7 +54,7 @@ public class ResolvedCodeActionTest extends LSPCodeActionFixtureTestCase {
         type("!");
 
         invoke(intention);
-        PlatformTestUtil.dispatchAllEventsInIdeEventQueue();
+        waitUntilTheResolvedEditIsAppliedOrRefused();
         assertEquals("hello world!", document().getText());
 
         // the typing before the code action is not undone with it
@@ -67,7 +69,7 @@ public class ResolvedCodeActionTest extends LSPCodeActionFixtureTestCase {
         invoke(intention);
         // typed after the code action was resolved, before its edit is applied
         type("!");
-        PlatformTestUtil.dispatchAllEventsInIdeEventQueue();
+        waitUntilTheResolvedEditIsAppliedOrRefused();
 
         assertEquals("world!", document().getText());
     }
@@ -81,7 +83,7 @@ public class ResolvedCodeActionTest extends LSPCodeActionFixtureTestCase {
         invoke(intention);
         // opened in an editor after the code action was resolved, before its edit is applied
         openInEditor(other);
-        PlatformTestUtil.dispatchAllEventsInIdeEventQueue();
+        waitUntilTheResolvedEditIsAppliedOrRefused();
 
         assertEquals("hello world", LSPIJUtils.getDocument(other).getText());
     }
@@ -97,7 +99,7 @@ public class ResolvedCodeActionTest extends LSPCodeActionFixtureTestCase {
         var document = LSPIJUtils.getDocument(other);
         WriteCommandAction.runWriteCommandAction(myFixture.getProject(), "Typing", null,
                 () -> document.insertString(document.getTextLength(), "!"));
-        PlatformTestUtil.dispatchAllEventsInIdeEventQueue();
+        waitUntilTheResolvedEditIsAppliedOrRefused();
 
         assertEquals("world!", document.getText());
     }
@@ -121,7 +123,7 @@ public class ResolvedCodeActionTest extends LSPCodeActionFixtureTestCase {
         MockLanguageServer.INSTANCE.setResolvedCodeAction(resolved);
 
         invoke(intention);
-        PlatformTestUtil.dispatchAllEventsInIdeEventQueue();
+        waitUntilTheResolvedEditIsAppliedOrRefused();
 
         // the edit which the language server computes lazily is applied, and then its command is executed
         assertEquals("hello world", document().getText());
@@ -149,6 +151,21 @@ public class ResolvedCodeActionTest extends LSPCodeActionFixtureTestCase {
     private void invoke(IntentionAction intention) {
         WriteCommandAction.runWriteCommandAction(myFixture.getProject(), TITLE, null,
                 () -> intention.invoke(myFixture.getProject(), myFixture.getEditor(), myFixture.getFile()));
+    }
+
+    /**
+     * Waits until the resolved edit of the intention invoked last has been applied, or refused, while the UI thread
+     * dispatches its events. The intention queued the edit with {@code invokeLater}, so it has run once a runnable
+     * queued after it in the same modality has: the runnables of a modality run in the order they were queued.
+     * Dispatching the events once isn't enough on IntelliJ 2025.3 and later: while a write action is pending or runs in
+     * the background, the UI thread holds back the runnables that need the write-intent lock, as the edit does, and
+     * one dispatch can end before that write action does.
+     */
+    private void waitUntilTheResolvedEditIsAppliedOrRefused() {
+        var queuedAfterTheEdit = new AtomicBoolean();
+        ApplicationManager.getApplication().invokeLater(() -> queuedAfterTheEdit.set(true));
+        PlatformTestUtil.waitWithEventsDispatching("the resolved edit must be applied or refused",
+                queuedAfterTheEdit::get, IN_MEMORY_TIMEOUT_SECONDS);
     }
 
     /**
