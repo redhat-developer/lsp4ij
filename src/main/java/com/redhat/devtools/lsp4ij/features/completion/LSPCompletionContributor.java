@@ -153,6 +153,10 @@ public class LSPCompletionContributor extends CompletionContributor {
         // When the language server preselects an item, the other items of this result are skipped when the lookup
         // chooses the item to select (the order is kept), see LSPCompletionPreselectSkipper
         boolean hasPreselect = items.stream().anyMatch(completionFeature::isPreselect);
+        if (hasPreselect) {
+            // and so are the items of the other completion contributors, which run after this one
+            LSPCompletionPreselectSkipper.preselectIn(parameters);
+        }
         // Items now sorted by priority, low index == high priority
         for (int i = 0; i < size; i++) {
             var item = items.get(i);

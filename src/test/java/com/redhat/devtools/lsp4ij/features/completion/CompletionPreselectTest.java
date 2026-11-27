@@ -8,7 +8,6 @@
 package com.redhat.devtools.lsp4ij.features.completion;
 
 import com.intellij.codeInsight.lookup.LookupElement;
-import com.intellij.codeInsight.lookup.LookupElementBuilder;
 import com.redhat.devtools.lsp4ij.fixtures.LSPCompletionFixtureTestCase;
 import org.jetbrains.annotations.NotNull;
 
@@ -74,13 +73,6 @@ public class CompletionPreselectTest extends LSPCompletionFixtureTestCase {
                 ]""", "Zebra", "ZebraFish");
 
         assertEquals("Zebra", myFixture.getLookup().getCurrentItem().getLookupString());
-    }
-
-    public void testAnItemOfAnotherCompletionContributorIsNotSkipped() {
-        var skipper = new LSPCompletionPreselectSkipper();
-        LookupElement other = LookupElementBuilder.create("other");
-
-        assertFalse(skipper.skipElement(other, null));
     }
 
     private @NotNull List<String> lookupStrings() {
