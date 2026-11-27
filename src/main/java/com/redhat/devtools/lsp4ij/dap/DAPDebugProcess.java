@@ -16,11 +16,15 @@ import com.intellij.execution.process.ProcessHandler;
 import com.intellij.execution.ui.ConsoleView;
 import com.intellij.execution.ui.ConsoleViewContentType;
 import com.intellij.execution.ui.ExecutionConsole;
+import com.intellij.execution.ui.RunContentManager;
 import com.intellij.execution.ui.RunnerLayoutUi;
 import com.intellij.execution.ui.layout.PlaceInGrid;
 import com.intellij.icons.AllIcons;
+import com.intellij.ide.actions.ShowLogAction;
+import com.intellij.notification.NotificationAction;
 import com.intellij.openapi.Disposable;
 import com.intellij.openapi.actionSystem.ActionManager;
+import com.intellij.openapi.actionSystem.AnAction;
 import com.intellij.openapi.actionSystem.Anchor;
 import com.intellij.openapi.actionSystem.Constraints;
 import com.intellij.openapi.actionSystem.DefaultActionGroup;
@@ -41,6 +45,7 @@ import com.intellij.ui.content.Content;
 import com.intellij.util.ui.FormBuilder;
 import com.intellij.xdebugger.XDebugProcess;
 import com.intellij.xdebugger.XDebugSession;
+import com.intellij.xdebugger.XDebuggerManager;
 import com.intellij.xdebugger.XSourcePosition;
 import com.intellij.xdebugger.breakpoints.XBreakpoint;
 import com.intellij.xdebugger.breakpoints.XBreakpointHandler;
@@ -69,6 +74,7 @@ import com.redhat.devtools.lsp4ij.dap.client.variables.DAPValueFormat;
 import com.redhat.devtools.lsp4ij.dap.configurations.DAPCommandLineState;
 import com.redhat.devtools.lsp4ij.dap.console.DAPConsoleView;
 import com.redhat.devtools.lsp4ij.dap.console.DAPOutputDecoder;
+import com.redhat.devtools.lsp4ij.dap.definitions.DebugAdapterServerDefinition;
 import com.redhat.devtools.lsp4ij.dap.definitions.userdefined.UserDefinedDebugAdapterServerDefinition;
 import com.redhat.devtools.lsp4ij.dap.descriptors.DebugAdapterDescriptor;
 import com.redhat.devtools.lsp4ij.dap.disassembly.DAPAlternativeSourceHandler;
@@ -166,6 +172,8 @@ public class DAPDebugProcess extends XDebugProcess implements Disposable {
      * loaded sources or modules.
      */
     private volatile @Nullable RunnerLayoutUi layoutUi;
+    // The "Installer" tab of the session, once the layout has it
+    private volatile @Nullable Content installerContent;
     // Whether the DAP server reported loaded sources, or modules, which may be before the layout of the debug tab exists
     private volatile boolean loadedSourcesReported;
     private volatile boolean modulesReported;
@@ -918,35 +926,111 @@ public class DAPDebugProcess extends XDebugProcess implements Disposable {
         return dapState;
     }
 
+    /**
+     * Creates the panel of the "Installer" tab of a debug session with the given builder, whose console shows what the
+     * installer printed at the start of the session, if it ran then (#2296).
+     *
+     * @param builder                the builder of the tab.
+     * @param installerConfiguration the JSON of the installer, or null.
+     * @param commandLineUpdater     the command line updater of the installer of the tab.
+     * @param project                the project of the debug session.
+     * @param installerOutput        what the installer printed at the start of the session, or null.
+     * @return the panel of the "Installer" tab, which the caller disposes.
+     */
+    static @NotNull InstallerPanel createInstallerPanel(@NotNull FormBuilder builder,
+                                                        @Nullable String installerConfiguration,
+                                                        @NotNull CommandLineUpdater commandLineUpdater,
+                                                        @NotNull Project project,
+                                                        @Nullable DAPInstallerOutput installerOutput) {
+        var installerPanel = new InstallerPanel(builder, true, project);
+        installerPanel.setCommandLineUpdater(commandLineUpdater);
+        if (installerConfiguration != null) {
+            ApplicationManager.getApplication()
+                    .invokeLater(() -> installerPanel.getInstallerConfigurationWidget().setText(installerConfiguration));
+        }
+        if (installerOutput != null) {
+            installerOutput.printTo(installerPanel);
+        }
+        return installerPanel;
+    }
+
+    /**
+     * Returns the action of the notification which says that the installation of the given debug adapter failed,
+     * which shows the "Installer" tab of its last debug session in the given project, with what the installer printed
+     * at the start of the session (#2296), or, without such a session, the IDE's log.
+     *
+     * @param project          the project of the debug session.
+     * @param serverDefinition the debug adapter.
+     * @return the action of the notification.
+     */
+    public static @NotNull AnAction createShowInstallerTabAction(@NotNull Project project,
+                                                                 @NotNull DebugAdapterServerDefinition serverDefinition) {
+        return NotificationAction.createSimple(DAPBundle.message("dap.installer.notification.show.installer.tab"), () -> {
+            if (!showInstallerTab(project, serverDefinition) && ShowLogAction.isSupported()) {
+                ShowLogAction.showLog();
+            }
+        });
+    }
+
+    /**
+     * Shows the "Installer" tab of the last debug session of the given debug adapter in the given project, and returns
+     * true, or returns false without such a session.
+     */
+    private static boolean showInstallerTab(@NotNull Project project,
+                                            @NotNull DebugAdapterServerDefinition serverDefinition) {
+        if (project.isDisposed()) {
+            return false;
+        }
+        XDebugSession[] sessions = XDebuggerManager.getInstance(project).getDebugSessions();
+        for (int i = sessions.length - 1; i >= 0; i--) {
+            if (sessions[i].getDebugProcess() instanceof DAPDebugProcess process
+                    && process.getServerDescriptor().getServerDefinition() == serverDefinition
+                    && process.showInstallerTab()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Brings the debug session to the front and selects its "Installer" tab, and returns true, or returns false if it
+     * has none.
+     */
+    private boolean showInstallerTab() {
+        RunnerLayoutUi ui = layoutUi;
+        Content content = installerContent;
+        if (ui == null || content == null) {
+            return false;
+        }
+        RunContentManager.getInstance(getProject())
+                .toFrontRunContent(dapState.getEnvironment().getExecutor(), getSession().getRunContentDescriptor());
+        ui.selectAndFocus(content, true, true);
+        return true;
+    }
+
     @Override
     public @NotNull XDebugTabLayouter createTabLayouter() {
         return new XDebugTabLayouter() {
 
-            private static void resisterInstallerTab(@NotNull RunnerLayoutUi ui,
-                                                     @Nullable String installerConfiguration,
-                                                     @NotNull CommandLineUpdater commandLineUpdater,
-                                                     @NotNull Project project) {
+            private static @NotNull Content resisterInstallerTab(@NotNull RunnerLayoutUi ui,
+                                                                 @Nullable String installerConfiguration,
+                                                                 @NotNull CommandLineUpdater commandLineUpdater,
+                                                                 @NotNull Project project,
+                                                                 @Nullable DAPInstallerOutput installerOutput) {
+                FormBuilder builder = FormBuilder.createFormBuilder();
+                var installerPanel = createInstallerPanel(builder, installerConfiguration, commandLineUpdater, project,
+                        installerOutput);
                 Content customTab = ui.createContent(
                         "dap-installer-tab",
-                        createInstallerPanel(installerConfiguration, commandLineUpdater, project),
+                        builder.getPanel(),
                         DAPBundle.message("dap.settings.editor.installer.tab"),
                         AllIcons.Actions.Install,
                         null
                 );
+                // Disposes the console of the tab with the tab
+                customTab.setDisposer(installerPanel);
                 ui.addContent(customTab);
-            }
-
-            private static JComponent createInstallerPanel(@Nullable String installerConfiguration,
-                                                           @NotNull CommandLineUpdater commandLineUpdater,
-                                                           @NotNull Project project) {
-                FormBuilder builder = FormBuilder.createFormBuilder();
-                var installerPanel = new InstallerPanel(builder, true, project);
-                installerPanel.setCommandLineUpdater(commandLineUpdater);
-                if (installerConfiguration != null) {
-                    ApplicationManager.getApplication()
-                            .invokeLater(() -> installerPanel.getInstallerConfigurationWidget().setText(installerConfiguration));
-                }
-                return builder.getPanel();
+                return customTab;
             }
 
             @Override
@@ -968,11 +1052,12 @@ public class DAPDebugProcess extends XDebugProcess implements Disposable {
                 registerThreadsPanel(ui);
 
                 if (serverDescriptor.isShowInstallerTab()) {
-                    // Register the "Installer" tab
+                    // Register the "Installer" tab, which shows what the installer printed at the start of the session
                     String installerConfiguration = DAPDebugProcess.this.dapState.getInstallerConfiguration();
                     var project = DAPDebugProcess.this.getProject();
                     var commandLineUpdater = createInstallerCommandLineUpdater(DAPDebugProcess.this.dapState);
-                    resisterInstallerTab(ui, installerConfiguration, commandLineUpdater, project);
+                    installerContent = resisterInstallerTab(ui, installerConfiguration, commandLineUpdater, project,
+                            DAPInstallerOutput.of(DAPDebugProcess.this.dapState.getEnvironment()));
                 }
             }
 

@@ -170,11 +170,17 @@ installer for all of them.
 
 A debug adapter checks its installation before its first debug session in each IDE session, whatever
 `executeOnStartServer` says: a console, `DAP Debugger (initializing)`, shows the `check`, and the `run` if the check
-fails, and the debug session then starts. The `Installer` tab of the debug session has the links of the LSP console.
-Since LSP4IJ 0.30.2, the installer of a debug adapter runs for the project of the run configuration, so an `exec` task
+fails, and the debug session then starts. The `Installer` tab of the debug session has the links of the LSP console,
+and, since LSP4IJ 0.30.2, its console shows the `check` and the `run` which ran at the start of the session, until a link
+runs the installer again. Since LSP4IJ 0.30.2, the installer of a debug adapter runs for the project of the run
+configuration, so an `exec` task
 without `workingDir` runs in the directory of the project, as for a language server, and gets the tools that the project
 selects, as with mise or asdf. An earlier version runs it in the directory of the IDE, as `/` for an IDE started from
 the Dock.
+
+Since LSP4IJ 0.30.2, the notification which says that an installation failed has *View logs*, which shows the IDE's
+log, with each step of the installation (see below), in the file manager of the system, when it has one. For a debug
+adapter which a debug session installs, it also has `Show Installer Tab`, which shows the `Installer` tab of the session.
 
 The IDE's log, `idea.log` (*Help | Show Log in Finder*, *Explorer* or *Files*), has what an installer does, also when no
 console shows it, as when the installer runs at the start of a language server whose console was never opened: the

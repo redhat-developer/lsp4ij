@@ -30,7 +30,6 @@ import com.redhat.devtools.lsp4ij.dap.configurations.DAPCommandLineState;
 import com.redhat.devtools.lsp4ij.dap.configurations.DAPRunConfigurationBase;
 import com.redhat.devtools.lsp4ij.dap.installation.DebugAdapterServerInstallerBase;
 import com.redhat.devtools.lsp4ij.installation.CommandLineUpdater;
-import com.redhat.devtools.lsp4ij.installation.ConsoleProvider;
 import com.redhat.devtools.lsp4ij.installation.ServerInstallationStatus;
 import com.redhat.devtools.lsp4ij.installation.ServerInstaller;
 import org.jetbrains.annotations.NotNull;
@@ -111,7 +110,8 @@ public class DAPDebugRunner extends AsyncProgramRunner<RunnerSettings> {
         RunContentManager.getInstance(env.getProject())
                 .showRunContent(env.getExecutor(), tempDescriptor);
 
-        var consoleProvider = new ConsoleProvider(console, env.getProject());
+        // The console is removed once the session starts: the "Installer" tab of the session shows what it printed
+        var consoleProvider = DAPInstallerOutput.record(console, env.getProject(), env);
         installer.registerConsoleProvider(consoleProvider);
 
         // Trigger installation

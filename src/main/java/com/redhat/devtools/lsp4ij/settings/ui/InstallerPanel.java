@@ -16,6 +16,7 @@ package com.redhat.devtools.lsp4ij.settings.ui;
 import com.intellij.execution.filters.TextConsoleBuilder;
 import com.intellij.execution.filters.TextConsoleBuilderFactory;
 import com.intellij.execution.ui.ConsoleView;
+import com.intellij.execution.ui.ConsoleViewContentType;
 import com.intellij.notification.Notification;
 import com.intellij.notification.NotificationType;
 import com.intellij.notification.Notifications;
@@ -155,6 +156,19 @@ public class InstallerPanel implements Disposable {
             onPostInstall = new HashSet<>();
         }
         onPostInstall.add(action);
+    }
+
+    /**
+     * Prints the given text into the console of this panel, if it has one, as what an installation which ran
+     * elsewhere printed, as the one which ran at the start of a debug session.
+     *
+     * @param text        the text, with its line separators.
+     * @param contentType the content type of the text.
+     */
+    public void print(@NotNull String text, @NotNull ConsoleViewContentType contentType) {
+        if (console != null) {
+            console.print(text, contentType);
+        }
     }
 
     public @NotNull JsonTextField getInstallerConfigurationWidget() {
