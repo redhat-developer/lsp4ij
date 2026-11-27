@@ -53,6 +53,7 @@ import java.util.logging.Level;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
+import java.util.stream.Stream;
 
 /**
  * <pre>
@@ -72,11 +73,33 @@ public class ExecTask extends InstallerTask {
     private static final Logger LOGGER = LoggerFactory.getLogger(ExecTask.class);
 
     /**
-     * How many characters of the PATH, and of the output of a command whose task fails, the IDE's log gets at INFO, so
-     * that a long output, as that of npm install, doesn't fill it up. The consoles show them all.
+     * How many characters of the PATH, and of the output of a command whose task fails, the IDE's log gets at INFO by
+     * default, so that a long output, as that of npm install, doesn't fill it up. The consoles show them all.
      */
     @VisibleForTesting
-    static final int MAX_LOGGED_LENGTH = 4000;
+    static final int DEFAULT_MAX_LOGGED_LENGTH = 4000;
+
+    /**
+     * The JVM system property, as set in Help | Edit Custom Properties, which sets another length than
+     * {@link #DEFAULT_MAX_LOGGED_LENGTH}.
+     */
+    @VisibleForTesting
+    static final String MAX_LOGGED_LENGTH_PROPERTY = "lsp4ij.installer.log.maxLength";
+
+    /**
+     * The environment variable which sets another length than {@link #DEFAULT_MAX_LOGGED_LENGTH}, when the system
+     * property {@link #MAX_LOGGED_LENGTH_PROPERTY} doesn't.
+     */
+    @VisibleForTesting
+    static final String MAX_LOGGED_LENGTH_VARIABLE = "LSP4IJ_INSTALLER_LOG_MAX_LENGTH";
+
+    /**
+     * The length that the IDE's log gets, read once, the first time an installer logs a PATH or an output.
+     */
+    private static final class MaxLoggedLength {
+        static final int VALUE = maxLoggedLength(System.getProperty(MAX_LOGGED_LENGTH_PROPERTY),
+                EnvironmentUtil.getValue(MAX_LOGGED_LENGTH_VARIABLE));
+    }
 
     /**
      * The locks of the working directories that exec tasks declare, by absolute path: the installers of two language
@@ -402,7 +425,7 @@ public class ExecTask extends InstallerTask {
      * Prints how the command ended in the consoles, and writes to the IDE's log at INFO, also when the task succeeds,
      * how the command ended, in which directory, and with which PATH, so that a check which finds the wrong tool can be
      * understood from the log (#2296). The log gets the output of the command at INFO only when the task fails, without
-     * the values which can be secrets and cut to {@link #MAX_LOGGED_LENGTH} characters, so that a failed installation
+     * the values which can be secrets and cut to {@link #maxLoggedLength()} characters, so that a failed installation
      * can be understood from it too. The output of a task which succeeds stays at DEBUG, line by line, since it can hold
      * a secret that the log doesn't recognise, and a default log is attached to bug reports (#2156).
      *
@@ -435,12 +458,25 @@ public class ExecTask extends InstallerTask {
     }
 
     private static void logPath(@Nullable String path, @NotNull InstallerContext context) {
-        context.log(Level.INFO, "the PATH of the command: " + (path != null ? truncate(path) : "none"));
+        context.log(Level.INFO, "the PATH of the command: " + loggedPath(path));
+    }
+
+    /**
+     * Returns the given PATH as the IDE's log gets it: without the values which can be secrets, then cut to
+     * {@link #maxLoggedLength()} characters, in this order, so that the cut can't leave a part of a secret which the
+     * redaction no longer recognises, as the start of a GitHub token.
+     *
+     * @param path the PATH of the command, or null if it has none.
+     * @return the PATH as the IDE's log gets it.
+     */
+    @VisibleForTesting
+    static @NotNull String loggedPath(@Nullable String path) {
+        return path != null ? truncate(SecretRedactor.redact(path)) : "none";
     }
 
     /**
      * Writes the given output of a command whose task failed to the IDE's log at INFO, unless it is blank, as one
-     * record, without the values which can be secrets and cut to {@link #MAX_LOGGED_LENGTH} characters.
+     * record, without the values which can be secrets and cut to {@link #maxLoggedLength()} characters.
      */
     private static void logOutput(@NotNull String stream, @NotNull String output, @NotNull InstallerContext context) {
         if (!output.isBlank()) {
@@ -451,7 +487,7 @@ public class ExecTask extends InstallerTask {
     }
 
     /**
-     * Returns the given text, or, if it is longer than {@link #MAX_LOGGED_LENGTH} characters, its start and its end,
+     * Returns the given text, or, if it is longer than {@link #maxLoggedLength()} characters, its start and its end,
      * with how many characters are left out between them: a check prints the version of a tool at its start, and a
      * failed installation says why at its end.
      *
@@ -460,12 +496,52 @@ public class ExecTask extends InstallerTask {
      */
     @VisibleForTesting
     static @NotNull String truncate(@NotNull String text) {
-        if (text.length() <= MAX_LOGGED_LENGTH) {
+        int maxLength = maxLoggedLength();
+        if (text.length() <= maxLength) {
             return text;
         }
-        int half = MAX_LOGGED_LENGTH / 2;
+        int half = maxLength / 2;
         return text.substring(0, half) + "\n[... " + (text.length() - 2 * half) + " characters left out ...]\n"
                 + text.substring(text.length() - half);
+    }
+
+    /**
+     * Returns how many characters of the PATH, and of the output of a command whose task fails, the IDE's log gets at
+     * INFO: the system property {@value #MAX_LOGGED_LENGTH_PROPERTY}, or else the environment variable
+     * {@value #MAX_LOGGED_LENGTH_VARIABLE}, or else {@value #DEFAULT_MAX_LOGGED_LENGTH}.
+     *
+     * @return how many characters of a PATH or an output the IDE's log gets at INFO.
+     */
+    @VisibleForTesting
+    static int maxLoggedLength() {
+        return MaxLoggedLength.VALUE;
+    }
+
+    /**
+     * Returns the length that the given system property, or else the given environment variable, sets, or
+     * {@link #DEFAULT_MAX_LOGGED_LENGTH} if neither sets a positive number.
+     *
+     * @param property the value of the system property {@value #MAX_LOGGED_LENGTH_PROPERTY}, or null if it isn't set.
+     * @param variable the value of the environment variable {@value #MAX_LOGGED_LENGTH_VARIABLE}, or null if it isn't
+     *                 set.
+     * @return the length that the IDE's log gets.
+     */
+    @VisibleForTesting
+    static int maxLoggedLength(@Nullable String property, @Nullable String variable) {
+        return Stream.of(property, variable)
+                .filter(value -> value != null && !value.isBlank())
+                .map(value -> {
+                    try {
+                        return Integer.parseInt(value.strip());
+                    } catch (NumberFormatException e) {
+                        LOGGER.warn("{} or {} is '{}', which isn't a number of characters",
+                                MAX_LOGGED_LENGTH_PROPERTY, MAX_LOGGED_LENGTH_VARIABLE, value);
+                        return -1;
+                    }
+                })
+                .filter(length -> length > 0)
+                .findFirst()
+                .orElse(DEFAULT_MAX_LOGGED_LENGTH);
     }
 
     private Path getWorkingDir(@Nullable String workingDir,
