@@ -10,19 +10,23 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.dap.configurations;
 
+import com.google.gson.JsonParseException;
 import com.intellij.execution.configuration.EnvironmentVariablesData;
 import com.intellij.execution.configurations.*;
 import com.intellij.openapi.options.SettingsEditor;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.InvalidDataException;
 import com.intellij.openapi.vfs.VirtualFile;
+import com.redhat.devtools.lsp4ij.dap.DAPBundle;
 import com.redhat.devtools.lsp4ij.dap.DebugMode;
 import com.redhat.devtools.lsp4ij.dap.DebugServerWaitStrategy;
+import com.redhat.devtools.lsp4ij.dap.client.LaunchUtils;
 import com.redhat.devtools.lsp4ij.dap.configurations.options.AttachConfigurable;
 import com.redhat.devtools.lsp4ij.dap.configurations.options.EnvironmentVariablesDataConfigurable;
 import com.redhat.devtools.lsp4ij.dap.configurations.options.FileOptionConfigurable;
 import com.redhat.devtools.lsp4ij.dap.configurations.options.WorkingDirectoryConfigurable;
 import com.redhat.devtools.lsp4ij.dap.definitions.DebugAdapterServerDefinition;
+import com.redhat.devtools.lsp4ij.dap.definitions.userdefined.UserDefinedDebugAdapterServerDefinition;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
 import com.redhat.devtools.lsp4ij.settings.ServerTrace;
 import com.redhat.devtools.lsp4ij.templates.ServerMappingSettings;
@@ -31,6 +35,7 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * Default Debug Adapter Protocol (DAP) run configuration.
@@ -270,6 +275,60 @@ public class DAPRunConfiguration extends DAPRunConfigurationBase<DAPRunConfigura
         if (StringUtils.isBlank(getCommand()) && StringUtils.isBlank(getServerId())) {
             throw new RuntimeConfigurationException("Server command is required", DEBUG_ADAPTER_CONFIGURATION);
         }
+        checkAttachPort();
+    }
+
+    /**
+     * Reports an attach port which can't be resolved, such as {@code $port} when the DAP parameters have no
+     * {@code port}, as an error, which keeps the run from starting: the client of an attach connects to that port, and
+     * a socket can't connect without one. Only an attach with the Debug Adapter descriptor of LSP4IJ is checked, the
+     * one of a configuration without a server or with a user-defined server: the descriptor of a server from an
+     * extension point can reach its Debug Adapter in another way for an attach.
+     *
+     * @throws RuntimeConfigurationError if the attach connects to the attach port and that port can't be resolved.
+     */
+    private void checkAttachPort() throws RuntimeConfigurationError {
+        if (getDebugMode() != DebugMode.ATTACH || !connectsToAttachPort()) {
+            return;
+        }
+        Map<String, Object> parameters;
+        try {
+            parameters = LaunchUtils.getDapParameters(getOptions());
+        } catch (JsonParseException e) {
+            // DAP parameters which aren't valid JSON fail as the run starts, with the message of the parser
+            return;
+        }
+        String attachPort = getAttachPort();
+        if (LaunchUtils.resolveAttachPort(attachPort, parameters) == -1) {
+            throw new RuntimeConfigurationError(getAttachPortError(attachPort));
+        }
+    }
+
+    /**
+     * Returns true if an attach connects to the attach port, as the Debug Adapter descriptor of LSP4IJ does: the one
+     * of a configuration without a server, or with a user-defined server.
+     */
+    private boolean connectsToAttachPort() {
+        var server = getDebugAdapterServer();
+        return server == null || server instanceof UserDefinedDebugAdapterServerDefinition;
+    }
+
+    /**
+     * Returns the error for the given attach port, which can't be resolved: it names the field and how to fix it.
+     *
+     * @param attachPort the attach port: blank, {@code $} and the path of a value in the DAP parameters, or a text which
+     *                   isn't a number.
+     * @return the error for the given attach port.
+     */
+    private static @NotNull String getAttachPortError(@Nullable String attachPort) {
+        if (StringUtils.isBlank(attachPort)) {
+            return DAPBundle.message("dap.settings.editor.configuration.attach.port.missing");
+        }
+        if (attachPort.charAt(0) == '$') {
+            return DAPBundle.message("dap.settings.editor.configuration.attach.port.unresolved",
+                    attachPort.substring(1), attachPort);
+        }
+        return DAPBundle.message("dap.settings.editor.configuration.attach.port.notNumber", attachPort);
     }
 
     @Override
