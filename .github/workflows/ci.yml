@@ -24,7 +24,7 @@ jobs:
 
   # Run tests and upload a code coverage report
   test:
-    name: Test (${{ matrix.os }}${{ matrix.platformVersion && format(', {0}', matrix.platformVersion) || '' }}${{ matrix.part && format(', part {0} of 2', matrix.part) || '' }})
+    name: Test (${{ matrix.os }}${{ matrix.platformVersion && format(', {0}', matrix.platformVersion) || '' }})
     needs: changes
     if: needs.changes.outputs.docs_only != 'true'
     runs-on: ${{ matrix.os }}
@@ -39,18 +39,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ ubuntu-latest, windows-latest ]
+        os: [ ubuntu-latest, windows-latest, macos-latest ]
         # The platform version of gradle.properties
         platformVersion: [ '' ]
         include:
-          # macOS in two jobs, each with half of the test classes (-PtestShard). Its runner (3 CPUs, 7 GB) holds one test
-          # JVM, where the Linux and Windows runners hold two, so one job took about twice as long as the others.
-          - os: macos-latest
-            platformVersion: ''
-            part: 1
-          - os: macos-latest
-            platformVersion: ''
-            part: 2
           # Two more releases, on Linux only, each as a job of its own that runs alongside the others:
           # IntelliJ IDEA Community 2025.3, and the newest release, 2026.3, of the unified IntelliJ IDEA (IU)
           - os: ubuntu-latest
@@ -84,9 +76,6 @@ jobs:
           gradle-home-cache-excludes: |
             caches/transforms-4
             caches/*/transforms
-          # The second half of macOS saves no entry of its own, which the first half's entry would duplicate. Otherwise, as
-          # by default, only main saves entries.
-          cache-read-only: ${{ matrix.part == 2 || (github.event.repository != null && github.ref_name != github.event.repository.default_branch) }}
 
       # Run tests. In the 490 runs from 2026-11-11 to 11-25, this step took at most 23 minutes, on macOS (20 with an empty
       # Gradle cache), 16 on Linux and 14 on Windows. When test after test fails at a wait, as when each waits 30 s for a
@@ -99,14 +88,14 @@ jobs:
       # minutes less on Linux and 1.6 on Windows. The build's own default, as used locally, stays at half the CPUs.
       - name: Run Tests
         timeout-minutes: 45
-        run: ./gradlew check ${{ matrix.platformVersion && format('-PplatformVersion={0}', matrix.platformVersion) || '' }} ${{ matrix.platformType && format('-PplatformType={0}', matrix.platformType) || '' }} ${{ github.event_name == 'pull_request' && '-PbuildSearchableOptions=false' || '' }} ${{ matrix.part && format('-PtestShard={0}/2', matrix.part) || '' }} ${{ (runner.os == 'Linux' || runner.os == 'Windows') && '-PtestForks=3' || '' }}
+        run: ./gradlew check ${{ matrix.platformVersion && format('-PplatformVersion={0}', matrix.platformVersion) || '' }} ${{ matrix.platformType && format('-PplatformType={0}', matrix.platformType) || '' }} ${{ github.event_name == 'pull_request' && '-PbuildSearchableOptions=false' || '' }} ${{ (runner.os == 'Linux' || runner.os == 'Windows') && '-PtestForks=3' || '' }}
 
       # Collect Tests Result
       - name: Collect Tests Result
         if: ${{ success() || failure()}}
         uses: actions/upload-artifact@v7
         with:
-          name: tests-result-${{runner.os}}${{ matrix.platformVersion && format('-{0}', matrix.platformVersion) || '' }}${{ matrix.part && format('-part{0}', matrix.part) || '' }}
+          name: tests-result-${{runner.os}}${{ matrix.platformVersion && format('-{0}', matrix.platformVersion) || '' }}
           path: ${{ github.workspace }}/build/reports/tests
 
       - name: Upload coverage reports to Codecov
