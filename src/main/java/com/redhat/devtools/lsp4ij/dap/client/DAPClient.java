@@ -177,6 +177,10 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
     // Whether each thread runs, is stopped or has exited, which the Threads tab shows: immutable run states, which the
     // events of the debug adapter and the requests of the session which resume the program swap
     private final AtomicReference<DAPThreadRunStates> threadRunStates = new AtomicReference<>(DAPThreadRunStates.INITIAL);
+    // The changes of the debug session which must not interleave: the suspension at a stop, and the resume once the
+    // debug adapter accepted a request which IntelliJ doesn't resume the session for (resumeWhenAnswered). The clients
+    // of a tree of DAP sessions ('startDebugging') share them, as they share the session
+    private final DAPSessionChanges sessionChanges;
     // Whether the last request that resumed the program was a step that resumed only its thread. A breakpoint which
     // doesn't suspend then resumes only the stopped thread, so the threads the step kept stopped stay stopped.
     private volatile boolean singleThreadResumed;
@@ -207,6 +211,7 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
         this.debugMode = debugMode;
         this.serverTrace = serverTrace;
         this.parentClient = parentClient;
+        this.sessionChanges = parentClient != null ? parentClient.sessionChanges : new DAPSessionChanges();
         this.childrenClient = new CopyOnWriteArrayList<>();
     }
 
@@ -799,9 +804,9 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
             boolean reverse = reverseResumed;
             // Set once the program is resumed at a breakpoint which doesn't suspend
             var resuming = new AtomicReference<@Nullable Resuming>();
-            breakpointReached(getSession(), server, breakpoint, context, topFrame.getId(), stoppedThread.getId(),
-                    singleThread, reverse, () -> resuming.set(beforeResuming(stoppedThread.getId(), singleThread)),
-                    continued)
+            breakpointReached(getSession(), sessionChanges, server, breakpoint, context, topFrame.getId(),
+                    stoppedThread.getId(), singleThread, reverse,
+                    () -> resuming.set(beforeResuming(stoppedThread.getId(), singleThread)), continued)
                     .exceptionally(error -> {
                         var refused = resuming.get();
                         if (refused == null) {
@@ -818,15 +823,19 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
             }
             return;
         }
-        positionReached(getSession(), context, args.getReason());
-        if (resumeIfContinued(getSession(), context, continued)) {
-            return;
-        }
-        if (StoppedEventArgumentsReason.EXCEPTION.equals(args.getReason())) {
-            showExceptionHint(getProject(), context, server, getCapabilities(), args, DAPClient::showErrorHint);
-        } else {
-            showDataBreakpointHint(getProject(), context, args, DAPClient::showInformationHint);
-        }
+        // A change of the session, which the resume once the debug adapter answers a request doesn't interleave with
+        // (resumeWhenAnswered)
+        CompletableFuture.runAsync(() -> {
+            positionReached(getSession(), context, args.getReason());
+            if (resumeIfContinued(getSession(), context, continued)) {
+                return;
+            }
+            if (StoppedEventArgumentsReason.EXCEPTION.equals(args.getReason())) {
+                showExceptionHint(getProject(), context, server, getCapabilities(), args, DAPClient::showErrorHint);
+            } else {
+                showDataBreakpointHint(getProject(), context, args, DAPClient::showInformationHint);
+            }
+        }, sessionChanges);
     }
 
     /**
@@ -1130,21 +1139,26 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
      * <p>
      * A breakpoint which doesn't suspend is sent as a logpoint, so a debug adapter which supports logpoints doesn't
      * stop at it; one which doesn't support them stops, and is resumed here once IntelliJ has logged.
+     * <p>
+     * The session is told in a change of the session ({@link DAPSessionChanges}), which the resume of the session once
+     * the debug adapter answers a request doesn't interleave with (see {@link #resumeWhenAnswered}).
      *
-     * @param session      the debug session.
-     * @param server       the debug adapter.
-     * @param breakpoint   the IntelliJ breakpoint where the program stopped.
-     * @param context      the suspend context of the stop.
-     * @param frameId      the DAP frame where the program stopped.
-     * @param threadId     the DAP thread which stopped.
-     * @param singleThread true to resume only the stopped thread, when a step resumed it alone, and null to resume
-     *                     every thread.
-     * @param resuming     runs right before the request which resumes the program is sent.
-     * @param continued    returns whether the debug adapter said that the stopped thread continued since it stopped:
-     *                     the stop is then over, and the session is neither told nor suspended there.
+     * @param session        the debug session.
+     * @param sessionChanges the changes of the debug session.
+     * @param server         the debug adapter.
+     * @param breakpoint     the IntelliJ breakpoint where the program stopped.
+     * @param context        the suspend context of the stop.
+     * @param frameId        the DAP frame where the program stopped.
+     * @param threadId       the DAP thread which stopped.
+     * @param singleThread   true to resume only the stopped thread, when a step resumed it alone, and null to resume
+     *                       every thread.
+     * @param resuming       runs right before the request which resumes the program is sent.
+     * @param continued      returns whether the debug adapter said that the stopped thread continued since it
+     *                       stopped: the stop is then over, and the session is neither told nor suspended there.
      * @return the future, completed once the session is told and the program resumed if it must be.
      */
     static CompletableFuture<@Nullable Void> breakpointReached(@NotNull XDebugSession session,
+                                                               @NotNull DAPSessionChanges sessionChanges,
                                                                @NotNull IDebugProtocolServer server,
                                                                @NotNull XBreakpoint<?> breakpoint,
                                                                @NotNull XSuspendContext context,
@@ -1153,22 +1167,23 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
                                                                @Nullable Boolean singleThread,
                                                                @NotNull Runnable resuming,
                                                                @NotNull BooleanSupplier continued) {
-        return breakpointReached(session, server, breakpoint, context, frameId, threadId, singleThread, false, resuming,
-                continued);
+        return breakpointReached(session, sessionChanges, server, breakpoint, context, frameId, threadId, singleThread,
+                false, resuming, continued);
     }
 
     /**
      * Tells the session that the program stopped at the given breakpoint, as
-     * {@link #breakpointReached(XDebugSession, IDebugProtocolServer, XBreakpoint, XSuspendContext, int, int, Boolean, Runnable, BooleanSupplier)}
+     * {@link #breakpointReached(XDebugSession, DAPSessionChanges, IDebugProtocolServer, XBreakpoint, XSuspendContext, int, int, Boolean, Runnable, BooleanSupplier)}
      * does, and resumes the program in the direction it ran when it stopped there: backwards with 'reverseContinue'
      * when the last request that resumed it ran it backwards, as Reverse Continue does, and forward with 'continue'
      * otherwise.
      *
      * @param reverse true if the last request that resumed the program ran it backwards ('stepBack',
      *                'reverseContinue'), and false otherwise.
-     * @see #breakpointReached(XDebugSession, IDebugProtocolServer, XBreakpoint, XSuspendContext, int, int, Boolean, Runnable, BooleanSupplier)
+     * @see #breakpointReached(XDebugSession, DAPSessionChanges, IDebugProtocolServer, XBreakpoint, XSuspendContext, int, int, Boolean, Runnable, BooleanSupplier)
      */
     static CompletableFuture<@Nullable Void> breakpointReached(@NotNull XDebugSession session,
+                                                               @NotNull DAPSessionChanges sessionChanges,
                                                                @NotNull IDebugProtocolServer server,
                                                                @NotNull XBreakpoint<?> breakpoint,
                                                                @NotNull XSuspendContext context,
@@ -1179,7 +1194,7 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
                                                                @NotNull Runnable resuming,
                                                                @NotNull BooleanSupplier continued) {
         return evaluateLogExpression(server, breakpoint, frameId)
-                .thenCompose(logged -> {
+                .thenComposeAsync(logged -> {
                     if (continued.getAsBoolean()) {
                         // The thread continued while the log expression was evaluated
                         return CompletableFuture.completedFuture(null);
@@ -1198,7 +1213,7 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
                     args.setSingleThread(singleThread);
                     return server.continue_(args).thenAccept(response -> {
                     });
-                });
+                }, sessionChanges);
     }
 
     private static CompletableFuture<@Nullable String> evaluateLogExpression(@NotNull IDebugProtocolServer server,
@@ -1890,7 +1905,7 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
             }
             return response;
         });
-        return resumeWhenAnswered(accepted, session, context, stoppedOrContinued, error -> {
+        return resumeWhenAnswered(accepted, session, sessionChanges, context, stoppedOrContinued, error -> {
             executionEpoch.resumeRefused(ended);
             debugProcess.print(DAPBundle.message(failedKey, error.getMessage()), ConsoleViewContentType.ERROR_OUTPUT);
         });
@@ -1909,32 +1924,43 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
      * sent the request, such as the EDT, chained this to the request: that thread handles it then, maybe while another
      * thread suspends the session at a stop which came before the answer. Resuming the session then would undo that
      * stop, and the session would wait as if the program ran.
+     * <p>
+     * The resume is a change of the session ({@link DAPSessionChanges}), as the suspension at a stop is, so that they
+     * don't interleave: a stop which the debug adapter sent after its answer, and which the client has the frames of
+     * while the thread which handles the answer resumes the session, suspends the session once it resumed. A stop which
+     * suspended the session before has another suspend context, and the session stays there.
      *
      * @param request            the request which resumes the program.
      * @param session            the debug session.
+     * @param sessionChanges     the changes of the debug session.
      * @param context            the suspend context of the session when the request was sent, or null if it was not
      *                           suspended.
      * @param stoppedOrContinued returns whether the debug adapter said that the program stopped or continued since the
      *                           request was sent.
      * @param refused            reports why the debug adapter refused.
-     * @return the future, completed once the debug adapter has answered.
+     * @return the future, completed once the debug adapter has answered, and the session resumed if it must be.
      */
     static CompletableFuture<@Nullable Void> resumeWhenAnswered(@NotNull CompletableFuture<?> request,
                                                                 @NotNull XDebugSession session,
+                                                                @NotNull DAPSessionChanges sessionChanges,
                                                                 @Nullable XSuspendContext context,
                                                                 @NotNull BooleanSupplier stoppedOrContinued,
                                                                 @NotNull Consumer<Throwable> refused) {
-        // Not async: the session runs before the 'stopped' event which follows the answer is handled
+        // Not async, unless another change of the session runs: the session runs before the 'stopped' event which
+        // follows the answer is handled
         return request.handle((response, error) -> {
             if (error != null) {
                 refused.accept(getCause(error));
-            } else if (!stoppedOrContinued.getAsBoolean() && session.getSuspendContext() == context) {
-                // Unless the debug adapter said meanwhile that the program stopped or continued, or another stop, such
-                // as one of a child session, suspended the session
+                return false;
+            }
+            // Unless the debug adapter said meanwhile that the program stopped or continued
+            return !stoppedOrContinued.getAsBoolean();
+        }).thenAcceptAsync(resume -> {
+            // Unless another stop, such as one of a child session, suspended the session
+            if (resume && session.getSuspendContext() == context) {
                 session.sessionResumed();
             }
-            return null;
-        });
+        }, sessionChanges);
     }
 
     /**
@@ -2648,6 +2674,18 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
      */
     boolean stoppedOrContinuedSince(int ended) {
         return executionEpoch.stoppedOrContinuedSince(ended);
+    }
+
+    /**
+     * Returns the changes of the debug session which must not interleave, such as the suspension at a stop and the
+     * resume once the debug adapter accepted a request which IntelliJ doesn't resume the session for. The clients of a
+     * tree of DAP sessions ('startDebugging') share them.
+     *
+     * @return the changes of the debug session.
+     */
+    @NotNull
+    DAPSessionChanges getSessionChanges() {
+        return sessionChanges;
     }
 
     /**

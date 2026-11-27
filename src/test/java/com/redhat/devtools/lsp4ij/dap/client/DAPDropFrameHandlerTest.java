@@ -39,6 +39,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 public class DAPDropFrameHandlerTest {
 
+    private final DAPSessionChanges sessionChanges = new DAPSessionChanges();
     private final List<String> calls = new ArrayList<>();
     private final XSuspendContext stop = new XSuspendContext() {
     };
@@ -68,7 +69,7 @@ public class DAPDropFrameHandlerTest {
     void aDropRestartsTheFrameThenTheSessionRuns() {
         var failures = new ArrayList<Throwable>();
 
-        DAPDropFrameHandler.restartFrame(server(CompletableFuture.completedFuture(null)), 7, session(stop), stop, () -> false,
+        DAPDropFrameHandler.restartFrame(server(CompletableFuture.completedFuture(null)), 7, session(stop), sessionChanges, stop, () -> false,
                 failures::add).join();
 
         assertEquals(List.of("restartFrame 7", "resumed"), calls);
@@ -79,7 +80,7 @@ public class DAPDropFrameHandlerTest {
     void theSessionRunsOnceTheDebugAdapterHasAnswered() {
         var answer = new CompletableFuture<Void>();
 
-        var done = DAPDropFrameHandler.restartFrame(server(answer), 7, session(stop), stop, () -> false,
+        var done = DAPDropFrameHandler.restartFrame(server(answer), 7, session(stop), sessionChanges, stop, () -> false,
                 error -> calls.add("failed"));
 
         // the session stays suspended until the debug adapter answers
@@ -94,7 +95,7 @@ public class DAPDropFrameHandlerTest {
         var failures = new ArrayList<Throwable>();
         var error = new ResponseErrorException(new ResponseError(ResponseErrorCode.RequestFailed, "frame cannot be restarted", null));
 
-        DAPDropFrameHandler.restartFrame(server(CompletableFuture.failedFuture(error)), 7, session(stop), stop, () -> false,
+        DAPDropFrameHandler.restartFrame(server(CompletableFuture.failedFuture(error)), 7, session(stop), sessionChanges, stop, () -> false,
                 failures::add).join();
 
         // the failure is reported, and the session is still suspended where it was
@@ -106,7 +107,7 @@ public class DAPDropFrameHandlerTest {
     void anAnswerWhichComesOnceTheDebugAdapterSaidThatTheProgramStoppedLeavesTheSessionAsItIs() {
         // The 'stopped' event of the restart, which came before the answer, hasn't suspended the session in the
         // restarted frame yet: it does so meanwhile, which resuming the session would undo
-        DAPDropFrameHandler.restartFrame(server(CompletableFuture.completedFuture(null)), 7, session(stop), stop, () -> true,
+        DAPDropFrameHandler.restartFrame(server(CompletableFuture.completedFuture(null)), 7, session(stop), sessionChanges, stop, () -> true,
                 error -> calls.add("failed")).join();
 
         assertEquals(List.of("restartFrame 7"), calls);
@@ -117,7 +118,7 @@ public class DAPDropFrameHandlerTest {
         var otherStop = new XSuspendContext() {
         };
 
-        DAPDropFrameHandler.restartFrame(server(CompletableFuture.completedFuture(null)), 7, session(otherStop), stop,
+        DAPDropFrameHandler.restartFrame(server(CompletableFuture.completedFuture(null)), 7, session(otherStop), sessionChanges, stop,
                 () -> false, error -> calls.add("failed")).join();
 
         assertEquals(List.of("restartFrame 7"), calls);

@@ -58,10 +58,11 @@ public class DAPDropFrameHandler implements XDropFrameHandler {
         // The values of the frames of this stop can't be set once the program resumes, unless the frame isn't restarted
         var client = dapFrame.getClient();
         int ended = client.endExecutionEpochBeforeResuming();
-        restartFrame(server, dapFrame.getFrameId(), session, context, () -> client.stoppedOrContinuedSince(ended), error -> {
-            client.resumeRefused(ended);
-            debugProcess.print(DAPBundle.message("dap.frames.restart.failed", error.getMessage()), ConsoleViewContentType.ERROR_OUTPUT);
-        });
+        restartFrame(server, dapFrame.getFrameId(), session, client.getSessionChanges(), context,
+                () -> client.stoppedOrContinuedSince(ended), error -> {
+                    client.resumeRefused(ended);
+                    debugProcess.print(DAPBundle.message("dap.frames.restart.failed", error.getMessage()), ConsoleViewContentType.ERROR_OUTPUT);
+                });
     }
 
     /**
@@ -74,20 +75,23 @@ public class DAPDropFrameHandler implements XDropFrameHandler {
      * @param server             the debug adapter.
      * @param frameId            the DAP frame to restart.
      * @param session            the debug session.
+     * @param sessionChanges     the changes of the debug session, which the resume is one of.
      * @param context            the suspend context of the session when the frame is restarted.
      * @param stoppedOrContinued returns whether the debug adapter said that the program stopped or continued since the
      *                           request was sent.
      * @param failed             reports why the debug adapter can't restart the frame.
-     * @return the future, completed once the debug adapter has answered.
+     * @return the future, completed once the debug adapter has answered, and the session resumed if it must be.
      */
     static CompletableFuture<@Nullable Void> restartFrame(@NotNull IDebugProtocolServer server,
                                                           int frameId,
                                                           @NotNull XDebugSession session,
+                                                          @NotNull DAPSessionChanges sessionChanges,
                                                           @Nullable XSuspendContext context,
                                                           @NotNull BooleanSupplier stoppedOrContinued,
                                                           @NotNull Consumer<Throwable> failed) {
         RestartFrameArguments args = new RestartFrameArguments();
         args.setFrameId(frameId);
-        return DAPClient.resumeWhenAnswered(server.restartFrame(args), session, context, stoppedOrContinued, failed);
+        return DAPClient.resumeWhenAnswered(server.restartFrame(args), session, sessionChanges, context,
+                stoppedOrContinued, failed);
     }
 }
