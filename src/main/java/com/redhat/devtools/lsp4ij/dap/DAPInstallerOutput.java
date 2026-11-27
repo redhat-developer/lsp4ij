@@ -20,8 +20,8 @@ import com.redhat.devtools.lsp4ij.settings.ui.InstallerPanel;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
  * What the installer of a debug adapter printed at the start of a debug session, in the console
@@ -39,7 +39,9 @@ final class DAPInstallerOutput {
     private record Printed(@NotNull String text, @NotNull ConsoleViewContentType contentType) {
     }
 
-    private final List<Printed> printed = new CopyOnWriteArrayList<>();
+    // Guarded by itself: an installer prints many lines, as npm install does, which a copy on each write would make
+    // quadratic
+    private final List<Printed> printed = new ArrayList<>();
 
     /**
      * Keeps what the installer prints into the given console from now on for the debug session of the given execution
@@ -63,7 +65,9 @@ final class DAPInstallerOutput {
                 super.print(message, contentType);
                 if (message != null) {
                     // As the console got it
-                    output.printed.add(new Printed(message + "\n", contentType));
+                    synchronized (output.printed) {
+                        output.printed.add(new Printed(message + "\n", contentType));
+                    }
                 }
             }
         };
@@ -86,6 +90,11 @@ final class DAPInstallerOutput {
      * @param installerPanel the panel of the {@code Installer} tab.
      */
     void printTo(@NotNull InstallerPanel installerPanel) {
-        printed.forEach(text -> installerPanel.print(text.text(), text.contentType()));
+        List<Printed> snapshot;
+        synchronized (printed) {
+            snapshot = List.copyOf(printed);
+        }
+        // Outside the lock: the console of the tab can take its time
+        snapshot.forEach(text -> installerPanel.print(text.text(), text.contentType()));
     }
 }

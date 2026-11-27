@@ -24,6 +24,7 @@ import com.redhat.devtools.lsp4ij.server.definition.launching.CommandUtils;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
@@ -65,13 +66,38 @@ public class ExecTaskTraceTest extends BasePlatformTestCase {
             trace.assertPrinted("Exit code: 0");
             // The log
             trace.assertLogged(LOGGED + "the command exited with 0, in " + directory + ": " + commandText);
-            trace.assertLogged(LOGGED + "the PATH of the command: " + ExecTask.truncate(path));
+            trace.assertLogged(LOGGED + "the PATH of the command: " + ExecTask.loggedPath(path));
             trace.assertNoOutputAtInfo();
             assertTrue("The output is logged at DEBUG: " + trace.log.output(), trace.log.lines().stream()
                     .anyMatch(line -> line.startsWith("FINE Installer 'Test server': version-1.2.3")));
         } finally {
             NioFiles.deleteRecursively(workingDir);
         }
+    }
+
+    public void testThePathIsLoggedWithoutASecretWhichTheCutWouldSplit() {
+        // A GitHub token which starts just before the end of the start that the cut keeps: cut first, its start, ghp_
+        // and six characters, would be too short for the redaction to recognise
+        String token = "ghp_" + "A".repeat(36);
+        String path = "x".repeat(ExecTask.maxLoggedLength() / 2 - 10) + File.pathSeparator + token + File.pathSeparator
+                + "y".repeat(ExecTask.maxLoggedLength());
+
+        String logged = ExecTask.loggedPath(path);
+
+        // The cut can split the <redacted> which replaced the token, but no part of the token itself is left
+        assertFalse("No part of the token is logged: " + logged, logged.contains("ghp_") || logged.contains("AAAAA"));
+        assertTrue("The PATH is cut: " + logged.length(), logged.length() < path.length());
+        assertEquals("none", ExecTask.loggedPath(null));
+    }
+
+    public void testTheLoggedLengthIsTheSystemPropertyOrElseTheEnvironmentVariableOrElse4000() {
+        assertEquals(4000, ExecTask.DEFAULT_MAX_LOGGED_LENGTH);
+        assertEquals("Neither is set", 4000, ExecTask.maxLoggedLength(null, null));
+        assertEquals("The environment variable", 800, ExecTask.maxLoggedLength(null, "800"));
+        assertEquals("The system property", 600, ExecTask.maxLoggedLength(" 600 ", "800"));
+        assertEquals("A system property which isn't a number", 800, ExecTask.maxLoggedLength("many", "800"));
+        assertEquals("Neither is a positive number", 4000, ExecTask.maxLoggedLength("0", "-5"));
+        assertEquals("Blank values", 4000, ExecTask.maxLoggedLength("", " "));
     }
 
     public void testACommandWhichFailsShowsItsExitCodeAndOutputAndLogsThemWithItsOutput() throws Exception {
@@ -132,7 +158,7 @@ public class ExecTaskTraceTest extends BasePlatformTestCase {
         assertFalse(trace.log.output(), trace.succeeded);
         // The output can come in several parts
         assertTrue("The console must show the whole output", String.join("", trace.printed).contains(longLine));
-        int half = ExecTask.MAX_LOGGED_LENGTH / 2;
+        int half = ExecTask.maxLoggedLength() / 2;
         trace.assertLogged(LOGGED + "the standard output of the command:\n" + longLine.substring(0, half)
                 + "\n[... " + (longLine.length() - 2 * half) + " characters left out ...]\n"
                 + longLine.substring(longLine.length() - half));

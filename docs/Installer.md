@@ -187,7 +187,9 @@ console shows it, as when the installer runs at the start of a language server w
 start and the result of the installation and of each step, and the errors as warnings. Since LSP4IJ 0.30.2, it also has
 for each `exec` task, whether it succeeds or fails, a line with its exit code, the directory it ran in and its command,
 then the `PATH` in which LSP4IJ looked the command up; for an `exec` task which fails, also its standard output and its
-standard error, of which a long one keeps its first and its last 2,000 characters; and a line which says what a
+standard error, of which a long one keeps its first and its last 2,000 characters (4,000 in all: set the environment
+variable `LSP4IJ_INSTALLER_LOG_MAX_LENGTH`, or the system property `lsp4ij.installer.log.maxLength` in
+*Help | Edit Custom Properties*, to another number of characters, which the IDE reads at its first installation); and a line which says what a
 `fileExists`, `configureServer`, `replaceTemplateCommand` or `initialize` task found or did. The output of an `exec` task
 which succeeds stays out of the default log, since it can hold a secret that LSP4IJ doesn't recognise. With
 `#com.redhat.devtools.lsp4ij.installation` in *Help | Diagnostic Tools | Debug Log Settings*, the log also has the rest
