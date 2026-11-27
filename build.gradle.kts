@@ -129,6 +129,10 @@ kotlin {
 // plugin runs there even though the toolchain uses Java 25 for the 263 platform.
 tasks.withType<JavaCompile>().configureEach {
     options.release.set(21)
+    // Lists each use of a deprecated API, in the main and the test classes, instead of javac's one note per source set,
+    // up to javac's 100 warnings a source set. The uses of an API scheduled for removal are listed without it. Warnings
+    // don't fail the build.
+    options.compilerArgs.add("-Xlint:deprecation")
 }
 
 // Set Kotlin JVM language level to match Java compatibility. The API and language versions must not exceed the Kotlin
