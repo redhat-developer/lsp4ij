@@ -150,6 +150,13 @@ public class LSPCompletionContributor extends CompletionContributor {
         Set<String> addedLookupStrings = new HashSet<>();
         var completionFeature = clientFeatures.getCompletionFeature();
         LSPCompletionFeature.LSPCompletionContext context = new LSPCompletionFeature.LSPCompletionContext(parameters, languageServer);
+        // When the language server preselects an item, the other items of this result are skipped when the lookup
+        // chooses the item to select (the order is kept), see LSPCompletionPreselectSkipper
+        boolean hasPreselect = items.stream().anyMatch(completionFeature::isPreselect);
+        if (hasPreselect) {
+            // and so are the items of the other completion contributors, which run after this one
+            LSPCompletionPreselectSkipper.preselectIn(parameters);
+        }
         // Items now sorted by priority, low index == high priority
         for (int i = 0; i < size; i++) {
             var item = items.get(i);
@@ -159,6 +166,10 @@ public class LSPCompletionContributor extends CompletionContributor {
             // Create lookup item
             LookupElement lookupItem = completionFeature.createLookupElement(item, context);
             if (lookupItem != null) {
+                if (hasPreselect && lookupItem instanceof LSPCompletionProposal proposal
+                        && !completionFeature.isPreselect(item)) {
+                    proposal.setPreselectSkipped(true);
+                }
                 completionFeature.addLookupItem(context, completionPrefix, result, lookupItem, size - i, item);
                 ContainerUtil.addIfNotNull(addedLookupStrings, lookupItem.getLookupString());
             }

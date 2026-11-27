@@ -177,6 +177,7 @@ public class ClientCapabilitiesFactory {
                         "additionalTextEdits")));
         completionItemCapabilities.setDeprecatedSupport(Boolean.TRUE);
         completionItemCapabilities.setLabelDetailsSupport(Boolean.TRUE);
+        completionItemCapabilities.setPreselectSupport(Boolean.TRUE);
         completionItemCapabilities.setInsertReplaceSupport(Boolean.TRUE);
         CompletionCapabilities completionCapabilities = new CompletionCapabilities(completionItemCapabilities);
         completionCapabilities.setInsertTextMode(InsertTextMode.AdjustIndentation);

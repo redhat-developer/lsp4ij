@@ -92,6 +92,10 @@ public class LSPCompletionProposal extends LookupElement implements Pointer<LSPC
 
     private volatile CompletableFuture<CompletionItem> resolvedCompletionItemFuture;
 
+    // true when another item of the same completion result is preselected by the language server
+    // and this one is not: the lookup must not select it (see LSPCompletionPreselectSkipper)
+    private volatile boolean preselectSkipped;
+
     // char which accepts the item, set by handleInsert for apply(Document, int), which keeps its signature for the
     // subclasses that override it: Tab replaces the whole word of an InsertReplaceEdit, any other char inserts
     private char completionChar = Lookup.NORMAL_SELECT_CHAR;
@@ -107,6 +111,28 @@ public class LSPCompletionProposal extends LookupElement implements Pointer<LSPC
         this.prefixStartOffset = getPrefixStartOffset(editor.getDocument(), completionOffset);
         this.completionFeature = completionFeature;
         putUserData(CodeCompletionHandlerBase.DIRECT_INSERTION, true);
+    }
+
+    /**
+     * Returns true if the lookup must not select this item because the language server preselects another item
+     * of the same completion result, and false otherwise.
+     *
+     * @return true if the lookup must not select this item and false otherwise.
+     */
+    @ApiStatus.Internal
+    public boolean isPreselectSkipped() {
+        return preselectSkipped;
+    }
+
+    /**
+     * Set to true if the lookup must not select this item because the language server preselects another item
+     * of the same completion result.
+     *
+     * @param preselectSkipped true if the lookup must not select this item.
+     */
+    @ApiStatus.Internal
+    public void setPreselectSkipped(boolean preselectSkipped) {
+        this.preselectSkipped = preselectSkipped;
     }
 
     @Override

@@ -378,6 +378,12 @@ When a language server returns an incomplete list (`isIncomplete: true`), or no 
 When the token at the caret spans whitespace, such as a comment that a language plugin keeps as one token, a completion
 item without a `textEdit` is matched against, and replaces, the word before the caret instead of the whole token: after
 `foo.ba`, the item `foo.bar` replaces `foo.ba`, and the item `bar` replaces `ba`.
+When a language server preselects a completion item (`preselect: true`), that item is the one selected when the list
+shows, as the specification asks. The order of the items doesn't change. An exact match of the typed text is selected
+before it, and once the typed text filters it out, the first item is selected, as when no item is preselected. A
+client feature can turn it off
+(see [LSP Completion Feature](./LSPApi.md#lsp-completion-feature)).
+
 The client declares `insertReplaceSupport`, so a language server can answer an item with an `InsertReplaceEdit`, which
 has two ranges: `insert` stops at the caret and `replace` covers the whole word. With the caret in `foo|Bar`, the item
 `fooBaz` gives `fooBazBar` when it is accepted with Enter, which inserts it, and `fooBaz` when it is accepted with Tab,
