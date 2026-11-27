@@ -661,8 +661,9 @@ public class LanguageServiceAccessor implements Disposable {
             @NotNull PsiFile psiFile, @Nullable Predicate<LSPClientFeatures> beforeStartingServerFilter,
             @Nullable Predicate<LSPClientFeatures> afterStartingServerFilter,
             @Nullable LanguageServerDefinition matchServerDefinition, @Nullable DocumentConnectionScope scope) {
-        // The place of the file before its instances are chosen: an instance can start for a while, and if the file
-        // moves meanwhile, it can be the instance of its earlier place, which then must not get the file
+        // The place of the file before its language servers are matched and their instances chosen: a language server
+        // can start for a while, and if the file moves meanwhile, its new place may no longer match the language
+        // server, or belong to another instance, so the language server of its earlier place must not get the file
         var file = psiFile.getVirtualFile();
         var url = file != null ? file.getUrl() : null;
         // Collect started (or not) language servers which matches the given file.
@@ -719,10 +720,9 @@ public class LanguageServiceAccessor implements Disposable {
                                                         }
                                                         // The connection compares the file with it as it opens the
                                                         // document, which can be a while after this
-                                                        var chosenUrl = wrapper.getInstanceRoot() != null ? url : null;
                                                         return scope == null
-                                                                ? wrapper.connect(file, info, editorCloses, chosenUrl)
-                                                                : wrapper.connect(file, info, scope, chosenUrl);
+                                                                ? wrapper.connect(file, info, editorCloses, url)
+                                                                : wrapper.connect(file, info, scope, url);
                                                     }
                                                     return CompletableFuture.completedFuture(null);
                                                 }).thenAccept(server -> {
