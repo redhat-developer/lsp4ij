@@ -117,27 +117,28 @@ dependencies {
     testImplementation("org.junit.platform:junit-platform-launcher:1.11.0")
 }
 
-// Set the JDK version used by the toolchain to build the project (Java 21 is required for platform 2025.3, and Java 25
-// for platform 2026.2 and later, whose classes are Java 25 classes). Output compatibility and API usage are restricted
-// to Java 17 in the tasks below.
+// Set the JDK version used by the toolchain to build the project (Java 21, and Java 25 for platform 2026.2 and later, whose
+// classes are Java 25 classes). Output compatibility and API usage are restricted to Java 21 in the tasks below.
 kotlin {
     jvmToolchain {
         languageVersion = JavaLanguageVersion.of(if (ideaVersionInt >= 262) 25 else 21)
     }
 }
 
-// Maintain compatibility with Java 17 runtimes, ensuring the built plugin 
-// can run on older IDEs even though the toolchain uses Java 21 for the 253 platform.
+// Java 21, the version of the JetBrains Runtime of IntelliJ 2025.1, the oldest supported platform, so that the built
+// plugin runs there even though the toolchain uses Java 25 for the 263 platform.
 tasks.withType<JavaCompile>().configureEach {
-    options.release.set(17)
+    options.release.set(21)
 }
 
-// Set Kotlin JVM language level to match Java compatibility.
+// Set Kotlin JVM language level to match Java compatibility. The API and language versions must not exceed the Kotlin
+// standard library that the oldest supported platform bundles (kotlin.stdlib.default.dependency=false), 2.1.10 in
+// IntelliJ 2025.1.
 tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
     compilerOptions {
-        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
-        apiVersion.set(org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_1_9)
-        languageVersion.set(org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_1_9)
+        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_21)
+        apiVersion.set(org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_2_1)
+        languageVersion.set(org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_2_1)
     }
 }
 

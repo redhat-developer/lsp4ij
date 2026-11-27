@@ -5,9 +5,9 @@ junit-jupiter = "5.10.3"
 
 # plugins
 testlogger = "4.0.0"
-# Pinned to 2.3.x: Kotlin 2.4 no longer accepts apiVersion/languageVersion 1.9. API 1.9 is required because the
-# plugin runs against the Kotlin stdlib bundled with the IDE (kotlin.stdlib.default.dependency=false), which is
-# 1.9.24 in IntelliJ 2024.2 (pluginSinceBuild=242). Moving past 2.3.x means raising pluginSinceBuild.
+# The plugin runs against the Kotlin stdlib bundled with the IDE (kotlin.stdlib.default.dependency=false), which is
+# 2.1.10 in IntelliJ 2025.1 (pluginSinceBuild=251): build.gradle.kts sets apiVersion/languageVersion 2.1, which a
+# newer Kotlin compiler accepts as long as it supports language version 2.1.
 kotlin = "2.3.21"
 changelog = "2.5.0"
 gradleIntelliJPlugin = "2.20.0"
