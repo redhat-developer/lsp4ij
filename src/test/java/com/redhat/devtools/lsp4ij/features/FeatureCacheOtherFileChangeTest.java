@@ -44,7 +44,10 @@ public class FeatureCacheOtherFileChangeTest extends LSPCodeInsightFixtureTestCa
 
     public void testHoverIsAskedForAgainWhenAnotherFileChanges() {
         var other = myFixture.configureByText("other.foo", "class Other");
-        myFixture.configureByText("main.foo", "Oth<caret>er o");
+        var main = myFixture.configureByText("main.foo", "Oth<caret>er o");
+        // The language server has started: a start which ends while the first hover is asked for makes the next hover
+        // ask again (see LSPHoverSupport)
+        awaitLanguageServers(main);
         MockLanguageServer.INSTANCE.setHover(hover("class Other"));
         assertEquals("class Other", hover());
 
