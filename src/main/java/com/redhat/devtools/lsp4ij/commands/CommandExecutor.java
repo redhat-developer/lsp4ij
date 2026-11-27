@@ -239,7 +239,8 @@ public class CommandExecutor {
             return false;
         }
         DataContext dataContext = createDataContext(file, psiFile, command, action, source, editor, languageServer, project);
-        ActionUtil.invokeAction(action, dataContext, ActionPlaces.UNKNOWN, inputEvent, null);
+        var event = AnActionEvent.createEvent(action, dataContext, null, ActionPlaces.UNKNOWN, ActionUiKind.NONE, inputEvent);
+        ActionUtil.invokeAction(action, event, null);
         return true;
     }
 
