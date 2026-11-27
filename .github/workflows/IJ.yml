@@ -27,11 +27,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
 
-      # Free GitHub Actions Environment Disk Space
+      # Free GitHub Actions Environment Disk Space, for main, which verifies the plugin against every release since the
+      # oldest. A pull request verifies it against two IDEs only, for which the runner's free disk (87 GB in November
+      # 2026) is plenty, so it skips this step, which takes 1.5 to 2.5 minutes.
       - name: Maximize Build Space
-        uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be # main
+        if: github.event_name != 'pull_request'
+        uses: jlumbroso/free-disk-space@ceedf095f4ec1a097402bc6bd80831f2e1a6fde6 # v2.0.0
         with:
-          tool-cache: false
+          preinstalled-runtimes: false
           large-packages: false
 
       # Check out current repository
@@ -62,7 +65,7 @@ jobs:
           # one that ci.yml tests on.
           ./gradlew verifyPlugin -Dplugin.verifier.home.dir=~/.pluginVerifier ${{ github.event_name == 'pull_request' && '-PverifiedIdes=2024.2,2026.3' || '' }}
           REPORTS=$(cat ${{ github.workspace }}/build/reports/pluginVerifier/*/report.md | sed 's/^#/##/')
-          echo "$REPORTS" >> $GITHUB_STEP_SUMMARY
+          echo "$REPORTS" >> "$GITHUB_STEP_SUMMARY"
 
       # Collect Plugin Verifier Result
       - name: Collect Plugin Verifier Result

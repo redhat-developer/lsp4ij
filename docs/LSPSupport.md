@@ -383,6 +383,11 @@ shows, as the specification asks. The order of the items doesn't change. Only th
 response are affected, never those of other completion contributors. A client feature can turn it off
 (see [LSP Completion Feature](./LSPApi.md#lsp-completion-feature)).
 
+The client declares `insertReplaceSupport`, so a language server can answer an item with an `InsertReplaceEdit`, which
+has two ranges: `insert` stops at the caret and `replace` covers the whole word. With the caret in `foo|Bar`, the item
+`fooBaz` gives `fooBazBar` when it is accepted with Enter, which inserts it, and `fooBaz` when it is accepted with Tab,
+which replaces the word. An item with a plain `TextEdit` is applied as the language server gave it, with either key.
+
 Here is an example with the [Qute language server](https://github.com/redhat-developer/quarkus-ls/tree/master/qute.ls) showing method completion:
 
 ![textDocument/completion](./images/lsp-support/textDocument_completion.png)

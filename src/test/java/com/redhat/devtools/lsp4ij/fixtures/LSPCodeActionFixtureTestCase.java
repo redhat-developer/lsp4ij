@@ -21,6 +21,7 @@ import com.intellij.testFramework.fixtures.CodeInsightTestUtil;
 import com.redhat.devtools.lsp4ij.JSONUtils;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.features.codeAction.LSPLazyCodeActionIntentionAction;
+import com.redhat.devtools.lsp4ij.features.diagnostics.LSPDiagnosticsApplier;
 import com.redhat.devtools.lsp4ij.mock.MockLanguageServer;
 import org.eclipse.lsp4j.CodeAction;
 import org.eclipse.lsp4j.Command;
@@ -200,7 +201,7 @@ public abstract class LSPCodeActionFixtureTestCase extends LSPCodeInsightFixture
 
     // The server publishes diagnostics after didOpen, which highlighting can trigger, and
     // LSPDiagnosticsApplier shows them asynchronously. Highlighting once can finish before they are
-    // shown, so highlight again until every diagnostic is shown.
+    // shown, so highlight again until every diagnostic is shown, and fail once the time is up.
     @NotNull
     private List<HighlightInfo> highlightLanguageServerDiagnostics(int diagnosticCount) {
         long deadline = System.currentTimeMillis() + 30_000;
@@ -210,8 +211,16 @@ public abstract class LSPCodeActionFixtureTestCase extends LSPCodeInsightFixture
                     .filter(info -> info.findRegisteredQuickFix((descriptor, range) ->
                             descriptor.getAction() instanceof LSPLazyCodeActionIntentionAction ? descriptor : null) != null)
                     .count();
-            if (shown >= diagnosticCount || System.currentTimeMillis() > deadline) {
+            if (shown >= diagnosticCount) {
                 return infos;
+            }
+            if (System.currentTimeMillis() > deadline) {
+                boolean refreshPending = LSPDiagnosticsApplier.getInstance(myFixture.getProject())
+                        .isRefreshPending(myFixture.getFile().getVirtualFile());
+                fail("The editor must show the " + diagnosticCount + " diagnostics of the language server with their "
+                        + "quick fixes within 30 s, but its last highlighting showed " + shown + " of them among "
+                        + infos.size() + " highlights, and " + (refreshPending ? "a" : "no")
+                        + " refresh of the diagnostics is pending");
             }
             NonBlockingReadActionImpl.waitForAsyncTaskCompletion();
         }

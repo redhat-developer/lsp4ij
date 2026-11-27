@@ -1,4 +1,6 @@
 import com.adarshr.gradle.testlogger.theme.ThemeType
+import com.sun.management.OperatingSystemMXBean
+import java.lang.management.ManagementFactory
 import org.jetbrains.changelog.markdownToHTML
 import org.jetbrains.intellij.platform.gradle.IntelliJPlatformType
 import org.jetbrains.intellij.platform.gradle.tasks.VerifyPluginTask.FailureLevel.*
@@ -153,6 +155,11 @@ intellijPlatform {
     // (JetBrains/intellij-platform-gradle-plugin#2294)
     instrumentCode = false
 
+    // check builds the plugin, and so its searchable options, which start an IDE when the build cache hasn't got them.
+    // The Test jobs of a pull request leave them out with -PbuildSearchableOptions=false, as no test reads them; every
+    // other build has them, as on main, in the Build Plugin zip workflow and in releases.
+    buildSearchableOptions = properties("buildSearchableOptions").map(String::toBooleanStrict).orElse(true)
+
     pluginConfiguration {
         name = properties("pluginName")
 
@@ -296,6 +303,29 @@ intellijPlatformTesting {
     }
 }
 
+/**
+ * How many test JVMs a test task runs at once when -PtestForks doesn't say: half the CPUs, rounded up, since a test JVM
+ * keeps more than one CPU busy, and no more than the memory holds, at 3 GB a JVM once 4 GB are left to Gradle and the OS.
+ * A test JVM gets the -Xmx2048m and -XX:ReservedCodeCacheSize=512m of the IDE's vmoptions, and takes up to about 3 GB
+ * with its metaspace and native memory. That makes 5 on a Mac with 10 CPUs and 64 GB, 2 on GitHub's Linux and Windows
+ * runners (4 CPUs, 16 GB), and 1 on its macOS runner (3 CPUs, 7 GB). As a ValueSource, it's computed again when the build
+ * reuses its configuration cache, as on another machine.
+ */
+abstract class MachineTestForks : ValueSource<Int, ValueSourceParameters.None> {
+    override fun obtain(): Int {
+        val byCpus = (Runtime.getRuntime().availableProcessors() + 1) / 2
+        val memoryMb = (ManagementFactory.getOperatingSystemMXBean() as? OperatingSystemMXBean)?.totalMemorySize?.div(1024 * 1024)
+        val byMemory = memoryMb?.let { ((it - 4096) / 3072).toInt() } ?: byCpus
+        return byCpus.coerceAtMost(byMemory).coerceAtLeast(1)
+    }
+}
+
+// With more than one fork, TestForkSandbox gives each test JVM a sandbox of its own
+val testForks = properties("testForks")
+    .map { it.toIntOrNull()?.takeIf { forks -> forks >= 1 } ?: throw GradleException("-PtestForks=$it is no number of test JVMs, 1 or more") }
+    .orElse(providers.of(MachineTestForks::class) {})
+    .get()
+
 tasks.withType<Test>().configureEach {
     useJUnitPlatform()
     environment("GRADLE_RELEASE_REPOSITORY","https://services.gradle.org/distributions")
@@ -307,6 +337,16 @@ tasks.withType<Test>().configureEach {
     // so the thread leak check of a test that closes its project can find it still running. The tests need none of
     // it. The property, misspelled as in IntelliJ, has no effect on older versions.
     systemProperty("jetbrains.ide.builtin.descovery.enabled", "false")
+    maxParallelForks = testForks
+    if (testForks > 1) {
+        systemProperty("lsp4ij.test.forks", testForks)
+        systemProperty("junit.platform.launcher.interceptors.enabled", "true")
+    }
+    // Local copy: the configuration cache can't store a reference to the build script
+    val jvms = if (testForks == 1) "1 test JVM" else "up to $testForks test JVMs at once"
+    doFirst {
+        logger.lifecycle("$path runs its test classes in $jvms (-PtestForks=<n> sets how many)")
+    }
 }
 
 // Configure Gradle Kover Plugin - read more: https://github.com/Kotlin/kotlinx-kover#configuration
@@ -341,6 +381,21 @@ tasks {
     test {
         // They run in testJavaScript, with the JavaScript plugin
         exclude(javaScriptPluginTests)
+        // -PtestShard=<k>/<n> runs only the k-th of n parts of the test classes, so that CI can run them in n jobs on a
+        // runner that holds only one test JVM. A class belongs to the part that the hash of its name gives, with its
+        // nested classes, so the parts divide the classes without a list to keep up to date, and about evenly.
+        properties("testShard").orNull?.let { shard ->
+            val (part, parts) = shard.split("/").mapNotNull(String::toIntOrNull).takeIf { it.size == 2 }
+                ?.takeIf { (k, n) -> k in 1..n }
+                ?: throw GradleException("-PtestShard=$shard is no <k>/<n> with k from 1 to n")
+            exclude { element ->
+                !element.isDirectory && element.path.endsWith(".class")
+                        && Math.floorMod(element.path.substringBefore('$').removeSuffix(".class").hashCode(), parts) != part - 1
+            }
+            doFirst {
+                logger.lifecycle("$path runs part $part of $parts of the test classes (-PtestShard=$shard)")
+            }
+        }
     }
 
     // TODO: Once LSP4IJ no longer supports 2023.*, the hotswap JVM args can be added unconditionally

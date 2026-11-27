@@ -8,7 +8,6 @@
 package com.redhat.devtools.lsp4ij.settings.ui;
 
 import com.intellij.openapi.application.ApplicationManager;
-import com.intellij.openapi.application.impl.NonBlockingReadActionImpl;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.Disposer;
 import com.intellij.openapi.util.io.FileUtil;
@@ -317,17 +316,13 @@ public class WorkspaceFoldersPanelTest extends BasePlatformTestCase {
 
     public void testAFolderWithoutTheRootOfAnInstanceGetsNone() throws IOException {
         var root = localContentRoot();
-        try {
-            // The project's directories are the workspace folders, and the source roots the roots of the instances
-            configure("{\"serverInstances\": {\"rootType\": \"SOURCE_ROOTS\"}, \"rootType\": \"PROJECT_BASE\"}");
+        // The project's directories are the workspace folders, and the source roots the roots of the instances
+        configure("{\"serverInstances\": {\"rootType\": \"SOURCE_ROOTS\"}, \"rootType\": \"PROJECT_BASE\"}");
 
-            var rows = rows();
-            int noInstance = ContainerUtil.indexOf(rows, row -> row.contains("(No root: no language server instance)"));
-            int folder = ContainerUtil.indexOf(rows, row -> row.contains(root.getPath()));
-            assertTrue(rows.toString(), noInstance >= 0 && folder > noInstance);
-        } finally {
-            PsiTestUtil.removeContentEntry(getModule(), root);
-        }
+        var rows = rows();
+        int noInstance = ContainerUtil.indexOf(rows, row -> row.contains("(No root: no language server instance)"));
+        int folder = ContainerUtil.indexOf(rows, row -> row.contains(root.getPath()));
+        assertTrue(rows.toString(), noInstance >= 0 && folder > noInstance);
     }
 
     public void testTheInitializeModeSaysWhyItDoesNotApplyWithInstances() {
@@ -370,18 +365,19 @@ public class WorkspaceFoldersPanelTest extends BasePlatformTestCase {
     }
 
     /**
-     * Waits until the preview has computed where its folders and files go, which it does off the UI thread, and shows
-     * them.
+     * Waits until the preview shows the last update of the panel, which computes where its folders and files go off the
+     * UI thread. An update that replaces the computation of another, as the debounced update after a change of the
+     * JSON does, is waited for too.
      */
-    private static void waitForThePreview() {
-        PlatformTestUtil.dispatchAllEventsInIdeEventQueue();
-        NonBlockingReadActionImpl.waitForAsyncTaskCompletion();
-        PlatformTestUtil.dispatchAllEventsInIdeEventQueue();
+    private void waitForThePreview() {
+        PlatformTestUtil.waitWithEventsDispatching("The preview must show the last update of the panel",
+                () -> !panel.isUpdatingThePreview(), TIMEOUT);
     }
 
     private int cursorOverTheRowOf(@NotNull VirtualFile folder) {
-        var row = ContainerUtil.indexOf(rows(), text -> text.contains(folder.getPath()));
-        assertTrue(rows().toString(), row >= 0);
+        var rows = rows();
+        var row = ContainerUtil.indexOf(rows, text -> text.contains(folder.getPath()));
+        assertTrue(rows.toString(), row >= 0);
         var tree = panel.getWorkspaceFoldersTree();
         var bounds = tree.getRowBounds(row);
         var moved = new MouseEvent(tree, MouseEvent.MOUSE_MOVED, 0, 0, bounds.x + 1, bounds.y + 1, 0, false);
@@ -410,9 +406,14 @@ public class WorkspaceFoldersPanelTest extends BasePlatformTestCase {
         return root;
     }
 
+    /**
+     * Returns a new directory, which is a content root of the project until the end of the test: the light project is
+     * kept for the next test and test class, which would get the root too.
+     */
     private @NotNull VirtualFile localContentRoot() throws IOException {
         var root = localFile(localDirectory());
         PsiTestUtil.addContentRoot(getModule(), root);
+        Disposer.register(getTestRootDisposable(), () -> PsiTestUtil.removeContentEntry(getModule(), root));
         return root;
     }
 
