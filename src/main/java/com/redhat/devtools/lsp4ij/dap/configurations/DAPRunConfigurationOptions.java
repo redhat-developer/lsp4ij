@@ -127,8 +127,9 @@ public class DAPRunConfigurationOptions extends DAPRunConfigurationOptionsBase i
 
     /**
      * Returns the working directory to run with: {@link #getWorkingDirectory()} with a leading {@code ~} expanded to
-     * the user's home directory, and a relative path resolved against the project's directory. An absolute path stays
-     * as it is. {@link #getWorkingDirectory()} keeps the text as it is stored, which the settings editor shows.
+     * the user's home directory, and a relative path resolved against the project's directory. An absolute path, or
+     * one which starts with a separator, stays as it is. {@link #getWorkingDirectory()} keeps the text as it is stored,
+     * which the settings editor shows.
      *
      * @param project the project, whose directory a relative path is resolved against, or null if it isn't known: a
      *                relative path then stays as it is.
@@ -142,8 +143,8 @@ public class DAPRunConfigurationOptions extends DAPRunConfigurationOptionsBase i
      * Returns the file to run with: {@link #getFile()} with a leading {@code ~} expanded to the user's home directory,
      * and a relative path resolved against the working directory to run with
      * ({@link #getResolvedWorkingDirectory(Project)}) when one is set, as the Debug Adapter, which runs in it, resolves
-     * the path, and otherwise against the project's directory. An absolute path stays as it is. {@link #getFile()}
-     * keeps the text as it is stored, which the settings editor shows.
+     * the path, and otherwise against the project's directory. An absolute path, or one which starts with a
+     * separator, stays as it is. {@link #getFile()} keeps the text as it is stored, which the settings editor shows.
      *
      * @param project the project, whose directory a relative working directory, or without a working directory a
      *                relative path, is resolved against, or null if it isn't known: a relative path then stays as it
@@ -159,7 +160,9 @@ public class DAPRunConfigurationOptions extends DAPRunConfigurationOptionsBase i
 
     /**
      * Returns the given path to run with: an absolute path as it is, and otherwise a leading {@code ~} expanded to the
-     * user's home directory and a relative path resolved against the given directory, normalized.
+     * user's home directory and a relative path resolved against the given directory, normalized. A path which starts
+     * with a separator stays as it is too: on Windows, where {@code /working/directory} has no drive and so isn't
+     * absolute, it names a directory from the root of the current drive, as the Debug Adapter got it before.
      *
      * @param path      the path as it is stored, or null.
      * @param directory the directory which a relative path is relative to, or null if there is none: a relative path
@@ -167,7 +170,8 @@ public class DAPRunConfigurationOptions extends DAPRunConfigurationOptionsBase i
      * @return the path to run with, or the given one if it is null or blank, or isn't a path of this system.
      */
     private static @Nullable String resolvePath(@Nullable String path, @Nullable String directory) {
-        if (path == null || StringUtils.isBlank(path) || FileUtil.isAbsolute(path)) {
+        if (path == null || StringUtils.isBlank(path) || FileUtil.isAbsolute(path)
+                || path.charAt(0) == '/' || path.charAt(0) == '\\') {
             return path;
         }
         try {

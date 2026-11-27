@@ -92,6 +92,14 @@ public class DAPRunConfigurationOptionsResolvedPathTest extends LightPlatformTes
 
         assertEquals(absolute, options.getResolvedWorkingDirectory(getProject()));
         assertEquals(absolute + "hello.rb", options.getResolvedFile(getProject()));
+
+        // On Windows, a path which starts with a separator has no drive, so isn't absolute: it stays as it is too
+        options.setWorkingDirectory("/working/directory");
+        options.setFile("/working/directory/hello.rb");
+        assertEquals("/working/directory", options.getResolvedWorkingDirectory(getProject()));
+        assertEquals("/working/directory/hello.rb", options.getResolvedFile(getProject()));
+        options.setWorkingDirectory("\\working\\directory");
+        assertEquals("\\working\\directory", options.getResolvedWorkingDirectory(getProject()));
     }
 
     public void testNoPathStaysAsItIs() {
