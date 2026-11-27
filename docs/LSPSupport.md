@@ -378,6 +378,10 @@ When a language server returns an incomplete list (`isIncomplete: true`), or no 
 When the token at the caret spans whitespace, such as a comment that a language plugin keeps as one token, a completion
 item without a `textEdit` is matched against, and replaces, the word before the caret instead of the whole token: after
 `foo.ba`, the item `foo.bar` replaces `foo.ba`, and the item `bar` replaces `ba`.
+The client declares `insertReplaceSupport`, so a language server can answer an item with an `InsertReplaceEdit`, which
+has two ranges: `insert` stops at the caret and `replace` covers the whole word. With the caret in `foo|Bar`, the item
+`fooBaz` gives `fooBazBar` when it is accepted with Enter, which inserts it, and `fooBaz` when it is accepted with Tab,
+which replaces the word. An item with a plain `TextEdit` is applied as the language server gave it, with either key.
 
 Here is an example with the [Qute language server](https://github.com/redhat-developer/quarkus-ls/tree/master/qute.ls) showing method completion:
 

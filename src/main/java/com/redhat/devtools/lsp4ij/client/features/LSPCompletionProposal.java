@@ -92,6 +92,10 @@ public class LSPCompletionProposal extends LookupElement implements Pointer<LSPC
 
     private volatile CompletableFuture<CompletionItem> resolvedCompletionItemFuture;
 
+    // char which accepts the item, set by handleInsert for apply(Document, int), which keeps its signature for the
+    // subclasses that override it: Tab replaces the whole word of an InsertReplaceEdit, any other char inserts
+    private char completionChar = Lookup.NORMAL_SELECT_CHAR;
+
     public LSPCompletionProposal(@NotNull CompletionItem item,
                                  @NotNull LSPCompletionFeature.LSPCompletionContext completionContext,
                                  @NotNull LSPCompletionFeature completionFeature) {
@@ -140,7 +144,12 @@ public class LSPCompletionProposal extends LookupElement implements Pointer<LSPC
         }
 
         // Apply all text edits
-        apply(context.getDocument(), context.getOffset(CompletionInitializationContext.SELECTION_END_OFFSET));
+        this.completionChar = context.getCompletionChar();
+        try {
+            apply(context.getDocument(), context.getOffset(CompletionInitializationContext.SELECTION_END_OFFSET));
+        } finally {
+            this.completionChar = Lookup.NORMAL_SELECT_CHAR;
+        }
 
         // Just move to the first tab stop if there's a single invocation argument with no default value
         if (shouldMoveToFirstTabStop(template)) {
@@ -326,9 +335,12 @@ public class LSPCompletionProposal extends LookupElement implements Pointer<LSPC
             if (eitherTextEdit.isLeft()) {
                 textEdit = eitherTextEdit.getLeft();
             } else {
-                // trick to partially support the new InsertReplaceEdit from LSP 3.16. Reuse previously code for TextEdit.
+                // InsertReplaceEdit from LSP 3.16: the 'replace' range covers the whole word, including the text after the
+                // caret, and is used when the item is accepted with Tab. Any other completion char uses the 'insert'
+                // range, which stops at the caret. Then reuse the code for TextEdit.
                 InsertReplaceEdit insertReplaceEdit = eitherTextEdit.getRight();
-                textEdit = new TextEdit(insertReplaceEdit.getInsert(), insertReplaceEdit.getNewText());
+                Range range = completionChar == Lookup.REPLACE_SELECT_CHAR ? insertReplaceEdit.getReplace() : insertReplaceEdit.getInsert();
+                textEdit = new TextEdit(range, insertReplaceEdit.getNewText());
             }
         }
         try {
@@ -431,7 +443,8 @@ public class LSPCompletionProposal extends LookupElement implements Pointer<LSPC
         if (item.getTextEdit().isLeft()) {
             return item.getTextEdit().getLeft().getRange();
         } else {
-            // here providing insert range, currently do not know if insert or replace is requested
+            // the insert range stops at the caret, which is what the completion prefix is computed from, whether the
+            // item is accepted with Tab (replace range) or not (insert range)
             return item.getTextEdit().getRight().getInsert();
         }
     }
