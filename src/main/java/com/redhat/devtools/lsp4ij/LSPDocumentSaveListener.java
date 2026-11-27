@@ -8,8 +8,6 @@
 package com.redhat.devtools.lsp4ij;
 
 import com.intellij.openapi.Disposable;
-import com.intellij.openapi.application.ApplicationManager;
-import com.intellij.openapi.application.ModalityState;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.fileEditor.FileDocumentManager;
 import com.intellij.openapi.fileEditor.FileDocumentManagerListener;
@@ -18,6 +16,7 @@ import com.intellij.openapi.util.Disposer;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.TestOnly;
 
+import javax.swing.SwingUtilities;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.concurrent.TimeUnit;
@@ -47,9 +46,12 @@ public class LSPDocumentSaveListener implements FileDocumentManagerListener {
             return;
         }
         if (deadlineNanos == 0) {
-            // The first save of this event starts the budget, which ends with the event
+            // The first save of this event starts the budget, which ends with the event, in a plain AWT event that needs no
+            // lock. A runnable of Application.invokeLater needs the write-intent lock, and from IntelliJ 2025.3 on, the UI
+            // thread holds it back while a background write action runs, such as a document commit: the next save could
+            // then come first, find the budget used up, and not send willSaveWaitUntil at all.
             deadlineNanos = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(willSaveWaitUntilTimeoutMs);
-            ApplicationManager.getApplication().invokeLater(() -> deadlineNanos = 0, ModalityState.any());
+            SwingUtilities.invokeLater(() -> deadlineNanos = 0);
         }
         for (var project : ProjectManager.getInstance().getOpenProjects()) {
             for (var wrapper : new ArrayList<>(LanguageServiceAccessor.getInstance(project).getStartedServers())) {
