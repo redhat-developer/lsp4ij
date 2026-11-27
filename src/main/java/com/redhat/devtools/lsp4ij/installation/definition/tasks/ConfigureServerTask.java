@@ -10,11 +10,14 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.installation.definition.tasks;
 
+import com.intellij.execution.ui.ConsoleViewContentType;
 import com.redhat.devtools.lsp4ij.installation.definition.InstallerContext;
 import com.redhat.devtools.lsp4ij.installation.definition.InstallerTask;
 import com.redhat.devtools.lsp4ij.installation.definition.ServerInstallerDescriptor;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+
+import java.util.logging.Level;
 
 /**
  * <pre>
@@ -53,7 +56,8 @@ public class ConfigureServerTask extends InstallerTask {
                         + ", but no fileExists task found a file for it", true);
                 return false;
             }
-            context.print("Start server command=" + resolvedCommand);
+            // At INFO, as the line for the log of what the task did
+            context.print("Start server command=" + resolvedCommand, ConsoleViewContentType.NORMAL_OUTPUT, Level.INFO);
             var commandLineUpdater = context.getCommandLineUpdater();
             if (commandLineUpdater != null) {
                 commandLineUpdater.setCommandLine(resolvedCommand);

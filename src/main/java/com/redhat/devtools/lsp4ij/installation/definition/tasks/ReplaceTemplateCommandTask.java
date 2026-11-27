@@ -10,11 +10,14 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.installation.definition.tasks;
 
+import com.intellij.execution.ui.ConsoleViewContentType;
 import com.redhat.devtools.lsp4ij.installation.definition.InstallerContext;
 import com.redhat.devtools.lsp4ij.installation.definition.InstallerTask;
 import com.redhat.devtools.lsp4ij.installation.definition.ServerInstallerDescriptor;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+
+import java.util.logging.Level;
 
 /**
  * Installer task that replaces the command of the template with the given command, as {@code configureServer} does,
@@ -57,13 +60,15 @@ public class ReplaceTemplateCommandTask extends ConfigureServerTask {
         var commandLineUpdater = context.getCommandLineUpdater();
         String currentCommand = commandLineUpdater != null ? commandLineUpdater.getCommandLine() : null;
         if (templateCommand == null || !templateCommand.equals(currentCommand)) {
+            // At INFO, as the line for the log of what the task did
             context.print("Server command kept, since it is not the command of the template '" + templateCommand
-                    + "': " + currentCommand);
+                    + "': " + currentCommand, ConsoleViewContentType.NORMAL_OUTPUT, Level.INFO);
             return true;
         }
         if (command.isBlank()) {
             // No command for this OS: replacing the command of the template with it would leave the server without one
-            context.print("Server command kept, since the task has no command for this OS: " + currentCommand);
+            context.print("Server command kept, since the task has no command for this OS: " + currentCommand,
+                    ConsoleViewContentType.NORMAL_OUTPUT, Level.INFO);
             return true;
         }
         return super.run(context);

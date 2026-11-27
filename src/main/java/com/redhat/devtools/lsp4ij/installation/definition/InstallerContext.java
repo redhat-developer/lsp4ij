@@ -287,12 +287,13 @@ public class InstallerContext implements Reporter {
 
     /**
      * Writes the given message to the IDE's log at the given level, after the name of the installer, without its
-     * values which can be secrets, as {@link #print(String, ConsoleViewContentType, Level)} says.
+     * values which can be secrets, as {@link #print(String, ConsoleViewContentType, Level)} says, but not to the
+     * consoles, as a line for the log only, which says how a task ended.
      *
      * @param level   the level at which the IDE's log gets the message.
      * @param message the message.
      */
-    void log(@NotNull Level level, @NotNull String message) {
+    public void log(@NotNull Level level, @NotNull String message) {
         if (level.equals(Level.OFF)) {
             return;
         }

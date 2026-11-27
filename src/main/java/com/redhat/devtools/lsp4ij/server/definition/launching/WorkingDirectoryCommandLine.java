@@ -14,6 +14,7 @@ import com.intellij.execution.Platform;
 import com.intellij.execution.configurations.GeneralCommandLine;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.io.File;
 import java.io.IOException;
@@ -35,12 +36,28 @@ import java.util.List;
 @ApiStatus.Internal
 public class WorkingDirectoryCommandLine extends GeneralCommandLine {
 
+    // The PATH of the environment that the process got as it started, or null before
+    private volatile @Nullable String processPath;
+
     public WorkingDirectoryCommandLine(@NotNull List<String> command) {
         super(command);
     }
 
+    /**
+     * Returns the PATH of the environment that the process got as it started, which the platform customizes for its
+     * working directory since 2025.1, or, before it started, the PATH of the environment that this command line gives
+     * it; or null if the environment has none.
+     *
+     * @return the PATH of the environment of the process, or null if it has none.
+     */
+    public @Nullable String getProcessPath() {
+        String path = processPath;
+        return path != null ? path : CommandUtils.getVariable(getEffectiveEnvironment(), "PATH");
+    }
+
     @Override
     protected @NotNull Process createProcess(@NotNull ProcessBuilder processBuilder) throws IOException {
+        processPath = CommandUtils.getVariable(processBuilder.environment(), "PATH");
         String name = CommandUtils.getExecutable(this);
         if (getWorkDirectory() != null && name != null) {
             // The environment of the process, which the platform has customized for its working directory

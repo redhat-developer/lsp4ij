@@ -17,10 +17,12 @@ import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.project.ProjectUtil;
 import com.intellij.openapi.util.Key;
+import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.util.EnvironmentUtil;
 import com.intellij.util.SystemProperties;
 import com.redhat.devtools.lsp4ij.installation.definition.InstallerContext;
 import com.redhat.devtools.lsp4ij.installation.definition.InstallerTask;
+import com.redhat.devtools.lsp4ij.installation.definition.SecretRedactor;
 import com.redhat.devtools.lsp4ij.installation.definition.ServerInstallerDescriptor;
 import com.redhat.devtools.lsp4ij.server.definition.launching.CommandUtils;
 import com.redhat.devtools.lsp4ij.server.definition.launching.WorkingDirectoryCommandLine;
@@ -68,6 +70,13 @@ import java.util.regex.PatternSyntaxException;
 public class ExecTask extends InstallerTask {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(ExecTask.class);
+
+    /**
+     * How many characters of the PATH, and of the output of a command whose task fails, the IDE's log gets at INFO, so
+     * that a long output, as that of npm install, doesn't fill it up. The consoles show them all.
+     */
+    @VisibleForTesting
+    static final int MAX_LOGGED_LENGTH = 4000;
 
     /**
      * The locks of the working directories that exec tasks declare, by absolute path: the installers of two language
@@ -293,6 +302,10 @@ public class ExecTask extends InstallerTask {
      */
     private boolean runCommand(@NotNull InstallerContext context, @Nullable Pattern outputPattern) {
         CapturingProcessHandler handler = null;
+        // What the console and the log say about the command, once known
+        String commandText = null;
+        String directory = null;
+        WorkingDirectoryCommandLine processCommandLine = null;
         try {
             @Nullable var project = context.getProject();
             List<String> command = resolveServerCommand(this.command, context);
@@ -300,10 +313,12 @@ public class ExecTask extends InstallerTask {
                     .stream()
                     .map(args -> CommandUtils.resolveCommandLine(args, project))
                     .toList();
-            context.print("> " + String.join(" ", resolvedCommand));
+            commandText = String.join(" ", resolvedCommand);
+            context.print("> " + commandText);
 
             // With a working directory, the tools which its environment selects, as the language server gets them
-            GeneralCommandLine cmdLine = new WorkingDirectoryCommandLine(resolvedCommand)
+            processCommandLine = new WorkingDirectoryCommandLine(resolvedCommand);
+            GeneralCommandLine cmdLine = processCommandLine
                     .withEnvironment(EnvironmentUtil.getEnvironmentMap());
             Path workingDir = getWorkingDir(this.workingDir, context);
             if (workingDir != null) {
@@ -314,13 +329,22 @@ public class ExecTask extends InstallerTask {
                         .withWorkDirectory(workingDir.toFile());
             }
             cmdLine.setCharset(java.nio.charset.StandardCharsets.UTF_8);
+            // Without a working directory, the command runs in the directory of the IDE, as / for an IDE started from
+            // the Dock (#2295)
+            directory = workingDir != null
+                    ? workingDir.toAbsolutePath().toString()
+                    : Path.of("").toAbsolutePath() + " (the directory of the IDE)";
+            printDetail("Working directory: " + directory, context);
 
             handler = new CapturingProcessHandler(cmdLine);
+            // The PATH in which the command was looked up, which the process got as it started
+            printPath(processCommandLine.getProcessPath(), context);
             handler.addProcessListener(new ProcessListener() {
                 @Override
                 public void onTextAvailable(@NotNull ProcessEvent event, @NotNull Key outputType) {
-                    // The output of the command, which can be long, as that of npm install, is logged at DEBUG only,
-                    // its standard error too, where commands also write their warnings
+                    // The output of the command, which can be long, as that of npm install, is logged line by line at
+                    // DEBUG only, its standard error too, where commands also write their warnings; logRun logs it at
+                    // INFO once the command ends, cut, if the task fails
                     context.print(event.getText(), outputType == ProcessOutputType.STDERR
                             ? ConsoleViewContentType.ERROR_OUTPUT
                             : ConsoleViewContentType.NORMAL_OUTPUT, Level.FINE);
@@ -333,9 +357,14 @@ public class ExecTask extends InstallerTask {
             }
             boolean succeeded = result.isTimeout()
                     || result.getExitCode() == 0 && (ignoreStderr || result.getStderr().isEmpty());
-            if (succeeded && outputPattern != null && !outputPattern.matcher(result.getStdout()).find()) {
-                // The warning names the command and the regular expression only; the output, which can hold a secret
-                // that the log doesn't recognise, is logged at DEBUG, as the rest of the output of the command
+            boolean outputMismatch = succeeded && outputPattern != null
+                    && !outputPattern.matcher(result.getStdout()).find();
+            // The log says how the command ended as the task does: its output at INFO only if the task fails
+            logRun(result, commandText, directory, processCommandLine.getProcessPath(), succeeded && !outputMismatch,
+                    context);
+            if (outputMismatch) {
+                // The warning names the command and the regular expression only; logRun logged the output at INFO,
+                // without the secrets that the log recognises, and the console shows it again here
                 context.printError("The output of '" + String.join(" ", resolvedCommand) + "' doesn't match "
                         + outputPattern.pattern() + (result.getStdout().isBlank() ? ": it printed nothing" : ":"));
                 if (!result.getStdout().isBlank()) {
@@ -345,6 +374,13 @@ public class ExecTask extends InstallerTask {
             }
             return succeeded;
         } catch (Exception e) {
+            if (handler == null && processCommandLine != null && directory != null) {
+                // The command didn't start, as one which isn't found in the PATH: the error below says why
+                String path = processCommandLine.getProcessPath();
+                printPath(path, context);
+                context.log(Level.INFO, "the command didn't start, in " + directory + ": " + commandText);
+                logPath(path, context);
+            }
             context.printError("", e);
             return false;
         } finally {
@@ -352,6 +388,84 @@ public class ExecTask extends InstallerTask {
                 handler.destroyProcess();
             }
         }
+    }
+
+    /**
+     * Prints the given detail of the command, as its working directory, in the consoles only: the IDE's log gets the
+     * details once the command ends, from {@link #logRun}.
+     */
+    private static void printDetail(@NotNull String detail, @NotNull InstallerContext context) {
+        context.print(detail, ConsoleViewContentType.SYSTEM_OUTPUT, Level.OFF);
+    }
+
+    /**
+     * Prints how the command ended in the consoles, and writes to the IDE's log at INFO, also when the task succeeds,
+     * how the command ended, in which directory, and with which PATH, so that a check which finds the wrong tool can be
+     * understood from the log (#2296). The log gets the output of the command at INFO only when the task fails, without
+     * the values which can be secrets and cut to {@link #MAX_LOGGED_LENGTH} characters, so that a failed installation
+     * can be understood from it too. The output of a task which succeeds stays at DEBUG, line by line, since it can hold
+     * a secret that the log doesn't recognise, and a default log is attached to bug reports (#2156).
+     *
+     * @param succeeded true if the task succeeds, as {@link #runCommand} returns it, and false otherwise.
+     */
+    private void logRun(@NotNull ProcessOutput result,
+                        @NotNull String commandText,
+                        @NotNull String directory,
+                        @Nullable String path,
+                        boolean succeeded,
+                        @NotNull InstallerContext context) {
+        if (result.isTimeout()) {
+            printDetail("Stopped at the timeout of " + timeout + " ms", context);
+            context.log(Level.INFO, "the command still ran at its timeout of " + timeout + " ms, in " + directory
+                    + ": " + commandText);
+        } else {
+            printDetail("Exit code: " + result.getExitCode(), context);
+            context.log(Level.INFO, "the command exited with " + result.getExitCode() + ", in " + directory + ": "
+                    + commandText);
+        }
+        logPath(path, context);
+        if (!succeeded) {
+            logOutput("standard output", result.getStdout(), context);
+            logOutput("standard error", result.getStderr(), context);
+        }
+    }
+
+    private static void printPath(@Nullable String path, @NotNull InstallerContext context) {
+        printDetail("PATH: " + Objects.requireNonNullElse(path, "none"), context);
+    }
+
+    private static void logPath(@Nullable String path, @NotNull InstallerContext context) {
+        context.log(Level.INFO, "the PATH of the command: " + (path != null ? truncate(path) : "none"));
+    }
+
+    /**
+     * Writes the given output of a command whose task failed to the IDE's log at INFO, unless it is blank, as one
+     * record, without the values which can be secrets and cut to {@link #MAX_LOGGED_LENGTH} characters.
+     */
+    private static void logOutput(@NotNull String stream, @NotNull String output, @NotNull InstallerContext context) {
+        if (!output.isBlank()) {
+            // Without its secrets before it is cut, so that no part of a secret is left which the log can't recognise
+            String lines = StringUtil.convertLineSeparators(output.strip());
+            context.log(Level.INFO, "the " + stream + " of the command:\n" + truncate(SecretRedactor.redact(lines)));
+        }
+    }
+
+    /**
+     * Returns the given text, or, if it is longer than {@link #MAX_LOGGED_LENGTH} characters, its start and its end,
+     * with how many characters are left out between them: a check prints the version of a tool at its start, and a
+     * failed installation says why at its end.
+     *
+     * @param text the text, as the output of a command.
+     * @return the text, or its start and its end.
+     */
+    @VisibleForTesting
+    static @NotNull String truncate(@NotNull String text) {
+        if (text.length() <= MAX_LOGGED_LENGTH) {
+            return text;
+        }
+        int half = MAX_LOGGED_LENGTH / 2;
+        return text.substring(0, half) + "\n[... " + (text.length() - 2 * half) + " characters left out ...]\n"
+                + text.substring(text.length() - half);
     }
 
     private Path getWorkingDir(@Nullable String workingDir,
