@@ -84,13 +84,15 @@ dependencies {
             // Since 2025.2, JetBrains moved spellchecker in a new "intellij.spellchecker" module
             bundledModule("intellij.spellchecker")
         }
-        if (ideaVersionInt >= 263) {
-            // In 2026.3, the debugger API is in modules of its own, and the structure view in a plugin of its own
+        if (ideaVersionInt >= 262) {
+            // Since 2026.2, the debugger API is in modules of its own, and the structure view in a plugin of its own,
+            // whose ID is intellij.structureView.plugin in 2026.2, and com.intellij.structureView, with the former as an
+            // alias, since 2026.3
             bundledModule("intellij.platform.debugger")
             bundledModule("intellij.platform.debugger.impl")
             bundledModule("intellij.platform.debugger.impl.shared")
             bundledModule("intellij.platform.debugger.impl.ui")
-            bundledPlugin("com.intellij.structureView")
+            bundledPlugin(if (ideaVersionInt >= 263) "com.intellij.structureView" else "intellij.structureView.plugin")
         }
 
         pluginVerifier()
@@ -126,11 +128,11 @@ dependencies {
 }
 
 // Set the JDK version used by the toolchain to build the project (Java 21 is required for platform 2025.3, and Java 25
-// for platform 2026.3, whose classes are Java 25 classes). Output compatibility and API usage are restricted to Java 17
-// in the tasks below.
+// for platform 2026.2 and later, whose classes are Java 25 classes). Output compatibility and API usage are restricted
+// to Java 17 in the tasks below.
 kotlin {
     jvmToolchain {
-        languageVersion = JavaLanguageVersion.of(if (ideaVersionInt >= 263) 25 else 21)
+        languageVersion = JavaLanguageVersion.of(if (ideaVersionInt >= 262) 25 else 21)
     }
 }
 
