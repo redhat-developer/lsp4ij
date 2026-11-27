@@ -7,6 +7,9 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij;
 
+import com.intellij.openapi.application.TransactionGuard;
+import com.intellij.openapi.application.TransactionGuardImpl;
+import com.intellij.openapi.application.WriteIntentReadAction;
 import com.intellij.openapi.command.WriteCommandAction;
 import com.intellij.openapi.fileEditor.FileDocumentManager;
 import com.intellij.openapi.vfs.VfsUtilCore;
@@ -22,6 +25,7 @@ import org.eclipse.lsp4j.TextDocumentSyncOptions;
 import org.eclipse.lsp4j.TextEdit;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
 
+import javax.swing.SwingUtilities;
 import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -93,6 +97,43 @@ public class WillSaveTest extends LSPCodeInsightFixtureTestCase {
                 () -> received().stream().filter("didSave"::equals).count() == 4, 10);
         assertEquals("after three timeouts, willSaveWaitUntil is no longer sent for the document",
                 3, received().stream().filter("willSaveWaitUntil"::equals).count());
+    }
+
+    public void testASaveQueuedWhileAnotherWaitsGetsABudgetOfItsOwn() throws Exception {
+        serverAsks(false, true);
+        var answers = holdAnswers();
+        open("text");
+        var queuedSave = new CompletableFuture<Void>();
+
+        try {
+            type("first ");
+            // A save in a UI event of its own, queued while the first save waits for the server, as a second Ctrl+S is:
+            // it runs before whatever the first save queues. As a user's key press, it may change the document.
+            SwingUtilities.invokeLater(() -> WriteIntentReadAction.run((Runnable) () ->
+                    ((TransactionGuardImpl) TransactionGuard.getInstance()).performUserActivity(() -> {
+                        try {
+                            type("second ");
+                            save();
+                            queuedSave.complete(null);
+                        } catch (Throwable e) {
+                            queuedSave.completeExceptionally(e);
+                        }
+                    })));
+            save();
+            assertFalse("the save must stop waiting for the server when the willSaveWaitUntil budget ends",
+                    answers.isDone());
+            PlatformTestUtil.waitWithEventsDispatching("the queued save must run", queuedSave::isDone, 30);
+            // rethrows what failed in the queued save
+            queuedSave.get();
+            assertFalse("the queued save must stop waiting for the server when its willSaveWaitUntil budget ends",
+                    answers.isDone());
+        } finally {
+            answers.complete(null);
+        }
+        PlatformTestUtil.waitWithEventsDispatching("the server must be told of both saves",
+                () -> received().stream().filter("didSave"::equals).count() == 2, 10);
+        assertEquals("a save in a UI event of its own must not find the budget that an earlier event used up",
+                2, received().stream().filter("willSaveWaitUntil"::equals).count());
     }
 
     public void testTheDocumentsSavedTogetherShareTheBudget() throws Exception {
