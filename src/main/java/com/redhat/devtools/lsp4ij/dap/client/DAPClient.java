@@ -1878,17 +1878,19 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
         singleThreadResumed = singleThread != null;
         reverseResumed = true;
         int ended = executionEpoch.endBeforeResuming();
+        // The 'stopped' event, which a debug adapter may send before its answer, ends the execution epoch as it
+        // arrives, before the stop has a suspend context
+        BooleanSupplier stoppedOrContinued = () -> executionEpoch.stoppedOrContinuedSince(ended);
         // The threads run once the debug adapter has accepted the request, right before the session resumes
         // (resumeWhenAnswered), which then no longer has this suspend context: a refused request leaves them stopped,
-        // and a stop which came meanwhile is newer. The 'stopped' event, which a debug adapter may send before its
-        // answer, ends the execution epoch as it arrives, before the stop has a suspend context
+        // and a stop which came meanwhile is newer
         var accepted = request.get().thenApply(response -> {
-            if (session.getSuspendContext() == context && !executionEpoch.stoppedOrContinuedSince(ended)) {
+            if (session.getSuspendContext() == context && !stoppedOrContinued.getAsBoolean()) {
                 updateThreadRunStates(states -> states.resumed(threadId, singleThread != null));
             }
             return response;
         });
-        return resumeWhenAnswered(accepted, session, context, error -> {
+        return resumeWhenAnswered(accepted, session, context, stoppedOrContinued, error -> {
             executionEpoch.resumeRefused(ended);
             debugProcess.print(DAPBundle.message(failedKey, error.getMessage()), ConsoleViewContentType.ERROR_OUTPUT);
         });
@@ -1899,23 +1901,36 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
      * doesn't resume the session for, such as 'stepBack': {@link XDebugSession#sessionResumed()} clears the views of
      * the stop as a step does, and the 'stopped' event which follows the answer suspends the session again. When the
      * debug adapter refuses, the session stays suspended where it was.
+     * <p>
+     * An answer which comes once the debug adapter said that the program stopped or continued leaves the session as it
+     * is: a 'stopped' event which the debug adapter sent before its answer, as DAP allows for 'reverseContinue',
+     * suspends the session where the program stopped, and a 'continued' event resumed it. LSP4J handles the answer on
+     * its own thread, after the events which came before it, unless the debug adapter answered before the thread which
+     * sent the request, such as the EDT, chained this to the request: that thread handles it then, maybe while another
+     * thread suspends the session at a stop which came before the answer. Resuming the session then would undo that
+     * stop, and the session would wait as if the program ran.
      *
-     * @param request the request which resumes the program.
-     * @param session the debug session.
-     * @param context the suspend context of the session when the request was sent, or null if it was not suspended.
-     * @param refused reports why the debug adapter refused.
+     * @param request            the request which resumes the program.
+     * @param session            the debug session.
+     * @param context            the suspend context of the session when the request was sent, or null if it was not
+     *                           suspended.
+     * @param stoppedOrContinued returns whether the debug adapter said that the program stopped or continued since the
+     *                           request was sent.
+     * @param refused            reports why the debug adapter refused.
      * @return the future, completed once the debug adapter has answered.
      */
     static CompletableFuture<@Nullable Void> resumeWhenAnswered(@NotNull CompletableFuture<?> request,
                                                                 @NotNull XDebugSession session,
                                                                 @Nullable XSuspendContext context,
+                                                                @NotNull BooleanSupplier stoppedOrContinued,
                                                                 @NotNull Consumer<Throwable> refused) {
         // Not async: the session runs before the 'stopped' event which follows the answer is handled
         return request.handle((response, error) -> {
             if (error != null) {
                 refused.accept(getCause(error));
-            } else if (session.getSuspendContext() == context) {
-                // Unless a 'continued' event resumed it, or a stop suspended it, meanwhile
+            } else if (!stoppedOrContinued.getAsBoolean() && session.getSuspendContext() == context) {
+                // Unless the debug adapter said meanwhile that the program stopped or continued, or another stop, such
+                // as one of a child session, suspended the session
                 session.sessionResumed();
             }
             return null;
@@ -2622,6 +2637,17 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
      */
     int endExecutionEpochBeforeResuming() {
         return executionEpoch.endBeforeResuming();
+    }
+
+    /**
+     * Returns true if the debug adapter said that the program stopped or continued since the given execution epoch
+     * ended before a request of this client resumed the program: the event is newer than the request.
+     *
+     * @param ended the execution epoch which {@link #endExecutionEpochBeforeResuming()} ended.
+     * @return true if the debug adapter said that the program stopped or continued since, and false otherwise.
+     */
+    boolean stoppedOrContinuedSince(int ended) {
+        return executionEpoch.stoppedOrContinuedSince(ended);
     }
 
     /**

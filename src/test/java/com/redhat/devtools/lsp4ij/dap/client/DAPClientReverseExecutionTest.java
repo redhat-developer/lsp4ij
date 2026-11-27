@@ -78,7 +78,7 @@ public class DAPClientReverseExecutionTest {
     void theSessionRunsOnceTheDebugAdapterHasAnswered() {
         var answer = new CompletableFuture<Void>();
 
-        var done = DAPClient.resumeWhenAnswered(answer, session(stop), stop, error -> calls.add("refused"));
+        var done = DAPClient.resumeWhenAnswered(answer, session(stop), stop, () -> false, error -> calls.add("refused"));
 
         // the session stays suspended until the debug adapter answers
         assertTrue(calls.isEmpty(), calls.toString());
@@ -93,7 +93,8 @@ public class DAPClientReverseExecutionTest {
         var error = new ResponseErrorException(new ResponseError(ResponseErrorCode.RequestFailed,
                 "Reverse Continue is not supported. Only \"Step back\" is supported.", null));
 
-        DAPClient.resumeWhenAnswered(CompletableFuture.failedFuture(error), session(stop), stop, failures::add).join();
+        DAPClient.resumeWhenAnswered(CompletableFuture.failedFuture(error), session(stop), stop, () -> false,
+                failures::add).join();
 
         // the refusal is reported, and the session is still suspended where it was
         assertTrue(calls.isEmpty(), calls.toString());
@@ -105,7 +106,18 @@ public class DAPClientReverseExecutionTest {
         var nextStop = new XSuspendContext() {
         };
 
-        DAPClient.resumeWhenAnswered(CompletableFuture.completedFuture(null), session(nextStop), stop, error -> calls.add("refused")).join();
+        DAPClient.resumeWhenAnswered(CompletableFuture.completedFuture(null), session(nextStop), stop, () -> false,
+                error -> calls.add("refused")).join();
+
+        assertTrue(calls.isEmpty(), calls.toString());
+    }
+
+    @Test
+    void anAnswerWhichComesOnceTheDebugAdapterSaidThatTheProgramStoppedLeavesTheSessionAsItIs() {
+        // The 'stopped' event, which the debug adapter sent before its answer, hasn't suspended the session at the new
+        // stop yet: it does so meanwhile, which resuming the session would undo
+        DAPClient.resumeWhenAnswered(CompletableFuture.completedFuture(null), session(stop), stop, () -> true,
+                error -> calls.add("refused")).join();
 
         assertTrue(calls.isEmpty(), calls.toString());
     }
