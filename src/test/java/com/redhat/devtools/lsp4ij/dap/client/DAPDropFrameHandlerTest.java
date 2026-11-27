@@ -11,6 +11,7 @@
 package com.redhat.devtools.lsp4ij.dap.client;
 
 import com.intellij.xdebugger.XDebugSession;
+import com.intellij.xdebugger.frame.XSuspendContext;
 import org.eclipse.lsp4j.debug.Capabilities;
 import org.eclipse.lsp4j.debug.RestartFrameArguments;
 import org.eclipse.lsp4j.debug.StackFrame;
@@ -39,6 +40,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 public class DAPDropFrameHandlerTest {
 
     private final List<String> calls = new ArrayList<>();
+    private final XSuspendContext stop = new XSuspendContext() {
+    };
 
     @Test
     void aDebugAdapterWithoutRestartFrameRestartsNoFrame() {
@@ -65,7 +68,8 @@ public class DAPDropFrameHandlerTest {
     void aDropRestartsTheFrameThenTheSessionRuns() {
         var failures = new ArrayList<Throwable>();
 
-        DAPDropFrameHandler.restartFrame(server(CompletableFuture.completedFuture(null)), 7, session(), failures::add).join();
+        DAPDropFrameHandler.restartFrame(server(CompletableFuture.completedFuture(null)), 7, session(stop), stop, () -> false,
+                failures::add).join();
 
         assertEquals(List.of("restartFrame 7", "resumed"), calls);
         assertTrue(failures.isEmpty(), failures.toString());
@@ -75,7 +79,8 @@ public class DAPDropFrameHandlerTest {
     void theSessionRunsOnceTheDebugAdapterHasAnswered() {
         var answer = new CompletableFuture<Void>();
 
-        var done = DAPDropFrameHandler.restartFrame(server(answer), 7, session(), error -> calls.add("failed"));
+        var done = DAPDropFrameHandler.restartFrame(server(answer), 7, session(stop), stop, () -> false,
+                error -> calls.add("failed"));
 
         // the session stays suspended until the debug adapter answers
         assertEquals(List.of("restartFrame 7"), calls);
@@ -89,11 +94,33 @@ public class DAPDropFrameHandlerTest {
         var failures = new ArrayList<Throwable>();
         var error = new ResponseErrorException(new ResponseError(ResponseErrorCode.RequestFailed, "frame cannot be restarted", null));
 
-        DAPDropFrameHandler.restartFrame(server(CompletableFuture.failedFuture(error)), 7, session(), failures::add).join();
+        DAPDropFrameHandler.restartFrame(server(CompletableFuture.failedFuture(error)), 7, session(stop), stop, () -> false,
+                failures::add).join();
 
         // the failure is reported, and the session is still suspended where it was
         assertEquals(List.of("restartFrame 7"), calls);
         assertEquals(List.of(error), failures);
+    }
+
+    @Test
+    void anAnswerWhichComesOnceTheDebugAdapterSaidThatTheProgramStoppedLeavesTheSessionAsItIs() {
+        // The 'stopped' event of the restart, which came before the answer, hasn't suspended the session in the
+        // restarted frame yet: it does so meanwhile, which resuming the session would undo
+        DAPDropFrameHandler.restartFrame(server(CompletableFuture.completedFuture(null)), 7, session(stop), stop, () -> true,
+                error -> calls.add("failed")).join();
+
+        assertEquals(List.of("restartFrame 7"), calls);
+    }
+
+    @Test
+    void aSessionWhichAnotherStopSuspendedMeanwhileStaysSuspended() {
+        var otherStop = new XSuspendContext() {
+        };
+
+        DAPDropFrameHandler.restartFrame(server(CompletableFuture.completedFuture(null)), 7, session(otherStop), stop,
+                () -> false, error -> calls.add("failed")).join();
+
+        assertEquals(List.of("restartFrame 7"), calls);
     }
 
     @Test
@@ -131,9 +158,13 @@ public class DAPDropFrameHandlerTest {
                 });
     }
 
-    private XDebugSession session() {
+    /**
+     * Returns a debug session suspended at the given suspend context.
+     */
+    private XDebugSession session(XSuspendContext context) {
         return (XDebugSession) Proxy.newProxyInstance(XDebugSession.class.getClassLoader(), new Class<?>[]{XDebugSession.class},
                 (proxy, method, args) -> switch (method.getName()) {
+                    case "getSuspendContext" -> context;
                     case "sessionResumed" -> {
                         calls.add("resumed");
                         yield null;

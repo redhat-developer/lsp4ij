@@ -12,7 +12,9 @@ package com.redhat.devtools.lsp4ij.dap.stepping;
 
 import com.intellij.execution.RunManager;
 import com.intellij.execution.configurations.ConfigurationType;
+import com.intellij.execution.configurations.RunConfigurationOptions;
 import com.intellij.execution.executors.DefaultDebugExecutor;
+import com.intellij.execution.runners.ExecutionEnvironment;
 import com.intellij.execution.runners.ExecutionEnvironmentBuilder;
 import com.intellij.openapi.actionSystem.ActionManager;
 import com.intellij.openapi.actionSystem.AnAction;
@@ -26,11 +28,19 @@ import com.intellij.xdebugger.XDebugSession;
 import com.intellij.xdebugger.XDebugSessionListener;
 import com.intellij.xdebugger.XDebuggerManager;
 import com.redhat.devtools.lsp4ij.dap.DAPDebugProcess;
+import com.redhat.devtools.lsp4ij.dap.DebugAdapterManager;
 import com.redhat.devtools.lsp4ij.dap.DebugMode;
+import com.redhat.devtools.lsp4ij.dap.client.DAPClient;
 import com.redhat.devtools.lsp4ij.dap.client.DAPStackFrame;
 import com.redhat.devtools.lsp4ij.dap.client.DAPSuspendContext;
 import com.redhat.devtools.lsp4ij.dap.client.DAPThreadRunState;
 import com.redhat.devtools.lsp4ij.dap.configurations.DAPRunConfiguration;
+import com.redhat.devtools.lsp4ij.dap.definitions.DebugAdapterServerDefinition;
+import com.redhat.devtools.lsp4ij.dap.descriptors.DebugAdapterDescriptor;
+import com.redhat.devtools.lsp4ij.dap.descriptors.DebugAdapterDescriptorFactory;
+import com.redhat.devtools.lsp4ij.dap.descriptors.DefaultDebugAdapterDescriptor;
+import com.redhat.devtools.lsp4ij.server.definition.ServerMapping;
+import com.redhat.devtools.lsp4ij.settings.ServerTrace;
 import org.eclipse.lsp4j.debug.Capabilities;
 import org.eclipse.lsp4j.debug.CapabilitiesEventArguments;
 import org.eclipse.lsp4j.debug.ConfigurationDoneArguments;
@@ -52,20 +62,34 @@ import org.eclipse.lsp4j.debug.ThreadsResponse;
 import org.eclipse.lsp4j.debug.launch.DSPLauncher;
 import org.eclipse.lsp4j.debug.services.IDebugProtocolClient;
 import org.eclipse.lsp4j.debug.services.IDebugProtocolServer;
+import org.eclipse.lsp4j.jsonrpc.Launcher;
+import org.eclipse.lsp4j.jsonrpc.MessageConsumer;
+import org.eclipse.lsp4j.jsonrpc.RemoteEndpoint;
 import org.eclipse.lsp4j.jsonrpc.ResponseErrorException;
 import org.eclipse.lsp4j.jsonrpc.messages.ResponseError;
 import org.eclipse.lsp4j.jsonrpc.messages.ResponseErrorCode;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Proxy;
 import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.UnaryOperator;
 
 /**
  * Step Back and Reverse Continue in a debug session, against a DAP server in the test's process which the session
@@ -86,6 +110,7 @@ public class DAPReverseDebuggingSessionTest extends HeavyPlatformTestCase {
 
     private ReversingServer server;
     private XDebugSession session;
+    private @Nullable DebugAdapterServerDefinition serverDefinition;
 
     @Override
     protected void tearDown() throws Exception {
@@ -95,6 +120,9 @@ public class DAPReverseDebuggingSessionTest extends HeavyPlatformTestCase {
             }
             if (server != null) {
                 server.close();
+            }
+            if (serverDefinition != null) {
+                DebugAdapterManager.getInstance().removeDebugAdapterServer(serverDefinition);
             }
         } finally {
             super.tearDown();
@@ -240,6 +268,46 @@ public class DAPReverseDebuggingSessionTest extends HeavyPlatformTestCase {
                 client.getThreadRunStates().getState(MAIN));
     }
 
+    public void testAnAnswerToReverseContinueHandledOnTheEDTWhileTheStopSentBeforeItSuspendsTheSessionLeavesItSuspendedThere() throws Exception {
+        // The EDT, which sends Reverse Continue, handles the answer itself: the client returns the request only once
+        // LSP4J has handled the answer, after the 'stopped' event which the DAP server sent first, as a busy EDT finds it
+        debugHandingAnswersOver();
+        server.stopsBeforeAnswering = true;
+        var client = ((DAPSuspendContext) session.getSuspendContext()).getClient();
+        // The stop suspends the session once the DAP server gives the frames of the stop, which it holds
+        var frames = new CompletableFuture<Void>();
+        server.stackTraces = frames;
+        var suspendedAtTheStop = new CompletableFuture<Void>();
+        session.addSessionListener(new XDebugSessionListener() {
+            @Override
+            public void sessionPaused() {
+                if (currentFrameId() == 2) {
+                    suspendedAtTheStop.complete(null);
+                }
+            }
+
+            @Override
+            public void beforeSessionResume() {
+                // The answer resumes the session, which it found still suspended where Reverse Continue was performed:
+                // the stop suspends it meanwhile, on the thread which gets the frames
+                frames.complete(null);
+                waitFor(suspendedAtTheStop, "the stop suspends the session while the answer resumes it");
+            }
+        }, getTestRootDisposable());
+        var reverseContinue = action(DAPReverseContinueAction.ID, "Reverse Continue");
+
+        reverseContinue.actionPerformed(update(reverseContinue));
+        assertInstanceOf(request(), ReverseContinueArguments.class);
+        // The answer is handled: the stop suspends the session, unless it did while the answer resumed it
+        frames.complete(null);
+        PlatformTestUtil.waitWithEventsDispatching("the stop suspends the session", suspendedAtTheStop::isDone, BOUND_SECONDS);
+
+        // The answer, which came after the stop, leaves the session as the stop suspended it
+        waitUntilStoppedAt(2, "where the program stopped running backwards");
+        assertEquals("The Threads tab shows the thread which stopped as stopped", DAPThreadRunState.STOPPED,
+                client.getThreadRunStates().getState(MAIN));
+    }
+
     public void testStepBackAndReverseContinueAreHiddenWhenTheDAPServerDoesNotSupportStepBack() throws Exception {
         debug(false, false);
         var stepBack = action(DAPStepBackAction.ID, "Step Back");
@@ -259,6 +327,24 @@ public class DAPReverseDebuggingSessionTest extends HeavyPlatformTestCase {
      * Starts debugging, attached to a new {@link ReversingServer}, and waits for the program to stop.
      */
     private void debug(boolean supportsStepBack, boolean refusesReverseContinue) throws Exception {
+        debug(supportsStepBack, refusesReverseContinue, null);
+    }
+
+    /**
+     * Starts debugging, as {@link #debug(boolean, boolean)} does, with the client of the
+     * {@link HandingAnswersOverServerDefinition}: the DAP server supports stepping back, and accepts Reverse Continue.
+     */
+    private void debugHandingAnswersOver() throws Exception {
+        serverDefinition = new HandingAnswersOverServerDefinition();
+        DebugAdapterManager.getInstance().addDebugAdapterServerWithoutNotification(serverDefinition);
+        debug(true, false, serverDefinition.getId());
+    }
+
+    /**
+     * Starts debugging, attached to a new {@link ReversingServer}, with the debug adapter of the given id, or the
+     * default one, and waits for the program to stop.
+     */
+    private void debug(boolean supportsStepBack, boolean refusesReverseContinue, @Nullable String serverId) throws Exception {
         server = new ReversingServer(supportsStepBack, refusesReverseContinue);
         var type = Arrays.stream(ConfigurationType.CONFIGURATION_TYPE_EP.getExtensions())
                 .filter(t -> t.getId().equals("DAPConfiguration")).findFirst().orElseThrow();
@@ -268,6 +354,9 @@ public class DAPReverseDebuggingSessionTest extends HeavyPlatformTestCase {
         configuration.setAttachAddress(InetAddress.getLoopbackAddress().getHostAddress());
         configuration.setAttachPort(String.valueOf(server.getPort()));
         configuration.setAttachConfiguration("{}");
+        if (serverId != null) {
+            configuration.setServerId(serverId);
+        }
         // the debug process connects to the DAP server in the background, as it does outside tests
         PlatformTestUtil.withSystemProperty("intellij.progress.task.ignoreHeadless", "true", () ->
                 ExecutionEnvironmentBuilder.create(getProject(), DefaultDebugExecutor.getDebugExecutorInstance(), configuration)
@@ -310,6 +399,17 @@ public class DAPReverseDebuggingSessionTest extends HeavyPlatformTestCase {
         return server.requests.take();
     }
 
+    /**
+     * Waits for the given future without dispatching events, as on the thread which handles an answer of the DAP server.
+     */
+    private static void waitFor(@NotNull CompletableFuture<?> future, @NotNull String what) {
+        try {
+            future.get(BOUND_SECONDS, TimeUnit.SECONDS);
+        } catch (InterruptedException | ExecutionException | TimeoutException e) {
+            throw new AssertionError(what, e);
+        }
+    }
+
     private static @NotNull AnAction action(@NotNull String id, @NotNull String text) {
         var action = ActionManager.getInstance().getAction(id);
         assertInstanceOf(action, DAPReverseExecutionAction.class);
@@ -344,6 +444,8 @@ public class DAPReverseDebuggingSessionTest extends HeavyPlatformTestCase {
         // Set by the test: the DAP server sends the 'stopped' event of Reverse Continue before it answers, which DAP
         // allows, as it orders only the answer to a step before the 'stopped' event
         volatile boolean stopsBeforeAnswering;
+        // Set by the test: the DAP server gives the frames of the thread once this future completes
+        volatile @Nullable CompletableFuture<Void> stackTraces;
 
         ReversingServer(boolean supportsStepBack, boolean refusesReverseContinue) throws IOException {
             this.supportsStepBack = supportsStepBack;
@@ -472,7 +574,8 @@ public class DAPReverseDebuggingSessionTest extends HeavyPlatformTestCase {
             var response = new StackTraceResponse();
             response.setStackFrames(new StackFrame[]{frame});
             response.setTotalFrames(1);
-            return CompletableFuture.completedFuture(response);
+            var given = stackTraces;
+            return given != null ? given.thenApply(ignored -> response) : CompletableFuture.completedFuture(response);
         }
 
         @Override
@@ -485,6 +588,106 @@ public class DAPReverseDebuggingSessionTest extends HeavyPlatformTestCase {
         @Override
         public CompletableFuture<Void> disconnect(DisconnectArguments args) {
             return CompletableFuture.completedFuture(null);
+        }
+    }
+
+    /**
+     * A debug adapter whose client handles the answer to Reverse Continue on the thread which sent the request, once
+     * LSP4J has handled the answer, and the events before it, on its own thread: as when the DAP server answers before
+     * the thread which sends the request, such as the EDT, is done sending it.
+     */
+    private static class HandingAnswersOverServerDefinition extends DebugAdapterServerDefinition {
+
+        HandingAnswersOverServerDefinition() {
+            super("dap-reverse-debugging-test", "Handing answers over");
+        }
+
+        @Override
+        protected @NotNull DebugAdapterDescriptorFactory createFactory() {
+            return new DebugAdapterDescriptorFactory() {
+                @Override
+                public DebugAdapterDescriptor createDebugAdapterDescriptor(@NotNull RunConfigurationOptions options,
+                                                                           @NotNull ExecutionEnvironment environment) {
+                    return new DefaultDebugAdapterDescriptor(options, environment, getServerDefinition()) {
+                        @Override
+                        public @NotNull DAPClient createClient(@NotNull DAPDebugProcess debugProcess,
+                                                               @NotNull Map<String, Object> dapParameters,
+                                                               boolean isDebug,
+                                                               @NotNull DebugMode debugMode,
+                                                               @NotNull ServerTrace serverTrace,
+                                                               @Nullable DAPClient parentClient) {
+                            return new HandingAnswersOverClient(debugProcess, dapParameters, isDebug, debugMode,
+                                    serverTrace, parentClient);
+                        }
+                    };
+                }
+            };
+        }
+
+        @Override
+        protected List<ServerMapping> getServerMappings() {
+            return List.of();
+        }
+    }
+
+    /**
+     * The client of the {@link HandingAnswersOverServerDefinition}: it sends Reverse Continue to the DAP server, and
+     * returns the future of the answer only once LSP4J has completed it.
+     */
+    private static class HandingAnswersOverClient extends DAPClient {
+
+        HandingAnswersOverClient(@NotNull DAPDebugProcess debugProcess,
+                                 @NotNull Map<String, Object> dapParameters,
+                                 boolean isDebug,
+                                 @NotNull DebugMode debugMode,
+                                 @NotNull ServerTrace serverTrace,
+                                 @Nullable DAPClient parentClient) {
+            super(debugProcess, dapParameters, isDebug, debugMode, serverTrace, parentClient);
+        }
+
+        @Override
+        protected Launcher<? extends IDebugProtocolServer> createLauncher(UnaryOperator<MessageConsumer> wrapper,
+                                                                          InputStream in, OutputStream out,
+                                                                          ExecutorService threadPool) {
+            var launcher = super.createLauncher(wrapper, in, out, threadPool);
+            var server = launcher.getRemoteProxy();
+            var handingAnswersOver = (IDebugProtocolServer) Proxy.newProxyInstance(IDebugProtocolServer.class.getClassLoader(),
+                    new Class<?>[]{IDebugProtocolServer.class}, (proxy, method, args) -> {
+                        if (method.getDeclaringClass() == Object.class) {
+                            return switch (method.getName()) {
+                                case "equals" -> proxy == args[0];
+                                case "hashCode" -> System.identityHashCode(proxy);
+                                default -> "Handing answers over: " + server;
+                            };
+                        }
+                        Object result;
+                        try {
+                            result = method.invoke(server, args);
+                        } catch (InvocationTargetException e) {
+                            throw e.getCause();
+                        }
+                        if ("reverseContinue".equals(method.getName())) {
+                            waitFor(((CompletableFuture<?>) result).handle((answer, error) -> null),
+                                    "the DAP server answers Reverse Continue");
+                        }
+                        return result;
+                    });
+            return new Launcher<IDebugProtocolServer>() {
+                @Override
+                public Future<Void> startListening() {
+                    return launcher.startListening();
+                }
+
+                @Override
+                public IDebugProtocolServer getRemoteProxy() {
+                    return handingAnswersOver;
+                }
+
+                @Override
+                public RemoteEndpoint getRemoteEndpoint() {
+                    return launcher.getRemoteEndpoint();
+                }
+            };
         }
     }
 }
