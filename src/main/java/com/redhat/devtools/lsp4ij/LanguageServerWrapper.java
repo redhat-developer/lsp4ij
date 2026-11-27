@@ -1257,7 +1257,8 @@ public class LanguageServerWrapper implements Disposable {
      * Connects the file as {@link #connect(VirtualFile, LSPFileConnectionInfo)} does, for a connection asked for when
      * the last editor of the file had closed the given number of times. A close of the file's last editor since then
      * disconnects the file, which this connection then leaves disconnected: it gives no language server. So does a
-     * move of the file from the place with the given URL, which this instance was chosen for.
+     * move of the file from the place with the given URL, which this language server, and this instance of it, were
+     * chosen for: the new place of the file decides again.
      */
     CompletableFuture<@Nullable LanguageServer> connect(@NotNull VirtualFile file,
                                                         @NotNull LSPFileConnectionInfo fileConnectionInfo,
@@ -1433,8 +1434,9 @@ public class LanguageServerWrapper implements Disposable {
                 }
                 String url = file.getUrl();
                 if ((chosenUrl != null && !chosenUrl.equals(url)) || !fileUrl.equals(url)) {
-                    // The file moved since the connection was asked for, or since this instance was chosen for it.
-                    // Opened with the URI of its earlier place, which the move found no document for, or on the
+                    // The file moved since the connection was asked for, or since this language server, and this
+                    // instance of it, were chosen for it. Opened with the URI of its earlier place, which the move found
+                    // no document for, or by a language server that matched only its earlier place, or on the
                     // instance of its earlier place, it would stay with this language server. Its new place decides.
                     // The move found no document to take along, so this connects an open file as the move connects a
                     // moved document, once the lock is released

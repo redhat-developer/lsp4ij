@@ -303,6 +303,33 @@ public class FileDocumentMoveTest extends LSPCodeInsightFixtureTestCase {
         }
     }
 
+    public void testARequestMatchedBeforeARenameDoesNotConnectTheFileToALanguageServerThatNoLongerMatchesIt()
+            throws Exception {
+        var wrapper = connect(myFixture.getTempDirFixture().createFile("source/other.foo", "other")).wrapper();
+        var matcher = matchAsynchronously(wrapper.getServerDefinition());
+        var file = myFixture.getTempDirFixture().createFile("source/test.async", "disk");
+        var editor = EditorFactory.getInstance().createEditor(LSPIJUtils.getDocument(file), myFixture.getProject());
+        try {
+            // A request, as of a highlighting pass, matches the file and connects it only after the rename
+            var match = new CompletableFuture<Boolean>();
+            matcher.answers.put("test.async", match);
+            var servers = connectLater(file);
+            PlatformTestUtil.waitWithEventsDispatching("The request must ask the matcher about the file",
+                    () -> matcher.asked.contains("test.async"), 10);
+
+            write(() -> file.rename(this, "test.txt"));
+            match.complete(true);
+
+            assertEmpty("No language server matches the renamed file", servers.get(30, TimeUnit.SECONDS));
+            NonBlockingReadActionImpl.waitForAsyncTaskCompletion();
+            PlatformTestUtil.dispatchAllInvocationEventsInIdeEventQueue();
+            assertFalse("A language server that no longer matches the renamed file must not get it",
+                    wrapper.isSynchronizing(file));
+        } finally {
+            EditorFactory.getInstance().releaseEditor(editor);
+        }
+    }
+
     public void testAMovedDocumentIsConnectedAgainOnceAnAsynchronousMatcherAcceptsItsNewPlace() throws Exception {
         var wrapper = connect(myFixture.getTempDirFixture().createFile("source/other.foo", "other")).wrapper();
         var matcher = matchAsynchronously(wrapper.getServerDefinition());
