@@ -34,6 +34,7 @@ import org.jdom.Element;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.io.File;
 import java.util.List;
 import java.util.Map;
 
@@ -208,6 +209,17 @@ public class DAPRunConfiguration extends DAPRunConfigurationBase<DAPRunConfigura
         getOptions().setFile(file);
     }
 
+    /**
+     * Returns the file to run with: {@link #getFile()} with a leading {@code ~} expanded, and a relative path resolved
+     * against the working directory when one is set, and otherwise against the project's directory, see
+     * {@link DAPRunConfigurationOptions#getResolvedFile(Project)}.
+     *
+     * @return the file to run with, or null or blank if none is set.
+     */
+    public @Nullable String getResolvedFile() {
+        return getOptions().getResolvedFile(getProject());
+    }
+
     public DebugMode getDebugMode() {
         return getOptions().getDebugMode();
     }
@@ -276,6 +288,22 @@ public class DAPRunConfiguration extends DAPRunConfigurationBase<DAPRunConfigura
             throw new RuntimeConfigurationException("Server command is required", DEBUG_ADAPTER_CONFIGURATION);
         }
         checkAttachPort();
+        checkWorkingDirectory();
+    }
+
+    /**
+     * Reports a working directory which, with {@code ~} expanded and a relative path resolved against the project's
+     * directory, isn't a directory, as a warning, with which the run still starts, as before: a Debug Adapter which
+     * the run starts can't start in it, and starts in the IDE's working directory instead.
+     *
+     * @throws RuntimeConfigurationWarning if the working directory is set and isn't a directory.
+     */
+    private void checkWorkingDirectory() throws RuntimeConfigurationWarning {
+        String workingDirectory = getOptions().getResolvedWorkingDirectory(getProject());
+        if (StringUtils.isNotBlank(workingDirectory) && !new File(workingDirectory).isDirectory()) {
+            throw new RuntimeConfigurationWarning(
+                    DAPBundle.message("dap.settings.editor.configuration.cwd.notDirectory", workingDirectory));
+        }
     }
 
     /**

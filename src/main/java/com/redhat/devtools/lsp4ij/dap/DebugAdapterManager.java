@@ -343,7 +343,7 @@ public class DebugAdapterManager implements DebuggableFile {
             if (runConfiguration instanceof DAPRunConfiguration dapConfig) {
                 if (dapConfig.isDebuggableFile(file, project)) {
                     if (checkFile) {
-                        String existingFile = dapConfig.getFile();
+                        String existingFile = dapConfig.getResolvedFile();
                         if (!getFilePath(file).equals(existingFile)) {
                             return null;
                         }

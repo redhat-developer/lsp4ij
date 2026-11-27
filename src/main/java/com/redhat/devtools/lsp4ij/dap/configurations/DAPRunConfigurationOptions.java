@@ -13,6 +13,7 @@ package com.redhat.devtools.lsp4ij.dap.configurations;
 import com.intellij.lang.Language;
 import com.intellij.openapi.components.StoredProperty;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.util.io.FileUtil;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.dap.DebugAdapterManager;
@@ -30,6 +31,8 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.jetbrains.jps.model.fileTypes.FileNameMatcherFactory;
 
+import java.nio.file.InvalidPathException;
+import java.nio.file.Path;
 import java.util.List;
 
 /**
@@ -120,6 +123,65 @@ public class DAPRunConfigurationOptions extends DAPRunConfigurationOptionsBase i
     @Override
     public void setFile(@Nullable String file) {
         this.file.setValue(this, file);
+    }
+
+    /**
+     * Returns the working directory to run with: {@link #getWorkingDirectory()} with a leading {@code ~} expanded to
+     * the user's home directory, and a relative path resolved against the project's directory. An absolute path stays
+     * as it is. {@link #getWorkingDirectory()} keeps the text as it is stored, which the settings editor shows.
+     *
+     * @param project the project, whose directory a relative path is resolved against, or null if it isn't known: a
+     *                relative path then stays as it is.
+     * @return the working directory to run with, or null or blank if none is set.
+     */
+    public @Nullable String getResolvedWorkingDirectory(@Nullable Project project) {
+        return resolvePath(getWorkingDirectory(), project != null ? project.getBasePath() : null);
+    }
+
+    /**
+     * Returns the file to run with: {@link #getFile()} with a leading {@code ~} expanded to the user's home directory,
+     * and a relative path resolved against the working directory to run with
+     * ({@link #getResolvedWorkingDirectory(Project)}) when one is set, as the Debug Adapter, which runs in it, resolves
+     * the path, and otherwise against the project's directory. An absolute path stays as it is. {@link #getFile()}
+     * keeps the text as it is stored, which the settings editor shows.
+     *
+     * @param project the project, whose directory a relative working directory, or without a working directory a
+     *                relative path, is resolved against, or null if it isn't known: a relative path then stays as it
+     *                is without a working directory, and relative to a relative working directory.
+     * @return the file to run with, or null or blank if none is set.
+     */
+    public @Nullable String getResolvedFile(@Nullable Project project) {
+        String workingDirectory = getResolvedWorkingDirectory(project);
+        return resolvePath(getFile(), StringUtils.isNotBlank(workingDirectory)
+                ? workingDirectory
+                : project != null ? project.getBasePath() : null);
+    }
+
+    /**
+     * Returns the given path to run with: an absolute path as it is, and otherwise a leading {@code ~} expanded to the
+     * user's home directory and a relative path resolved against the given directory, normalized.
+     *
+     * @param path      the path as it is stored, or null.
+     * @param directory the directory which a relative path is relative to, or null if there is none: a relative path
+     *                  then stays as it is.
+     * @return the path to run with, or the given one if it is null or blank, or isn't a path of this system.
+     */
+    private static @Nullable String resolvePath(@Nullable String path, @Nullable String directory) {
+        if (path == null || StringUtils.isBlank(path) || FileUtil.isAbsolute(path)) {
+            return path;
+        }
+        try {
+            Path resolved = Path.of(FileUtil.expandUserHome(path));
+            if (!resolved.isAbsolute()) {
+                if (directory == null) {
+                    return path;
+                }
+                resolved = Path.of(directory).resolve(resolved);
+            }
+            return resolved.normalize().toString();
+        } catch (InvalidPathException e) {
+            return path;
+        }
     }
 
     public DebugMode getDebugMode() {

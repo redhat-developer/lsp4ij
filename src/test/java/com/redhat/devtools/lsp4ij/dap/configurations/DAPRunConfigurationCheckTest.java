@@ -14,6 +14,9 @@ import com.intellij.execution.configurations.ConfigurationFactory;
 import com.intellij.execution.configurations.ConfigurationTypeUtil;
 import com.intellij.execution.configurations.RuntimeConfigurationError;
 import com.intellij.execution.configurations.RuntimeConfigurationException;
+import com.intellij.execution.configurations.RuntimeConfigurationWarning;
+import com.intellij.openapi.util.Disposer;
+import com.intellij.openapi.util.io.FileUtil;
 import com.intellij.testFramework.LightPlatformTestCase;
 import com.redhat.devtools.lsp4ij.dap.DAPBundle;
 import com.redhat.devtools.lsp4ij.dap.DebugMode;
@@ -24,13 +27,18 @@ import com.redhat.devtools.lsp4ij.server.definition.ServerMapping;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.io.File;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 
 /**
  * Tests what {@link DAPRunConfiguration#checkConfiguration()} reports, which IntelliJ shows in the run configuration
  * dialog and before a run starts. An attach whose port can't be resolved, such as {@code $port} when the DAP
  * parameters have no {@code port}, can never connect, so it is an error which names the field and how to fix it,
- * instead of an {@code IllegalArgumentException: port out of range:-1} in the console.
+ * instead of an {@code IllegalArgumentException: port out of range:-1} in the console. A working directory which isn't a
+ * directory, once {@code ~} is expanded and a relative path is resolved against the project's directory, is a warning,
+ * with which the run still starts, instead of being dropped without a word.
  */
 public class DAPRunConfigurationCheckTest extends LightPlatformTestCase {
 
@@ -113,6 +121,44 @@ public class DAPRunConfigurationCheckTest extends LightPlatformTestCase {
         attach(create(), "$port", "{\"port\": ").checkConfiguration();
     }
 
+    public void testAWorkingDirectoryWhichDoesNotExistIsAWarning() throws Exception {
+        var configuration = launch(create());
+        String missing = new File(createTempDirectory(), "missing").getPath();
+        configuration.setWorkingDirectory(missing);
+
+        assertWarning(DAPBundle.message("dap.settings.editor.configuration.cwd.notDirectory", missing), configuration);
+    }
+
+    public void testAWorkingDirectoryWhichIsAFileIsAWarning() throws Exception {
+        var configuration = launch(create());
+        String file = Files.createFile(createTempDirectory().toPath().resolve("hello.rb")).toString();
+        configuration.setWorkingDirectory(file);
+
+        assertWarning(DAPBundle.message("dap.settings.editor.configuration.cwd.notDirectory", file), configuration);
+    }
+
+    public void testTheWarningNamesTheResolvedWorkingDirectory() {
+        var configuration = launch(create());
+        configuration.setWorkingDirectory("missing/directory");
+        String basePath = getProject().getBasePath();
+        assertNotNull("The project of the tests has a directory", basePath);
+
+        assertWarning(DAPBundle.message("dap.settings.editor.configuration.cwd.notDirectory",
+                Path.of(basePath).resolve("missing").resolve("directory").normalize().toString()), configuration);
+    }
+
+    public void testAnExistingWorkingDirectoryOrNoneIsValid() throws Exception {
+        var configuration = launch(create());
+        configuration.checkConfiguration();
+
+        configuration.setWorkingDirectory(createTempDirectory().getPath());
+        configuration.checkConfiguration();
+
+        // The home directory
+        configuration.setWorkingDirectory("~");
+        configuration.checkConfiguration();
+    }
+
     private static void assertError(@NotNull String expected, @NotNull DAPRunConfiguration configuration) {
         try {
             configuration.checkConfiguration();
@@ -123,6 +169,30 @@ public class DAPRunConfigurationCheckTest extends LightPlatformTestCase {
             fail("checkConfiguration() reported \"" + e.getLocalizedMessage() + "\" as "
                     + e.getClass().getSimpleName() + ", expected the error: " + expected);
         }
+    }
+
+    private static void assertWarning(@NotNull String expected, @NotNull DAPRunConfiguration configuration) {
+        try {
+            configuration.checkConfiguration();
+            fail("checkConfiguration() reported no warning, expected: " + expected);
+        } catch (RuntimeConfigurationWarning e) {
+            assertEquals(expected, e.getLocalizedMessage());
+        } catch (RuntimeConfigurationException e) {
+            fail("checkConfiguration() reported \"" + e.getLocalizedMessage() + "\" as "
+                    + e.getClass().getSimpleName() + ", expected the warning: " + expected);
+        }
+    }
+
+    private static @NotNull DAPRunConfiguration launch(@NotNull DAPRunConfiguration configuration) {
+        configuration.setCommand("dap-server");
+        configuration.setDebugMode(DebugMode.LAUNCH);
+        return configuration;
+    }
+
+    private @NotNull File createTempDirectory() throws Exception {
+        File directory = FileUtil.createTempDirectory("dap-check", null);
+        Disposer.register(getTestRootDisposable(), () -> FileUtil.delete(directory));
+        return directory;
     }
 
     private static @NotNull DAPRunConfiguration attach(@NotNull DAPRunConfiguration configuration,

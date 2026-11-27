@@ -23,6 +23,7 @@ import com.intellij.openapi.application.PathManager;
 import com.intellij.openapi.project.ProjectUtil;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.testFramework.HeavyPlatformTestCase;
+import com.intellij.util.SystemProperties;
 import com.redhat.devtools.lsp4ij.dap.DebugAdapterManager;
 import com.redhat.devtools.lsp4ij.dap.configurations.DAPCommandLineState;
 import com.redhat.devtools.lsp4ij.dap.configurations.DAPRunConfiguration;
@@ -49,7 +50,9 @@ import static com.redhat.devtools.lsp4ij.dap.DAPIJUtils.getFilePath;
  * has no working directory, so its Debug Adapter runs in the directory of that file and gets the environment of that
  * directory, as a {@code mise.toml} or an {@code .envrc} gives it with the mise or direnv plugin, while
  * {@code ${workspaceFolder}} stays the project's directory. Without a file, it runs in the project's directory. A
- * working directory set in the configuration wins, and an existing configuration keeps the one it stored.
+ * working directory set in the configuration wins, and an existing configuration keeps the one it stored. A relative
+ * working directory is relative to the project's directory, a relative file to the working directory, and without one
+ * to the project's directory, and a leading {@code ~} is the home directory.
  */
 public class DAPConfigurationWorkingDirectoryTest extends HeavyPlatformTestCase {
 
@@ -168,6 +171,73 @@ public class DAPConfigurationWorkingDirectoryTest extends HeavyPlatformTestCase 
         configuration.setFile(getFilePath(folder));
 
         assertEquals(realPath(folder.getPath()), workDirectory(configuration));
+    }
+
+    public void testARelativeWorkingDirectoryIsRelativeToTheProjectDirectory() throws Exception {
+        VirtualFile subdirectory = createChildDirectory(projectDirectory(), "sub");
+        var configuration = create();
+        configuration.setServerId(SERVER_ID);
+        configuration.setCommand(server.getCommandLine());
+        configuration.setLaunchConfiguration("{\"cwd\": \"${workspaceFolder}\"}");
+        configuration.setWorkingDirectory("sub");
+
+        // not the IDE's working directory, where it was dropped without a word as it isn't a directory there
+        assertEquals(realPath(subdirectory.getPath()), workDirectory(configuration));
+        assertEquals(realPath(subdirectory.getPath()), realPath((String) dapParameters(configuration).get("cwd")));
+        // no warning
+        configuration.checkConfiguration();
+        assertEquals("what is stored, and shown in the settings editor", "sub", configuration.getWorkingDirectory());
+    }
+
+    public void testATildeInTheWorkingDirectoryIsTheHomeDirectory() throws Exception {
+        var configuration = create();
+        configuration.setServerId(SERVER_ID);
+        configuration.setCommand(server.getCommandLine());
+        configuration.setWorkingDirectory("~");
+
+        assertEquals(realPath(SystemProperties.getUserHome()), workDirectory(configuration));
+    }
+
+    public void testAConfigurationWithAFileRelativeToTheProjectDirectoryIsTheConfigurationOfThatFile() throws Exception {
+        VirtualFile file = createChildData(createChildDirectory(projectDirectory(), "sub"), "test." + FILE_EXTENSION);
+
+        // Without a working directory, a relative file is relative to the project's directory
+        assertExistingConfigurationIsCopied(file, null, "sub/test." + FILE_EXTENSION);
+    }
+
+    public void testAConfigurationWithAFileRelativeToItsWorkingDirectoryIsTheConfigurationOfThatFile() throws Exception {
+        VirtualFile subdirectory = createChildDirectory(projectDirectory(), "sub");
+        VirtualFile file = createChildData(subdirectory, "test." + FILE_EXTENSION);
+
+        // As the Debug Adapter resolves the file in its working directory
+        assertExistingConfigurationIsCopied(file, getFilePath(subdirectory), "test." + FILE_EXTENSION);
+        // A relative working directory is relative to the project's directory
+        assertExistingConfigurationIsCopied(file, "sub", "test." + FILE_EXTENSION);
+    }
+
+    /**
+     * Asserts that a configuration created from the given file copies an existing configuration with the given working
+     * directory and the given relative path of that file.
+     */
+    private void assertExistingConfigurationIsCopied(@NotNull VirtualFile file,
+                                                     @Nullable String workingDirectory,
+                                                     @NotNull String relativeFile) {
+        var runManager = RunManager.getInstance(getProject());
+        // only the existing configuration of this call
+        List.copyOf(runManager.getAllSettings()).forEach(runManager::removeConfiguration);
+        var existing = createFromFile(file);
+        existing.setWorkingDirectory(workingDirectory);
+        existing.setFile(relativeFile);
+        // which a configuration prepared for the file without the existing one doesn't get
+        String launchConfiguration = "{\"name\": \"existing\"}";
+        existing.setLaunchConfiguration(launchConfiguration);
+        runManager.addConfiguration(runManager.createConfiguration(existing, existing.getFactory()));
+
+        var copy = create();
+        assertTrue(DebugAdapterManager.getInstance().prepareConfiguration(copy, file, getProject()));
+
+        assertEquals("the existing configuration is copied", launchConfiguration, copy.getLaunchConfiguration());
+        assertEquals(relativeFile, copy.getFile());
     }
 
     /**

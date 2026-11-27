@@ -95,6 +95,9 @@ public class DAPCommandLineState extends CommandLineState implements CommandLine
 
     @Nullable
     public String getFile() {
+        if (options instanceof DAPRunConfigurationOptions dapOptions) {
+            return dapOptions.getResolvedFile(getEnvironment().getProject());
+        }
         if (options instanceof FileOptionConfigurable fileOptions) {
             return fileOptions.getFile();
         }
