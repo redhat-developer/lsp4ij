@@ -91,10 +91,10 @@ The `Installer` tab holds the JSON of the [installer](../Installer.md) of
 the DAP server, as its [template](#templates) gives it. Before the first debug session of the DAP server in each IDE
 session, LSP4IJ runs the `check` of the installer, and its `run` if the check fails, in a console, and then starts the
 debug session (see [When the installer runs](../Installer.md#when-the-installer-runs)). The
-`Installer` tab of the debug session has the links `Check Installation`, `Run Installation` and
-`Check / Run Installation`, which run the installer again. Its console shows the `check` and the `run` which ran at the
-start of the session, with the directory, the `PATH` and the exit code of each command, and the notification of an
-installation which failed shows the tab with `Show Installer Tab`.
+`Installer` tab of the debug session has three links that run the installer again: `Check Installation`,
+`Run Installation` and `Check / Run Installation`. Its console shows the `check` from the start of the session, and the
+`run` if the check failed, with the directory, the `PATH` and the exit code of each command. When an installation fails,
+`Show Installer Tab` in its notification opens this tab.
 
 ### IntelliJ macro expansion
 
