@@ -8,12 +8,10 @@
 package com.redhat.devtools.lsp4ij.internal;
 
 import com.intellij.openapi.application.ApplicationManager;
-import com.intellij.openapi.application.ex.ApplicationEx;
 import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.util.Disposer;
-import com.intellij.openapi.util.ThrowableComputable;
+import com.intellij.testFramework.EdtTestUtil;
 import com.intellij.testFramework.fixtures.BasePlatformTestCase;
-import kotlin.jvm.functions.Function0;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;
@@ -115,28 +113,24 @@ public class ApplicationUtilsTest extends BasePlatformTestCase {
     }
 
     /**
-     * Runs the action on the EDT, which holds the write-intent lock in these tests, without it. IntelliJ 2025.3 and
-     * 2026.3 take it away with {@code ThreadingSupport.releaseTheAcquiredWriteIntentLockThenExecuteActionAndTakeWriteIntentLockBack},
-     * and IntelliJ 2024.2, which doesn't have it, with {@code ApplicationEx.runUnlockingIntendedWrite}, which 2026.3
-     * no longer has, and which leaves the EDT read access in 2025.3.
+     * Runs the tests of the EDT without read access on the test's thread, from which
+     * {@link #runWithoutTheWriteIntentLock} runs their action on the EDT, and the others on the EDT, which holds the
+     * write-intent lock in these tests.
      */
-    private static void runWithoutTheWriteIntentLock(@NotNull Runnable action) throws Exception {
-        var application = ApplicationManager.getApplication();
-        try {
-            var threadingSupport = application.getClass().getMethod("getThreadingSupport").invoke(application);
-            Class.forName("com.intellij.openapi.application.ThreadingSupport")
-                    .getMethod("releaseTheAcquiredWriteIntentLockThenExecuteActionAndTakeWriteIntentLockBack", Function0.class)
-                    .invoke(threadingSupport, (Function0<Object>) () -> {
-                        action.run();
-                        return null;
-                    });
-        } catch (NoSuchMethodException earlierVersion) {
-            ApplicationEx.class.getMethod("runUnlockingIntendedWrite", ThrowableComputable.class)
-                    .invoke(application, (ThrowableComputable<Object, RuntimeException>) () -> {
-                        action.run();
-                        return null;
-                    });
-        }
+    @Override
+    protected boolean runInDispatchThread() {
+        return !getName().contains("WithoutReadAccess");
+    }
+
+    /**
+     * Runs the action on the EDT without the write-intent lock, and so without read access, as an event that IntelliJ
+     * dispatches without the lock. Called off the EDT: the EDT can't give the lock away while it runs a test, as
+     * {@code ApplicationEx.runUnlockingIntendedWrite} doesn't once the lock is stored in the thread's context, as by
+     * default in IntelliJ 2025.1.
+     */
+    private static void runWithoutTheWriteIntentLock(@NotNull Runnable action) {
+        assertFalse("The test must run off the EDT", ApplicationManager.getApplication().isDispatchThread());
+        EdtTestUtil.runInEdtAndWait(action::run, false);
     }
 
     /**

@@ -138,7 +138,7 @@ public class DAPThreadRunStateSessionTest extends HeavyPlatformTestCase {
              * Leaves out the views which the frontend of IntelliJ builds again, as it does once it has created the
              * session tab: IntelliJ 2026.3 tells the listeners of that with this method, which calls
              * {@link #settingsChanged()} by default, at any time after the session started, as after the stop. It
-             * overrides nothing in IntelliJ 2024.2 and 2025.3, which build the views of a new tab again at once, as
+             * overrides nothing in IntelliJ 2025.1 and 2025.3, which build the views of a new tab again at once, as
              * the session starts.
              */
             @SuppressWarnings("unused")
