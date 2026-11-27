@@ -24,9 +24,11 @@ import com.intellij.execution.ui.RunContentDescriptor;
 import com.intellij.execution.ui.RunContentManager;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.fileEditor.FileDocumentManager;
+import com.intellij.openapi.project.Project;
 import com.intellij.xdebugger.*;
 import com.redhat.devtools.lsp4ij.dap.configurations.DAPCommandLineState;
 import com.redhat.devtools.lsp4ij.dap.configurations.DAPRunConfigurationBase;
+import com.redhat.devtools.lsp4ij.dap.installation.DebugAdapterServerInstallerBase;
 import com.redhat.devtools.lsp4ij.installation.CommandLineUpdater;
 import com.redhat.devtools.lsp4ij.installation.ConsoleProvider;
 import com.redhat.devtools.lsp4ij.installation.ServerInstallationStatus;
@@ -36,6 +38,8 @@ import org.jetbrains.annotations.Nullable;
 import org.jetbrains.concurrency.AsyncPromise;
 import org.jetbrains.concurrency.Promise;
 import org.jetbrains.concurrency.Promises;
+
+import java.util.concurrent.CompletableFuture;
 
 /**
  * Debug runner that integrates with Debug Adapter Protocol (DAP).
@@ -111,8 +115,7 @@ public class DAPDebugRunner extends AsyncProgramRunner<RunnerSettings> {
         installer.registerConsoleProvider(consoleProvider);
 
         // Trigger installation
-        installer
-                .checkInstallation()
+        checkInstallation(installer, env.getProject())
                 .handle((ignored, err) -> {
                     if (err != null) {
                         ApplicationManager.getApplication().invokeLater(() -> {
@@ -145,6 +148,23 @@ public class DAPDebugRunner extends AsyncProgramRunner<RunnerSettings> {
                 });
 
         return promise;
+    }
+
+    /**
+     * Checks the installation of the debug adapter with the given installer, for the given project of the run
+     * configuration: the commands of the installer run in the directory of the project, as those of the installer of a
+     * language server, unless the installer gives a {@code workingDir} (#2295).
+     *
+     * @param installer the installer of the debug adapter.
+     * @param project   the project of the run configuration.
+     * @return the future of the installation.
+     */
+    static @NotNull CompletableFuture<ServerInstallationStatus> checkInstallation(@NotNull ServerInstaller installer,
+                                                                                @NotNull Project project) {
+        if (installer instanceof DebugAdapterServerInstallerBase debugAdapterInstaller) {
+            debugAdapterInstaller.setProject(project);
+        }
+        return installer.checkInstallation();
     }
 
     /**

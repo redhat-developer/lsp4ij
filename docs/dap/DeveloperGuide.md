@@ -352,6 +352,11 @@ factory for the installer once, so once the installer reports the DAP server ins
 at once. See [Language server installer](../LSPApi.md#language-server-installer) for how to write an installer, and
 [Install language server](../DeveloperGuide.md#install-language-server) for how it runs.
 
+Since LSP4IJ 0.30.2, the runner gives an installer which extends `DebugAdapterServerInstallerBase` the project of the
+Run/Debug configuration with `setProject(project)` before it checks the installation, and `getProject()` returns it:
+the `exec` tasks of a `DeclarativeDebugAdapterServerInstaller` without a `workingDir` then run in the directory of that
+project. The installer keeps the project weakly, so it doesn't keep a closed project.
+
 # Launch and attach
 
 `getDebugMode()` says whether the client sends `launch` or `attach`. It returns `DebugMode.LAUNCH` by default.

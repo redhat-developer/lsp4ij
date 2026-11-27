@@ -12,8 +12,8 @@ package com.redhat.devtools.lsp4ij.installation.definition;
 
 /**
  * A program which prints its arguments, each on a line: on its standard error those which start with {@code err:},
- * without it, and on its standard output the others. It exits with the code {@code N} of an argument {@code exit:N},
- * and with 0 without one.
+ * without it, and on its standard output the others. An argument {@code cwd} prints the directory it runs in, as
+ * {@code cwd=<directory>}. It exits with the code {@code N} of an argument {@code exit:N}, and with 0 without one.
  */
 public final class PrintOutput {
 
@@ -24,6 +24,8 @@ public final class PrintOutput {
         for (String arg : args) {
             if (arg.startsWith("exit:")) {
                 System.exit(Integer.parseInt(arg.substring("exit:".length())));
+            } else if (arg.equals("cwd")) {
+                System.out.println("cwd=" + System.getProperty("user.dir"));
             } else if (arg.startsWith("err:")) {
                 System.err.println(arg.substring("err:".length()));
             } else {
