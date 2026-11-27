@@ -1,14 +1,16 @@
 name: Changes
 
-# Tells the workflows that call it whether a pull request changes only documentation: the files under docs/ and the
-# Markdown files at the root. No test reads them, so such a pull request needs no tests and no plugin verification. The
-# Build Plugin zip workflow still runs, since the plugin's description comes from README.md. A push to main is never
-# documentation only, and neither is a pull request that changes any other file, such as a workflow.
+# Tells the workflows that call it whether a pull request, or a push to main, changes only documentation: the files under
+# docs/ and the Markdown files at the root. No test reads them, so such a change needs no tests and no plugin
+# verification: on main, the code is that of the commit before, which its own push tested. The Build Plugin zip
+# workflow still runs, since the plugin's description comes from README.md. A change of any other file, such as a
+# workflow, is not documentation only, and neither is a push whose changes can't all be listed, as the first push of a
+# branch or one that rewrites history.
 on:
   workflow_call:
     outputs:
       docs_only:
-        description: "'true' when the pull request changes only documentation"
+        description: "'true' when the pull request, or every commit of the push, changes only documentation"
         value: ${{ jobs.changes.outputs.docs_only }}
 
 jobs:
@@ -16,20 +18,34 @@ jobs:
     name: Documentation only?
     runs-on: ubuntu-latest
     permissions:
+      contents: read
       pull-requests: read
     outputs:
       docs_only: ${{ steps.files.outputs.docs_only }}
     steps:
       - name: List the changed files
         id: files
-        if: github.event_name == 'pull_request'
+        if: github.event_name == 'pull_request' || github.event_name == 'push'
         env:
           GH_TOKEN: ${{ github.token }}
+          EVENT: ${{ github.event_name }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
+          BEFORE: ${{ github.event.before }}
+          AFTER: ${{ github.sha }}
         # A renamed file counts with its old path too, so that moving a file out of src/ is a change of src/
         run: |
-          files=$(gh api --paginate "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER/files" \
-            --jq '.[] | .filename, (.previous_filename // empty)')
+          files=""
+          if [ "$EVENT" = pull_request ]; then
+            files=$(gh api --paginate "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER/files" \
+              --jq '.[] | .filename, (.previous_filename // empty)')
+          elif [ -n "$BEFORE" ] && [ "$BEFORE" != 0000000000000000000000000000000000000000 ]; then
+            # Every commit of the push, as the several commits of a rebase merge. Only a push that adds commits to
+            # the one before counts, and the compare API lists 300 files at most: a longer list may be cut
+            compare=$(gh api "repos/$GITHUB_REPOSITORY/compare/$BEFORE...$AFTER")
+            if [ "$(jq -r .status <<< "$compare")" = ahead ] && [ "$(jq '.files | length' <<< "$compare")" -lt 300 ]; then
+              files=$(jq -r '.files[] | .filename, (.previous_filename // empty)' <<< "$compare")
+            fi
+          fi
           echo "$files"
           if [ -n "$files" ] && ! grep -qvE '^docs/|^[^/]+\.md$' <<< "$files"; then
             echo "docs_only=true" >> "$GITHUB_OUTPUT"
