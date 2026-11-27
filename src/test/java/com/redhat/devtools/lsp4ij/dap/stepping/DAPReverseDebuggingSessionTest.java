@@ -82,13 +82,17 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.UnaryOperator;
 
 /**
@@ -303,6 +307,51 @@ public class DAPReverseDebuggingSessionTest extends HeavyPlatformTestCase {
         PlatformTestUtil.waitWithEventsDispatching("the stop suspends the session", suspendedAtTheStop::isDone, BOUND_SECONDS);
 
         // The answer, which came after the stop, leaves the session as the stop suspended it
+        waitUntilStoppedAt(2, "where the program stopped running backwards");
+        assertEquals("The Threads tab shows the thread which stopped as stopped", DAPThreadRunState.STOPPED,
+                client.getThreadRunStates().getState(MAIN));
+    }
+
+    public void testAStopHandledWhileTheAnswerToReverseContinueResumesTheSessionOnTheEDTSuspendsTheSessionOnceItResumed() throws Exception {
+        // The EDT, which sends Reverse Continue, handles the answer itself, as a busy EDT finds it: the client returns
+        // the request only once LSP4J has handled the answer, which the DAP server sends before the 'stopped' event
+        debugHandingAnswersOver();
+        var client = (HandingAnswersOverClient) ((DAPSuspendContext) session.getSuspendContext()).getClient();
+        var stopHandled = new CompletableFuture<Void>();
+        var stopSent = new AtomicBoolean();
+        var events = new CopyOnWriteArrayList<String>();
+        session.addSessionListener(new XDebugSessionListener() {
+            @Override
+            public void beforeSessionResume() {
+                if (!stopSent.compareAndSet(false, true)) {
+                    return;
+                }
+                // The answer resumes the session, which it found still suspended where Reverse Continue was performed:
+                // the program stops meanwhile, and the client handles the stop on the thread which gets its frames
+                client.signalOnceTheNextStopIsHandled(stopHandled);
+                server.stop(StoppedEventArgumentsReason.ENTRY);
+                waitFor(stopHandled, "the client handles the stop while the answer resumes the session");
+            }
+
+            @Override
+            public void sessionResumed() {
+                events.add("resumed");
+            }
+
+            @Override
+            public void sessionPaused() {
+                events.add("suspended in the frame " + currentFrameId());
+            }
+        }, getTestRootDisposable());
+        var reverseContinue = action(DAPReverseContinueAction.ID, "Reverse Continue");
+
+        reverseContinue.actionPerformed(update(reverseContinue));
+        assertInstanceOf(request(), ReverseContinueArguments.class);
+        PlatformTestUtil.waitWithEventsDispatching("the session resumes, and is suspended at the stop",
+                () -> events.size() >= 2, BOUND_SECONDS);
+
+        // The answer resumed the session, and the stop suspended it then, rather than the other way round
+        assertEquals(List.of("resumed", "suspended in the frame 2"), events);
         waitUntilStoppedAt(2, "where the program stopped running backwards");
         assertEquals("The Threads tab shows the thread which stopped as stopped", DAPThreadRunState.STOPPED,
                 client.getThreadRunStates().getState(MAIN));
@@ -636,6 +685,9 @@ public class DAPReverseDebuggingSessionTest extends HeavyPlatformTestCase {
      */
     private static class HandingAnswersOverClient extends DAPClient {
 
+        // Set by the test: completed once the client has handled the next stop with its frames
+        private final AtomicReference<@Nullable CompletableFuture<Void>> nextStopHandled = new AtomicReference<>();
+
         HandingAnswersOverClient(@NotNull DAPDebugProcess debugProcess,
                                  @NotNull Map<String, Object> dapParameters,
                                  boolean isDebug,
@@ -643,6 +695,15 @@ public class DAPReverseDebuggingSessionTest extends HeavyPlatformTestCase {
                                  @NotNull ServerTrace serverTrace,
                                  @Nullable DAPClient parentClient) {
             super(debugProcess, dapParameters, isDebug, debugMode, serverTrace, parentClient);
+        }
+
+        /**
+         * Completes the given future once the client has handled the next stop with its frames: the stage which
+         * handles the frames of the next 'stackTrace', on the default executor, has run, whether it suspended the
+         * session or left that to the thread which resumes it.
+         */
+        void signalOnceTheNextStopIsHandled(@NotNull CompletableFuture<Void> handled) {
+            nextStopHandled.set(handled);
         }
 
         @Override
@@ -670,6 +731,12 @@ public class DAPReverseDebuggingSessionTest extends HeavyPlatformTestCase {
                             waitFor(((CompletableFuture<?>) result).handle((answer, error) -> null),
                                     "the DAP server answers Reverse Continue");
                         }
+                        if ("stackTrace".equals(method.getName())) {
+                            var handled = nextStopHandled.getAndSet(null);
+                            if (handled != null) {
+                                return signalling((CompletableFuture<?>) result, handled);
+                            }
+                        }
                         return result;
                     });
             return new Launcher<IDebugProtocolServer>() {
@@ -688,6 +755,53 @@ public class DAPReverseDebuggingSessionTest extends HeavyPlatformTestCase {
                     return launcher.getRemoteEndpoint();
                 }
             };
+        }
+
+        /**
+         * Returns the given answer as a {@link SignallingFuture}, which completes the given future once the stage
+         * which handles the answer asynchronously has run.
+         */
+        private static <T> CompletableFuture<T> signalling(@NotNull CompletableFuture<T> answer,
+                                                           @NotNull CompletableFuture<Void> handled) {
+            var signalling = new SignallingFuture<T>(handled);
+            answer.whenComplete((value, error) -> {
+                if (error != null) {
+                    signalling.completeExceptionally(error);
+                } else {
+                    signalling.complete(value);
+                }
+            });
+            return signalling;
+        }
+    }
+
+    /**
+     * A future whose dependent stages which run asynchronously on the default executor, as the client's handling of
+     * the frames of a stop does, complete the given future once they have run.
+     */
+    private static final class SignallingFuture<T> extends CompletableFuture<T> {
+
+        private final CompletableFuture<Void> handled;
+
+        SignallingFuture(@NotNull CompletableFuture<Void> handled) {
+            this.handled = handled;
+        }
+
+        @Override
+        public <U> CompletableFuture<U> newIncompleteFuture() {
+            return new SignallingFuture<>(handled);
+        }
+
+        @Override
+        public Executor defaultExecutor() {
+            var executor = super.defaultExecutor();
+            return task -> executor.execute(() -> {
+                try {
+                    task.run();
+                } finally {
+                    handled.complete(null);
+                }
+            });
         }
     }
 }
