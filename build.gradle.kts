@@ -33,8 +33,9 @@ val flexmarkVersion = prop("flexmarkVersion")
 
 val platformVersion = prop("platformVersion")
 val ideaVersionInt = when {
-    // e.g. '20XY.Z'
-    platformVersion.length == 6 -> platformVersion.replace(".", "").substring(2).toInt()
+    // e.g. '20XY.Z', or a release with its patch number, such as '2026.2.5.1': XYZ
+    platformVersion.matches(Regex("""20\d\d\.\d+(\.\d+)*""")) ->
+        platformVersion.split(".").let { (it[0].substring(2) + it[1]).toInt() }
     // e.g. '2XY.ABCDE.12'
     else -> platformVersion.substringBefore(".").toInt()
 }
