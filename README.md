@@ -11,6 +11,11 @@
 [![JetBrains Plugin Rating][plugin-rating-svg]][plugin-repo]
 [![JetBrains plugins][plugin-downloads-svg]][plugin-repo]
 
+LSP4IJ brings language servers and debug adapters to IntelliJ IDEA and the other JetBrains IDEs. Its manuals start
+at the [documentation index](./docs/README.md), which says what each guide is for and links all of them: the user
+guides, the pages of the language server and debug adapter templates, the reference of templates and installers, and
+the guides for plugin developers.
+
 ## Description
 <!-- Plugin description -->
 
@@ -45,13 +50,14 @@ and use the left toolbar to `Apply` or `Reset` the settings.
 
 ![Language Server preferences](./docs/images/LanguageServerPreferences.png)
 
-You can find more documentation in:
+The [documentation index](./docs/README.md) is the starting point of all the manuals. The main ones are:
 
  * [the developer guide](./docs/DeveloperGuide.md), providing step-by-step instructions on how to integrate a language server in LSP4IJ in an external IntelliJ plugin.
  * [the LSP API](./docs/LSPApi.md), describing how an IntelliJ plugin customizes the LSP features of its language server.
  * [the workspace folder strategies](./docs/WorkspaceFolders.md), describing how an IntelliJ plugin chooses the workspace folders of its language server.
  * [the User-defined language server documentation](./docs/UserDefinedLanguageServer.md), explaining how to integrate a language server in LSP4IJ with few settings. 
  * [the template documentation](./docs/UserDefinedLanguageServerTemplate.md), describing the templates of user-defined language servers.
+ * [the pages of the templates](./docs/README.md#language-server-templates), which say how to set up each language server and debug adapter that LSP4IJ has a template for.
  * [the installer documentation](./docs/Installer.md), describing the installers which check and install the language servers and debug adapters of the templates.
  * [the user guide](./docs/UserGuide.md), which explains how to use LSP console and Language Server preferences.
  * [the LSP Support overview](./docs/LSPSupport.md), describing which LSP features are implemented, and how.
@@ -319,6 +325,10 @@ Here are some projects that use LSP4IJ, grouped by the protocol they use it for.
 ## Contributing
 
 This is an open source project open to anyone. Contributions are extremely welcome!
+
+Each contribution agrees to the Developer Certificate of Origin, as [CONTRIBUTING.md](CONTRIBUTING.md) explains. To
+contribute the template of a language server, see
+[how to contribute a user-defined language server template](./docs/UserDefinedLanguageServerTemplate.md#how-to-contribute-a-user-defined-language-server-template).
 
  
 ### Building

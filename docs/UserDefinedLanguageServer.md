@@ -444,7 +444,7 @@ and potential configuration.
 
 ![New Language Server with Default Template](./images/user-defined-ls/NewLanguageServerWithDefaultTemplate.png)
 
-* [Ada Language Server](./user-defined-ls/ada_language_server.md)
+* [Ada Language Server](./user-defined-ls/ada-language-server.md)
 * [Astro Language Server](./user-defined-ls/astro-ls.md)
 * [C# Language Server (OmniSharp)](./user-defined-ls/omnisharp-roslyn.md)
 * [CSS Language Server](./user-defined-ls/vscode-css-language-server.md)
@@ -452,7 +452,7 @@ and potential configuration.
 * [Candor Language Server](./user-defined-ls/candor-lsp.md)
 * [Clangd](./user-defined-ls/clangd.md) 
 * [Clojure LSP](./user-defined-ls/clojure-lsp.md)
-* [Cpp Language Server](./user-defined-ls/cpp_ls.md)
+* [Cpp Language Server](./user-defined-ls/cpp-ls.md)
 * [Dart LSP server](./user-defined-ls/dart-lsp.md) 
 * [Docker Language Server](./user-defined-ls/docker-language-server.md)
 * [ESLint Language Server](./user-defined-ls/vscode-eslint-language-server.md) 
