@@ -64,6 +64,13 @@ created from a file has no working directory, so its debug adapter runs in the d
 directory isn't on disk, as in an archive, it runs in the project's directory, and in a project whose directory isn't on
 disk, in the IDE's working directory.
 
+In the `Working directory` and the `File`, a leading `~` is your home directory, as in `~/docs/ruby-test`, and an
+absolute path is used as it is. A relative `Working directory`, such as `.` or `src`, is relative to the project's
+directory. A relative `File` is relative to the `Working directory`, in which the debug adapter runs, and without one to
+the project's directory. `${file}` and `${workspaceFolder}` get the paths that this gives. A `Working directory` that
+isn't an existing directory is shown as a warning in the run configuration: the run still starts, and the debug adapter
+then runs in the IDE's working directory.
+
 Since IntelliJ 2025.1, a plugin can set up the environment of a process for its working directory (the
 `commandLineEnvCustomizer` extension point), as the [mise](https://mise.jdx.dev/) plugin does from a `mise.toml`, or a
 [direnv](https://direnv.net/) plugin from an `.envrc`. The debug adapter's process gets that environment when it starts,

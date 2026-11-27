@@ -84,8 +84,9 @@ public class LaunchUtils {
             @Nullable Project project,
             @Nullable VirtualFile selectedFile) {
 
-        LaunchContext context = new LaunchContext(
-                dapOptions.getFile(), getWorkspaceFolder(dapOptions.getWorkingDirectory(), project));
+        // The Debug Adapter doesn't know ~, nor the directory which a relative path is relative to
+        LaunchContext context = new LaunchContext(dapOptions.getResolvedFile(project),
+                getWorkspaceFolder(dapOptions.getResolvedWorkingDirectory(project), project));
 
         Map<String, Object> parameters =
                 getDapParameters(dapOptions.getDapParameters(), context);

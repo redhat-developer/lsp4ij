@@ -86,9 +86,11 @@ public class DefaultDebugAdapterDescriptor extends DebugAdapterDescriptor {
     protected GeneralCommandLine createStartServerCommandLine(
             @NotNull RunConfigurationOptions options) throws ExecutionException {
         if (options instanceof DAPRunConfigurationOptions dapOptions) {
-            // Without a working directory, the directory of the file, whose environment the Debug Adapter then gets
-            String workingDirectory = LaunchUtils.getWorkingDirectory(dapOptions.getWorkingDirectory(),
-                    dapOptions.getFile(), environment.getProject());
+            // Without a working directory, the directory of the file, whose environment the Debug Adapter then gets.
+            // Both with ~ expanded and a relative path resolved against the project's directory
+            Project project = environment.getProject();
+            String workingDirectory = LaunchUtils.getWorkingDirectory(dapOptions.getResolvedWorkingDirectory(project),
+                    dapOptions.getResolvedFile(project), project);
             String command = dapOptions.getCommand();
 
             if (StringUtils.isBlank(command)) {
@@ -130,8 +132,10 @@ public class DefaultDebugAdapterDescriptor extends DebugAdapterDescriptor {
     }
 
     public @Nullable FileType getFileType() {
-        if (options instanceof FileOptionConfigurable dapOptions) {
-            String file = dapOptions.getFile();
+        if (options instanceof FileOptionConfigurable fileOptions) {
+            String file = options instanceof DAPRunConfigurationOptions dapOptions
+                    ? dapOptions.getResolvedFile(environment.getProject())
+                    : fileOptions.getFile();
             int index = file != null ? file.lastIndexOf('.') : -1;
 
             if (index != -1) {

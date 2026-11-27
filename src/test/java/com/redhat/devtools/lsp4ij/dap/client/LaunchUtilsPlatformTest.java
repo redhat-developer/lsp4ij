@@ -6,6 +6,7 @@ import com.intellij.openapi.project.ProjectUtil;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiFile;
 import com.intellij.testFramework.fixtures.BasePlatformTestCase;
+import com.intellij.util.SystemProperties;
 import com.redhat.devtools.lsp4ij.dap.configurations.DAPRunConfigurationOptions;
 
 import java.nio.file.Files;
@@ -77,6 +78,38 @@ public class LaunchUtilsPlatformTest extends BasePlatformTestCase {
         options.setWorkingDirectory("/working/directory");
 
         assertEquals("/working/directory", LaunchUtils.getDapParameters(options, project).get("cwd"));
+    }
+
+    public void testFileAndWorkspaceFolderGetTheResolvedPaths() {
+        Project project = myFixture.getProject();
+        String basePath = project.getBasePath();
+        assertNotNull(basePath);
+
+        DAPRunConfigurationOptions options = new DAPRunConfigurationOptions();
+        options.setFile("hello.rb");
+        options.setLaunchConfiguration("""
+                {
+                    "program": "${file}",
+                    "cwd": "${workspaceFolder}"
+                }
+                """);
+
+        // The Debug Adapter knows neither ~ nor the directory which a relative path is relative to: without a working
+        // directory, the project's directory
+        assertEquals(Path.of(basePath).resolve("hello.rb").normalize().toString(),
+                LaunchUtils.getDapParameters(options, project).get("program"));
+
+        // and with one, the working directory, in which the Debug Adapter runs
+        options.setWorkingDirectory("~");
+        Map<String, Object> parameters = LaunchUtils.getDapParameters(options, project);
+        Path home = Path.of(SystemProperties.getUserHome()).normalize();
+        assertEquals(home.toString(), parameters.get("cwd"));
+        assertEquals(home.resolve("hello.rb").toString(), parameters.get("program"));
+
+        options.setWorkingDirectory("src");
+        parameters = LaunchUtils.getDapParameters(options, project);
+        assertEquals(Path.of(basePath).resolve("src").normalize().toString(), parameters.get("cwd"));
+        assertEquals(Path.of(basePath).resolve("src").resolve("hello.rb").normalize().toString(), parameters.get("program"));
     }
 
     public void testAProjectDirectoryWhichIsNotOnDiskAndTheDefaultProjectGiveNoWorkingDirectory() {
