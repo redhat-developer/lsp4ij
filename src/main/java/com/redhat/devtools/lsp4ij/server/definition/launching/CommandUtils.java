@@ -210,7 +210,7 @@ public class CommandUtils {
      * Returns the variable of the environment. Windows ignores the case of its name, and the environment of a
      * {@link ProcessBuilder} keeps the case that the name has, such as {@code Path}.
      */
-    private static @Nullable String getVariable(@NotNull Map<String, String> environment, @NotNull String name) {
+    static @Nullable String getVariable(@NotNull Map<String, String> environment, @NotNull String name) {
         String value = environment.get(name);
         if (value != null || !SystemInfo.isWindows) {
             return value;

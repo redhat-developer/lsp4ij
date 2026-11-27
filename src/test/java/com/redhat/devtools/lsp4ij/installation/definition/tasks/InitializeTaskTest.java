@@ -36,6 +36,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.logging.Level;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -408,12 +409,14 @@ public class InitializeTaskTest {
             super(null, InstallerAction.CHECK);
         }
 
+        // Each line that the task prints goes through it, whatever the level of the log
         @Override
-        public void print(@Nullable String message, @NotNull ConsoleViewContentType contentType) {
+        public void print(@Nullable String message, @NotNull ConsoleViewContentType contentType,
+                          @NotNull Level logLevel) {
             if (message != null) {
                 printed.add(message);
             }
-            super.print(message, contentType);
+            super.print(message, contentType, logLevel);
         }
     }
 }

@@ -178,10 +178,15 @@ the Dock.
 
 The IDE's log, `idea.log` (*Help | Show Log in Finder*, *Explorer* or *Files*), has what an installer does, also when no
 console shows it, as when the installer runs at the start of a language server whose console was never opened: the
-start and the result of the installation and of each step, and the errors as warnings. With
-`#com.redhat.devtools.lsp4ij.installation` in *Help | Diagnostic Tools | Debug Log Settings*, it also has the rest of
-what the console shows, as the commands of the `exec` tasks and their output. The log has `<redacted>` instead of a
-value which can be a secret, as a token, an `Authorization` header or the password of a URL.
+start and the result of the installation and of each step, and the errors as warnings. Since LSP4IJ 0.30.2, it also has
+for each `exec` task, whether it succeeds or fails, a line with its exit code, the directory it ran in and its command,
+then the `PATH` in which LSP4IJ looked the command up; for an `exec` task which fails, also its standard output and its
+standard error, of which a long one keeps its first and its last 2,000 characters; and a line which says what a
+`fileExists`, `configureServer`, `replaceTemplateCommand` or `initialize` task found or did. The output of an `exec` task
+which succeeds stays out of the default log, since it can hold a secret that LSP4IJ doesn't recognise. With
+`#com.redhat.devtools.lsp4ij.installation` in *Help | Diagnostic Tools | Debug Log Settings*, the log also has the rest
+of what the console shows, as the commands of the `exec` tasks and their whole output, line by line. The log has
+`<redacted>` instead of a value which can be a secret, as a token, an `Authorization` header or the password of a URL.
 
 ## Task showMessage
 
@@ -221,9 +226,10 @@ Runs a command. The task succeeds when the command exits with 0 and writes nothi
 | `ignoreStderr`  | `true` lets the task succeed when the command writes on its standard error, as `npm install` does with its warnings                                                                                                                                                                                                                                                                                                                  | `false`                                   |
 | `outputMatches` | a [regular expression](https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/regex/Pattern.html) that the standard output of the command must match somewhere for the task to succeed, as a version, see [Output of the command](#output-of-the-command). Since LSP4IJ 0.30.2                                                                                                                                       | none: any output                          |
 
-The console of the installation shows the command after `> `, and its output. The command gets the environment
-variables of the IDE and, since IntelliJ 2025.1, the environment of its working directory, as a language server does
-(see [Directory-specific environment variables](./UserDefinedLanguageServer.md#directory-specific-environment-variables)),
+The console of the installation shows the command after `> `, the directory it runs in, the `PATH` in which LSP4IJ looks
+it up, its output, and its exit code. The command gets the environment variables of the IDE and, since IntelliJ 2025.1,
+the environment of its working directory, as a language server does (see
+[Directory-specific environment variables](./UserDefinedLanguageServer.md#directory-specific-environment-variables)),
 and LSP4IJ looks the command up in the `PATH` of that environment, so that `npm` is the one of the directory's `node`.
 
 Two `exec` tasks with the same `workingDir` run one after the other, also in two IDEs, as those of the CSS and ESLint

@@ -10,6 +10,7 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.installation.definition.tasks;
 
+import com.intellij.execution.ui.ConsoleViewContentType;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.text.NaturalComparator;
 import com.redhat.devtools.lsp4ij.installation.definition.InstallerContext;
@@ -23,6 +24,7 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.*;
 import java.util.Comparator;
+import java.util.logging.Level;
 import java.util.regex.PatternSyntaxException;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -84,11 +86,12 @@ public class FileExistsTask extends InstallerTask {
         }
 
         if (found != null) {
-            context.print("File exists: " + resolvedPath);
+            // At INFO, as the line for the log of what the task did
+            context.print("File exists: " + resolvedPath, ConsoleViewContentType.NORMAL_OUTPUT, Level.INFO);
             context.putProperty(CHECK_FILE_PROPERTY, found);
             return true;
         }
-        context.print("File not found: " + resolvedPath);
+        context.print("File not found: " + resolvedPath, ConsoleViewContentType.NORMAL_OUTPUT, Level.INFO);
         context.removeProperty(CHECK_FILE_PROPERTY);
         return false;
     }

@@ -18,18 +18,21 @@ import com.intellij.testFramework.fixtures.BasePlatformTestCase;
 import com.redhat.devtools.lsp4ij.installation.DeclarativeLanguageServerInstaller;
 import com.redhat.devtools.lsp4ij.installation.ServerInstallationStatus;
 import com.redhat.devtools.lsp4ij.installation.download.LogRecorder;
+import com.redhat.devtools.lsp4ij.server.definition.launching.CommandUtils;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.nio.file.Path;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
  * An installer writes what it prints to the IDE's log too, whatever consoles are registered, as when none is: the
  * start and the result of the installation and of each step at INFO, the errors as warnings, and the output of the
- * commands at DEBUG, without the values which can be secrets (#2156).
+ * commands at DEBUG, without the values which can be secrets (#2156). Each command also leaves its exit code, its
+ * directory and its PATH at INFO, and its output only when its task fails, as {@code ExecTaskTraceTest} shows (#2296).
  */
 public class InstallerLogTest extends BasePlatformTestCase {
 
@@ -41,9 +44,13 @@ public class InstallerLogTest extends BasePlatformTestCase {
     public void testAnInstallationWithoutAConsoleLogsTheStartAndTheResultOfTheInstallationAndOfEachStepAtInfo()
             throws Exception {
         // As when a language server starts before its console was ever opened
+        List<String> check = command("checking", "exit:1");
+        List<String> install = command("installing");
         var installer = new TestInstaller(loadInstaller(
-                exec("Check the server", command("checking", "exit:1")),
-                exec("Install the server", command("installing"))));
+                exec("Check the server", check),
+                exec("Install the server", install)));
+        // Without a project, the commands run in the directory of the IDE
+        String directory = Path.of("").toAbsolutePath() + " (the directory of the IDE)";
 
         try (var log = new LogRecorder()) {
             var installation = installer.checkInstallation();
@@ -54,17 +61,23 @@ public class InstallerLogTest extends BasePlatformTestCase {
             assertEquals(log.output(), List.of(
                             "INFO Installer 'Test server': checking the installation",
                             "INFO Installer 'Test server': - Step: Check the server",
+                            "INFO Installer 'Test server': the command exited with 1, in " + directory + ": "
+                                    + commandText(check),
+                            // The output of the check, which failed; not that of the install, which succeeded
+                            "INFO Installer 'Test server': the standard output of the command:\nchecking",
                             "INFO Installer 'Test server': the step 'Check the server' failed",
                             "INFO Installer 'Test server': the check failed",
                             "INFO Installer 'Test server': running the installation",
                             "INFO Installer 'Test server': - Step: Install the server",
+                            "INFO Installer 'Test server': the command exited with 0, in " + directory + ": "
+                                    + commandText(install),
                             "INFO Installer 'Test server': the step 'Install the server' succeeded",
                             "INFO Installer 'Test server': the installation completed successfully"),
-                    infoAndWarnings(log));
+                    withoutPathAndStandardError(infoAndWarnings(log)));
         }
     }
 
-    public void testTheOutputOfACommandIsLoggedAtDebugOnly() throws Exception {
+    public void testTheOutputOfACommandWhichSucceedsIsLoggedAtDebugOnly() throws Exception {
         var installer = loadInstaller(null,
                 exec("Install the server", command("output-of-the-command", "err:warning-of-the-command")));
 
@@ -75,8 +88,10 @@ public class InstallerLogTest extends BasePlatformTestCase {
             assertTrue(log.output(), log.lines().contains("FINE Installer 'Test server': warning-of-the-command"));
             assertTrue(log.output(), log.lines().stream().anyMatch(line -> line.startsWith("FINE Installer 'Test server': > ")
                     && line.endsWith(PrintOutput.class.getName() + " output-of-the-command err:warning-of-the-command")));
+            // Only the line of the exit code, the directory and the command, which has the arguments, at INFO (#2296)
             assertFalse("The output must not be logged at INFO or as a warning: " + log.output(),
-                    infoAndWarnings(log).stream().anyMatch(line -> line.contains("of-the-command")));
+                    infoAndWarnings(log).stream().anyMatch(line -> line.contains("of-the-command")
+                            && !line.startsWith("INFO Installer 'Test server': the command exited with 0, in ")));
         }
     }
 
@@ -134,6 +149,17 @@ public class InstallerLogTest extends BasePlatformTestCase {
     }
 
     /**
+     * Returns the given records without those of the PATH and of the standard error of the commands, which depend on
+     * the machine and on the JVM, which can say on its standard error that it picked up JAVA_TOOL_OPTIONS.
+     */
+    private static @NotNull List<String> withoutPathAndStandardError(@NotNull List<String> records) {
+        return records.stream()
+                .filter(record -> !record.startsWith("INFO Installer 'Test server': the PATH of the command: ")
+                        && !record.startsWith("INFO Installer 'Test server': the standard error of the command:"))
+                .toList();
+    }
+
+    /**
      * Returns the records of the log which IntelliJ writes by default, of the levels INFO and above.
      */
     private static @NotNull List<String> infoAndWarnings(@NotNull LogRecorder log) {
@@ -170,6 +196,15 @@ public class InstallerLogTest extends BasePlatformTestCase {
         var task = new JsonObject();
         task.add("exec", exec);
         return task;
+    }
+
+    /**
+     * Returns the given command as the console and the log show it, with its macros expanded.
+     */
+    private static @NotNull String commandText(@NotNull List<String> command) {
+        return command.stream()
+                .map(arg -> CommandUtils.resolveCommandLine(arg, null))
+                .collect(Collectors.joining(" "));
     }
 
     /**

@@ -12,6 +12,7 @@ package com.redhat.devtools.lsp4ij.installation.definition.tasks;
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.gson.JsonElement;
+import com.intellij.execution.ui.ConsoleViewContentType;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.progress.ProgressManager;
@@ -68,6 +69,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
+import java.util.logging.Level;
 import java.util.stream.Stream;
 
 /**
@@ -142,7 +144,9 @@ public class InitializeTask extends InstallerTask {
         try {
             StreamConnectionProvider provider = starter.createConnectionProvider(project);
             if (provider == null) {
-                context.print("LSP4IJ connects to the server, which runs already, and doesn't start it: there is nothing to check.");
+                // At INFO, as the line for the log of what the task did
+                context.print("LSP4IJ connects to the server, which runs already, and doesn't start it: there is nothing to check.",
+                        ConsoleViewContentType.NORMAL_OUTPUT, Level.INFO);
                 return true;
             }
             return check(provider, starter, project, context);
@@ -243,7 +247,8 @@ public class InitializeTask extends InstallerTask {
                                       @NotNull InstallerContext context) {
         try {
             String serverInfo = await(handshake.initialize(), deadline, provider, context);
-            context.print("The server answered initialize" + serverInfo + ".");
+            context.print("The server answered initialize" + serverInfo + ".", ConsoleViewContentType.NORMAL_OUTPUT,
+                    Level.INFO);
             return true;
         } catch (TimeoutException e) {
             context.printError("The server didn't answer initialize within " + timeout + " ms.");
@@ -256,7 +261,7 @@ public class InitializeTask extends InstallerTask {
                     return false;
                 }
                 context.print("The server answered initialize with an error, which shows that it runs: "
-                        + error.getMessage());
+                        + error.getMessage(), ConsoleViewContentType.NORMAL_OUTPUT, Level.INFO);
                 return true;
             }
             context.printError("The server didn't answer initialize: " + Objects.requireNonNullElse(e.getCause(), e).getMessage());
