@@ -13,6 +13,7 @@ package com.redhat.devtools.lsp4ij;
 import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.fileEditor.FileEditorManager;
 import com.intellij.openapi.fileEditor.FileEditorManagerEvent;
+import com.intellij.openapi.fileEditor.FileEditorManagerKeys;
 import com.intellij.openapi.fileEditor.FileEditorManagerListener;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.project.ProjectManagerListener;
@@ -60,39 +61,16 @@ public class ConnectDocumentToLanguageServerSetupParticipant implements FileEdit
     }
 
     /**
-     * The name of the platform's marker of a file whose editor closes to open again in another window or tab group.
-     */
-    private static final String CLOSING_TO_REOPEN = "CLOSING_TO_REOPEN";
-
-    // The platform's marker, once found
-    private static volatile Key<?> closingToReopen;
-
-    /**
      * Returns true if the platform closes an editor of the file only to open the file again in another window or tab
      * group: a tab dragged into another window, a detached one included, or moved to the opposite tab group. The file
      * can be in no editor between the close and the open, which can follow later, as a drop into a detached window
      * opens the file in a coroutine. The file stays open, so such a close neither disconnects it nor counts as a close
      * of its last editor.
      * <p>
-     * The platform marks the file with its key {@code CLOSING_TO_REOPEN}, which has no public field in 2024.2:
-     * {@code FileEditorManagerImpl.CLOSING_TO_REOPEN} is internal on every supported version, and the public
-     * {@code FileEditorManagerKeys.CLOSING_TO_REOPEN}, from 2024.3, is missing in 2024.2 (#2274). So the key is found
-     * by its name, the same in all of them, which is a workaround: once the minimum version has
-     * {@code FileEditorManagerKeys}, this reads it instead. The key exists once the platform's editor manager is
-     * loaded, before any editor closes, and is kept once found.
+     * The platform marks the file with {@link FileEditorManagerKeys#CLOSING_TO_REOPEN}.
      */
-    @SuppressWarnings("deprecation")
     static boolean isClosingToReopen(@NotNull VirtualFile file) {
-        Key<?> key = closingToReopen;
-        if (key == null) {
-            key = Key.findKeyByName(CLOSING_TO_REOPEN);
-            if (key == null) {
-                // The platform's editor manager isn't loaded, as with the editor manager of a test: no file is marked
-                return false;
-            }
-            closingToReopen = key;
-        }
-        return Boolean.TRUE.equals(file.getUserData(key));
+        return Boolean.TRUE.equals(file.getUserData(FileEditorManagerKeys.CLOSING_TO_REOPEN));
     }
 
     /**

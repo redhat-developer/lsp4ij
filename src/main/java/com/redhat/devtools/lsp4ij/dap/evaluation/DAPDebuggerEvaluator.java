@@ -56,7 +56,8 @@ public class DAPDebuggerEvaluator extends XDebuggerEvaluator {
     }
 
     private static @NotNull String getEvaluationContext(@NotNull XEvaluationCallback callback) {
-        // As XEvaluationCallbackWithOrigin is not available on old IntelliJ version  (<=2023.3) and i snot available with >=2025.3, we need to use Java reflection.
+        // XEvaluationCallbackWithOrigin is internal, and the package of the XEvaluationOrigin it gives changed in 2025.3,
+        // so it is used through Java reflection.
         if (reflectionUnsupported) {
             return EvaluateArgumentsContext.WATCH;
         }

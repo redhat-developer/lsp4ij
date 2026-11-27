@@ -91,7 +91,7 @@ public class LanguageServersRegistry implements Disposable {
     private final Map<Language, LSPFindUsagesProvider> registeredFindUsagesProviders = new ConcurrentHashMap<>();
 
     // The parent of the extension point listeners, which dispose() disposes, so that they end with this service. Not a
-    // CoroutineScope: the overload of addExtensionPointListener with one is internal from 2024.3 to 2026.2 (#2274)
+    // CoroutineScope: the overload of addExtensionPointListener with one is internal up to 2026.2 (#2274)
     private final Disposable extensionPointListenersDisposable =
             Disposer.newDisposable("LSP4IJ language server extension point listeners");
 

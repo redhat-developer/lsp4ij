@@ -186,8 +186,6 @@ public class LSPCompletionContributor extends CompletionContributor {
             result.stopHere();
 
             // Try to disable word completion by temporarily setting FORBID_WORD_COMPLETION=true on the completion process.
-            // Note that this will not work in some older IDE versions where WordCompletionContributor.addWordCompletionVariants()
-            // did not yet check the value of FORBID_WORD_COMPLETION
             CompletionProcess completionProcess = parameters.getProcess();
             UserDataHolder userDataHolder = completionProcess instanceof UserDataHolder ? (UserDataHolder) completionProcess : null;
             boolean originalForbidWordCompletion = false;

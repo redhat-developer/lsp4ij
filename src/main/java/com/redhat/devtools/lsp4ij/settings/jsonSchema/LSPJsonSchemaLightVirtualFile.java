@@ -21,7 +21,7 @@ import java.nio.charset.Charset;
  * In-memory implementation of {@link VirtualFile}.
  *
  * <p>We cannot use {@link com.intellij.testFramework.LightVirtualFile}
- * because IJ 2024.x? doesn't evict the Json Schema cache when {@link com.intellij.testFramework.LightVirtualFile} is used
+ * because IntelliJ (2025.1 to 2026.3 at least) doesn't evict the Json Schema cache when {@link com.intellij.testFramework.LightVirtualFile} is used
  * because it skips the modificationStamp (when file is updated).
  *
  * See <a href="https://github.com/JetBrains/intellij-community/blob/f873c09975f3262558093855d04474598356d2a5/json/src/com/jetbrains/jsonSchema/impl/light/nodes/JsonSchemaObjectStorage.kt#L74">JsonSchemaObjectStorage</a>

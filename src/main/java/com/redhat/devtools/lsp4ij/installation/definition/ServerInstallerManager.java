@@ -52,7 +52,7 @@ public class ServerInstallerManager extends InstallerTaskRegistry implements Dis
     private static final Logger LOGGER = LoggerFactory.getLogger(ServerInstallerManager.class);
 
     // The parent of the extension point listener, which dispose() disposes, so that it ends with this service. Not a
-    // CoroutineScope: the overload of addExtensionPointListener with one is internal from 2024.3 to 2026.2 (#2274)
+    // CoroutineScope: the overload of addExtensionPointListener with one is internal up to 2026.2 (#2274)
     private final Disposable extensionPointListenerDisposable =
             Disposer.newDisposable("LSP4IJ installer task extension point listener");
 

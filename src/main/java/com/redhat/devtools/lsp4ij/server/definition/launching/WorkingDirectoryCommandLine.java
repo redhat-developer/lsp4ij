@@ -25,7 +25,7 @@ import java.util.List;
  * environment that the process gets in its working directory, so that the tool which the directory provides, as with
  * mise or direnv, is the one that starts.
  * <p>
- * Since 2025.1, the platform lets plugins customize the environment of a process for its working directory
+ * The platform lets plugins customize the environment of a process for its working directory
  * ({@code CommandLineEnvCustomizer}) when the process starts, but it looks up the executable before that, in the PATH
  * given to the command line only. This command line looks it up again in the environment that the platform has
  * customized for the process, so the customizers run once for each start, and the executable is the one of the
@@ -45,8 +45,8 @@ public class WorkingDirectoryCommandLine extends GeneralCommandLine {
 
     /**
      * Returns the PATH of the environment that the process got as it started, which the platform customizes for its
-     * working directory since 2025.1, or, before it started, the PATH of the environment that this command line gives
-     * it; or null if the environment has none.
+     * working directory, or, before it started, the PATH of the environment that this command line gives it; or null
+     * if the environment has none.
      *
      * @return the PATH of the environment of the process, or null if it has none.
      */
