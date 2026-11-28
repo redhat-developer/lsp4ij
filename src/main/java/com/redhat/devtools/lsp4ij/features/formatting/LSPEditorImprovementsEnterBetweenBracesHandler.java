@@ -13,7 +13,8 @@ package com.redhat.devtools.lsp4ij.features.formatting;
 
 import com.intellij.application.options.CodeStyle;
 import com.intellij.codeInsight.CodeInsightSettings;
-import com.intellij.codeInsight.editorActions.enter.EnterBetweenBracesHandler;
+import com.intellij.codeInsight.editorActions.enter.EnterBetweenBracesFinalHandler;
+import com.intellij.codeInsight.editorActions.enter.EnterHandlerDelegateAdapter;
 import com.intellij.openapi.actionSystem.DataContext;
 import com.intellij.openapi.editor.CaretModel;
 import com.intellij.openapi.editor.Document;
@@ -32,8 +33,19 @@ import org.jetbrains.annotations.Nullable;
 
 /**
  * This provides a workaround for <a href="https://youtrack.jetbrains.com/issue/IJPL-159454">IJPL-159454</a>.
+ * <p>
+ * It applies only to the files of language servers, of an abstract file type or a TextMate one, when the fix is
+ * enabled: there, it runs the platform's Enter between braces first, as before, and then rewrites the braces and their
+ * indent once the Enter is done. It leaves any other file to the platform's Enter between braces, which runs where it
+ * is registered, after the handlers that run before it, such as those of Kotlin and Java.
  */
-public class LSPEditorImprovementsEnterBetweenBracesHandler extends EnterBetweenBracesHandler {
+public class LSPEditorImprovementsEnterBetweenBracesHandler extends EnterHandlerDelegateAdapter {
+
+    // The platform's Enter between braces, which the deprecated EnterBetweenBracesHandler extends: for the files of
+    // language servers, whose language has no EnterBetweenBracesDelegate of its own, both use the default delegate. It
+    // splits no braces of a TextMate file, whose braces are in the same element
+    private static final EnterBetweenBracesFinalHandler BETWEEN_BRACES = new EnterBetweenBracesFinalHandler();
+
     private boolean enterAfterOpenBrace = false;
     private Character openBraceCharacter = null;
     private boolean enterBeforeCloseBrace = false;
@@ -47,9 +59,7 @@ public class LSPEditorImprovementsEnterBetweenBracesHandler extends EnterBetween
             @NotNull Ref<Integer> caretAdvance,
             @NotNull DataContext dataContext,
             @Nullable EditorActionHandler originalHandler) {
-        if (LSPIJEditorUtils.isSupportedAbstractFileTypeOrTextMateFile(file) &&
-            CodeInsightSettings.getInstance().SMART_INDENT_ON_ENTER &&
-            EditorBehaviorFeature.enableEnterBetweenBracesFix(file)) {
+        if (isFixed(file)) {
             CaretModel caretModel = editor.getCaretModel();
             int offset = caretModel.getOffset();
             if (offset > 0) {
@@ -68,9 +78,10 @@ public class LSPEditorImprovementsEnterBetweenBracesHandler extends EnterBetween
                     }
                 }
             }
+            return BETWEEN_BRACES.preprocessEnter(file, editor, caretOffset, caretAdvance, dataContext, originalHandler);
         }
 
-        return super.preprocessEnter(file, editor, caretOffset, caretAdvance, dataContext, originalHandler);
+        return Result.Continue;
     }
 
     @Override
@@ -78,9 +89,7 @@ public class LSPEditorImprovementsEnterBetweenBracesHandler extends EnterBetween
             @NotNull PsiFile file,
             @NotNull Editor editor,
             @NotNull DataContext dataContext) {
-        if (LSPIJEditorUtils.isSupportedAbstractFileTypeOrTextMateFile(file) &&
-            CodeInsightSettings.getInstance().SMART_INDENT_ON_ENTER &&
-            EditorBehaviorFeature.enableEnterBetweenBracesFix(file)) {
+        if (isFixed(file)) {
             Project project = file.getProject();
             Document document = editor.getDocument();
             PsiDocumentManager.getInstance(project).commitDocument(document);
@@ -152,7 +161,17 @@ public class LSPEditorImprovementsEnterBetweenBracesHandler extends EnterBetween
             return Result.Stop;
         }
 
-        return super.postProcessEnter(file, editor, dataContext);
+        return Result.Continue;
+    }
+
+    /**
+     * Returns true if this handler fixes the Enter between braces of the given file: a file of a language server, of an
+     * abstract file type or a TextMate one, whose language server enables the fix, with smart indent on Enter.
+     */
+    private static boolean isFixed(@NotNull PsiFile file) {
+        return LSPIJEditorUtils.isSupportedAbstractFileTypeOrTextMateFile(file) &&
+               CodeInsightSettings.getInstance().SMART_INDENT_ON_ENTER &&
+               EditorBehaviorFeature.enableEnterBetweenBracesFix(file);
     }
 
     private static int getCurrentIndentSize(@NotNull PsiFile file,
