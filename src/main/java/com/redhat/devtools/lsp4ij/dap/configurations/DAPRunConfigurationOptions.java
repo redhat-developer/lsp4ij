@@ -15,6 +15,7 @@ import com.intellij.openapi.components.StoredProperty;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.io.FileUtil;
 import com.intellij.openapi.vfs.VirtualFile;
+import com.intellij.util.SystemProperties;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
 import com.redhat.devtools.lsp4ij.dap.DebugAdapterManager;
 import com.redhat.devtools.lsp4ij.dap.DebugMode;
@@ -175,7 +176,7 @@ public class DAPRunConfigurationOptions extends DAPRunConfigurationOptionsBase i
             return path;
         }
         try {
-            Path resolved = Path.of(FileUtil.expandUserHome(path));
+            Path resolved = Path.of(expandUserHome(path));
             if (!resolved.isAbsolute()) {
                 if (directory == null) {
                     return path;
@@ -186,6 +187,25 @@ public class DAPRunConfigurationOptions extends DAPRunConfigurationOptionsBase i
         } catch (InvalidPathException e) {
             return path;
         }
+    }
+
+    /**
+     * Returns the given path with a leading {@code ~} expanded to the user's home directory: {@code ~} alone, or
+     * followed by a separator, {@code /} or {@code \}. Any other path, such as {@code ~user/file}, stays as it is. This
+     * is what {@code FileUtil.expandUserHome} does: IntelliJ 2025.3 schedules it for removal, and the
+     * {@code OSAgnosticPathUtil.expandUserHome} which replaces it doesn't exist in IntelliJ 2024.2.
+     *
+     * @param path the path.
+     * @return the path with a leading {@code ~} expanded, or the given path.
+     */
+    static @NotNull String expandUserHome(@NotNull String path) {
+        if (path.equals("~")) {
+            return SystemProperties.getUserHome();
+        }
+        if (path.startsWith("~/") || path.startsWith("~\\")) {
+            return SystemProperties.getUserHome() + path.substring(1);
+        }
+        return path;
     }
 
     public DebugMode getDebugMode() {

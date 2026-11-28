@@ -23,7 +23,8 @@ import java.nio.file.Path;
  * ({@link DAPRunConfigurationOptions#getResolvedWorkingDirectory} and
  * {@link DAPRunConfigurationOptions#getResolvedFile}): a leading {@code ~} is the user's home directory, a relative path
  * is relative to the project's directory, and an absolute path stays as it is. What is stored, which the settings
- * editor shows, doesn't change.
+ * editor shows, doesn't change. The {@code ~} is expanded as IntelliJ's {@code FileUtil.expandUserHome} does
+ * ({@link DAPRunConfigurationOptions#expandUserHome}).
  */
 public class DAPRunConfigurationOptionsResolvedPathTest extends LightPlatformTestCase {
 
@@ -121,6 +122,20 @@ public class DAPRunConfigurationOptionsResolvedPathTest extends LightPlatformTes
 
         assertEquals("src/main", options.getResolvedWorkingDirectory(null));
         assertEquals(home().resolve("hello.rb").toString(), options.getResolvedFile(null));
+    }
+
+    public void testOnlyALeadingTildeAloneOrBeforeASeparatorIsTheHomeDirectory() {
+        String home = SystemProperties.getUserHome();
+        assertEquals(home, DAPRunConfigurationOptions.expandUserHome("~"));
+        assertEquals(home + "/docs/hello.rb", DAPRunConfigurationOptions.expandUserHome("~/docs/hello.rb"));
+        assertEquals(home + "\\docs\\hello.rb", DAPRunConfigurationOptions.expandUserHome("~\\docs\\hello.rb"));
+
+        // As IntelliJ's FileUtil.expandUserHome: the home of another user, and a tilde anywhere else, stay as they are
+        assertEquals("~user/hello.rb", DAPRunConfigurationOptions.expandUserHome("~user/hello.rb"));
+        assertEquals("~hello.rb", DAPRunConfigurationOptions.expandUserHome("~hello.rb"));
+        assertEquals("docs/~/hello.rb", DAPRunConfigurationOptions.expandUserHome("docs/~/hello.rb"));
+        assertEquals("hello.rb~", DAPRunConfigurationOptions.expandUserHome("hello.rb~"));
+        assertEquals("", DAPRunConfigurationOptions.expandUserHome(""));
     }
 
     private @NotNull Path projectDirectory() {
