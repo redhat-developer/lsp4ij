@@ -45,6 +45,19 @@ import static com.redhat.devtools.lsp4ij.features.diagnostics.LSPDiagnosticUtils
  */
 public class LSPDiagnosticsForServer {
 
+    private static final Comparator<Position> POSITION_ORDER = Comparator.comparingInt(Position::getLine)
+            .thenComparingInt(Position::getCharacter);
+
+    /**
+     * The order in which the diagnostics are grouped by covered range: a diagnostic comes before those whose range its
+     * own range contains, so that they join its group. The ranges are in the order of their start, and those with the
+     * same start the longest first. This is a total order, as a sort needs: the containment of ranges alone isn't one,
+     * and a sort of 32 diagnostics or more by it could fail with "Comparison method violates its general contract!".
+     */
+    static final Comparator<Diagnostic> CONTAINING_RANGE_FIRST = Comparator
+            .comparing((Diagnostic diagnostic) -> diagnostic.getRange().getStart(), POSITION_ORDER)
+            .thenComparing(diagnostic -> diagnostic.getRange().getEnd(), POSITION_ORDER.reversed());
+
     private boolean hasErrors;
 
     private record DiagnosticData(Range range, List<Diagnostic> diagnostics) {};
@@ -139,15 +152,10 @@ public class LSPDiagnosticsForServer {
         hasErrors = false;
         // Collect quick fixes from LSP code action
         Map<Diagnostic, LSPLazyCodeActions> map = new HashMap<>(diagnostics.size());
-        // Sort diagnostics by range
+        // Sort diagnostics by range, a diagnostic before those whose range its range contains
         List<Diagnostic> sortedDiagnostics = diagnostics
                 .stream()
-                .sorted((d1, d2) -> {
-                    if (Ranges.containsRange(d1.getRange(), d2.getRange())) {
-                        return -1;
-                    }
-                    return 1;
-                })
+                .sorted(CONTAINING_RANGE_FIRST)
                 .toList();
         // Group diagnostics by covered range
         List<DiagnosticData> diagnosticsGroupByCoveredRange = new ArrayList<>();
