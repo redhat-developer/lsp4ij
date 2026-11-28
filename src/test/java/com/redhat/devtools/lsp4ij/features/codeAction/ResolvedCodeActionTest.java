@@ -7,16 +7,23 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.features.codeAction;
 
+import com.intellij.codeInsight.hint.EditorHintListener;
+import com.intellij.codeInsight.hint.HintUtil;
 import com.intellij.codeInsight.intention.IntentionAction;
 import com.intellij.openapi.actionSystem.IdeActions;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.command.WriteCommandAction;
 import com.intellij.openapi.editor.Document;
+import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.fileEditor.FileEditorManager;
+import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiManager;
 import com.intellij.testFramework.PlatformTestUtil;
+import com.intellij.ui.HintHint;
+import com.intellij.ui.LightweightHint;
 import com.redhat.devtools.lsp4ij.LSPIJUtils;
+import com.redhat.devtools.lsp4ij.LanguageServerBundle;
 import com.redhat.devtools.lsp4ij.LanguageServiceAccessor;
 import com.redhat.devtools.lsp4ij.fixtures.LSPCodeActionFixtureTestCase;
 import com.redhat.devtools.lsp4ij.mock.MockLanguageServer;
@@ -27,25 +34,45 @@ import org.eclipse.lsp4j.Position;
 import org.eclipse.lsp4j.Range;
 import org.eclipse.lsp4j.TextEdit;
 import org.eclipse.lsp4j.WorkspaceEdit;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import javax.swing.JComponent;
+
 /**
  * A code action without an edit is resolved when it is invoked, and its edit arrives after the
  * intention's command has ended. It is applied in a command of its own, which Undo reverts, and only to
- * the text it was resolved for.
+ * the text it was resolved for. A refused edit shows the reason in an error hint, which the tests check.
  */
 public class ResolvedCodeActionTest extends LSPCodeActionFixtureTestCase {
 
     private static final String TITLE = "Insert a greeting";
 
+    /** The texts of the hints shown in the editors since the test started, such as why an edit was refused. */
+    private final List<String> hints = new CopyOnWriteArrayList<>();
+
     public ResolvedCodeActionTest() {
         super("*.greeting");
+    }
+
+    @Override
+    protected void setUp() throws Exception {
+        super.setUp();
+        ApplicationManager.getApplication().getMessageBus().connect(getTestRootDisposable())
+                .subscribe(EditorHintListener.TOPIC, new EditorHintListener() {
+                    @Override
+                    public void hintShown(@NotNull Editor editor, @NotNull LightweightHint hint, int flags,
+                                          @NotNull HintHint hintInfo) {
+                        hints.add(textOf(hint.getComponent()));
+                    }
+                });
     }
 
     public void testUndoRevertsTheResolvedEditAlone() {
@@ -55,6 +82,7 @@ public class ResolvedCodeActionTest extends LSPCodeActionFixtureTestCase {
 
         invoke(intention);
         waitUntilTheResolvedEditIsAppliedOrRefused();
+        assertNotRefused();
         assertEquals("hello world!", document().getText());
 
         // the typing before the code action is not undone with it
@@ -71,6 +99,7 @@ public class ResolvedCodeActionTest extends LSPCodeActionFixtureTestCase {
         type("!");
         waitUntilTheResolvedEditIsAppliedOrRefused();
 
+        assertRefused("lsp.workspace.edit.document.changed", myFixture.getFile().getVirtualFile());
         assertEquals("world!", document().getText());
     }
 
@@ -85,6 +114,7 @@ public class ResolvedCodeActionTest extends LSPCodeActionFixtureTestCase {
         openInEditor(other);
         waitUntilTheResolvedEditIsAppliedOrRefused();
 
+        assertNotRefused();
         assertEquals("hello world", LSPIJUtils.getDocument(other).getText());
     }
 
@@ -101,6 +131,7 @@ public class ResolvedCodeActionTest extends LSPCodeActionFixtureTestCase {
                 () -> document.insertString(document.getTextLength(), "!"));
         waitUntilTheResolvedEditIsAppliedOrRefused();
 
+        assertRefused("lsp.workspace.edit.document.opened", other);
         assertEquals("world!", document.getText());
     }
 
@@ -126,6 +157,7 @@ public class ResolvedCodeActionTest extends LSPCodeActionFixtureTestCase {
         waitUntilTheResolvedEditIsAppliedOrRefused();
 
         // the edit which the language server computes lazily is applied, and then its command is executed
+        assertNotRefused();
         assertEquals("hello world", document().getText());
         var executed = MockLanguageServer.INSTANCE.getWorkspaceService().getExecutedCommand()
                 .get(10, TimeUnit.SECONDS);
@@ -166,6 +198,26 @@ public class ResolvedCodeActionTest extends LSPCodeActionFixtureTestCase {
         ApplicationManager.getApplication().invokeLater(() -> queuedAfterTheEdit.set(true));
         PlatformTestUtil.waitWithEventsDispatching("the resolved edit must be applied or refused",
                 queuedAfterTheEdit::get, IN_MEMORY_TIMEOUT_SECONDS);
+    }
+
+    /** Asserts that no resolved edit was refused: a refusal shows its reason in a hint. */
+    private void assertNotRefused() {
+        assertEmpty("The resolved edit must not be refused", hints);
+    }
+
+    /**
+     * Asserts that the resolved edit was refused, for the reason that the given message of the bundle gives for the
+     * given file, and for no other.
+     */
+    private void assertRefused(@NotNull String reasonKey, @NotNull VirtualFile file) {
+        assertEquals("The resolved edit must be refused, for this reason alone",
+                List.of(LanguageServerBundle.message(reasonKey, LSPIJUtils.toUriAsString(file))), hints);
+    }
+
+    /** Returns the text of a hint, without its HTML. */
+    private static @NotNull String textOf(@NotNull JComponent component) {
+        String text = component instanceof HintUtil.HintLabel label ? label.getText() : component.toString();
+        return StringUtil.removeHtmlTags(text, true).replaceAll("\\s+", " ").trim();
     }
 
     /**
