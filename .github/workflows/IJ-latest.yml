@@ -10,8 +10,8 @@ on:
 
 jobs:
 
-  # Finds the newest IntelliJ IDEA build, which the job build tests, and whether ci.yml is behind the newest release,
-  # which the job newest-release then tests
+  # Finds the newest IntelliJ IDEA build, which the job build tests, whether ci.yml is behind the newest release,
+  # which the job newest-release then tests, and the supported releases that neither tests, for supported-releases
   discover:
     runs-on: ubuntu-latest
     outputs:
@@ -19,6 +19,7 @@ jobs:
       behind: ${{ steps.latest.outputs.behind }}
       newest-release: ${{ steps.latest.outputs.newest-release }}
       ci-release: ${{ steps.latest.outputs.ci-release }}
+      untested-releases: ${{ steps.latest.outputs.untested-releases }}
 
     steps:
       # Check out current repository
@@ -105,6 +106,31 @@ jobs:
               echo "ci-release=$CI_RELEASE"
             } >> "$GITHUB_OUTPUT"
           fi
+
+          # The newest build of each IntelliJ IDEA (IU) release that LSP4IJ supports, from pluginSinceBuild on, and that
+          # neither ci.yml, of any type, nor the job newest-release tests, such as 2025.2, 2026.1 and 2026.2. A release
+          # is its branch: 252 for 2025.2 and its patch releases. The job supported-releases tests them.
+          SINCE_BUILD=$(yq -p=props -o=yaml '.pluginSinceBuild' gradle.properties)
+          CI_VERSIONS=$(DEFAULT_VERSION="$DEFAULT_VERSION" yq '
+            .jobs[].strategy.matrix
+            | ((.platformVersion // [""]) | map({"platformVersion": .})) + (.include // [])
+            | .[]
+            | (.platformVersion // "") | (select(. != "") // strenv(DEFAULT_VERSION))
+          ' .github/workflows/ci.yml | jq -R . | jq -sc 'map(select(. != "")) | unique')
+          # The branch of a version: 2025.3 and 2025.3.6.3 -> 253
+          BRANCH='split(".") | (.[0][2:] + .[1]) | tonumber'
+          UNTESTED=$(jq -c --argjson since "$SINCE_BUILD" --argjson ci "$CI_VERSIONS" --arg newest "$NEWEST_RELEASE" "
+            ([\$ci[] | $BRANCH] + (if \$newest == \"\" then [] else [\$newest | $BRANCH] end)) as \$tested
+            | $SORTED
+            | map(select(.channel == \"RELEASE\") | .branch = (.buildNumber | split(\".\")[0] | tonumber))
+            | map(select(.branch >= \$since and (.branch as \$b | \$tested | any(. == \$b) | not)))
+            | group_by(.branch)
+            | map(max_by(.buildNumber | split(\".\") | map(tonumber)) | .version)
+          " $RELEASES)
+          UNTESTED_LIST=$(echo "$UNTESTED" | jq -r 'if length == 0 then "none" else join(", ") end')
+          echo "Supported releases (from build $SINCE_BUILD) that ci.yml ($CI_VERSIONS) and newest-release don't test: $UNTESTED_LIST"
+          echo "Supported releases that ci.yml doesn't test, tested by the job supported-releases: $UNTESTED_LIST" >> "$GITHUB_STEP_SUMMARY"
+          echo "untested-releases=$UNTESTED" >> "$GITHUB_OUTPUT"
 
   # Tests the newest build, often an EAP
   build:
@@ -194,6 +220,65 @@ jobs:
         if: always()
         with:
           name: test-reports-newest-release
+          path: |
+            ${{ github.workspace }}/build/reports/tests
+            ${{ github.workspace }}/build/jacoco/
+
+  # Tests the newest build of each IntelliJ IDEA release that LSP4IJ supports and that neither ci.yml nor the job
+  # newest-release tests, such as 2025.2, 2026.1 and 2026.2. ci.yml tests the oldest supported release, 2025.3 and the
+  # newest release, which together run every version-dependent path of LSP4IJ. But the platform behaves differently in
+  # the releases between them (#1300, #1636, #1648), whose users keep them after a newer release is out, when no other
+  # job tests them any more.
+  supported-releases:
+    needs: discover
+    if: needs.discover.outputs.untested-releases != '' && needs.discover.outputs.untested-releases != '[]'
+    name: supported-release (${{ matrix.version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        version: ${{ fromJSON(needs.discover.outputs.untested-releases) }}
+
+    steps:
+      - name: Fetch Sources
+        uses: actions/checkout@v7
+
+      - name: Setup Java
+        uses: actions/setup-java@v6
+        with:
+          distribution: 'temurin'
+          java-version: 21
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v5
+        with:
+          # Leaves the extracted IDEs out of the Actions cache, see ci.yml
+          gradle-home-cache-excludes: |
+            caches/transforms-4
+            caches/*/transforms
+
+      - name: Build with Gradle
+        env:
+          PLATFORM_VERSION: ${{ matrix.version }}
+        run: ./gradlew check -PplatformType=IU -PplatformVersion="$PLATFORM_VERSION"
+
+      - name: Say that the release doesn't pass
+        if: failure()
+        env:
+          PLATFORM_VERSION: ${{ matrix.version }}
+        run: |
+          MESSAGE="LSP4IJ supports IntelliJ IDEA $PLATFORM_VERSION, which ci.yml doesn't test, and it doesn't pass ./gradlew check: see the log of this job."
+          echo "::warning title=$PLATFORM_VERSION doesn't pass::$MESSAGE"
+          {
+            echo "> [!WARNING]"
+            echo "> $MESSAGE"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Collect Tests Result
+        uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: test-reports-${{ matrix.version }}
           path: |
             ${{ github.workspace }}/build/reports/tests
             ${{ github.workspace }}/build/jacoco/

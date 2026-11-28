@@ -511,7 +511,7 @@ public class DAPTerminateThreadSessionTest extends HeavyPlatformTestCase {
      *     list itself, under a private key, and the navigatable and the file of the selected frame. Unlike the Threads
      *     panel, it gives no {@link ThreadsPanel#SELECTED_THREADS}.</li>
      *     <li>The tab of the debug session above it (XDebugSessionTab) gives {@link XDebugSession#DATA_KEY}, in
-     *     2024.2. In the split debugger (2026.x), the tab gives an internal session proxy instead, and the action takes
+     *     2025.x. In the split debugger (2026.x), the tab gives an internal session proxy instead, and the action takes
      *     the project's current session, which tests don't have, as no session tab is selected in tests.</li>
      *     <li>The IDE gives the project.</li>
      * </ul>

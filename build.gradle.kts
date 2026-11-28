@@ -65,17 +65,7 @@ dependencies {
         }
 
         // Plugin Dependencies. Uses `platformBundledPlugins` property from the gradle.properties file for bundled IntelliJ Platform plugins.
-        // starting from 2024.3, all json related code is know on its own plugin
-        val platformBundledPlugins =  ArrayList<String>()
-        platformBundledPlugins.addAll(properties("platformBundledPlugins").map { it.split(',').map(String::trim).filter(String::isNotEmpty) }.get())
-        /*
-         * platformVersion check for JSON breaking changes since 2024.3
-         */
-        if (ideaVersionInt >= 243) {
-            platformBundledPlugins.add("com.intellij.modules.json")
-        }
-        println("use bundled Plugins: $platformBundledPlugins")
-        bundledPlugins(platformBundledPlugins)
+        bundledPlugins(properties("platformBundledPlugins").map { it.split(',').map(String::trim).filter(String::isNotEmpty) })
 
         // Plugin Dependencies. Uses `platformPlugins` property from the gradle.properties file for plugin from JetBrains Marketplace.
         plugins(properties("platformPlugins").map { it.split(',') })
@@ -127,27 +117,32 @@ dependencies {
     testImplementation("org.junit.platform:junit-platform-launcher:1.11.0")
 }
 
-// Set the JDK version used by the toolchain to build the project (Java 21 is required for platform 2025.3, and Java 25
-// for platform 2026.2 and later, whose classes are Java 25 classes). Output compatibility and API usage are restricted
-// to Java 17 in the tasks below.
+// Set the JDK version used by the toolchain to build the project (Java 21, and Java 25 for platform 2026.2 and later, whose
+// classes are Java 25 classes). Output compatibility and API usage are restricted to Java 21 in the tasks below.
 kotlin {
     jvmToolchain {
         languageVersion = JavaLanguageVersion.of(if (ideaVersionInt >= 262) 25 else 21)
     }
 }
 
-// Maintain compatibility with Java 17 runtimes, ensuring the built plugin 
-// can run on older IDEs even though the toolchain uses Java 21 for the 253 platform.
+// Java 21, the version of the JetBrains Runtime of IntelliJ 2025.1, the oldest supported platform, so that the built
+// plugin runs there even though the toolchain uses Java 25 for the 263 platform.
 tasks.withType<JavaCompile>().configureEach {
-    options.release.set(17)
+    options.release.set(21)
+    // Lists each use of a deprecated API, in the main and the test classes, instead of javac's one note per source set,
+    // up to javac's 100 warnings a source set. The uses of an API scheduled for removal are listed without it. Warnings
+    // don't fail the build.
+    options.compilerArgs.add("-Xlint:deprecation")
 }
 
-// Set Kotlin JVM language level to match Java compatibility.
+// Set Kotlin JVM language level to match Java compatibility. The API and language versions must not exceed the Kotlin
+// standard library that the oldest supported platform bundles (kotlin.stdlib.default.dependency=false), 2.1.10 in
+// IntelliJ 2025.1.
 tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
     compilerOptions {
-        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
-        apiVersion.set(org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_1_9)
-        languageVersion.set(org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_1_9)
+        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_21)
+        apiVersion.set(org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_2_1)
+        languageVersion.set(org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_2_1)
     }
 }
 
@@ -220,7 +215,7 @@ intellijPlatform {
                     // The latest release of each version, and the current EAP, so that an API that the coming
                     // version removes fails the verification before that version is released.
                     channels = listOf(ProductRelease.Channel.RELEASE, ProductRelease.Channel.EAP)
-                    sinceBuild = "242" // From your minimum supported version
+                    sinceBuild = properties("pluginSinceBuild") // From the minimum supported version
                 }
             }
         }
@@ -401,19 +396,9 @@ tasks {
         }
     }
 
-    // TODO: Once LSP4IJ no longer supports 2023.*, the hotswap JVM args can be added unconditionally
-    fun supportsEnhancedClassRedefinition(): Boolean {
-        // Versions before 2024.1 don't support enhanced class redefinition
-        return ideaVersionInt >= 241
-    }
-
     runIde {
         // Improved hotswap for the IDE's JVM
-        if (supportsEnhancedClassRedefinition()) {
-            println("Enabling enhanced class redefinition.")
-            jvmArgs("-XX:+AllowEnhancedClassRedefinition", "-XX:HotswapAgent=fatjar")
-        }
-
+        jvmArgs("-XX:+AllowEnhancedClassRedefinition", "-XX:HotswapAgent=fatjar")
     }
 
     publishPlugin {

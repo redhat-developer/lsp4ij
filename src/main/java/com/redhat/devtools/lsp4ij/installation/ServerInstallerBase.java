@@ -179,7 +179,7 @@ public abstract class ServerInstallerBase implements ServerInstaller {
 
                     markAsInstalled(context, installFuture);
                 } catch (CancellationException e) {
-                    // Also a ProcessCanceledException, which extends CancellationException since IntelliJ 2024.2
+                    // Also a ProcessCanceledException, which extends CancellationException
                     CancellationSupport.cancel(installFuture);
                 } catch (Throwable e) {
                     updateStatus(ServerInstallationStatus.NOT_INSTALLED);

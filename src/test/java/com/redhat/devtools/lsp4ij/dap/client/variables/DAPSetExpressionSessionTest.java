@@ -84,7 +84,6 @@ import org.jetbrains.annotations.Nullable;
 
 import javax.swing.Icon;
 import java.io.IOException;
-import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.net.InetAddress;
 import java.net.ServerSocket;
@@ -618,18 +617,10 @@ public class DAPSetExpressionSessionTest extends HeavyPlatformTestCase {
 
     /**
      * Returns the modifier of the given value as the debugger asks for it when it shows the value. IntelliJ 2026.3 asks
-     * once, with XValue.getModifierAsync(), which IntelliJ 2024.2 doesn't have, and asks getModifier() again when the
-     * value is set.
+     * once, with XValue.getModifierAsync(), and asks getModifier() again when the value is set.
      */
     private static @Nullable XValueModifier modifierWhenShown(@NotNull XValue value) throws Exception {
-        Method getModifierAsync;
-        try {
-            getModifierAsync = XValue.class.getMethod("getModifierAsync");
-        } catch (NoSuchMethodException e) {
-            return value.getModifier();
-        }
-        var modifier = (CompletableFuture<?>) getModifierAsync.invoke(value);
-        return (XValueModifier) modifier.get(BOUND_SECONDS, TimeUnit.SECONDS);
+        return value.getModifierAsync().get(BOUND_SECONDS, TimeUnit.SECONDS);
     }
 
     private @NotNull DAPClient client() {

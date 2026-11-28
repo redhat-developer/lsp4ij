@@ -10,9 +10,8 @@
  ******************************************************************************/
 package com.redhat.devtools.lsp4ij.server.definition.launching;
 
-import com.intellij.execution.configurations.GeneralCommandLine;
 import com.intellij.execution.process.CapturingProcessHandler;
-import com.intellij.openapi.application.ApplicationInfo;
+import com.intellij.execution.process.CommandLineEnvCustomizer;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.PathManager;
 import com.intellij.openapi.project.ProjectManager;
@@ -29,7 +28,6 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
-import java.lang.reflect.Proxy;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -49,26 +47,22 @@ public class UserDefinedServerWorkingDirectoryTest extends BasePlatformTestCase 
 
     /**
      * The extension point through which a plugin, as mise's, sets up the environment of a process for its working
-     * directory, since IntelliJ 2025.1. Its interface doesn't exist before, so the tests reach it by name.
+     * directory.
      */
     private static final String COMMAND_LINE_ENV_CUSTOMIZER = "com.intellij.commandLineEnvCustomizer";
-    private static final String COMMAND_LINE_ENV_CUSTOMIZER_CLASS = "com.intellij.execution.process.CommandLineEnvCustomizer";
     // The variable which the environment of the working directory sets to that directory
     private static final String DIRECTORY_VARIABLE = "LSP4IJ_TEST_DIRECTORY_ENVIRONMENT";
     private static final long TIMEOUT_SECONDS = 120;
 
     public void testWithoutAWorkingDirectoryTheLanguageServerRunsInTheProjectDirectoryAndGetsItsEnvironment() throws Exception {
         Path projectDirectory = createProjectDirectory();
-        boolean directoryEnvironments = addDirectoryEnvironment();
+        addDirectoryEnvironment();
         var definition = definition(recorder(), null);
 
         var record = run(definition.createConnectionProvider(getProject()));
 
         assertEquals(projectDirectory, record.directory());
-        if (directoryEnvironments) {
-            assertEquals(projectDirectory, record.directoryEnvironment());
-        }
-        // else IntelliJ 2024.x, which has no environment of a directory
+        assertEquals(projectDirectory, record.directoryEnvironment());
     }
 
     public void testWithABlankWorkingDirectoryTheLanguageServerRunsInTheProjectDirectory() throws IOException {
@@ -88,21 +82,19 @@ public class UserDefinedServerWorkingDirectoryTest extends BasePlatformTestCase 
     }
 
     public void testAConfiguredWorkingDirectoryWinsAndGivesItsEnvironment() throws Exception {
-        boolean directoryEnvironments = addDirectoryEnvironment();
+        addDirectoryEnvironment();
         Path directory = temporaryDirectory();
         var definition = definition(recorder(), directory.toString());
 
         var record = run(definition.createConnectionProvider(getProject()));
 
         assertEquals(directory, record.directory());
-        if (directoryEnvironments) {
-            assertEquals(directory, record.directoryEnvironment());
-        }
+        assertEquals(directory, record.directoryEnvironment());
     }
 
     public void testOverASocketTheLanguageServerRunsInTheProjectDirectoryAndGetsItsEnvironment() throws Exception {
         Path projectDirectory = createProjectDirectory();
-        boolean directoryEnvironments = addDirectoryEnvironment();
+        addDirectoryEnvironment();
         var definition = definition(recorder() + " ${port}", null);
         definition.setTransport(new UserDefinedTransport(UserDefinedTransport.Mode.START_AND_ACCEPT, null, 0));
         var provider = definition.createConnectionProvider(getProject());
@@ -116,9 +108,7 @@ public class UserDefinedServerWorkingDirectoryTest extends BasePlatformTestCase 
         }
 
         assertEquals(projectDirectory, record.directory());
-        if (directoryEnvironments) {
-            assertEquals(projectDirectory, record.directoryEnvironment());
-        }
+        assertEquals(projectDirectory, record.directoryEnvironment());
     }
 
     public void testTheInstallerChecksTheLanguageServerInTheProjectDirectory() throws IOException {
@@ -154,41 +144,18 @@ public class UserDefinedServerWorkingDirectoryTest extends BasePlatformTestCase 
 
     /**
      * Gives each process of {@link WorkingDirectoryRecorder} with a working directory the environment of that
-     * directory, {@link #DIRECTORY_VARIABLE} set to it, as a {@code CommandLineEnvCustomizer} does, when the IDE has
-     * the extension point, since IntelliJ 2025.1.
-     *
-     * @return true if the IDE sets up the environment of a directory, and false if it doesn't, before 2025.1.
+     * directory, {@link #DIRECTORY_VARIABLE} set to it, as a {@code CommandLineEnvCustomizer} does.
      */
-    private boolean addDirectoryEnvironment() throws ClassNotFoundException {
-        var area = ApplicationManager.getApplication().getExtensionArea();
-        boolean directoryEnvironments = area.hasExtensionPoint(COMMAND_LINE_ENV_CUSTOMIZER);
-        // so that the environment is checked wherever the IDE has it
-        assertEquals("IntelliJ 2025.1 and later set up the environment of a directory",
-                ApplicationInfo.getInstance().getBuild().getBaselineVersion() >= 251, directoryEnvironments);
-        if (!directoryEnvironments) {
-            return false;
-        }
-        Class<?> customizerClass = Class.forName(COMMAND_LINE_ENV_CUSTOMIZER_CLASS, true,
-                GeneralCommandLine.class.getClassLoader());
-        Object customizer = Proxy.newProxyInstance(customizerClass.getClassLoader(), new Class<?>[]{customizerClass},
-                (proxy, method, args) -> switch (method.getName()) {
-                    case "customizeEnv" -> {
-                        var commandLine = (GeneralCommandLine) args[0];
-                        @SuppressWarnings("unchecked")
-                        var environment = (Map<String, String>) args[1];
-                        if (commandLine.getWorkDirectory() != null
-                                && commandLine.getParametersList().getList().contains(WorkingDirectoryRecorder.class.getName())) {
-                            environment.put(DIRECTORY_VARIABLE, commandLine.getWorkDirectory().getPath());
-                        }
-                        yield null;
-                    }
-                    case "equals" -> proxy == args[0];
-                    case "hashCode" -> System.identityHashCode(proxy);
-                    case "toString" -> "the environment of the working directory of the tests";
-                    default -> null;
-                });
-        area.getExtensionPoint(COMMAND_LINE_ENV_CUSTOMIZER).registerExtension(customizer, getTestRootDisposable());
-        return true;
+    private void addDirectoryEnvironment() {
+        CommandLineEnvCustomizer customizer = (commandLine, environment) -> {
+            if (commandLine.getWorkDirectory() != null
+                    && commandLine.getParametersList().getList().contains(WorkingDirectoryRecorder.class.getName())) {
+                environment.put(DIRECTORY_VARIABLE, commandLine.getWorkDirectory().getPath());
+            }
+        };
+        ApplicationManager.getApplication().getExtensionArea()
+                .<CommandLineEnvCustomizer>getExtensionPoint(COMMAND_LINE_ENV_CUSTOMIZER)
+                .registerExtension(customizer, getTestRootDisposable());
     }
 
     /**

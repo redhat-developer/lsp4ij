@@ -220,8 +220,8 @@ public class CompletableFutures {
             public void run(@NotNull ProgressIndicator indicator) {
                 try {
                     ProgressIndicatorUtils.awaitWithCheckCanceled(future);
-                } catch (
-                        ProcessCanceledException e) {//Since 2024.2 ProcessCanceledException extends CancellationException so we can't use multicatch to keep backward compatibility
+                } catch (ProcessCanceledException e) {
+                    // A CancellationException too, caught first to be thrown again
                     CancellationSupport.cancel(future);
                     throw e;
                 } catch (CancellationException e) {
@@ -258,7 +258,7 @@ public class CompletableFutures {
             ProgressManager.checkCanceled();
             throw cancellation;
         } catch (CancellationException e) {
-            // Since 2024.2 ProcessCanceledException extends CancellationException
+            // The future was cancelled (a ProcessCanceledException is caught above)
             throw e;
         } catch (RuntimeException e) {
             // ProgressIndicatorUtils rethrows the failure of the future, an ExecutionException, in a RuntimeException

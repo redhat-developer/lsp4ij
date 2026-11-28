@@ -130,9 +130,9 @@ public class CommandUtils {
      * process gets there, so that the tool which the directory provides, as with mise or direnv, is the one that
      * starts. A command line without a working directory, or whose executable is a path, is left as it is.
      * <p>
-     * This is for a command line that a plugin creates. Since 2025.1, the platform lets plugins customize the
-     * environment of a process for its working directory ({@code CommandLineEnvCustomizer}) when the process starts,
-     * but it looks up the executable before that, in the PATH given to the command line only.
+     * This is for a command line that a plugin creates. The platform lets plugins customize the environment of a
+     * process for its working directory ({@code CommandLineEnvCustomizer}) when the process starts, but it looks up
+     * the executable before that, in the PATH given to the command line only.
      * {@link GeneralCommandLine#getEffectiveEnvironment()} is the environment that the process gets, with those
      * customizations, so the customizers run for the lookup, and again when the process starts. A
      * {@link WorkingDirectoryCommandLine}, which LSP4IJ creates, looks up its executable as its process starts instead,
@@ -259,7 +259,7 @@ public class CommandUtils {
     /**
      * Looks up an executable in the given PATH: the file of that name that can be executed in the first of its
      * directories which has one, as {@code PathEnvironmentVariableUtil.findInPath} does. IntelliJ 2026.3 schedules
-     * {@code findInPath} for removal, and the {@code findFirst} which replaces it doesn't exist in IntelliJ 2024.2.
+     * {@code findInPath} for removal, and the {@code findFirst} which replaces it is experimental, and new in 2026.3.
      *
      * @param executable the name of the executable, without a path.
      * @param path       the PATH to look it up in.

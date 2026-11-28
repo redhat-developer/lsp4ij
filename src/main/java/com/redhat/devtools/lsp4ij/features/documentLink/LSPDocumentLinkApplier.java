@@ -110,7 +110,6 @@ public final class LSPDocumentLinkApplier implements Disposable {
         return new HighlightsToApply(document, highlights, GROUP_ID, modificationStamp);
     }
 
-    @SuppressWarnings("deprecation")
     private void applyHighlights(@NotNull HighlightsToApply data) {
         // Check if document was modified since we collected document links
         // If modified, skip applying stale document links to avoid flicker
@@ -118,6 +117,8 @@ public final class LSPDocumentLinkApplier implements Disposable {
             return;
         }
 
+        // Deprecated since 2025.3 for BackgroundUpdateHighlightersUtil, which is experimental and applies highlights
+        // from a highlighting pass in the background, under a read action: this applies them on the EDT
         UpdateHighlightersUtil.setHighlightersToEditor(
                 project,
                 data.document,

@@ -39,7 +39,7 @@ import static com.intellij.util.PathUtil.getFileExtension;
  */
 public class IconMapper {
 
-    // Copied from IntelliJ icons. To be removed once the minimal supported version of IDEA is > 232
+    // Copied from IntelliJ icons: ExpUiIcons, which had it, no longer exists in 2025.1
     // See https://github.com/JetBrains/intellij-community/blob/50157fc8eec4af77f67bd468ada4dff39daa1b88/platform/util/ui/src/com/intellij/icons/ExpUiIcons.java#L226
     // Original light https://github.com/JetBrains/intellij-community/blob/50157fc8eec4af77f67bd468ada4dff39daa1b88/platform/icons/src/expui/fileTypes/text.svg
     // Original dark https://github.com/JetBrains/intellij-community/blob/50157fc8eec4af77f67bd468ada4dff39daa1b88/platform/icons/src/expui/fileTypes/text_dark.svg

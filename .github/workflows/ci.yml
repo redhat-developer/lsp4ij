@@ -41,7 +41,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ ubuntu-latest, windows-latest, macos-latest ]
-        # The platform version of gradle.properties
+        # The platform version of gradle.properties: IntelliJ IDEA Community 2025.1, the oldest that LSP4IJ supports
         platformVersion: [ '' ]
         include:
           # Two more releases, on Linux only, each as a job of its own that runs alongside the others:

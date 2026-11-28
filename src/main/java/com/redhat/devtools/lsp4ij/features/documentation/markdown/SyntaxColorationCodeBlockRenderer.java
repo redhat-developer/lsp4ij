@@ -11,13 +11,13 @@
 package com.redhat.devtools.lsp4ij.features.documentation.markdown;
 
 import com.intellij.lang.Language;
+import com.intellij.lang.documentation.QuickDocHighlightingHelper;
 import com.intellij.openapi.editor.highlighter.EditorHighlighter;
 import com.intellij.openapi.editor.highlighter.HighlighterIterator;
 import com.intellij.openapi.editor.markup.TextAttributes;
 import com.intellij.openapi.editor.richcopy.SyntaxInfoBuilder;
 import com.intellij.openapi.project.Project;
 import com.intellij.psi.TokenType;
-import com.redhat.devtools.lsp4ij.features.documentation.LightQuickDocHighlightingHelper;
 import com.redhat.devtools.lsp4ij.features.documentation.MarkdownConverter;
 import com.redhat.devtools.lsp4ij.internal.SimpleLanguageUtils;
 import com.redhat.devtools.lsp4ij.internal.StringUtils;
@@ -177,8 +177,9 @@ public class SyntaxColorationCodeBlockRenderer implements NodeRenderer {
 
         Language lang = getLanguage(language);
         if (lang != null) {
-            // Case 1: Highlight code block with the guessed language
-            String s = LightQuickDocHighlightingHelper.getStyledSignatureFragment(project, lang, node.getContentChars().toString());
+            // Case 1: Highlight code block with the guessed language. The code is trimmed as before: the platform
+            // only trims the line breaks around it.
+            String s = QuickDocHighlightingHelper.getStyledSignatureFragment(project, lang, node.getContentChars().toString().trim());
             html.append(s);
         } else {
             // Case 2: Try to highlight code block with TextMate
@@ -195,7 +196,7 @@ public class SyntaxColorationCodeBlockRenderer implements NodeRenderer {
     @Nullable
     private Language getLanguage(String language) {
         if(language != null && StringUtils.isNotBlank(language)) {
-            return LightQuickDocHighlightingHelper.guessLanguage(language);
+            return QuickDocHighlightingHelper.guessLanguage(language);
         }
         if (fileLanguage != null && !SimpleLanguageUtils.isSupported(fileLanguage)) {
             // It is not a TextMate language or TEXT language, use it.

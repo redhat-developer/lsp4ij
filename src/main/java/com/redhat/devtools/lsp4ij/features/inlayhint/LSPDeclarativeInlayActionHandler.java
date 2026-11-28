@@ -14,6 +14,7 @@ import com.intellij.codeInsight.hints.declarative.InlayActionHandler;
 import com.intellij.codeInsight.hints.declarative.InlayActionPayload;
 import com.intellij.codeInsight.hints.declarative.PsiPointerInlayActionPayload;
 import com.intellij.openapi.editor.Editor;
+import com.intellij.openapi.editor.event.EditorMouseEvent;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.Segment;
 import com.intellij.openapi.vfs.VirtualFile;
@@ -32,13 +33,13 @@ public class LSPDeclarativeInlayActionHandler implements InlayActionHandler {
     public static final String HANDLER_ID = "LSP4IJ";
 
     @Override
-    public void handleClick(@NotNull Editor editor, @NotNull InlayActionPayload payload) {
+    public void handleClick(@NotNull EditorMouseEvent event, @NotNull InlayActionPayload payload) {
         if (!(payload instanceof PsiPointerInlayActionPayload pointerPayload))
             return;
         var thePointer = pointerPayload.getPointer();
         if (!(thePointer instanceof LSPPayloadAction action))
             return;
-        action.onClick(editor);
+        action.onClick(event.getEditor());
     }
 
     //This is technically a hack, but it seems to be reliable enough for the time being.

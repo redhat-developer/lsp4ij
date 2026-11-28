@@ -278,7 +278,6 @@ public final class LSPDiagnosticsApplier implements Disposable {
         return new HighlightsToApply(file, document, highlights, GROUP_ID, modificationStamp);
     }
 
-    @SuppressWarnings("deprecation")
     private void applyHighlights(@NotNull HighlightsToApply data) {
         // Check if document was modified since we collected diagnostics
         // If modified, reschedule so that diagnostics are eventually applied
@@ -287,6 +286,8 @@ public final class LSPDiagnosticsApplier implements Disposable {
             return;
         }
 
+        // Deprecated since 2025.3 for BackgroundUpdateHighlightersUtil, which is experimental and applies highlights
+        // from a highlighting pass in the background, under a read action: this applies them on the EDT
         UpdateHighlightersUtil.setHighlightersToEditor(
                 project,
                 data.document,

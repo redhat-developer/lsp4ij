@@ -89,7 +89,7 @@ final class LSPServerSideOnTypeFormattingHelper {
         try {
             onTypeFormattingFutures.get(timeoutMs, TimeUnit.MILLISECONDS);
         } catch (CancellationException e) {
-            // Also a ProcessCanceledException, which extends CancellationException since IntelliJ 2024.2
+            // Also a ProcessCanceledException, which extends CancellationException
             onTypeFormattingSupport.cancel();
             return false;
         } catch (TimeoutException e) {

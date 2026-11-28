@@ -235,8 +235,8 @@ Runs a command. The task succeeds when the command exits with 0 and writes nothi
 | `outputMatches` | a [regular expression](https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/regex/Pattern.html) that the standard output of the command must match somewhere for the task to succeed, as a version, see [Output of the command](#output-of-the-command). Since LSP4IJ 0.30.2                                                                                                                                       | none: any output                          |
 
 The console of the installation shows the command after `> `, the directory it runs in, the `PATH` in which LSP4IJ looks
-it up, its output, and its exit code. The command gets the environment variables of the IDE and, since IntelliJ 2025.1,
-the environment of its working directory, as a language server does (see
+it up, its output, and its exit code. The command gets the environment variables of the IDE and the
+environment of its working directory, as a language server does (see
 [Directory-specific environment variables](./UserDefinedLanguageServer.md#directory-specific-environment-variables)),
 and LSP4IJ looks the command up in the `PATH` of that environment, so that `npm` is the one of the directory's `node`.
 

@@ -71,8 +71,8 @@ the project's directory. `${file}` and `${workspaceFolder}` get the paths that t
 isn't an existing directory is shown as a warning in the run configuration: the run still starts, and the debug adapter
 then runs in the IDE's working directory.
 
-Since IntelliJ 2025.1, a plugin can set up the environment of a process for its working directory (the
-`commandLineEnvCustomizer` extension point), as the [mise](https://mise.jdx.dev/) plugin does from a `mise.toml`, or a
+A plugin can set up the environment of a process for its working directory (the `commandLineEnvCustomizer` extension
+point), as the [mise](https://mise.jdx.dev/) plugin does from a `mise.toml`, or a
 [direnv](https://direnv.net/) plugin from an `.envrc`. The debug adapter's process gets that environment when it starts,
 and LSP4IJ looks up the debug adapter's command in its `PATH`, so that the tools which the directory selects, such as its
 version of `node`, are the ones that run.
@@ -83,7 +83,6 @@ version of `node`, are the ones that run.
 > - **Precedence**: the directory's environment is applied when the process starts, after the environment variables of the run configuration, so it wins over a variable that both set.
 > - **Windows**: with a working directory, a debug adapter's command without its extension, such as `node` or `npx`, is looked up with the extensions in `PATHEXT`, as Windows does, so that the directory's `node.exe` or `npx.cmd` starts.
 > - **Tools not bundled**: LSP4IJ doesn't bundle mise or direnv. Install the tool and its IntelliJ plugin. The mise plugin customizes the processes of other plugins only with its `useMiseInAllCommandLines` setting, which is off by default.
-> - **IntelliJ 2024.x** has no such extension point, so the environment is as before. The command is looked up as described above, also with the extensions in `PATHEXT` on Windows.
 
 ### Installer tab
 

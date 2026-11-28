@@ -17,6 +17,7 @@ import com.intellij.openapi.actionSystem.CommonDataKeys;
 import com.intellij.openapi.actionSystem.impl.SimpleDataContext;
 import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.fileEditor.FileEditorManager;
+import com.intellij.openapi.fileEditor.FileEditorManagerKeys;
 import com.intellij.openapi.fileEditor.impl.EditorWindow;
 import com.intellij.openapi.fileEditor.impl.FileEditorManagerImpl;
 import com.intellij.openapi.util.Disposer;
@@ -129,9 +130,9 @@ public class EditorWindowConnectionTest extends LSPCodeInsightFixtureTestCase {
 
         // As the drag of a tab into another window ends: it closes the editor, marked as closed to be opened again,
         // and the drop opens the file in the window only later, in a coroutine, as it does for a detached window
-        file.putUserData(FileEditorManagerImpl.CLOSING_TO_REOPEN, true);
+        file.putUserData(FileEditorManagerKeys.CLOSING_TO_REOPEN, true);
         editors.closeFile(file, source);
-        file.putUserData(FileEditorManagerImpl.CLOSING_TO_REOPEN, null);
+        file.putUserData(FileEditorManagerKeys.CLOSING_TO_REOPEN, null);
         assertFalse("the file must be in no editor until the drop opens it", editors.isFileOpen(file));
         editors.openFileWithProviders(file, false, target);
 
@@ -141,20 +142,19 @@ public class EditorWindowConnectionTest extends LSPCodeInsightFixtureTestCase {
     }
 
     /**
-     * The marker that the platform's editor manager puts on a file whose editor closes to open again is the one that
-     * LSP4IJ reads, by its name, as no public field has it in 2024.2 (#2274).
+     * The marker that the platform's editor manager puts on a file whose editor closes to open again,
+     * {@link FileEditorManagerKeys#CLOSING_TO_REOPEN}, tells LSP4IJ that the file stays open (#2274).
      */
-    @SuppressWarnings("deprecation")
     public void testTheMarkerOfTheEditorManagerTellsThatAnEditorClosesToReopen() {
         var file = otherFile();
         assertFalse("a file without the marker must not be closing to reopen",
                 ConnectDocumentToLanguageServerSetupParticipant.isClosingToReopen(file));
-        file.putUserData(FileEditorManagerImpl.CLOSING_TO_REOPEN, true);
+        file.putUserData(FileEditorManagerKeys.CLOSING_TO_REOPEN, true);
         try {
             assertTrue("the marker of the platform's editor manager must tell that the editor closes to reopen",
                     ConnectDocumentToLanguageServerSetupParticipant.isClosingToReopen(file));
         } finally {
-            file.putUserData(FileEditorManagerImpl.CLOSING_TO_REOPEN, null);
+            file.putUserData(FileEditorManagerKeys.CLOSING_TO_REOPEN, null);
         }
         assertFalse("a file whose marker is removed must not be closing to reopen",
                 ConnectDocumentToLanguageServerSetupParticipant.isClosingToReopen(file));

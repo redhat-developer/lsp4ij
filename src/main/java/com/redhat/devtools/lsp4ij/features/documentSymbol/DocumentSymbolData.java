@@ -117,8 +117,7 @@ public class DocumentSymbolData extends FakePsiElement {
     }
 
     // Still calls the deprecated matchesPsiElement, so that a client that overrides it keeps its behaviour until it is
-    // removed
-    @SuppressWarnings("removal")
+    // removed (#2285)
     @Override
     public boolean equals(Object o) {
         if (o == null) {
