@@ -22,12 +22,15 @@ import org.eclipse.lsp4j.DiagnosticSeverity;
 import org.eclipse.lsp4j.Position;
 import org.eclipse.lsp4j.Range;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
+import org.eclipse.lsp4j.util.Ranges;
 
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.IntStream;
+import java.util.stream.Stream;
 
 /**
  * Tests for {@link LSPDiagnosticsForServer}.
@@ -94,6 +97,55 @@ public class LSPDiagnosticsForServerTest extends LSPCodeInsightFixtureTestCase {
         // As many diagnostics as before, each of them known, but bar is gone
         assertTrue("A removed diagnostic is a change", diagnostics.update("test", List.of(foo, foo)));
         assertTrue("The removed diagnostic has no quick fixes", diagnostics.getQuickFixesFor(bar, file).isEmpty());
+    }
+
+    public void testManyDiagnosticsWithNestedOverlappingAndEqualRangesAreAllKept() throws Exception {
+        PsiFile file = myFixture.configureByText("test.ts", "const foo = 1;");
+        LanguageServerItem languageServer = getLanguageServer(file);
+        var diagnostics = new LSPDiagnosticsForServer(languageServer, file.getVirtualFile(), null);
+        List<Diagnostic> published = manyDiagnostics();
+
+        assertTrue(diagnostics.update("test", published));
+
+        assertSameElements(diagnostics.getDiagnostics(), published);
+    }
+
+    public void testADiagnosticComesBeforeTheDiagnosticsWhoseRangeItsRangeContains() {
+        List<Diagnostic> sorted = manyDiagnostics().stream()
+                .sorted(LSPDiagnosticsForServer.CONTAINING_RANGE_FIRST)
+                .toList();
+        for (int i = 0; i < sorted.size(); i++) {
+            for (int j = i + 1; j < sorted.size(); j++) {
+                Range earlier = sorted.get(i).getRange();
+                Range later = sorted.get(j).getRange();
+                assertFalse(later + " contains " + earlier + ", so it must come first",
+                        Ranges.containsRange(later, earlier) && !later.equals(earlier));
+            }
+        }
+
+        // Whichever of the two comes first in the list
+        Diagnostic outer = diagnostic(0, 10, "outer");
+        Diagnostic inner = diagnostic(2, 5, "inner");
+        assertEquals(List.of(outer, inner),
+                Stream.of(inner, outer).sorted(LSPDiagnosticsForServer.CONTAINING_RANGE_FIRST).toList());
+        assertEquals(List.of(outer, inner),
+                Stream.of(outer, inner).sorted(LSPDiagnosticsForServer.CONTAINING_RANGE_FIRST).toList());
+    }
+
+    /**
+     * Returns 32 diagnostics of one line whose ranges are as a language server may publish them: nested, equal,
+     * overlapping, apart and empty. Sorted by the containment of their ranges alone, as the diagnostics were, their sort
+     * fails with "Comparison method violates its general contract!" (#2323).
+     */
+    private static List<Diagnostic> manyDiagnostics() {
+        int[][] ranges = {
+                {33, 33}, {13, 13}, {6, 12}, {37, 45}, {21, 25}, {3, 12}, {31, 39}, {15, 15}, {6, 9}, {13, 21}, {13, 22},
+                {35, 43}, {15, 24}, {14, 14}, {28, 28}, {28, 30}, {32, 38}, {37, 42}, {30, 30}, {35, 38}, {19, 26},
+                {32, 34}, {28, 37}, {38, 42}, {1, 4}, {25, 26}, {11, 16}, {1, 10}, {8, 10}, {28, 36}, {0, 4}, {16, 25}
+        };
+        return IntStream.range(0, ranges.length)
+                .mapToObj(i -> diagnostic(ranges[i][0], ranges[i][1], "diagnostic " + i))
+                .toList();
     }
 
     private LanguageServerItem getLanguageServer(PsiFile file) throws Exception {
