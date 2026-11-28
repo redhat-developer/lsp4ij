@@ -13,29 +13,39 @@ package com.redhat.devtools.lsp4ij.dap.client;
 import com.intellij.xdebugger.XDebugSession;
 import com.intellij.xdebugger.frame.XSuspendContext;
 import org.eclipse.lsp4j.debug.ContinuedEventArguments;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Proxy;
-import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * A 'continued' event shows the program as running: the session resumes when it is suspended at a stop of the client
  * which received the event, and the event continued the thread of that stop. A 'continued' event of another thread
  * leaves the session suspended, and shows the threads again. A stop whose thread continued while the session was
- * being suspended there doesn't stay suspended.
+ * being suspended there doesn't stay suspended. The resume doesn't interleave with the suspension at another stop.
  */
 public class DAPClientContinuedTest {
 
     private static final int STOPPED_THREAD = 1;
     private static final int OTHER_THREAD = 2;
+    private static final long BOUND_SECONDS = 30;
 
-    private final List<String> calls = new ArrayList<>();
+    private final DAPSessionChanges sessionChanges = new DAPSessionChanges();
+    private final List<String> calls = new CopyOnWriteArrayList<>();
     // The suspend context of a stop of the client which receives the events
     private final XSuspendContext ownStop = new XSuspendContext() {
     };
@@ -45,7 +55,8 @@ public class DAPClientContinuedTest {
 
     @Test
     void resumesWhenAllThreadsContinued() {
-        assertTrue(DAPClient.continued(session(true, ownStop), event(OTHER_THREAD, true), this::stoppedThread, this::refreshThreads));
+        DAPClient.continued(session(true, ownStop), sessionChanges, event(OTHER_THREAD, true),
+                this::stoppedThread, this::refreshThreads);
 
         assertEquals(List.of("resumed"), calls);
     }
@@ -53,21 +64,24 @@ public class DAPClientContinuedTest {
     @Test
     void resumesWhenTheEventDoesNotSayWhetherAllThreadsContinued() {
         // DAP: "If omitted or set to `true`, this event signals to the client that all threads have been resumed."
-        assertTrue(DAPClient.continued(session(true, ownStop), event(OTHER_THREAD, null), this::stoppedThread, this::refreshThreads));
+        DAPClient.continued(session(true, ownStop), sessionChanges, event(OTHER_THREAD, null),
+                this::stoppedThread, this::refreshThreads);
 
         assertEquals(List.of("resumed"), calls);
     }
 
     @Test
     void resumesWhenTheStoppedThreadContinuedAlone() {
-        assertTrue(DAPClient.continued(session(true, ownStop), event(STOPPED_THREAD, false), this::stoppedThread, this::refreshThreads));
+        DAPClient.continued(session(true, ownStop), sessionChanges, event(STOPPED_THREAD, false),
+                this::stoppedThread, this::refreshThreads);
 
         assertEquals(List.of("resumed"), calls);
     }
 
     @Test
     void staysSuspendedAndShowsTheThreadsAgainWhenAnotherThreadContinuedAlone() {
-        assertFalse(DAPClient.continued(session(true, ownStop), event(OTHER_THREAD, false), this::stoppedThread, this::refreshThreads));
+        DAPClient.continued(session(true, ownStop), sessionChanges, event(OTHER_THREAD, false),
+                this::stoppedThread, this::refreshThreads);
 
         assertEquals(List.of("threads"), calls);
     }
@@ -75,8 +89,10 @@ public class DAPClientContinuedTest {
     @Test
     void staysSuspendedAtAStopOfAnotherClient() {
         // a worker's 'continued' doesn't resume a session suspended in the page's session
-        assertFalse(DAPClient.continued(session(true, otherClientStop), event(STOPPED_THREAD, true), this::stoppedThread, this::refreshThreads));
-        assertFalse(DAPClient.continued(session(true, otherClientStop), event(STOPPED_THREAD, false), this::stoppedThread, this::refreshThreads));
+        DAPClient.continued(session(true, otherClientStop), sessionChanges, event(STOPPED_THREAD, true),
+                this::stoppedThread, this::refreshThreads);
+        DAPClient.continued(session(true, otherClientStop), sessionChanges, event(STOPPED_THREAD, false),
+                this::stoppedThread, this::refreshThreads);
 
         assertEquals(List.of(), calls);
     }
@@ -84,10 +100,36 @@ public class DAPClientContinuedTest {
     @Test
     void doesNothingWhenTheSessionIsNotSuspended() {
         // as after a resume or a step of the session itself, which the debug adapter may follow with 'continued'
-        assertFalse(DAPClient.continued(session(false, null), event(STOPPED_THREAD, true), this::stoppedThread, this::refreshThreads));
-        assertFalse(DAPClient.continued(session(false, null), event(OTHER_THREAD, false), this::stoppedThread, this::refreshThreads));
+        DAPClient.continued(session(false, null), sessionChanges, event(STOPPED_THREAD, true),
+                this::stoppedThread, this::refreshThreads);
+        DAPClient.continued(session(false, null), sessionChanges, event(OTHER_THREAD, false),
+                this::stoppedThread, this::refreshThreads);
 
         assertEquals(List.of(), calls);
+    }
+
+    @Test
+    void aStopOfAnotherThreadWhichComesWhileTheEventResumesTheSessionSuspendsItAfterwardsAndTheSessionStaysThere() {
+        // The stop of the other thread, which the event doesn't continue
+        var otherThreadStop = new XSuspendContext() {
+        };
+        var context = new AtomicReference<>(ownStop);
+        var stopCame = new AtomicBoolean();
+        var session = new AtomicReference<XDebugSession>();
+        session.set(session(context, () -> {
+            if (stopCame.compareAndSet(false, true)) {
+                // The other thread stopped before the event came, and the client has its frames on another thread
+                // while the event resumes the session: that thread doesn't wait
+                await(CompletableFuture.runAsync(() -> sessionChanges.execute(
+                        () -> session.get().positionReached(otherThreadStop))), "the thread of the stop returns");
+            }
+        }));
+
+        DAPClient.continued(session.get(), sessionChanges, event(STOPPED_THREAD, false), this::stoppedThread,
+                this::refreshThreads);
+
+        assertEquals(List.of("resumed", "suspended"), calls);
+        assertSame(otherThreadStop, context.get(), "the session stays at the stop of the other thread");
     }
 
     @Test
@@ -149,5 +191,38 @@ public class DAPClientContinuedTest {
                     }
                     default -> throw new UnsupportedOperationException(method.getName());
                 });
+    }
+
+    /**
+     * Returns a debug session suspended at the given suspend context, or running for null, which positionReached()
+     * suspends, and which sessionResumed() resumes once it ran the given runnable.
+     */
+    private XDebugSession session(@NotNull AtomicReference<@Nullable XSuspendContext> context,
+                                  @NotNull Runnable resuming) {
+        return (XDebugSession) Proxy.newProxyInstance(XDebugSession.class.getClassLoader(), new Class<?>[]{XDebugSession.class},
+                (proxy, method, args) -> switch (method.getName()) {
+                    case "isSuspended" -> context.get() != null;
+                    case "getSuspendContext" -> context.get();
+                    case "positionReached" -> {
+                        calls.add("suspended");
+                        context.set((XSuspendContext) args[0]);
+                        yield null;
+                    }
+                    case "sessionResumed" -> {
+                        resuming.run();
+                        calls.add("resumed");
+                        context.set(null);
+                        yield null;
+                    }
+                    default -> throw new UnsupportedOperationException(method.getName());
+                });
+    }
+
+    private static void await(@NotNull CompletableFuture<?> future, @NotNull String what) {
+        try {
+            future.get(BOUND_SECONDS, TimeUnit.SECONDS);
+        } catch (InterruptedException | ExecutionException | TimeoutException e) {
+            throw new AssertionError(what, e);
+        }
     }
 }

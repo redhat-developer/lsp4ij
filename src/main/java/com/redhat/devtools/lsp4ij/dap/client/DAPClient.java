@@ -178,9 +178,9 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
     // events of the debug adapter and the requests of the session which resume the program swap
     private final AtomicReference<DAPThreadRunStates> threadRunStates = new AtomicReference<>(DAPThreadRunStates.INITIAL);
     // The changes of the debug session which must not interleave: the suspension at a stop, the resume once the debug
-    // adapter accepted a request which IntelliJ doesn't resume the session for (resumeWhenAnswered), and the
-    // suspension again once it refused one which IntelliJ resumed the session for (suspendAgain). The clients of a tree
-    // of DAP sessions ('startDebugging') share them, as they share the session
+    // adapter accepted a request which IntelliJ doesn't resume the session for (resumeWhenAnswered), the suspension
+    // again once it refused one which IntelliJ resumed the session for (suspendAgain), and the resume at a 'continued'
+    // event (continued). The clients of a tree of DAP sessions ('startDebugging') share them, as they share the session
     private final DAPSessionChanges sessionChanges;
     // Whether the last request that resumed the program was a step that resumed only its thread. A breakpoint which
     // doesn't suspend then resumes only the stopped thread, so the threads the step kept stopped stay stopped.
@@ -2183,7 +2183,7 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
         // The Threads tab shows the thread which continued, or all threads, as running. Before the session is looked
         // at: the Frames view then shows no frames for a thread which continued alone
         updateThreadRunStates(states -> states.continued(args));
-        continued(getSession(), args, this::getStoppedThreadId, () -> {
+        continued(getSession(), sessionChanges, args, this::getStoppedThreadId, () -> {
             getThreads(true);
             // The Frames view asks again for the frames of the stack which it shows, and forgets those of the others,
             // such as the frames of the stop of the thread which continued
@@ -2241,35 +2241,43 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
      * <p>
      * The debug adapter isn't asked to resume the program: {@link XDebugSession#sessionResumed()} only clears the views
      * of the stop, and does nothing when the session isn't suspended, as after a resume or a step of the session itself.
+     * <p>
+     * This is a change of the session ({@link DAPSessionChanges}), as the suspension at a stop is, so that they don't
+     * interleave. Another stop which the event didn't continue, such as one of another thread or of a child session,
+     * and which suspends the session while the session is looked at, then suspends it once the event resumed it, and
+     * the session stays at that stop. Otherwise, the event could resume the session right after that stop suspended it,
+     * and the session would show the program running although it is stopped there.
      *
      * @param session        the debug session.
+     * @param sessionChanges the changes of the debug session.
      * @param args           the 'continued' event.
      * @param stoppedThread  returns the DAP thread which stopped at a suspend context of the client which received the
      *                       event, and null for no suspend context or one of another client, such as the stop of
      *                       another session of a tree ('startDebugging').
      * @param refreshThreads shows the threads of the client again, and the views of the stop, where a selection of the
      *                       thread which continued moves to the thread of the stop.
-     * @return true if the session resumed and false otherwise.
      */
-    static boolean continued(@NotNull XDebugSession session,
-                             @NotNull ContinuedEventArguments args,
-                             @NotNull Function<@Nullable XSuspendContext, @Nullable Integer> stoppedThread,
-                             @NotNull Runnable refreshThreads) {
-        if (!session.isSuspended()) {
-            return false;
-        }
-        Integer threadId = stoppedThread.apply(session.getSuspendContext());
-        if (threadId == null) {
-            // The session shows a stop of another client, which this event doesn't continue
-            return false;
-        }
-        if (continues(args, threadId)) {
-            session.sessionResumed();
-            return true;
-        }
-        // Another thread continued, and the thread where the session is suspended stays stopped
-        refreshThreads.run();
-        return false;
+    static void continued(@NotNull XDebugSession session,
+                          @NotNull DAPSessionChanges sessionChanges,
+                          @NotNull ContinuedEventArguments args,
+                          @NotNull Function<@Nullable XSuspendContext, @Nullable Integer> stoppedThread,
+                          @NotNull Runnable refreshThreads) {
+        sessionChanges.execute(() -> {
+            if (!session.isSuspended()) {
+                return;
+            }
+            Integer threadId = stoppedThread.apply(session.getSuspendContext());
+            if (threadId == null) {
+                // The session shows a stop of another client, which this event doesn't continue
+                return;
+            }
+            if (continues(args, threadId)) {
+                session.sessionResumed();
+                return;
+            }
+            // Another thread continued, and the thread where the session is suspended stays stopped
+            refreshThreads.run();
+        });
     }
 
     /**
