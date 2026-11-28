@@ -177,9 +177,10 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
     // Whether each thread runs, is stopped or has exited, which the Threads tab shows: immutable run states, which the
     // events of the debug adapter and the requests of the session which resume the program swap
     private final AtomicReference<DAPThreadRunStates> threadRunStates = new AtomicReference<>(DAPThreadRunStates.INITIAL);
-    // The changes of the debug session which must not interleave: the suspension at a stop, and the resume once the
-    // debug adapter accepted a request which IntelliJ doesn't resume the session for (resumeWhenAnswered). The clients
-    // of a tree of DAP sessions ('startDebugging') share them, as they share the session
+    // The changes of the debug session which must not interleave: the suspension at a stop, the resume once the debug
+    // adapter accepted a request which IntelliJ doesn't resume the session for (resumeWhenAnswered), and the
+    // suspension again once it refused one which IntelliJ resumed the session for (suspendAgain). The clients of a tree
+    // of DAP sessions ('startDebugging') share them, as they share the session
     private final DAPSessionChanges sessionChanges;
     // Whether the last request that resumed the program was a step that resumed only its thread. A breakpoint which
     // doesn't suspend then resumes only the stopped thread, so the threads the step kept stopped stay stopped.
@@ -1623,7 +1624,7 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
         if (executionEpoch.resumeRefused(resuming.endedEpoch()) && context != null) {
             // "Run to Cursor" ends at this stop, as at any other, rather than at a later one
             debugProcess.getRunToCursorBreakpoint().stopped();
-            suspendAgain(getSession(), context);
+            suspendAgain(getSession(), sessionChanges, context);
         }
     }
 
@@ -1633,17 +1634,26 @@ public class DAPClient implements IDebugProtocolClient, Disposable {
      * suspend it at a breakpoint which doesn't suspend. Resume Program and the steps then work again, and the frames
      * and values of the stop are shown. A session which ended, or which another stop suspended meanwhile, is left as it
      * is.
+     * <p>
+     * This is a change of the session ({@link DAPSessionChanges}), as the suspension at a stop is, so that they don't
+     * interleave. Another stop, such as one of another thread or of a child session, which suspends the session while
+     * the session is looked at, then suspends it once it is suspended again here, and the session stays at that stop,
+     * where the program is now. Otherwise, the session could be suspended again here right after that stop suspended
+     * it, and would show the stop of the refused request instead.
      *
-     * @param session the debug session.
-     * @param context the suspend context of the stop where the program is.
-     * @return true if the session is suspended at the given suspend context again, and false otherwise.
+     * @param session        the debug session.
+     * @param sessionChanges the changes of the debug session.
+     * @param context        the suspend context of the stop where the program is.
      */
-    static boolean suspendAgain(@NotNull XDebugSession session, @NotNull XSuspendContext context) {
-        if (session.isStopped() || session.getSuspendContext() != null) {
-            return false;
-        }
-        session.positionReached(context);
-        return true;
+    static void suspendAgain(@NotNull XDebugSession session,
+                             @NotNull DAPSessionChanges sessionChanges,
+                             @NotNull XSuspendContext context) {
+        sessionChanges.execute(() -> {
+            if (session.isStopped() || session.getSuspendContext() != null) {
+                return;
+            }
+            session.positionReached(context);
+        });
     }
 
     public void next(int threadId, @Nullable SteppingGranularity granularity) {
