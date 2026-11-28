@@ -27,9 +27,11 @@ import java.util.concurrent.atomic.AtomicInteger;
  * A stop suspends the session on the thread which got its frames, while the answer to a request which IntelliJ doesn't
  * resume the session for, such as 'reverseContinue', resumes it on the thread which handles the answer, which may be
  * the EDT. Interleaved, the resume can undo the stop, and the session then shows the program running although it is
- * stopped. A lock would make one of these threads wait for the other, while the other runs the listeners of the
- * session, which may wait for the EDT, as a synchronous refresh of the VFS does when the position of a frame is first
- * computed, or for LSP4J's thread: here no thread waits for another.
+ * stopped. The refusal of a request which IntelliJ resumed the session for, which suspends the session again at the
+ * stop of the request, can replace a newer stop in the same way. A lock would make one of these threads wait for the
+ * other, while the other runs the listeners of the session, which may wait for the EDT, as a synchronous refresh of
+ * the VFS does when the position of a frame is first computed, or for LSP4J's thread: here no thread waits for
+ * another.
  * <p>
  * The clients of a tree of DAP sessions ('startDebugging') share the debug session, and so share these changes.
  * <p>
