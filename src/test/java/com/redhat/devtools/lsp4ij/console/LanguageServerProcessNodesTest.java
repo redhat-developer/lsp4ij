@@ -42,6 +42,7 @@ import com.redhat.devtools.lsp4ij.console.explorer.LanguageServerTreeNode;
 import com.redhat.devtools.lsp4ij.features.workspaceFolder.WorkspaceFolderStrategy;
 import com.redhat.devtools.lsp4ij.fixtures.LSPCodeInsightFixtureTestCase;
 import com.redhat.devtools.lsp4ij.internal.CancellationSupport;
+import com.redhat.devtools.lsp4ij.lifecycle.LanguageServerLifecycleListener;
 import com.redhat.devtools.lsp4ij.lifecycle.LanguageServerLifecycleManager;
 import com.redhat.devtools.lsp4ij.mock.MockConnectionProvider;
 import com.redhat.devtools.lsp4ij.mock.MockLanguageServer;
@@ -57,8 +58,10 @@ import com.redhat.devtools.lsp4ij.templates.ServerMappingSettings;
 import org.eclipse.lsp4j.MessageParams;
 import org.eclipse.lsp4j.MessageType;
 import org.eclipse.lsp4j.WorkspaceFolder;
+import org.eclipse.lsp4j.jsonrpc.MessageConsumer;
 import org.eclipse.lsp4j.jsonrpc.json.MessageJsonHandler;
 import org.eclipse.lsp4j.jsonrpc.json.StreamMessageConsumer;
+import org.eclipse.lsp4j.jsonrpc.messages.Message;
 import org.eclipse.lsp4j.jsonrpc.messages.NotificationMessage;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -584,17 +587,49 @@ public class LanguageServerProcessNodesTest extends LSPCodeInsightFixtureTestCas
                 notifications.add(notification);
             }
         });
-        definition.cannotStart = true;
-        var failing = instance("c");
-        failing.restart();
-        PlatformTestUtil.waitWithEventsDispatching("The start must fail with a notification",
-                () -> ContainerUtil.exists(notifications, n -> "Cannot start server".equals(n.getSubtitle())), TIMEOUT);
-        var notification = ContainerUtil.find(notifications, n -> "Cannot start server".equals(n.getSubtitle()));
-        assertFalse(notification.isExpired());
+        // The failed start shows its notification, keeps it, and then reports its error. A dispose before it keeps the
+        // notification is the case of testACannotStartNotificationShownWhileItsLanguageServerIsDisposedExpires
+        List<LanguageServerWrapper> failed = new CopyOnWriteArrayList<>();
+        var lifecycleManager = LanguageServerLifecycleManager.getInstance(project);
+        var listener = new LanguageServerLifecycleListener() {
+            @Override
+            public void handleStatusChanged(@NotNull LanguageServerWrapper languageServer) {
+            }
 
-        Disposer.dispose(failing);
+            @Override
+            public void handleLSPMessage(@NotNull Message message,
+                                         @NotNull MessageConsumer messageConsumer,
+                                         @NotNull LanguageServerWrapper languageServer) {
+            }
 
-        assertTrue(notification.isExpired());
+            @Override
+            public void handleError(@NotNull LanguageServerWrapper languageServer, @NotNull Throwable exception) {
+                failed.add(languageServer);
+            }
+
+            @Override
+            public void dispose() {
+            }
+        };
+        lifecycleManager.addLanguageServerLifecycleListener(listener);
+        try {
+            definition.cannotStart = true;
+            var failing = instance("c");
+            failing.restart();
+            PlatformTestUtil.waitWithEventsDispatching(
+                    "The start must fail with a notification, which its language server keeps",
+                    () -> failed.contains(failing)
+                            && ContainerUtil.exists(notifications, n -> "Cannot start server".equals(n.getSubtitle())),
+                    TIMEOUT);
+            var notification = ContainerUtil.find(notifications, n -> "Cannot start server".equals(n.getSubtitle()));
+            assertFalse(notification.isExpired());
+
+            Disposer.dispose(failing);
+
+            assertTrue("The dispose must expire the notification", notification.isExpired());
+        } finally {
+            lifecycleManager.removeLanguageServerLifecycleListener(listener);
+        }
     }
 
     public void testACannotStartNotificationShownWhileItsLanguageServerIsDisposedExpires() {
