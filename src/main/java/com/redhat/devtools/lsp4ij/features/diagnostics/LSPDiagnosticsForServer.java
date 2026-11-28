@@ -32,6 +32,7 @@ import org.jetbrains.annotations.Nullable;
 import java.util.*;
 
 import static com.redhat.devtools.lsp4ij.features.diagnostics.LSPDiagnosticUtils.isDiagnosticsChanged;
+import static com.redhat.devtools.lsp4ij.features.diagnostics.LSPDiagnosticUtils.withRange;
 
 /**
  * LSP diagnostics holder for a file reported by a language server. This class holds:
@@ -85,13 +86,16 @@ public class LSPDiagnosticsForServer {
     }
 
     /**
-     * Update the new LSP published diagnostics.
+     * Update the new LSP published diagnostics. A diagnostic without a range is ignored
+     * ({@link LSPDiagnosticUtils#withRange(List)}).
      *
      * @param identifier the diagnostic identifier
-     * @param diagnostics the new LSP published/pulled diagnostics
+     * @param reported the new LSP published/pulled diagnostics
      */
     public boolean update(@NotNull String identifier,
-                          @NotNull List<Diagnostic> diagnostics) {
+                          @NotNull List<Diagnostic> reported) {
+        // A diagnostic without a range can't be placed in the file, nor grouped by covered range
+        List<Diagnostic> diagnostics = withRange(reported);
         if (diagnosticsPerIdentifier == null) {
             // At this step there are
             // - no cached diagnostics

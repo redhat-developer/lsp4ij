@@ -13,6 +13,7 @@
  *******************************************************************************/
 package com.redhat.devtools.lsp4ij;
 
+import com.redhat.devtools.lsp4ij.features.diagnostics.LSPDiagnosticUtils;
 import org.eclipse.lsp4j.Diagnostic;
 import org.eclipse.lsp4j.DiagnosticSeverity;
 import org.jetbrains.annotations.NotNull;
@@ -24,6 +25,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 import static com.redhat.devtools.lsp4ij.features.diagnostics.LSPDiagnosticUtils.isDiagnosticsChanged;
+import static com.redhat.devtools.lsp4ij.features.diagnostics.LSPDiagnosticUtils.withRange;
 
 /**
  * LSP closed document for a given language server.
@@ -38,17 +40,20 @@ public class ClosedDocument extends LSPDocumentBase {
 
     /**
      * Replaces one provider's diagnostics in this closed document's cache.
-     * Diagnostics from other providers are retained.
+     * Diagnostics from other providers are retained. A diagnostic without a range
+     * is ignored ({@link LSPDiagnosticUtils#withRange(List)}).
      *
      * @param identifier  the diagnostic provider's cache identifier
-     * @param diagnostics the replacement diagnostics; an empty list removes
+     * @param reported    the replacement diagnostics; an empty list removes
      *                    this provider's diagnostics
      * @param version     the report's version, ignored for closed files
      * @return {@code true} if the merged diagnostic list changed
      */
     @Override
     public synchronized boolean updateDiagnostics(@NotNull String identifier,
-                                     @NotNull List<Diagnostic> diagnostics, @Nullable Integer version) {
+                                     @NotNull List<Diagnostic> reported, @Nullable Integer version) {
+        // As for an opened document: a diagnostic without a range can't be placed in the file
+        List<Diagnostic> diagnostics = withRange(reported);
         if (diagnostics.isEmpty()) {
             diagnosticsPerIdentifier.remove(identifier);
         } else {
