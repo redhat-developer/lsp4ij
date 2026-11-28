@@ -24,6 +24,7 @@ import org.eclipse.lsp4j.Range;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
 import org.eclipse.lsp4j.util.Ranges;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
@@ -110,6 +111,21 @@ public class LSPDiagnosticsForServerTest extends LSPCodeInsightFixtureTestCase {
         assertSameElements(diagnostics.getDiagnostics(), published);
     }
 
+    public void testADiagnosticWithoutARangeIsIgnoredAndTheOthersAreKept() throws Exception {
+        PsiFile file = myFixture.configureByText("test.ts", "const foo = 1; const bar = 2;");
+        LanguageServerItem languageServer = getLanguageServer(file);
+        var diagnostics = new LSPDiagnosticsForServer(languageServer, file.getVirtualFile(), null);
+        Diagnostic foo = diagnostic(6, 9, "'foo' is declared but its value is never read.");
+        Diagnostic bar = diagnostic(21, 24, "'bar' is declared but its value is never read.");
+        List<Diagnostic> published = Arrays.asList(foo, errorWithoutRange(), null, errorWithoutStart(), bar);
+
+        assertTrue(diagnostics.update("test", published));
+
+        assertSameElements(diagnostics.getDiagnostics(), foo, bar);
+        assertFalse("An error without a range isn't one of the file", diagnostics.hasErrors());
+        assertFalse("The same list again is no change", diagnostics.update("test", published));
+    }
+
     public void testADiagnosticComesBeforeTheDiagnosticsWhoseRangeItsRangeContains() {
         List<Diagnostic> sorted = manyDiagnostics().stream()
                 .sorted(LSPDiagnosticsForServer.CONTAINING_RANGE_FIRST)
@@ -146,6 +162,28 @@ public class LSPDiagnosticsForServerTest extends LSPCodeInsightFixtureTestCase {
         return IntStream.range(0, ranges.length)
                 .mapToObj(i -> diagnostic(ranges[i][0], ranges[i][1], "diagnostic " + i))
                 .toList();
+    }
+
+    /**
+     * Returns an error without a range, which LSP requires, as a language server may publish it. LSP4J's constructors
+     * and setters refuse null, but its JSON parser doesn't.
+     */
+    static Diagnostic errorWithoutRange() {
+        Diagnostic diagnostic = new Diagnostic();
+        diagnostic.setMessage("an error without a range");
+        diagnostic.setSeverity(DiagnosticSeverity.Error);
+        return diagnostic;
+    }
+
+    /**
+     * Returns an error whose range has an end and no start.
+     */
+    static Diagnostic errorWithoutStart() {
+        Range range = new Range();
+        range.setEnd(new Position(0, 3));
+        Diagnostic diagnostic = new Diagnostic(range, "an error without the start of its range");
+        diagnostic.setSeverity(DiagnosticSeverity.Error);
+        return diagnostic;
     }
 
     private LanguageServerItem getLanguageServer(PsiFile file) throws Exception {

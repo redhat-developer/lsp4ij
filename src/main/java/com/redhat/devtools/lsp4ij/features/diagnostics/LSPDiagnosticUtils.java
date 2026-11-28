@@ -22,6 +22,7 @@ import com.redhat.devtools.lsp4ij.*;
 import com.redhat.devtools.lsp4ij.client.features.FileUriSupport;
 import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures;
 import org.eclipse.lsp4j.Diagnostic;
+import org.eclipse.lsp4j.Range;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.jetbrains.concurrency.CancellablePromise;
@@ -57,6 +58,25 @@ public class LSPDiagnosticUtils {
         // Compare the contents as sets: a published list can repeat a diagnostic, so equal sizes
         // with every new diagnostic among the old ones do not mean that none was removed
         return !new HashSet<>(oldDiagnostics).equals(new HashSet<>(newDiagnostics));
+    }
+
+    /**
+     * Returns the given diagnostics which have a range, with a start and an end. LSP requires a range, but a language
+     * server may leave it out, or send a null diagnostic: such a diagnostic can't be placed in the file, so it is
+     * ignored, as one whose range doesn't fit the document already is when it is shown.
+     *
+     * @param diagnostics the diagnostics which a language server reported.
+     * @return the given list when each diagnostic has a range, and otherwise the diagnostics which have one.
+     */
+    public static @NotNull List<Diagnostic> withRange(@NotNull List<Diagnostic> diagnostics) {
+        return diagnostics.stream().allMatch(LSPDiagnosticUtils::hasRange)
+                ? diagnostics
+                : diagnostics.stream().filter(LSPDiagnosticUtils::hasRange).toList();
+    }
+
+    private static boolean hasRange(@Nullable Diagnostic diagnostic) {
+        Range range = diagnostic != null ? diagnostic.getRange() : null;
+        return range != null && range.getStart() != null && range.getEnd() != null;
     }
 
     /**
